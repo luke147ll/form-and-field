@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Takeoff Dashboard v6</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e;color:#cdd6f4;overflow:hidden;display:flex;flex-direction:column;height:100vh}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#181825}::-webkit-scrollbar-thumb{background:#45475a;border-radius:4px}
+
+/* HEADER */
+.header{background:#181825;border-bottom:1px solid #313244;padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.header h1{font-size:13px;font-weight:700;color:#cba6f7;white-space:nowrap}
+.hb{padding:3px 8px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:11px;white-space:nowrap;font-family:inherit}
+.hb:hover{background:#45475a}.hb.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
+.hb.grn{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1}
+.hb.yel{background:#f9e2af;color:#1e1e2e;border-color:#f9e2af}
+.sep{width:1px;height:18px;background:#45475a}
+
+/* SUMMARY */
+.summary{background:#181825;border-bottom:1px solid #313244;padding:4px 12px;display:flex;gap:14px;flex-wrap:wrap;flex-shrink:0;font-size:11px}
+.sb{display:flex;align-items:center;gap:4px}.sb b{color:#89b4fa}.sb .e{color:#f38ba8}
+
+/* BULK BAR */
+.bulk{padding:5px 10px;background:#2d2040;border-bottom:1px solid #cba6f7;display:none;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;font-size:11px}
+.bulk.show{display:flex}
+.bulk .cnt{color:#cba6f7;font-weight:600;margin-right:4px}
+.bulk input,.bulk select{background:#313244;border:1px solid #45475a;color:#cdd6f4;font-size:11px;border-radius:3px;padding:2px 4px;font-family:inherit}
+.bulk input[type=text]{width:70px}
+.bulk select{max-width:130px}
+.bulk label{color:#a6adc8}
+
+/* MULTI-ISOLATE PANEL */
+#catPanel{display:none;background:#181825;border-bottom:1px solid #313244;padding:6px 12px;flex-shrink:0;max-height:180px;overflow-y:auto}
+#catPanel.show{display:block}
+.cpRow{display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0;font-size:11px;cursor:pointer}
+.cpRow:hover{color:#cdd6f4}
+.cpRow input{cursor:pointer}
+.cpBtn{margin-top:6px;display:flex;gap:5px;flex-wrap:wrap}
+
+/* FILTER BAR */
+.fbar{padding:5px 10px;background:#181825;border-bottom:1px solid #313244;display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.fbar input[type=text],.fbar select{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 5px;font-size:11px;font-family:inherit}
+.fbar input[type=text]{width:140px}.fbar select{max-width:140px}
+.fbar label{font-size:11px;color:#a6adc8}
+
+/* MAIN SCROLLABLE */
+.tp{flex:1;overflow:auto;padding:0}
+
+/* CATEGORY GROUPS */
+.cg{border-bottom:1px solid #252535}
+.cgh{padding:5px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;background:#1a1a2e;user-select:none}
+.cgh:hover{background:#222236}
+.cgh .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:9px;width:12px}
+.cgh.closed .arr{transform:rotate(-90deg)}
+.cgh .cname{font-weight:600;font-size:11px;border-radius:3px;padding:1px 7px;color:#1e1e2e;background:#7f849c}
+.cgh .cinfo{color:#89b4fa;font-size:11px;font-weight:600;margin-left:auto;white-space:nowrap}
+.cgh .cact{display:flex;gap:3px;align-items:center;margin-left:8px}
+.cgb{display:none}
+.cg.open .cgb{display:block}
+
+/* EYE TOGGLE */
+.ey{background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:#a6adc8;font-family:inherit;line-height:1}
+.ey:hover{color:#cdd6f4}
+.ey.off{color:#45475a}
+
+/* ACTION BUTTONS */
+.ab{padding:1px 5px;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap}
+.ab:hover{background:#45475a;border-color:#89b4fa}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:#262637;color:#a6adc8;padding:3px 5px;text-align:left;font-weight:600;border-bottom:1px solid #45475a;white-space:nowrap;font-size:10px;position:sticky;top:0;z-index:4}
+td{padding:2px 5px;border-bottom:1px solid #222230;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:#2a2a3e}
+tr.sel td{background:#2d2050 !important}
+td.r{text-align:right;font-variant-numeric:tabular-nums}
+td.ck{width:20px;text-align:center;padding:1px}
+td.ck input,th.ck input{cursor:pointer}
+th.ck{width:20px;text-align:center;padding:1px}
+
+/* INLINE EDITABLE */
+select.cs{background:#313244;border:1px solid #45475a;color:#cdd6f4;font-size:10px;border-radius:3px;padding:1px 2px;max-width:110px;font-family:inherit}
+select.cs.fl{border-color:#fab387;background:#3e3020}
+.sz{background:transparent;border:1px solid transparent;color:#cdd6f4;font-size:10px;padding:1px 3px;border-radius:3px;width:65px;font-family:inherit;cursor:pointer}
+.sz:hover{border-color:#45475a}.sz:focus{border-color:#89b4fa;background:#313244;outline:none}
+
+.cb{border-radius:3px;padding:1px 5px;font-size:10px;color:#1e1e2e;font-weight:600;background:#7f849c}
+.tg{background:#45475a;border-radius:3px;padding:1px 5px;font-size:10px}
+.wi{color:#f9e2af;cursor:help;font-weight:bold}
+.fi{color:#fab387;cursor:help;font-weight:bold;margin-right:2px}
+
+/* DEBUG */
+#dbg{background:#11111b;border-top:1px solid #313244;max-height:80px;overflow:auto;padding:4px 8px;font-family:monospace;font-size:10px;color:#a6e3a1;flex-shrink:0;display:none}
+#dbg.show{display:block}
+#dbg div{border-bottom:1px solid #1e1e2e;padding:1px 0}
+#dbg .err{color:#f38ba8}
+
+/* CATEGORY COLORS */
+.c-Drywall{background:#f9e2af}.c-WallFraming{background:#fab387}.c-Walls{background:#f0c8a0}
+.c-WallFinish{background:#f0dca0}.c-WallStructure{background:#dcaa78}.c-WallSheathing{background:#e6d2a0}
+.c-MasonryVeneer{background:#d2b48c}.c-Siding{background:#8cc88c}.c-ExteriorFinish{background:#78be78}
+.c-MetalRoofing{background:#8cb4dc}.c-ShingleRoofing{background:#a08cb4}.c-Roofing{background:#96aad2}
+.c-RoofFraming{background:#c89664}.c-RoofSheathing{background:#e6c896}
+.c-Concrete{background:#aaa}.c-Flooring{background:#beb496}
+.c-StructuralLumber{background:#dca050}.c-Insulation{background:#ffb4dc}.c-Membrane{background:#c8c8ff}
+.c-Windows{background:#64b4ff}.c-Doors{background:#a07850}
+.c-Casework{background:#b4c88c}.c-Countertops{background:#c8b4a0}
+.c-Ceilings{background:#a0c8e6}.c-Plumbing{background:#64c8c8}
+.c-Hardware{background:#c8c8c8}.c-Trim{background:#b48cc8}.c-Fascia{background:#b4a0c8}
+.c-Soffit{background:#c8b4dc}.c-GenericModels{background:#c8c8a0}.c-Uncategorized{background:#ff6464}
+.c-Gutters{background:#8ca0b4}.c-Flashing{background:#b4b4dc}.c-Baseboard{background:#c8a088}
+.c-CrownMold{background:#c8b0a0}.c-Casing{background:#b0a0c0}.c-Railing{background:#a0b0c0}
+.c-DripEdge{background:#90b0a0}.c-Tile{background:#a0c8b4}.c-Backsplash{background:#b4c8c8}
+.c-ShowerWalls{background:#90b8c8}.c-_IGNORE{background:#585b70;color:#a6adc8}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>TAKEOFF v6</h1><div class="sep"></div>
+  <button class="hb pri" onclick="call('highlightAll')">Highlight All</button>
+  <button class="hb" onclick="call('clearHighlights')">Clear</button>
+  <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
+  <button class="hb grn" onclick="toggleCatPanel()">Multi-Isolate</button>
+  <div class="sep"></div>
+  <button class="hb" onclick="call('exportCSV')">CSV</button>
+  <button class="hb pri" onclick="call('exportHTML')">Report</button>
+  <button class="hb" onclick="call('rescan')">Rescan</button>
+  <div class="sep"></div>
+  <button class="hb yel" onclick="call('activateLF')">LF</button>
+  <button class="hb yel" onclick="call('activateSF')">SF</button>
+  <div class="sep"></div>
+  <button class="hb" onclick="expandAll()" title="Expand all">+</button>
+  <button class="hb" onclick="collapseAll()" title="Collapse all">&minus;</button>
+  <button class="hb" onclick="toggleDebug()" style="font-size:10px;color:#a6e3a1">dbg</button>
+</div>
+
+<!-- SUMMARY STRIP -->
+<div class="summary" id="sstrip"></div>
+
+<!-- MULTI-ISOLATE PANEL -->
+<div id="catPanel">
+  <div id="catChecks"></div>
+  <div class="cpBtn">
+    <button class="hb grn" onclick="doMultiIsolate()">Isolate</button>
+    <button class="hb" onclick="doMultiHide()" style="color:#f38ba8;border-color:#f38ba8">Hide</button>
+    <button class="hb pri" onclick="doMultiHighlight()">Highlight</button>
+    <button class="hb" onclick="cpAll(true)">All</button>
+    <button class="hb" onclick="cpAll(false)">None</button>
+    <button class="hb" onclick="toggleCatPanel()">Close</button>
+  </div>
+</div>
+
+<!-- BULK EDIT BAR -->
+<div class="bulk" id="bulkBar">
+  <span class="cnt" id="bulkCnt">0</span>
+  <label>Cat:</label><select id="bulkCat"></select><button class="hb pri" onclick="bulkSetCat()">Set</button>
+  <label>Code:</label><select id="bulkCC"></select><button class="hb pri" onclick="bulkSetCC()">Set</button>
+  <label>Size:</label><input type="text" id="bulkSize" placeholder="1x6" onkeydown="if(event.key==='Enter')bulkSetSize()">
+  <label>Sub:</label><input type="text" id="bulkSub" placeholder="Guest Bath" onkeydown="if(event.key==='Enter')bulkSetSub()">
+  <div class="sep"></div>
+  <button class="hb" onclick="bulkExclude()" style="color:#f38ba8">Exclude</button>
+  <button class="hb" onclick="clearSel()">Deselect</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="fbar">
+  <input type="text" id="fS" oninput="filt()" placeholder="Search...">
+  <label>Cat:</label><select id="fC" onchange="filt()"><option value="">All</option></select>
+  <label>Code:</label><select id="fCC" onchange="filt()"><option value="">All</option></select>
+  <label>Sub:</label><select id="fSub" onchange="filt()"><option value="">All</option></select>
+  <div class="sep"></div>
+  <label>Group:</label><select id="gBy" onchange="filt()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 4px;font-size:11px;font-family:inherit">
+    <option value="category">Category</option>
+    <option value="costCode">Cost Code</option>
+    <option value="subcategory">Subcategory</option>
+  </select>
+  <span id="fCnt" style="margin-left:auto;color:#a6adc8;font-size:11px"></span>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="tp" id="dp"></div>
+<div id="dbg"></div>
+
+<script>
+var D=[],CA=[],CO=[],F=[],sc='definitionName',sd=1;
+var SEL={},lastCheckIdx=-1;
+var openCats={};
+var VIS={},CATVIS={};
+var debugOn=false;
+
+function log(m,c){var el=document.getElementById('dbg'),d=document.createElement('div');if(c)d.className=c;d.textContent='['+new Date().toLocaleTimeString()+'] '+m;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function toggleDebug(){debugOn=!debugOn;document.getElementById('dbg').className=debugOn?'show':'';}
+
+function call(n,a){
+  try{
+    if(window.sketchup&&typeof window.sketchup[n]==='function'){if(a!==undefined)window.sketchup[n](a);else window.sketchup[n]();}
+    else{if(a!==undefined)window.location='skp:'+n+'@'+a;else window.location='skp:'+n;}
+  }catch(e){log('call ERR: '+n+' '+e.message,'err');}
+}
+function callJSON(n,o){call(n,JSON.stringify(o));}
+
+/* ═══ DATA ═══ */
+function receiveData(json){
+  try{
+    var d=JSON.parse(json);
+    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];
+    CA.sort(function(a,b){
+      if(a==='_IGNORE')return 1;if(b==='_IGNORE')return -1;
+      if(a==='Uncategorized')return 1;if(b==='Uncategorized')return -1;
+      return a.localeCompare(b);
+    });
+    log('Loaded '+D.length+' rows');
+    buildDD();buildCatPanel();buildBulkDDs();
+    for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
+    filt();
+  }catch(e){
+    log('PARSE: '+e.message,'err');
+    document.getElementById('dp').innerHTML='<div style="padding:20px;color:#f38ba8">'+e.message+'</div>';
+  }
+}
+
+function buildDD(){
+  var catM={},ccM={},subM={},cats=[],ccs=[],subs=[],i,r;
+  for(i=0;i<D.length;i++){
+    r=D[i];
+    if(r.category&&r.category!=='_IGNORE'&&!catM[r.category]){catM[r.category]=1;cats.push(r.category);}
+    if(r.costCode&&!ccM[r.costCode]){ccM[r.costCode]=1;ccs.push(r.costCode);}
+    if(r.subcategory&&!subM[r.subcategory]){subM[r.subcategory]=1;subs.push(r.subcategory);}
+  }
+  cats.sort();ccs.sort();subs.sort();
+  var h='<option value="">All</option>';
+  for(i=0;i<cats.length;i++)h+='<option>'+X(cats[i])+'</option>';
+  document.getElementById('fC').innerHTML=h;
+  h='<option value="">All</option>';
+  for(i=0;i<ccs.length;i++)h+='<option>'+X(ccs[i])+'</option>';
+  document.getElementById('fCC').innerHTML=h;
+  h='<option value="">All</option>';
+  for(i=0;i<subs.length;i++)h+='<option>'+X(subs[i])+'</option>';
+  document.getElementById('fSub').innerHTML=h;
+}
+function buildCatPanel(){
+  var cm={},cats=[],i,r;
+  for(i=0;i<D.length;i++){r=D[i];if(r.category&&r.category!=='_IGNORE'){if(!cm[r.category]){cm[r.category]=0;cats.push(r.category);}cm[r.category]++;}}
+  cats.sort();
+  var h='';
+  for(i=0;i<cats.length;i++) h+='<label class="cpRow"><input type="checkbox" value="'+X(cats[i])+'" class="cpCk"> '+catBadge(cats[i])+' ('+cm[cats[i]]+')</label>';
+  document.getElementById('catChecks').innerHTML=h;
+}
+function buildBulkDDs(){
+  var h='<option value="">--</option>';
+  for(var i=0;i<CA.length;i++)h+='<option value="'+X(CA[i])+'">'+X(CA[i])+'</option>';
+  h+='<option value="__custom__">+ Custom...</option>';
+  document.getElementById('bulkCat').innerHTML=h;
+  h='<option value="">--</option>';
+  for(var i=0;i<CO.length;i++)h+='<option value="'+CO[i].code+'">'+X(CO[i].full)+'</option>';
+  document.getElementById('bulkCC').innerHTML=h;
+}
+
+/* ═══ CATEGORY BADGE ═══ */
+var KNOWN_CATS={'Drywall':1,'WallFraming':1,'Walls':1,'WallFinish':1,'WallStructure':1,'WallSheathing':1,
+'MasonryVeneer':1,'Siding':1,'ExteriorFinish':1,'MetalRoofing':1,'ShingleRoofing':1,'Roofing':1,
+'RoofFraming':1,'RoofSheathing':1,'Concrete':1,'Flooring':1,'StructuralLumber':1,'Insulation':1,
+'Membrane':1,'Windows':1,'Doors':1,'Casework':1,'Countertops':1,'Ceilings':1,'Plumbing':1,
+'Hardware':1,'Trim':1,'Fascia':1,'Soffit':1,'GenericModels':1,'Uncategorized':1,
+'Gutters':1,'Flashing':1,'Baseboard':1,'CrownMold':1,'Casing':1,'Railing':1,
+'DripEdge':1,'Tile':1,'Backsplash':1,'ShowerWalls':1,'_IGNORE':1};
+
+function catBadge(c){
+  var cls=c.replace(/[\s\/]+/g,'');
+  if(KNOWN_CATS[cls]) return '<span class="cb c-'+cls+'">'+X(c)+'</span>';
+  var h=0;for(var i=0;i<c.length;i++)h=c.charCodeAt(i)+((h<<5)-h);
+  return '<span class="cb" style="background:hsl('+((h%360+360)%360)+',55%,70%)">'+X(c)+'</span>';
+}
+function catNameSpan(c){
+  var cls=c.replace(/[\s\/]+/g,'');
+  if(KNOWN_CATS[cls]) return '<span class="cname c-'+cls+'">'+X(c)+'</span>';
+  var h=0;for(var i=0;i<c.length;i++)h=c.charCodeAt(i)+((h<<5)-h);
+  return '<span class="cname" style="background:hsl('+((h%360+360)%360)+',55%,70%)">'+X(c)+'</span>';
+}
+
+/* ═══ FILTER ═══ */
+function filt(){
+  var s=document.getElementById('fS').value.toLowerCase();
+  var c=document.getElementById('fC').value;
+  var fcc=document.getElementById('fCC').value;
+  var fsub=document.getElementById('fSub').value;
+  var i,r,x,tot=0;
+  F=[];
+  for(i=0;i<D.length;i++){
+    r=D[i];
+    if(r.category==='_IGNORE')continue;
+    tot++;
+    if(c&&r.category!==c)continue;
+    if(fcc&&r.costCode!==fcc)continue;
+    if(fsub&&r.subcategory!==fsub)continue;
+    if(s){
+      x=(r.definitionName||'')+' '+(r.material||'')+' '+(r.category||'')+' '+(r.costCode||'')+' '+(r.sizeNominal||'')+' '+(r.subcategory||'');
+      if(x.toLowerCase().indexOf(s)===-1)continue;
+    }
+    F.push(r);
+  }
+  document.getElementById('fCnt').textContent=F.length+' / '+tot;
+  strip();renderGroups();updateBulkBar();
+}
+
+function strip(){
+  var i,r,cats={},sol=0,unc=0,all=0;
+  for(i=0;i<D.length;i++){r=D[i];if(r.category==='_IGNORE')continue;all++;cats[r.category]=1;if(r.category==='Uncategorized')unc++;}
+  var h='<div class="sb"><b>'+all+'</b> items</div>';
+  h+='<div class="sb"><b>'+Object.keys(cats).length+'</b> categories</div>';
+  if(unc)h+='<div class="sb"><span class="e">'+unc+'</span> uncat</div>';
+  document.getElementById('sstrip').innerHTML=h;
+}
+
+/* ═══ MEASUREMENTS ═══ */
+function pv(r){
+  var m=r.measurementType||'volume';
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return(r.instanceCount||1)+' EA';
+  if(m==='lf'){var l=r.linearFt||0;return l>0?(l*(r.instanceCount||1)).toFixed(1)+' LF':'--';}
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF?r.areaSF.toFixed(1)+' SF':'--';
+  if(m==='volume')return r.volumeFt3?r.volumeFt3.toFixed(2)+' ft3':'--';
+  return '--';
+}
+function sv2(r){
+  var m=r.measurementType||'volume';
+  if(m==='sf_cy')return r.volumeFt3?(r.volumeFt3/27).toFixed(2)+' CY':'';
+  if(m==='ea_bf')return r.volumeBF?r.volumeBF.toFixed(1)+' BF':'';
+  if(m==='ea_sf'){var w=(r.bbWidth||0)/12,h2=(r.bbHeight||0)/12,a=w*h2*(r.instanceCount||1);return a>0?a.toFixed(1)+' SF':'';}
+  if(m==='sf_sheets'){return r.areaSF?Math.ceil(r.areaSF/32)+' sht':'';}
+  return '';
+}
+function pn(r){
+  var m=r.measurementType||'volume';
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return r.instanceCount||1;
+  if(m==='lf')return(r.linearFt||0)*(r.instanceCount||1);
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF||0;
+  return r.volumeFt3||0;
+}
+function grpTotal(items){
+  var tot=0,i,m;
+  for(i=0;i<items.length;i++){
+    var r=items[i]; m=r.measurementType||'volume';
+    if(m==='ea'||m==='ea_bf'||m==='ea_sf')tot+=(r.instanceCount||1);
+    else if(m==='lf')tot+=(r.linearFt||0)*(r.instanceCount||1);
+    else if(m==='sf'||m==='sf_cy'||m==='sf_sheets')tot+=(r.areaSF||0);
+    else tot+=(r.volumeFt3||0);
+  }
+  if(!items.length)return'';
+  m=items[0].measurementType||'volume';
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return tot+' EA';
+  if(m==='lf')return tot.toFixed(1)+' LF';
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return tot.toFixed(1)+' SF';
+  return tot.toFixed(2)+' ft3';
+}
+
+/* ═══ GROUPED RENDER ═══ */
+var FIDX=[];
+
+function renderGroups(){
+  var gBy=document.getElementById('gBy').value||'category';
+  var groups={},order=[],i,r,key;
+  for(i=0;i<F.length;i++){
+    r=F[i];
+    if(gBy==='category') key=r.category||'Uncategorized';
+    else if(gBy==='costCode') key=r.costCode||'(no code)';
+    else if(gBy==='subcategory') key=r.subcategory||'(none)';
+    else key=r.category||'Uncategorized';
+    if(!groups[key]){groups[key]=[];order.push(key);}
+    groups[key].push(r);
+  }
+  order.sort();
+  FIDX=[];
+  var h='';
+  for(var gi=0;gi<order.length;gi++){
+    var gk=order[gi], items=groups[gk], isOpen=!!openCats[gk];
+    var catVis=CATVIS[gk]!==false;
+
+    h+='<div class="cg'+(isOpen?' open':'')+'" id="cg_'+gi+'">';
+    // ── HEADER ──
+    h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')">';
+    // Eye toggle
+    h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togCatVis(\''+X2(gk)+'\')" title="'+(catVis?'Hide':'Show')+'">'+(catVis?'&#9679;':'&#9675;')+'</button>';
+    h+='<span class="arr">&#9660;</span>';
+    // Name badge
+    if(gBy==='category') h+=catNameSpan(gk);
+    else h+='<span class="cname" style="background:#585b70;color:#cdd6f4">'+X(gk)+'</span>';
+    h+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
+    // Measurement dropdown (category mode only)
+    if(gBy==='category'){
+      var curMT=items.length?items[0].measurementType:'volume';
+      h+='<select class="cs" style="font-size:9px;padding:0 2px" onclick="event.stopPropagation()" onchange="event.stopPropagation();setMT(\''+X2(gk)+'\',this.value)">';
+      var mts=[['ea','EA'],['lf','LF'],['sf','SF'],['sf_cy','SF+CY'],['sf_sheets','SF+sht'],['ea_bf','EA+BF'],['ea_sf','EA+SF'],['volume','ft3']];
+      for(var mi=0;mi<mts.length;mi++) h+='<option value="'+mts[mi][0]+'"'+(curMT===mts[mi][0]?' selected':'')+'>'+mts[mi][1]+'</option>';
+      h+='</select>';
+    }
+    // Total
+    h+='<span class="cinfo">'+grpTotal(items)+'</span>';
+    // Actions
+    h+='<span class="cact">';
+    if(gBy==='category'){
+      h+='<button class="ab" onclick="event.stopPropagation();isoCat(\''+X2(gk)+'\')" title="Isolate">Iso</button>';
+      h+='<button class="ab" onclick="event.stopPropagation();zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">Z</button>';
+      h+='<button class="ab" onclick="event.stopPropagation();call(\'activateSFForCat\',\''+X2(gk)+'\')" title="Manual SF" style="color:#f9e2af">SF</button>';
+    }
+    h+='<button class="ab" onclick="event.stopPropagation();selGrpItems(\''+X2(gk)+'\')">Sel</button>';
+    if(gBy==='category') h+='<button class="ab" onclick="event.stopPropagation();excludeCat(\''+X2(gk)+'\')" title="Exclude" style="color:#f38ba8">x</button>';
+    h+='</span></div>';
+
+    // ── TABLE ──
+    h+='<div class="cgb"><table><thead><tr>';
+    h+='<th class="ck"><input type="checkbox" onchange="selGrpAll(\''+X2(gk)+'\',this.checked)"></th>';
+    h+='<th></th>'; // eye
+    h+='<th>Category</th><th>Code</th><th>Sub</th><th>Name</th><th>Size</th>';
+    h+='<th style="text-align:right">Qty</th><th style="text-align:right">Primary</th><th style="text-align:right">2nd</th>';
+    h+='<th></th>'; // actions
+    h+='</tr></thead><tbody>';
+
+    items.sort(function(a,b){
+      var va=a[sc]||'',vb=b[sc]||'';
+      if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;
+      return String(va).localeCompare(String(vb))*sd;
+    });
+
+    for(i=0;i<items.length;i++){
+      var row=items[i], vi=FIDX.length;
+      FIDX.push(row.entityId);
+      var sel=!!SEL[row.entityId], rv=VIS[row.entityId]!==false;
+      var wn=row.warnings&&row.warnings.length>0;
+      // Cat dropdown
+      var co='';
+      for(var j=0;j<CA.length;j++)co+='<option value="'+CA[j]+'"'+(CA[j]===row.category?' selected':'')+'>'+X(CA[j])+'</option>';
+      co+='<option value="__custom__">+ Custom...</option>';
+      // Cost code dropdown
+      var cco='<option value="">--</option>';
+      for(var j=0;j<CO.length;j++)cco+='<option value="'+CO[j].code+'"'+(row.costCode===CO[j].code?' selected':'')+'>'+X(CO[j].full)+'</option>';
+
+      h+='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+(sel?' class="sel"':'')+'>';
+      h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
+      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?'&#9679;':'&#9675;')+'</button></td>';
+      h+='<td><select class="cs" onchange="doSetCat('+row.entityId+',this.value)">'+co+'</select></td>';
+      h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
+      h+='<td><input class="sz" value="'+X(row.subcategory||'')+'" data-eid="'+row.entityId+'" onchange="doSetSub(this)" placeholder="..." style="width:60px"></td>';
+      h+='<td title="'+X(row.definitionName)+'">'+X(T(row.definitionName,28));
+      if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
+      h+='</td>';
+      h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
+      h+='<td class="r">'+(row.instanceCount||1)+'</td>';
+      h+='<td class="r">'+pv(row)+'</td>';
+      h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
+      h+='<td style="white-space:nowrap">';
+      h+='<button class="ab" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">I</button>';
+      h+='<button class="ab" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom">Z</button>';
+      h+='</td></tr>';
+    }
+    h+='</tbody></table></div></div>';
+  }
+  document.getElementById('dp').innerHTML=h||'<div style="padding:20px;color:#6c7086">No items match.</div>';
+}
+
+/* ═══ GROUP CONTROLS ═══ */
+function togCat(gi,gk){var el=document.getElementById('cg_'+gi);if(!el)return;var o=el.classList.contains('open');if(o){el.classList.remove('open');delete openCats[gk];el.querySelector('.cgh').classList.add('closed');}else{el.classList.add('open');openCats[gk]=true;el.querySelector('.cgh').classList.remove('closed');}}
+function expandAll(){var gs=document.querySelectorAll('.cg');for(var i=0;i<gs.length;i++){gs[i].classList.add('open');gs[i].querySelector('.cgh').classList.remove('closed');}for(var i=0;i<F.length;i++)openCats[F[i].category]=true;}
+function collapseAll(){var gs=document.querySelectorAll('.cg');for(var i=0;i<gs.length;i++){gs[i].classList.remove('open');gs[i].querySelector('.cgh').classList.add('closed');}openCats={};}
+
+/* ═══ VISIBILITY ═══ */
+function togCatVis(gk){
+  var vis=CATVIS[gk]!==false; CATVIS[gk]=!vis;
+  var ids=[];
+  var gBy=document.getElementById('gBy').value||'category';
+  for(var i=0;i<D.length;i++){
+    if(grpKey(D[i],gBy)===gk){ids.push(D[i].entityId);VIS[D[i].entityId]=!vis;}
+  }
+  if(ids.length) call(vis?'hideEntities':'showEntities',ids.join(','));
+  renderGroups();
+}
+function togItemVis(eid){
+  var vis=VIS[eid]!==false; VIS[eid]=!vis;
+  call(vis?'hideEntities':'showEntities',''+eid);
+  renderGroups();
+}
+function isoCat(cat){
+  for(var c in CATVIS) CATVIS[c]=false; CATVIS[cat]=true;
+  for(var i=0;i<D.length;i++) VIS[D[i].entityId]=(D[i].category===cat);
+  call('isolateCategory',cat); renderGroups();
+}
+function zoomCat(cat){
+  var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
+  if(ids.length) call('zoomToEntities',ids.join(','));
+}
+function resetVis(){VIS={};CATVIS={};renderGroups();}
+
+/* ═══ SELECTION ═══ */
+function ckClick(cb,ev){
+  var vi=parseInt(cb.getAttribute('data-vi')),eid=cb.getAttribute('data-eid'),chk=cb.checked;
+  if(ev.shiftKey&&lastCheckIdx>=0){
+    var lo=Math.min(lastCheckIdx,vi),hi=Math.max(lastCheckIdx,vi);
+    for(var i=lo;i<=hi;i++){var id=FIDX[i];if(id!==undefined){if(chk)SEL[id]=true;else delete SEL[id];}}
+    syncCBs();
+  }else{if(chk)SEL[eid]=true;else delete SEL[eid];var row=document.getElementById('r'+eid);if(row)row.className=chk?'sel':'';}
+  lastCheckIdx=vi; updateBulkBar(); hlSel();
+}
+function syncCBs(){
+  var cbs=document.querySelectorAll('td.ck input[type=checkbox]');
+  for(var i=0;i<cbs.length;i++){var eid=cbs[i].getAttribute('data-eid'),s=!!SEL[eid];cbs[i].checked=s;var row=cbs[i].closest('tr');if(row)row.className=s?'sel':'';}
+}
+function selGrpItems(gk){
+  var gBy=document.getElementById('gBy').value||'category';
+  for(var i=0;i<F.length;i++){if(grpKey(F[i],gBy)===gk)SEL[F[i].entityId]=true;}
+  syncCBs();updateBulkBar();hlSel();
+}
+function selGrpAll(gk,chk){
+  var gBy=document.getElementById('gBy').value||'category';
+  for(var i=0;i<F.length;i++){if(grpKey(F[i],gBy)===gk){if(chk)SEL[F[i].entityId]=true;else delete SEL[F[i].entityId];}}
+  syncCBs();updateBulkBar();hlSel();
+}
+function clearSel(){SEL={};lastCheckIdx=-1;syncCBs();updateBulkBar();call('clearHighlights');}
+function getSelIds(){var ids=[];for(var k in SEL)if(SEL.hasOwnProperty(k))ids.push(k);return ids;}
+function updateBulkBar(){var n=getSelIds().length;document.getElementById('bulkBar').className=n>0?'bulk show':'bulk';document.getElementById('bulkCnt').textContent=n+' sel';}
+function hlSel(){var ids=getSelIds();if(ids.length)call('highlightEntities',ids.join(','));else call('clearHighlights');}
+function grpKey(r,gBy){
+  if(gBy==='category')return r.category||'Uncategorized';
+  if(gBy==='costCode')return r.costCode||'(no code)';
+  if(gBy==='subcategory')return r.subcategory||'(none)';
+  return r.category||'Uncategorized';
+}
+
+/* ═══ MULTI-ISOLATE ═══ */
+function toggleCatPanel(){var p=document.getElementById('catPanel');p.className=p.className==='show'?'':'show';}
+function cpAll(v){var cks=document.querySelectorAll('.cpCk');for(var i=0;i<cks.length;i++)cks[i].checked=v;}
+function getCheckedCats(){var cks=document.querySelectorAll('.cpCk'),cats=[];for(var i=0;i<cks.length;i++)if(cks[i].checked)cats.push(cks[i].value);return cats;}
+function doMultiIsolate(){var c=getCheckedCats();if(c.length)callJSON('isolateCategories',{cats:c});}
+function doMultiHide(){var c=getCheckedCats();if(c.length)callJSON('hideCategories',{cats:c});}
+function doMultiHighlight(){var c=getCheckedCats();if(c.length)callJSON('highlightCategories',{cats:c});}
+
+/* ═══ BULK EDIT ═══ */
+function bulkSetCat(){
+  var v=document.getElementById('bulkCat').value;if(!v)return;
+  if(v==='__custom__'){var n=prompt('New category name:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
+  var ids=getSelIds();if(!ids.length)return;
+  callJSON('bulkSetCategory',{eids:ids,val:v});
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=v;}
+  clearSel();filt();
+}
+function bulkSetCC(){
+  var v=document.getElementById('bulkCC').value;if(!v)return;
+  var ids=getSelIds();if(!ids.length)return;
+  callJSON('bulkSetCostCode',{eids:ids,val:v});
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].costCode=v;}
+  clearSel();filt();
+}
+function bulkSetSize(){
+  var v=document.getElementById('bulkSize').value.trim();if(!v)return;
+  var ids=getSelIds();if(!ids.length)return;
+  callJSON('bulkSetSize',{eids:ids,val:v});
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].sizeNominal=v;}
+  clearSel();filt();
+}
+function bulkSetSub(){
+  var v=document.getElementById('bulkSub').value.trim();if(!v)return;
+  var ids=getSelIds();if(!ids.length)return;
+  callJSON('bulkSetSubcategory',{eids:ids,val:v});
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].subcategory=v;}
+  clearSel();buildDD();filt();
+}
+function bulkExclude(){
+  var ids=getSelIds();if(!ids.length)return;
+  callJSON('bulkSetCategory',{eids:ids,val:'_IGNORE'});
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category='_IGNORE';}
+  clearSel();filt();
+}
+function excludeCat(cat){
+  var ids=[];for(var i=0;i<D.length;i++){if(D[i].category===cat)ids.push(D[i].entityId);}
+  if(!ids.length)return;
+  callJSON('bulkSetCategory',{eids:ids,val:'_IGNORE'});
+  for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].category='_IGNORE';}
+  filt();
+}
+
+/* ═══ INLINE EDIT ═══ */
+function doSetCat(eid,v){
+  if(v==='__custom__'){var n=prompt('New category:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
+  callJSON('setCategory',{eid:eid,val:v});
+  for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].category=v;break;}}
+}
+function doSetCC(eid,v){callJSON('setCostCode',{eid:eid,val:v});}
+function doSetSize(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();callJSON('setSize',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].sizeNominal=v;break;}}}
+function doSetSub(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();callJSON('setSubcategory',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].subcategory=v;break;}}buildDD();}
+function setMT(cat,mt){
+  for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].measurementType=mt;}
+  callJSON('setMeasurementType',{cat:cat,mt:mt});filt();
+}
+
+function scrollToEntity(eid){
+  for(var i=0;i<F.length;i++){if(F[i].entityId==eid){openCats[F[i].category]=true;break;}}
+  renderGroups();
+  var row=document.getElementById('r'+eid);if(!row)return;
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  row.style.background='#2d4a2d';setTimeout(function(){row.style.background='';},3000);
+}
+
+function X(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function X2(s){return s?String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"):'';}
+function T(s,n){return s&&s.length>n?s.substr(0,n)+'...':s||'';}
+
+window.onload=function(){log('init');setTimeout(function(){call('requestData');},200);};
+</script>
+</body>
+</html>

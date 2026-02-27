@@ -1,0 +1,130 @@
+{
+  "profile_name": "Revit Direct Import",
+  "description": "Mapping rules for direct .rvt import into SketchUp",
+  "tag_mappings": {
+    "Walls": {
+      "definition_patterns": [
+        {
+          "match": "*Gypsum*",
+          "category": "Drywall",
+          "notes": "Gypsum wall board layers"
+        },
+        {
+          "match": "*Stone Veneer*",
+          "category": "Masonry / Veneer",
+          "notes": "Stone veneer finish layers"
+        },
+        {
+          "match": "*Brick*",
+          "category": "Masonry / Veneer",
+          "notes": "Brick veneer or structural brick"
+        },
+        {
+          "match": "*Siding*",
+          "category": "Siding",
+          "notes": "Exterior siding finish"
+        },
+        {
+          "match": "*Framing*",
+          "category": "Wall Framing",
+          "notes": "Stud wall framing layers"
+        },
+        {
+          "match": "*Insulation*",
+          "category": "Insulation",
+          "notes": "Wall insulation layers"
+        },
+        {
+          "match": "*Sheathing*",
+          "category": "Wall Sheathing",
+          "notes": "Wall sheathing layers"
+        }
+      ]
+    },
+    "Roofs": {
+      "definition_patterns": [
+        {
+          "match": "*Standing Seam*",
+          "category": "Metal Roofing"
+        },
+        {
+          "match": "*Metal*",
+          "category": "Metal Roofing"
+        },
+        {
+          "match": "*Shingle*",
+          "category": "Shingle Roofing"
+        },
+        {
+          "match": "*Asphalt*",
+          "category": "Shingle Roofing"
+        },
+        {
+          "match": "*Sheathing*",
+          "category": "Roof Sheathing"
+        },
+        {
+          "match": "*Plywood*",
+          "category": "Roof Sheathing"
+        }
+      ]
+    },
+    "Structural Framing": {
+      "definition_patterns": [
+        {
+          "match": "*Rough Sawn*",
+          "category": "Structural Lumber"
+        },
+        {
+          "match": "*Lumber*",
+          "category": "Structural Lumber"
+        },
+        {
+          "match": "*Brace*",
+          "category": "Structural Lumber"
+        },
+        {
+          "match": "*Beam*",
+          "category": "Structural Lumber"
+        },
+        {
+          "match": "*Joist*",
+          "category": "Structural Lumber"
+        }
+      ]
+    },
+    "Structural Columns": {
+      "default_category": "Structural Lumber"
+    },
+    "Floors": {
+      "definition_patterns": [
+        {
+          "match": "*Concrete*",
+          "category": "Concrete"
+        },
+        {
+          "match": "*Slab*",
+          "category": "Concrete"
+        }
+      ],
+      "default_category": "Flooring"
+    },
+    "Fascias": {
+      "default_category": "Trim / Fascia"
+    },
+    "Windows": {
+      "default_category": "Windows"
+    },
+    "Doors": {
+      "default_category": "Doors"
+    },
+    "Casework": {
+      "default_category": "Casework"
+    },
+    "Ceilings": {
+      "default_category": "Drywall"
+    }
+  },
+  "ignore_tags": ["Untagged"],
+  "ignore_patterns": ["T.O. S.F.*", "T.O.*", "B.O.*", "Level*"]
+}

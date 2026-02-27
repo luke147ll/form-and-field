@@ -1,0 +1,128 @@
+{
+  "categories": [
+    {
+      "name": "Drywall",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.10,
+      "conversions": {
+        "sheets_4x8": { "divisor": 32, "unit": "sheets" },
+        "sheets_4x12": { "divisor": 48, "unit": "sheets" }
+      }
+    },
+    {
+      "name": "Wall Framing",
+      "measurement": "derived",
+      "unit": "EA",
+      "params": {
+        "stud_spacing_in": 16,
+        "top_plates": 2,
+        "bottom_plates": 1
+      },
+      "waste_factor": 0.05
+    },
+    {
+      "name": "Masonry / Veneer",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.08
+    },
+    {
+      "name": "Siding",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.10
+    },
+    {
+      "name": "Exterior Finish",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.10
+    },
+    {
+      "name": "Metal Roofing",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.08,
+      "conversions": {
+        "squares": { "divisor": 100, "unit": "SQ" }
+      }
+    },
+    {
+      "name": "Shingle Roofing",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.12,
+      "conversions": {
+        "squares": { "divisor": 100, "unit": "SQ" },
+        "bundles_3tab": { "multiplier_per_sq": 3, "unit": "bundles" }
+      }
+    },
+    {
+      "name": "Roof Sheathing",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.08,
+      "conversions": {
+        "sheets_4x8": { "divisor": 32, "unit": "sheets" }
+      }
+    },
+    {
+      "name": "Roof Framing",
+      "measurement": "board_feet",
+      "unit": "BF",
+      "waste_factor": 0.05
+    },
+    {
+      "name": "Structural Lumber",
+      "measurement": "board_feet",
+      "unit": "BF",
+      "waste_factor": 0.05
+    },
+    {
+      "name": "Concrete",
+      "measurement": "volume",
+      "unit": "CY",
+      "conversion_factor": 0.037037,
+      "waste_factor": 0.08
+    },
+    {
+      "name": "Flooring",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.10
+    },
+    {
+      "name": "Insulation",
+      "measurement": "area",
+      "unit": "SF",
+      "waste_factor": 0.05
+    },
+    {
+      "name": "Windows",
+      "measurement": "count",
+      "unit": "EA"
+    },
+    {
+      "name": "Doors",
+      "measurement": "count",
+      "unit": "EA"
+    },
+    {
+      "name": "Casework",
+      "measurement": "count",
+      "unit": "EA"
+    },
+    {
+      "name": "Trim / Fascia",
+      "measurement": "linear",
+      "unit": "LF",
+      "waste_factor": 0.10
+    },
+    {
+      "name": "Hardware",
+      "measurement": "count",
+      "unit": "EA"
+    }
+  ]
+}
