@@ -1,12 +1,16 @@
 module TakeoffTool
 
-  require File.join(PLUGIN_DIR, 'scanner')
-  require File.join(PLUGIN_DIR, 'parser')
-  require File.join(PLUGIN_DIR, 'dashboard')
-  require File.join(PLUGIN_DIR, 'exporter')
-  require File.join(PLUGIN_DIR, 'highlighter')
-  require File.join(PLUGIN_DIR, 'measure_lf')
-  require File.join(PLUGIN_DIR, 'measure_sf')
+  load File.join(PLUGIN_DIR, 'scanner.rb')
+  load File.join(PLUGIN_DIR, 'parser.rb')
+  load File.join(PLUGIN_DIR, 'dashboard.rb')
+  load File.join(PLUGIN_DIR, 'startup_dialog.rb')
+  load File.join(PLUGIN_DIR, 'exporter.rb')
+  load File.join(PLUGIN_DIR, 'highlighter.rb')
+  load File.join(PLUGIN_DIR, 'measure_lf.rb')
+  load File.join(PLUGIN_DIR, 'measure_sf.rb')
+  load File.join(PLUGIN_DIR, 'identify_dialog.rb')
+  load File.join(PLUGIN_DIR, 'context_menu.rb')
+  load File.join(PLUGIN_DIR, 'parse_logger.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -35,37 +39,12 @@ module TakeoffTool
     nil
   end
 
-  # Selection observer: click in model → highlight in dashboard
-  class SelObs < Sketchup::SelectionObserver
-    def onSelectionBulkChange(sel); check(sel); end
-    def onSelectionAdded(sel, e); check(sel); end
-    def check(sel)
-      return if sel.empty?
-      eid = sel.first.entityID
-      Dashboard.scroll_to_entity(eid) if TakeoffTool.entity_registry[eid]
-    end
-  end
-
-  @observer = nil
-  def self.attach_observer
-    return if @observer
-    m = Sketchup.active_model; return unless m
-    @observer = SelObs.new
-    m.selection.add_observer(@observer)
-  end
-
-  def self.detach_observer
-    return unless @observer
-    m = Sketchup.active_model
-    if m
-      begin; m.selection.remove_observer(@observer); rescue; end
-    end
-    @observer = nil
-  end
+  # Selection observer removed — was calling Dashboard.scroll_to_entity on every
+  # selection change via execute_script, causing performance issues in large models.
 
   unless @menu_loaded
     sub = UI.menu('Extensions').add_submenu(PLUGIN_NAME)
-    sub.add_item('Scan Model') { TakeoffTool.run_scan }
+    sub.add_item('Scan Model') { StartupDialog.show }
     sub.add_item('Open Dashboard') { TakeoffTool.open_dashboard }
     sub.add_separator
     sub.add_item('📏 LF Measure Tool') { TakeoffTool.activate_lf_tool }
@@ -82,23 +61,59 @@ module TakeoffTool
     @menu_loaded = true
   end
 
-  def self.run_scan
+  def self.run_scan(progress_dlg = nil)
     m = Sketchup.active_model
     return UI.messagebox("No model open.") unless m
-    @scan_results, @entity_registry = Scanner.scan_model(m)
-    # Load saved category/cost code assignments from model attributes
-    load_saved_assignments
-    # Also load any manual measurements saved in the model
-    load_manual_measurements
-    if @scan_results.empty?
-      UI.messagebox("No components found.")
-    else
-      saved = @category_assignments.length + @cost_code_assignments.length
-      cats = @scan_results.map{|r| r[:parsed][:auto_category]}.compact.uniq.reject{|c| c=='_IGNORE'}.length
-      msg = "Scan complete!\n#{@scan_results.length} elements found\n#{@scan_results.map{|r|r[:display_name]}.uniq.length} unique types\n#{cats} categories detected"
-      msg += "\n#{saved} saved assignments loaded" if saved > 0
-      UI.messagebox(msg)
-      open_dashboard
+
+    begin
+      Dashboard.scan_log_start
+
+      @scan_results, @entity_registry = Scanner.scan_model(m) do |msg|
+        Dashboard.scan_log_msg(msg)
+        if progress_dlg
+          safe = msg.to_s.gsub("\\", "\\\\").gsub("'", "\\\\'")
+          progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('#{safe}')") rescue nil
+        end
+      end
+
+      Dashboard.scan_log_msg("Loading saved assignments...")
+      load_saved_assignments
+      load_manual_measurements
+
+      Dashboard.scan_log_msg("Generating parse log...")
+      begin
+        count = ParseLogger.generate(@scan_results, @entity_registry, @category_assignments, @cost_code_assignments)
+        Dashboard.scan_log_msg("Parse log saved to Desktop (#{count} entities)")
+        if progress_dlg
+          progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('Parse log saved to Desktop')") rescue nil
+        end
+      rescue => log_err
+        puts "Takeoff: ParseLogger error: #{log_err.message}"
+        Dashboard.scan_log_msg("Parse log error: #{log_err.message}")
+      end
+
+      if @scan_results.empty?
+        Dashboard.scan_log_end("No components found.")
+        if progress_dlg
+          progress_dlg.execute_script("if(typeof scanComplete==='function')scanComplete('No components found.')") rescue nil
+        end
+        UI.messagebox("No components found.")
+      else
+        saved = @category_assignments.length + @cost_code_assignments.length
+        cats = @scan_results.map{|r| r[:parsed][:auto_category]}.compact.uniq.reject{|c| c=='_IGNORE'}.length
+        summary = "#{@scan_results.length} elements, #{@scan_results.map{|r|r[:display_name]}.uniq.length} types, #{cats} categories"
+        summary += ", #{saved} saved assignments" if saved > 0
+        Dashboard.scan_log_end(summary)
+        if progress_dlg
+          safe = summary.gsub("\\", "\\\\").gsub("'", "\\\\'")
+          progress_dlg.execute_script("if(typeof scanComplete==='function')scanComplete('#{safe}')") rescue nil
+        end
+        open_dashboard
+      end
+    rescue => e
+      Dashboard.scan_log_end("ERROR: #{e.message}")
+      puts "Takeoff run_scan error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+      UI.messagebox("Scan error: #{e.message}")
     end
   end
 
@@ -155,7 +170,6 @@ module TakeoffTool
       r = UI.messagebox("No scan data. Run scan first?", MB_YESNO)
       return r == IDYES ? run_scan : nil
     end
-    attach_observer
     Dashboard.show(@scan_results, @category_assignments, @cost_code_assignments)
   end
 end

@@ -387,7 +387,7 @@ module TakeoffTool
           linearFt: r[:linear_ft],
           bbWidth: r[:bb_width_in], bbHeight: r[:bb_height_in], bbDepth: r[:bb_depth_in],
           category: cat, measurementType: mt, costCode: auto_cc,
-          subcategory: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue '') || '',
+          subcategory: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || '',
           suggestedCodes: sc, hasOverlap: has_overlap,
           warnings: r[:warnings] || [],
           revitId: r[:parsed][:revit_id], ifcType: r[:ifc_type]
@@ -395,13 +395,20 @@ module TakeoffTool
       end
 
       cats = ['Drywall','Wall Framing','Walls','Wall Finish','Wall Structure','Wall Sheathing',
-        'Masonry / Veneer','Siding','Exterior Finish','Soffit',
+        'Masonry / Veneer','Siding','Exterior Finish','Soffit','Stucco','Decorative Metal',
+        'Glass/Glazing','Wood Paneling',
         'Metal Roofing','Shingle Roofing','Roofing','Roof Framing','Roof Sheathing',
-        'Concrete','Flooring','Ceilings','Structural Lumber','Insulation','Membrane',
-        'Windows','Doors','Casework','Countertops','Plumbing',
+        'Concrete','Flooring','Ceilings','Ceiling Framing','Structural Lumber','Structural Steel',
+        'Insulation','Membrane',
+        'Foundation Slabs','Foundation Walls','Foundation Footings',
+        'Windows','Doors','Garage Doors','Shower Doors','Casework','Countertops','Plumbing',
         'Hardware','Trim','Fascia','Gutters','Flashing','Baseboard',
         'Crown Mold','Casing','Railing','Drip Edge',
-        'Tile','Backsplash','Shower Walls',
+        'Tile','Backsplash','Shower Walls','Sheathing',
+        'Appliances','Bath Accessories','Outdoor Kitchen','Chimney',
+        'HVAC','Snow Guards','Lighting Fixtures','Window Treatments','Outdoor Features',
+        'Furniture','Railings','Stairs','Specialty Equipment',
+        'Electrical Equipment','Electrical Fixtures','Rooms',
         'Generic Models','Uncategorized','_IGNORE']
 
       # Merge in any custom categories from assignments or auto-parsed
@@ -415,6 +422,27 @@ module TakeoffTool
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
+    end
+
+    def self.visible?
+      @dialog && @dialog.visible?
+    end
+
+    def self.scan_log_start
+      return unless @dialog && @dialog.visible?
+      @dialog.execute_script("scanStart()")
+    end
+
+    def self.scan_log_msg(msg)
+      return unless @dialog && @dialog.visible?
+      esc = msg.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("scanMsg('#{esc}')")
+    end
+
+    def self.scan_log_end(summary)
+      return unless @dialog && @dialog.visible?
+      esc = summary.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("scanEnd('#{esc}')")
     end
 
     def self.close

@@ -1,16 +1,24 @@
 module TakeoffTool
   module Scanner
-    def self.scan_model(model)
+    def self.scan_model(model, &progress)
       results = []; reg = {}; seen = {}
-      model.definitions.each do |defn|
-        next if defn.image?
+      defs = model.definitions.select { |d| !d.image? }
+      total_defs = defs.length
+      progress.call("Found #{total_defs} definitions to process") if progress
+
+      defs.each_with_index do |defn, idx|
+        inst_count = defn.instances.length
+        progress.call("Definition #{idx+1}/#{total_defs}: #{defn.name} (#{inst_count} instances)") if progress && inst_count > 0
         defn.instances.each do |inst|
           next if seen[inst.entityID]; seen[inst.entityID] = true
           reg[inst.entityID] = inst
           process(inst, defn, results)
         end
       end
+
+      progress.call("Processing warnings...") if progress
       check_warnings(results)
+      progress.call("Sorting #{results.length} results") if progress
       [results.sort_by{|r|[r[:tag]||'zzz',r[:display_name]||'']}, reg]
     end
 
@@ -22,7 +30,24 @@ module TakeoffTool
       display = iname || dname
       tag = inst.layer ? inst.layer.name : 'Untagged'
 
-      parsed = Parser.parse_definition(display, tag)
+      # Compute material BEFORE parser call
+      mat = nil
+      if inst.material
+        mat = inst.material.display_name
+      else
+        f = defn.entities.grep(Sketchup::Face).first
+        mat = f.material.display_name if f && f.material
+      end
+
+      # Compute IFC type BEFORE parser call
+      ifc = nil
+      if defn.attribute_dictionaries
+        a = defn.attribute_dictionaries['AppliedSchemaTypes']
+        ifc = a['IFC 4'] if a
+      end
+
+      # Call parser with material and IFC context
+      parsed = Parser.parse_definition(display, tag, material: mat, ifc_type: ifc)
       return if parsed[:auto_category] == '_IGNORE'
       return if tag == '<Revit Missing Links>'
       if tag == 'Layer0'
@@ -47,14 +72,6 @@ module TakeoffTool
       end
       cnt = [cnt, 1].max
 
-      mat = nil
-      if inst.material
-        mat = inst.material.display_name
-      else
-        f = defn.entities.grep(Sketchup::Face).first
-        mat = f.material.display_name if f && f.material
-      end
-
       vi3 = vol.to_f; vf3 = vi3/1728.0; vbf = vi3/144.0
 
       area = nil
@@ -67,10 +84,16 @@ module TakeoffTool
       longest_in = [w, h, d].max
       linear_ft = longest_in / 12.0
 
-      ifc = nil
-      if defn.attribute_dictionaries
-        a = defn.attribute_dictionaries['AppliedSchemaTypes']
-        ifc = a['IFC 4'] if a
+      # For Rooms: compute area from BB width x depth (two largest dims, excluding height)
+      if parsed[:auto_category] == 'Rooms'
+        dims = [w, h, d].sort
+        area = (dims[1] * dims[2]) / 144.0  # two largest dimensions, convert sq in to sq ft
+      end
+
+      # Extract thickness from foundation names if parser didn't find one
+      if parsed[:auto_category] =~ /Foundation/i && !parsed[:thickness]
+        ft = display =~ /(\d+)\s*inch/i ? "#{$1}\"" : nil
+        parsed[:thickness] = ft if ft
       end
 
       results << {

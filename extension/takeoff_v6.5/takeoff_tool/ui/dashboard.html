@@ -15,6 +15,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .hb:hover{background:#45475a}.hb.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
 .hb.grn{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1}
 .hb.yel{background:#f9e2af;color:#1e1e2e;border-color:#f9e2af}
+.hb svg{width:16px;height:16px;vertical-align:middle}
 .sep{width:1px;height:18px;background:#45475a}
 
 /* SUMMARY */
@@ -48,30 +49,38 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .tp{flex:1;overflow:auto;padding:0}
 
 /* CATEGORY GROUPS */
-.cg{border-bottom:1px solid #252535}
-.cgh{padding:5px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;background:#1a1a2e;user-select:none}
+.cg{border-bottom:1px solid #252535;margin-bottom:1px}
+.cgh{padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a2e;user-select:none}
 .cgh:hover{background:#222236}
 .cgh .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:9px;width:12px}
 .cgh.closed .arr{transform:rotate(-90deg)}
 .cgh .cname{font-weight:600;font-size:11px;border-radius:3px;padding:1px 7px;color:#1e1e2e;background:#7f849c}
-.cgh .cinfo{color:#89b4fa;font-size:11px;font-weight:600;margin-left:auto;white-space:nowrap}
-.cgh .cact{display:flex;gap:3px;align-items:center;margin-left:8px}
+.cgh .cinfo{color:#89b4fa;font-size:12px;font-weight:600;margin-left:auto;white-space:nowrap;min-width:90px;text-align:right}
+.cg-toolbar{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 34px;background:#222236;border-bottom:1px solid #313244;font-size:11px}
+.cg-toolbar .cact{display:flex;gap:4px;align-items:center;margin-left:auto}
 .cgb{display:none}
 .cg.open .cgb{display:block}
 
 /* EYE TOGGLE */
-.ey{background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;color:#a6adc8;font-family:inherit;line-height:1}
-.ey:hover{color:#cdd6f4}
-.ey.off{color:#45475a}
+.ey{background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;display:inline-flex;align-items:center}
+.ey svg{stroke:#fff;width:14px;height:14px}
+.ey:hover svg{stroke:#89b4fa}
+.ey.off svg{stroke:#45475a}
 
 /* ACTION BUTTONS */
-.ab{padding:1px 5px;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:10px;font-family:inherit;white-space:nowrap}
+.ab{padding:2px 7px;border-radius:3px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap}
 .ab:hover{background:#45475a;border-color:#89b4fa}
+.ib{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;vertical-align:middle}
+.ib svg{stroke:#888;transition:stroke 0.15s}
+.ib:hover svg{stroke:#fff}
+.ib.danger svg{stroke:#f38ba8}.ib.danger:hover svg{stroke:#ff6b8a}
+.ib.accent:hover svg{stroke:#89b4fa}
+.ib.warn svg{stroke:#f9e2af}.ib.warn:hover svg{stroke:#ffe566}
 
 /* TABLE */
 table{width:100%;border-collapse:collapse;font-size:11px}
-th{background:#262637;color:#a6adc8;padding:3px 5px;text-align:left;font-weight:600;border-bottom:1px solid #45475a;white-space:nowrap;font-size:10px;position:sticky;top:0;z-index:4}
-td{padding:2px 5px;border-bottom:1px solid #222230;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+th{background:#262637;color:#a6adc8;padding:5px 8px;text-align:left;font-weight:600;border-bottom:1px solid #45475a;white-space:nowrap;font-size:10px;position:sticky;top:0;z-index:4}
+td{padding:5px 8px;border-bottom:1px solid #222230;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr:hover td{background:#2a2a3e}
 tr.sel td{background:#2d2050 !important}
 td.r{text-align:right;font-variant-numeric:tabular-nums}
@@ -96,6 +105,44 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 #dbg div{border-bottom:1px solid #1e1e2e;padding:1px 0}
 #dbg .err{color:#f38ba8}
 
+/* SCAN DIALOG */
+#scanBackdrop{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99}
+#scanBackdrop.show{display:block}
+#scanOverlay{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;max-height:540px;background:#1e1e2e;border:1px solid #45475a;border-radius:10px;z-index:100;box-shadow:0 12px 40px rgba(0,0,0,0.6);flex-direction:column;overflow:hidden}
+#scanOverlay.show{display:flex}
+#scanOverlay .so-hdr{padding:12px 16px;background:#262637;border-bottom:1px solid #45475a;display:flex;align-items:center;gap:8px}
+#scanOverlay .so-hdr span{font-size:13px;font-weight:700;color:#cdd6f4}
+/* Pre-scan form */
+#scanOverlay .so-form{padding:16px;display:flex;flex-direction:column;gap:12px}
+#scanOverlay .so-form .so-desc{font-size:11px;color:#a6adc8;line-height:1.4}
+#scanOverlay .so-form .so-radio-group{display:flex;flex-direction:column;gap:6px}
+#scanOverlay .so-form label{font-size:11px;color:#cdd6f4;display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:1px solid #313244;border-radius:5px;background:#181825;transition:border-color 0.15s}
+#scanOverlay .so-form label:hover{border-color:#45475a}
+#scanOverlay .so-form label.active{border-color:#89b4fa;background:#1a1a2e}
+#scanOverlay .so-form label.disabled{opacity:0.4;cursor:not-allowed}
+#scanOverlay .so-form label .so-soon{margin-left:auto;font-size:9px;color:#6c7086;background:#313244;padding:1px 6px;border-radius:3px}
+#scanOverlay .so-form input[type=radio]{accent-color:#89b4fa}
+#scanOverlay .so-btns{display:flex;gap:8px;justify-content:flex-end;padding:0 16px 14px 16px}
+/* Scanning state */
+#scanOverlay .so-scanning{display:none;flex-direction:column;align-items:center;padding:8px 16px 8px 16px;gap:6px}
+#scanOverlay .so-scanning.show{display:flex}
+.scan-progress-wrap{width:100%;max-width:380px;height:4px;background:#313244;border-radius:2px;overflow:hidden}
+.scan-progress-bar{height:100%;width:40%;background:linear-gradient(90deg,#cba6f7,#89b4fa);border-radius:2px;animation:scanSlide 1.5s ease-in-out infinite}
+@keyframes scanSlide{0%{margin-left:-40%}100%{margin-left:100%}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.so-scanning-text{font-size:12px;font-weight:600;color:#cdd6f4;animation:pulse 1.8s ease-in-out infinite}
+/* Log area */
+#scanOverlay .so-body{flex:1;overflow-y:auto;padding:4px 16px 8px 16px;font-family:monospace;font-size:10px;color:#a6adc8;max-height:140px;display:none}
+#scanOverlay .so-body.show{display:block}
+#scanOverlay .so-body div{padding:2px 0;border-bottom:1px solid #181825}
+#scanOverlay .so-body .done{color:#a6e3a1}
+#scanOverlay .so-body .warn{color:#f9e2af}
+#scanOverlay .so-body .stat{color:#89b4fa}
+/* Complete state */
+#scanOverlay .so-done{display:none;flex-direction:column;align-items:center;padding:8px 16px 8px 16px;gap:8px}
+#scanOverlay .so-done.show{display:flex}
+.so-summary{font-size:11px;color:#a6adc8;text-align:center;line-height:1.5}
+
 /* CATEGORY COLORS */
 .c-Drywall{background:#f9e2af}.c-WallFraming{background:#fab387}.c-Walls{background:#f0c8a0}
 .c-WallFinish{background:#f0dca0}.c-WallStructure{background:#dcaa78}.c-WallSheathing{background:#e6d2a0}
@@ -119,7 +166,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
 <!-- HEADER -->
 <div class="header">
-  <h1>TAKEOFF v6</h1><div class="sep"></div>
+  <h1>Form and Field</h1><div class="sep"></div>
   <button class="hb pri" onclick="call('highlightAll')">Highlight All</button>
   <button class="hb" onclick="call('clearHighlights')">Clear</button>
   <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
@@ -127,14 +174,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <div class="sep"></div>
   <button class="hb" onclick="call('exportCSV')">CSV</button>
   <button class="hb pri" onclick="call('exportHTML')">Report</button>
-  <button class="hb" onclick="call('rescan')">Rescan</button>
+  <button class="hb" onclick="showScanDialog()">Rescan</button>
   <div class="sep"></div>
-  <button class="hb yel" onclick="call('activateLF')">LF</button>
-  <button class="hb yel" onclick="call('activateSF')">SF</button>
+  <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg></button>
+  <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg></button>
   <div class="sep"></div>
-  <button class="hb" onclick="expandAll()" title="Expand all">+</button>
-  <button class="hb" onclick="collapseAll()" title="Collapse all">&minus;</button>
-  <button class="hb" onclick="toggleDebug()" style="font-size:10px;color:#a6e3a1">dbg</button>
+  <button class="hb" onclick="expandAll()" title="Expand all" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+  <button class="hb" onclick="collapseAll()" title="Collapse all" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg></button>
+  <button class="hb" onclick="toggleDebug()" title="Debug" style="margin-left:auto;font-size:10px;color:#a6e3a1">dbg</button>
 </div>
 
 <!-- SUMMARY STRIP -->
@@ -167,10 +214,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
 <!-- FILTER BAR -->
 <div class="fbar">
+  <button onclick="call('showAll');resetVis()" title="Reset Visibility (Show All)" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
   <input type="text" id="fS" oninput="filt()" placeholder="Search...">
-  <label>Cat:</label><select id="fC" onchange="filt()"><option value="">All</option></select>
+  <label>Category:</label><select id="fC" onchange="fCatChange(this)"><option value="">All</option></select>
   <label>Code:</label><select id="fCC" onchange="filt()"><option value="">All</option></select>
-  <label>Sub:</label><select id="fSub" onchange="filt()"><option value="">All</option></select>
+  <label>Sub:</label><select id="fSub" onchange="fSubChange(this)"><option value="">All</option></select>
   <div class="sep"></div>
   <label>Group:</label><select id="gBy" onchange="filt()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 4px;font-size:11px;font-family:inherit">
     <option value="category">Category</option>
@@ -184,6 +232,130 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <div class="tp" id="dp"></div>
 <div id="dbg"></div>
 
+<!-- SCAN DIALOG -->
+<div id="scanBackdrop"></div>
+<div id="scanOverlay">
+  <div class="so-hdr"><span id="scanTitle">Scan Model</span></div>
+  <!-- Phase 1: Pre-scan form -->
+  <div class="so-form" id="scanForm">
+    <div class="so-desc">Analyze model geometry and extract quantities.</div>
+    <div class="so-radio-group">
+      <label class="active" onclick="scanRadio(this)"><input type="radio" name="scanSrc" value="sketchup" checked> SketchUp Model</label>
+      <label class="disabled"><input type="radio" name="scanSrc" value="ifc" disabled> IFC Import <span class="so-soon">Coming Soon</span></label>
+      <label class="disabled"><input type="radio" name="scanSrc" value="revit" disabled> Revit Import <span class="so-soon">Coming Soon</span></label>
+    </div>
+  </div>
+  <!-- Phase 2: Scanning -->
+  <div class="so-scanning" id="scanProgress">
+    <svg viewBox="0 0 400 170" width="380" height="160" style="display:block;margin:0 auto;">
+      <circle cx="45" cy="12" r="1" fill="#6c7086" opacity="0.4"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/></circle>
+      <circle cx="120" cy="28" r="0.8" fill="#6c7086" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="1.5s" repeatCount="indefinite"/></circle>
+      <circle cx="200" cy="8" r="1.2" fill="#6c7086" opacity="0.5"><animate attributeName="opacity" values="0.3;0.7;0.3" dur="1.8s" repeatCount="indefinite"/></circle>
+      <circle cx="280" cy="20" r="0.7" fill="#6c7086" opacity="0.3"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="2.2s" repeatCount="indefinite"/></circle>
+      <circle cx="340" cy="10" r="1" fill="#6c7086" opacity="0.4"><animate attributeName="opacity" values="0.1;0.6;0.1" dur="1.7s" repeatCount="indefinite"/></circle>
+      <circle cx="80" cy="45" r="0.6" fill="#6c7086" opacity="0.2"><animate attributeName="opacity" values="0.1;0.4;0.1" dur="2.5s" repeatCount="indefinite"/></circle>
+      <circle cx="320" cy="38" r="0.9" fill="#6c7086" opacity="0.3"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="1.3s" repeatCount="indefinite"/></circle>
+      <circle cx="160" cy="18" r="0.8" fill="#6c7086" opacity="0.35"><animate attributeName="opacity" values="0.15;0.55;0.15" dur="1.9s" repeatCount="indefinite"/></circle>
+      <circle cx="240" cy="42" r="0.7" fill="#6c7086" opacity="0.25"><animate attributeName="opacity" values="0.1;0.45;0.1" dur="2.1s" repeatCount="indefinite"/></circle>
+      <circle cx="370" cy="30" r="1.1" fill="#6c7086" opacity="0.3"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="1.6s" repeatCount="indefinite"/></circle>
+      <line x1="40" y1="148" x2="360" y2="148" stroke="#313244" stroke-width="1.5"/>
+      <g transform="translate(175,105)">
+        <rect x="0" y="15" width="50" height="35" fill="#313244" stroke="#6c7086" stroke-width="1" rx="1"/>
+        <polygon points="-5,15 25,-5 55,15" fill="#45475a" stroke="#6c7086" stroke-width="1"/>
+        <rect x="18" y="30" width="14" height="20" fill="#45475a" stroke="#6c7086" stroke-width="0.8" rx="1"/>
+        <circle cx="28" cy="41" r="1.2" fill="#f9e2af"/>
+        <rect x="5" y="22" width="10" height="10" fill="#f9e2af" opacity="0.3" stroke="#6c7086" stroke-width="0.8" rx="0.5"/>
+        <rect x="35" y="22" width="10" height="10" fill="#f9e2af" opacity="0.3" stroke="#6c7086" stroke-width="0.8" rx="0.5"/>
+        <rect x="35" y="-2" width="8" height="14" fill="#45475a" stroke="#6c7086" stroke-width="0.8"/>
+      </g>
+      <g transform="translate(120,118)">
+        <rect x="5" y="20" width="5" height="12" fill="#45475a"/>
+        <polygon points="-2,22 7.5,2 17,22" fill="#585b70"/>
+        <polygon points="0,16 7.5,-2 15,16" fill="#6c7086"/>
+      </g>
+      <g transform="translate(280,122)">
+        <rect x="4" y="16" width="4" height="10" fill="#45475a"/>
+        <polygon points="0,18 6,2 12,18" fill="#585b70"/>
+        <polygon points="1,13 6,-1 11,13" fill="#6c7086"/>
+      </g>
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="-60,0;60,0;-60,0" dur="4s" repeatCount="indefinite"/>
+        <polygon points="185,52 165,140 235,140 215,52" fill="#a6e3a1" opacity="0.08">
+          <animate attributeName="opacity" values="0.04;0.12;0.04" dur="1.5s" repeatCount="indefinite"/>
+        </polygon>
+        <line x1="185" y1="52" x2="165" y2="140" stroke="#a6e3a1" stroke-width="0.5" opacity="0.3">
+          <animate attributeName="opacity" values="0.1;0.4;0.1" dur="1.5s" repeatCount="indefinite"/>
+        </line>
+        <line x1="215" y1="52" x2="235" y2="140" stroke="#a6e3a1" stroke-width="0.5" opacity="0.3">
+          <animate attributeName="opacity" values="0.1;0.4;0.1" dur="1.5s" repeatCount="indefinite"/>
+        </line>
+        <line x1="170" y1="80" x2="230" y2="80" stroke="#a6e3a1" stroke-width="1" opacity="0.5">
+          <animate attributeName="y1" values="55;135;55" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="y2" values="55;135;55" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="x1" values="183;168;183" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="x2" values="217;232;217" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+        </line>
+        <g transform="translate(200,35)">
+          <ellipse cx="0" cy="-5" rx="12" ry="9" fill="#45475a" stroke="#cba6f7" stroke-width="1"/>
+          <ellipse cx="0" cy="2" rx="28" ry="8" fill="#313244" stroke="#cba6f7" stroke-width="1.2"/>
+          <circle cx="-18" cy="2" r="2.5" fill="#a6e3a1"><animate attributeName="fill" values="#a6e3a1;#89b4fa;#cba6f7;#a6e3a1" dur="1.2s" repeatCount="indefinite"/></circle>
+          <circle cx="-8" cy="5" r="2.5" fill="#89b4fa"><animate attributeName="fill" values="#89b4fa;#cba6f7;#a6e3a1;#89b4fa" dur="1.2s" repeatCount="indefinite"/></circle>
+          <circle cx="2" cy="6" r="2.5" fill="#cba6f7"><animate attributeName="fill" values="#cba6f7;#a6e3a1;#89b4fa;#cba6f7" dur="1.2s" repeatCount="indefinite"/></circle>
+          <circle cx="12" cy="5" r="2.5" fill="#a6e3a1"><animate attributeName="fill" values="#a6e3a1;#cba6f7;#a6e3a1;#89b4fa" dur="1.2s" repeatCount="indefinite"/></circle>
+          <circle cx="20" cy="1" r="2.5" fill="#89b4fa"><animate attributeName="fill" values="#89b4fa;#a6e3a1;#cba6f7;#89b4fa" dur="1.2s" repeatCount="indefinite"/></circle>
+          <ellipse cx="0" cy="-6" rx="6" ry="4" fill="#89b4fa" opacity="0.2"/>
+        </g>
+      </g>
+    </svg>
+    <div class="scan-progress-wrap"><div class="scan-progress-bar" id="scanBar"></div></div>
+    <div class="so-scanning-text">Scanning Model...</div>
+  </div>
+  <div class="so-body" id="scanLog"></div>
+  <!-- Phase 3: Complete -->
+  <div class="so-done" id="scanDone">
+    <svg viewBox="0 0 400 170" width="380" height="160" style="display:block;margin:0 auto;">
+      <circle cx="45" cy="12" r="1" fill="#6c7086" opacity="0.4"/>
+      <circle cx="120" cy="28" r="0.8" fill="#6c7086" opacity="0.3"/>
+      <circle cx="200" cy="8" r="1.2" fill="#6c7086" opacity="0.5"/>
+      <circle cx="280" cy="20" r="0.7" fill="#6c7086" opacity="0.3"/>
+      <circle cx="340" cy="10" r="1" fill="#6c7086" opacity="0.4"/>
+      <line x1="40" y1="148" x2="360" y2="148" stroke="#313244" stroke-width="1.5"/>
+      <g transform="translate(175,105)">
+        <rect x="0" y="15" width="50" height="35" fill="#313244" stroke="#6c7086" stroke-width="1" rx="1"/>
+        <polygon points="-5,15 25,-5 55,15" fill="#45475a" stroke="#6c7086" stroke-width="1"/>
+        <rect x="18" y="30" width="14" height="20" fill="#45475a" stroke="#6c7086" stroke-width="0.8" rx="1"/>
+        <circle cx="28" cy="41" r="1.2" fill="#f9e2af"/>
+        <rect x="5" y="22" width="10" height="10" fill="#f9e2af" opacity="0.3" stroke="#6c7086" stroke-width="0.8" rx="0.5"/>
+        <rect x="35" y="22" width="10" height="10" fill="#f9e2af" opacity="0.3" stroke="#6c7086" stroke-width="0.8" rx="0.5"/>
+        <rect x="35" y="-2" width="8" height="14" fill="#45475a" stroke="#6c7086" stroke-width="0.8"/>
+      </g>
+      <g transform="translate(120,118)"><rect x="5" y="20" width="5" height="12" fill="#45475a"/><polygon points="-2,22 7.5,2 17,22" fill="#585b70"/><polygon points="0,16 7.5,-2 15,16" fill="#6c7086"/></g>
+      <g transform="translate(280,122)"><rect x="4" y="16" width="4" height="10" fill="#45475a"/><polygon points="0,18 6,2 12,18" fill="#585b70"/><polygon points="1,13 6,-1 11,13" fill="#6c7086"/></g>
+      <polygon points="185,52 175,140 225,140 215,52" fill="#a6e3a1" opacity="0.06"/>
+      <g transform="translate(200,35)">
+        <animateTransform attributeName="transform" type="translate" values="200,35;200,33;200,35" dur="2s" repeatCount="indefinite"/>
+        <ellipse cx="0" cy="-5" rx="12" ry="9" fill="#45475a" stroke="#a6e3a1" stroke-width="1"/>
+        <ellipse cx="0" cy="2" rx="28" ry="8" fill="#313244" stroke="#a6e3a1" stroke-width="1.2"/>
+        <circle cx="-18" cy="2" r="2.5" fill="#a6e3a1"/>
+        <circle cx="-8" cy="5" r="2.5" fill="#a6e3a1"/>
+        <circle cx="2" cy="6" r="2.5" fill="#a6e3a1"/>
+        <circle cx="12" cy="5" r="2.5" fill="#a6e3a1"/>
+        <circle cx="20" cy="1" r="2.5" fill="#a6e3a1"/>
+        <ellipse cx="0" cy="-6" rx="6" ry="4" fill="#a6e3a1" opacity="0.2"/>
+      </g>
+      <g transform="translate(180,80)">
+        <polyline points="10,20 20,30 38,8" fill="none" stroke="#a6e3a1" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+    <div class="so-summary" id="scanSummary"></div>
+  </div>
+  <div class="so-btns" id="scanBtns">
+    <button class="hb" onclick="closeScanDialog()">Cancel</button>
+    <button class="hb grn" id="scanGoBtn" onclick="doScan()">Scan Model</button>
+  </div>
+</div>
+
 <script>
 var D=[],CA=[],CO=[],F=[],sc='definitionName',sd=1;
 var SEL={},lastCheckIdx=-1;
@@ -191,8 +363,96 @@ var openCats={};
 var VIS={},CATVIS={};
 var debugOn=false;
 
+/* SVG ICON TEMPLATES */
+var ICO_EYE_OPEN='<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var ICO_EYE_CLOSED='<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+var ICO_ZOOM='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+var ICO_ISO='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>';
+var ICO_SEL='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>';
+var ICO_X='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+var ICO_LF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>';
+var ICO_SF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
+/* Tiny inline unit icons for value cells (12px, no hover behavior) */
+var ICO_LF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="8" y1="6" x2="8" y2="10"/></svg>';
+var ICO_SF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="#a6adc8" fill-opacity="0.12"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
+/* Returns small inline unit label: icon for LF/SF, text for others */
+function uLabel(m){
+  if(m==='lf')return ICO_LF_SM;
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return ICO_SF_SM;
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return' <span style="color:#a6adc8;font-size:10px">EA</span>';
+  return' <span style="color:#a6adc8;font-size:10px">ft\u00B3</span>';
+}
+/* Returns action-button icon and onclick for measurement tool based on unit */
+function mtBtn(mt,gk){
+  var gke=X2(gk);
+  if(mt==='lf')return'<button class="ib warn" onclick="call(\'activateLF\')" title="Measure LF">'+ICO_LF+'</button>';
+  if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
+  if(mt==='ea_sf')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
+  if(mt==='ea_bf')return'<button class="ib warn" onclick="call(\'activateLF\')" title="Measure LF">'+ICO_LF+'</button>';
+  return '';
+}
+
 function log(m,c){var el=document.getElementById('dbg'),d=document.createElement('div');if(c)d.className=c;d.textContent='['+new Date().toLocaleTimeString()+'] '+m;el.appendChild(d);el.scrollTop=el.scrollHeight;}
 function toggleDebug(){debugOn=!debugOn;document.getElementById('dbg').className=debugOn?'show':'';}
+
+/* ═══ SCAN DIALOG ═══ */
+function showScanDialog(){
+  document.getElementById('scanForm').style.display='flex';
+  document.getElementById('scanProgress').className='so-scanning';
+  document.getElementById('scanLog').className='so-body';
+  document.getElementById('scanDone').className='so-done';
+  document.getElementById('scanLog').innerHTML='';
+  document.getElementById('scanTitle').textContent='Scan Model';
+  document.getElementById('scanBtns').innerHTML='<button class="hb" onclick="closeScanDialog()">Cancel</button><button class="hb grn" id="scanGoBtn" onclick="doScan()">Scan Model</button>';
+  document.getElementById('scanBackdrop').className='show';
+  document.getElementById('scanOverlay').className='show';
+}
+function closeScanDialog(){
+  document.getElementById('scanOverlay').className='';
+  document.getElementById('scanBackdrop').className='';
+}
+function scanRadio(lbl){
+  var labels=document.querySelectorAll('#scanForm .so-radio-group label:not(.disabled)');
+  for(var i=0;i<labels.length;i++)labels[i].className='';
+  lbl.className='active';
+}
+function doScan(){
+  document.getElementById('scanForm').style.display='none';
+  document.getElementById('scanBtns').innerHTML='';
+  document.getElementById('scanProgress').className='so-scanning show';
+  document.getElementById('scanLog').className='so-body show';
+  document.getElementById('scanTitle').textContent='Scanning...';
+  call('rescan');
+}
+function scanStart(){
+  if(!document.getElementById('scanOverlay').classList.contains('show')){
+    document.getElementById('scanForm').style.display='none';
+    document.getElementById('scanBtns').innerHTML='';
+    document.getElementById('scanProgress').className='so-scanning show';
+    document.getElementById('scanLog').className='so-body show';
+    document.getElementById('scanDone').className='so-done';
+    document.getElementById('scanLog').innerHTML='';
+    document.getElementById('scanTitle').textContent='Scanning...';
+    document.getElementById('scanBackdrop').className='show';
+    document.getElementById('scanOverlay').className='show';
+  }
+  scanMsg('Scan started','stat');
+}
+function scanMsg(m,cls){
+  var lb=document.getElementById('scanLog'),d=document.createElement('div');
+  d.textContent='['+new Date().toLocaleTimeString()+'] '+m;
+  if(cls)d.className=cls;
+  lb.appendChild(d);lb.scrollTop=lb.scrollHeight;
+}
+function scanEnd(summary){
+  scanMsg(summary||'Scan complete','done');
+  document.getElementById('scanProgress').className='so-scanning';
+  document.getElementById('scanTitle').textContent='Scan Complete';
+  document.getElementById('scanDone').className='so-done show';
+  document.getElementById('scanSummary').textContent=summary||'Scan complete';
+  document.getElementById('scanBtns').innerHTML='<button class="hb grn" onclick="closeScanDialog()">Close</button>';
+  setTimeout(function(){closeScanDialog();},3000);
+}
 
 function call(n,a){
   try{
@@ -233,12 +493,14 @@ function buildDD(){
   cats.sort();ccs.sort();subs.sort();
   var h='<option value="">All</option>';
   for(i=0;i<cats.length;i++)h+='<option>'+X(cats[i])+'</option>';
+  h+='<option value="__addcat__">+ Add new category</option>';
   document.getElementById('fC').innerHTML=h;
   h='<option value="">All</option>';
   for(i=0;i<ccs.length;i++)h+='<option>'+X(ccs[i])+'</option>';
   document.getElementById('fCC').innerHTML=h;
   h='<option value="">All</option>';
   for(i=0;i<subs.length;i++)h+='<option>'+X(subs[i])+'</option>';
+  h+='<option value="__addsub__">+ Add new subcategory</option>';
   document.getElementById('fSub').innerHTML=h;
 }
 function buildCatPanel(){
@@ -257,6 +519,20 @@ function buildBulkDDs(){
   h='<option value="">--</option>';
   for(var i=0;i<CO.length;i++)h+='<option value="'+CO[i].code+'">'+X(CO[i].full)+'</option>';
   document.getElementById('bulkCC').innerHTML=h;
+}
+function fCatChange(sel){
+  if(sel.value==='__addcat__'){
+    var n=prompt('New category name:');
+    if(n&&n.trim()){n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}buildDD();buildBulkDDs();sel.value=n;}
+    else{sel.value='';} filt();
+  }else{filt();}
+}
+function fSubChange(sel){
+  if(sel.value==='__addsub__'){
+    var n=prompt('New subcategory name:');
+    if(n&&n.trim()){n=n.trim();buildDD();sel.value=n;}
+    else{sel.value='';} filt();
+  }else{filt();}
 }
 
 /* ═══ CATEGORY BADGE ═══ */
@@ -318,18 +594,18 @@ function strip(){
 /* ═══ MEASUREMENTS ═══ */
 function pv(r){
   var m=r.measurementType||'volume';
-  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return(r.instanceCount||1)+' EA';
-  if(m==='lf'){var l=r.linearFt||0;return l>0?(l*(r.instanceCount||1)).toFixed(1)+' LF':'--';}
-  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF?r.areaSF.toFixed(1)+' SF':'--';
-  if(m==='volume')return r.volumeFt3?r.volumeFt3.toFixed(2)+' ft3':'--';
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return(r.instanceCount||1)+uLabel(m);
+  if(m==='lf'){var l=r.linearFt||0;return l>0?(l*(r.instanceCount||1)).toFixed(1)+uLabel(m):'--';}
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF?r.areaSF.toFixed(1)+uLabel(m):'--';
+  if(m==='volume')return r.volumeFt3?r.volumeFt3.toFixed(2)+uLabel(m):'--';
   return '--';
 }
 function sv2(r){
   var m=r.measurementType||'volume';
-  if(m==='sf_cy')return r.volumeFt3?(r.volumeFt3/27).toFixed(2)+' CY':'';
-  if(m==='ea_bf')return r.volumeBF?r.volumeBF.toFixed(1)+' BF':'';
-  if(m==='ea_sf'){var w=(r.bbWidth||0)/12,h2=(r.bbHeight||0)/12,a=w*h2*(r.instanceCount||1);return a>0?a.toFixed(1)+' SF':'';}
-  if(m==='sf_sheets'){return r.areaSF?Math.ceil(r.areaSF/32)+' sht':'';}
+  if(m==='sf_cy')return r.volumeFt3?(r.volumeFt3/27).toFixed(2)+' <span style="color:#a6adc8;font-size:10px">CY</span>':'';
+  if(m==='ea_bf')return r.volumeBF?r.volumeBF.toFixed(1)+' <span style="color:#a6adc8;font-size:10px">BF</span>':'';
+  if(m==='ea_sf'){var w=(r.bbWidth||0)/12,h2=(r.bbHeight||0)/12,a=w*h2*(r.instanceCount||1);return a>0?a.toFixed(1)+uLabel('sf'):'';}
+  if(m==='sf_sheets'){return r.areaSF?Math.ceil(r.areaSF/32)+' <span style="color:#a6adc8;font-size:10px">sht</span>':'';}
   return '';
 }
 function pn(r){
@@ -350,10 +626,10 @@ function grpTotal(items){
   }
   if(!items.length)return'';
   m=items[0].measurementType||'volume';
-  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return tot+' EA';
-  if(m==='lf')return tot.toFixed(1)+' LF';
-  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return tot.toFixed(1)+' SF';
-  return tot.toFixed(2)+' ft3';
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return tot+uLabel(m);
+  if(m==='lf')return tot.toFixed(1)+uLabel(m);
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return tot.toFixed(1)+uLabel(m);
+  return tot.toFixed(2)+uLabel(m);
 }
 
 /* ═══ GROUPED RENDER ═══ */
@@ -382,37 +658,39 @@ function renderGroups(){
     // ── HEADER ──
     h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')">';
     // Eye toggle
-    h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togCatVis(\''+X2(gk)+'\')" title="'+(catVis?'Hide':'Show')+'">'+(catVis?'&#9679;':'&#9675;')+'</button>';
+    h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togCatVis(\''+X2(gk)+'\')" title="'+(catVis?'Hide':'Show')+'">'+(catVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
     h+='<span class="arr">&#9660;</span>';
     // Name badge
     if(gBy==='category') h+=catNameSpan(gk);
     else h+='<span class="cname" style="background:#585b70;color:#cdd6f4">'+X(gk)+'</span>';
-    h+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
-    // Measurement dropdown (category mode only)
+    h+='<span style="color:#6c7086;font-size:11px">('+items.length+')</span>';
+    // Total
+    h+='<span class="cinfo">'+grpTotal(items)+'</span>';
+    h+='</div>';
+
+    // ── EXPANDED TOOLBAR + TABLE ──
+    h+='<div class="cgb">';
+    h+='<div class="cg-toolbar">';
     if(gBy==='category'){
       var curMT=items.length?items[0].measurementType:'volume';
-      h+='<select class="cs" style="font-size:9px;padding:0 2px" onclick="event.stopPropagation()" onchange="event.stopPropagation();setMT(\''+X2(gk)+'\',this.value)">';
+      h+='<label style="color:#a6adc8">Unit:</label>';
+      h+='<select class="cs" onchange="setMT(\''+X2(gk)+'\',this.value)">';
       var mts=[['ea','EA'],['lf','LF'],['sf','SF'],['sf_cy','SF+CY'],['sf_sheets','SF+sht'],['ea_bf','EA+BF'],['ea_sf','EA+SF'],['volume','ft3']];
       for(var mi=0;mi<mts.length;mi++) h+='<option value="'+mts[mi][0]+'"'+(curMT===mts[mi][0]?' selected':'')+'>'+mts[mi][1]+'</option>';
       h+='</select>';
     }
-    // Total
-    h+='<span class="cinfo">'+grpTotal(items)+'</span>';
-    // Actions
     h+='<span class="cact">';
     if(gBy==='category'){
-      h+='<button class="ab" onclick="event.stopPropagation();isoCat(\''+X2(gk)+'\')" title="Isolate">Iso</button>';
-      h+='<button class="ab" onclick="event.stopPropagation();zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">Z</button>';
-      h+='<button class="ab" onclick="event.stopPropagation();call(\'activateSFForCat\',\''+X2(gk)+'\')" title="Manual SF" style="color:#f9e2af">SF</button>';
+      h+='<button class="ib accent" onclick="isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
+      h+='<button class="ib accent" onclick="zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">'+ICO_ZOOM+'</button>';
+      h+=mtBtn(curMT,gk);
     }
-    h+='<button class="ab" onclick="event.stopPropagation();selGrpItems(\''+X2(gk)+'\')">Sel</button>';
-    if(gBy==='category') h+='<button class="ab" onclick="event.stopPropagation();excludeCat(\''+X2(gk)+'\')" title="Exclude" style="color:#f38ba8">x</button>';
+    h+='<button class="ib accent" onclick="selGrpItems(\''+X2(gk)+'\')" title="Select all">'+ICO_SEL+'</button>';
+    if(gBy==='category') h+='<button class="ib danger" onclick="excludeCat(\''+X2(gk)+'\')" title="Exclude">'+ICO_X+'</button>';
     h+='</span></div>';
-
-    // ── TABLE ──
-    h+='<div class="cgb"><table><thead><tr>';
+    h+='<table><thead><tr>';
     h+='<th class="ck"><input type="checkbox" onchange="selGrpAll(\''+X2(gk)+'\',this.checked)"></th>';
-    h+='<th></th>'; // eye
+    h+='<th style="width:18px;text-align:center;padding:4px 2px" title="Visibility"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></th>';
     h+='<th>Category</th><th>Code</th><th>Sub</th><th>Name</th><th>Size</th>';
     h+='<th style="text-align:right">Qty</th><th style="text-align:right">Primary</th><th style="text-align:right">2nd</th>';
     h+='<th></th>'; // actions
@@ -439,7 +717,7 @@ function renderGroups(){
 
       h+='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+(sel?' class="sel"':'')+'>';
       h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
-      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?'&#9679;':'&#9675;')+'</button></td>';
+      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button></td>';
       h+='<td><select class="cs" onchange="doSetCat('+row.entityId+',this.value)">'+co+'</select></td>';
       h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
       h+='<td><input class="sz" value="'+X(row.subcategory||'')+'" data-eid="'+row.entityId+'" onchange="doSetSub(this)" placeholder="..." style="width:60px"></td>';
@@ -451,8 +729,8 @@ function renderGroups(){
       h+='<td class="r">'+pv(row)+'</td>';
       h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
       h+='<td style="white-space:nowrap">';
-      h+='<button class="ab" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">I</button>';
-      h+='<button class="ab" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom">Z</button>';
+      h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
+      h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
       h+='</td></tr>';
     }
     h+='</tbody></table></div></div>';
