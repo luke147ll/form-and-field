@@ -94,6 +94,7 @@ module TakeoffTool
         dx = x - @lx; dy = y - @ly
         @lx = x; @ly = y
         return true if dx==0 && dy==0
+        return true if dx.abs > 50 || dy.abs > 50
         cam = view.camera; e = cam.eye; d = cam.target - e
         dist = d.length; dn = d.normalize
         yaw = -dx * 0.005

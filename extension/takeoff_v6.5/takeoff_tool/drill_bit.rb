@@ -7,10 +7,8 @@ module TakeoffTool
         @depth = 0
       end
       def activate
-        @highlight = nil
-        @stack = []
-        @depth = 0
-        Sketchup.status_text = "DRILL BIT | Hover to detect, arrows drill, click to select, N to exit"
+        @highlight = nil; @stack = []; @depth = 0
+        Sketchup.status_text = "DRILL BIT | Hover to detect, click to open and select, N to exit"
       end
       def deactivate(view)
         @highlight = nil
@@ -42,13 +40,11 @@ module TakeoffTool
         case key
         when 0x26
           if @depth < @stack.length - 1
-            @depth += 1
-            highlight_current(view)
+            @depth += 1; highlight_current(view)
           end
         when 0x28
           if @depth > 0
-            @depth -= 1
-            highlight_current(view)
+            @depth -= 1; highlight_current(view)
           end
         when 0x25
           siblings = get_siblings
@@ -66,16 +62,28 @@ module TakeoffTool
             @stack[@depth] = siblings[idx]
             highlight_current(view)
           end
-        when 0x0C
-          select_current
         end
         true
       end
-      def onKeyUp(key, repeat, flags, view)
-        true
-      end
+      def onKeyUp(key, repeat, flags, view); true; end
       def onLButtonDown(flags, x, y, view)
-        select_current
+        return true unless @highlight && @stack.length > 0
+        model = Sketchup.active_model
+        target = @stack[@depth]
+        parent_path = @stack[0...@depth]
+        model.select_tool(nil)
+        model.active_path = nil
+        if parent_path.length > 0
+          begin
+            model.active_path = parent_path
+          rescue => e
+            puts "active_path= error: #{e.message}"
+          end
+        end
+        model.selection.clear
+        model.selection.add(target)
+        name = target.is_a?(Sketchup::ComponentInstance) ? target.definition.name : (target.name.empty? ? "Group" : target.name)
+        Sketchup.status_text = "SELECTED: #{name} | Right-click for options, Esc to close edit"
         true
       end
       def draw(view)
@@ -100,34 +108,14 @@ module TakeoffTool
         view.draw_line(pts[2], pts[6])
         view.draw_line(pts[3], pts[7])
       end
-      def getMenu(menu)
-        true
-      end
+      def getMenu(menu); true; end
       private
       def highlight_current(view)
         return if @stack.empty? || @depth >= @stack.length
         @highlight = @stack[@depth]
-        name = ""
-        if @highlight.is_a?(Sketchup::ComponentInstance)
-          name = @highlight.definition.name
-        elsif @highlight.is_a?(Sketchup::Group)
-          name = @highlight.name.empty? ? "Group" : @highlight.name
-        end
-        Sketchup.status_text = "DRILL [#{@depth+1}/#{@stack.length}] #{name} | Up/Dn drill, L/R siblings, click select, N exit"
+        name = @highlight.is_a?(Sketchup::ComponentInstance) ? @highlight.definition.name : (@highlight.name.empty? ? "Group" : @highlight.name)
+        Sketchup.status_text = "DRILL [#{@depth+1}/#{@stack.length}] #{name} | Up/Dn drill, L/R siblings, click to open+select"
         view.invalidate
-      end
-      def select_current
-        return unless @highlight
-        sel = Sketchup.active_model.selection
-        sel.clear
-        sel.add(@highlight)
-        name = ""
-        if @highlight.is_a?(Sketchup::ComponentInstance)
-          name = @highlight.definition.name
-        elsif @highlight.is_a?(Sketchup::Group)
-          name = @highlight.name.empty? ? "Group" : @highlight.name
-        end
-        Sketchup.status_text = "SELECTED: #{name} | Right-click for options"
       end
       def get_siblings
         return [] if @stack.empty? || @depth >= @stack.length
