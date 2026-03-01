@@ -10,6 +10,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'measure_sf.rb')
   load File.join(PLUGIN_DIR, 'identify_dialog.rb')
   load File.join(PLUGIN_DIR, 'precision_nav.rb')
+  load File.join(PLUGIN_DIR, 'drill_bit.rb')
   load File.join(PLUGIN_DIR, 'context_menu.rb')
   load File.join(PLUGIN_DIR, 'parse_logger.rb')
 

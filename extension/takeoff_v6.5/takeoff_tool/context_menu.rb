@@ -71,6 +71,17 @@ module TakeoffTool
 
         sub.add_separator
 
+        # Tool toggles
+        sub.add_item('Precision Nav') do
+          TakeoffTool::PrecisionNav.toggle
+        end
+
+        sub.add_item('Drill Bit') do
+          TakeoffTool::DrillBit.toggle
+        end
+
+        sub.add_separator
+
         # Set Category submenu with dynamic categories
         cat_sub = sub.add_submenu('Set Category')
         TakeoffTool.build_context_categories.each do |cat|
