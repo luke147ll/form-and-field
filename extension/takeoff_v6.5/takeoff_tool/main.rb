@@ -9,6 +9,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'measure_lf.rb')
   load File.join(PLUGIN_DIR, 'measure_sf.rb')
   load File.join(PLUGIN_DIR, 'identify_dialog.rb')
+  load File.join(PLUGIN_DIR, 'precision_nav.rb')
   load File.join(PLUGIN_DIR, 'context_menu.rb')
   load File.join(PLUGIN_DIR, 'parse_logger.rb')
 
@@ -49,6 +50,9 @@ module TakeoffTool
     sub.add_separator
     sub.add_item('📏 LF Measure Tool') { TakeoffTool.activate_lf_tool }
     sub.add_item('📐 SF Measure Tool') { TakeoffTool.activate_sf_tool }
+    nav_cmd = UI::Command.new('Precision Navigation') { PrecisionNav.toggle }
+    nav_cmd.set_validation_proc { PrecisionNav.enabled? ? MF_CHECKED : MF_UNCHECKED }
+    sub.add_item(nav_cmd)
     sub.add_separator
     sub.add_item('Highlight by Category') { Highlighter.highlight_all(@scan_results, @category_assignments) }
     sub.add_item('Clear Highlights') { Highlighter.clear_all }
