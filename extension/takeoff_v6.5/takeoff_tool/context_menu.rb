@@ -91,10 +91,43 @@ module TakeoffTool
         end
         cat_sub.add_separator
         cat_sub.add_item('Custom...') do
-          result = UI.inputbox(['Category Name:'], [''], 'Custom Category')
-          if result && result[0] && !result[0].strip.empty?
-            TakeoffTool.apply_category_to_selection(sel.to_a, result[0].strip)
+          entities = sel.to_a
+          cdlg = UI::HtmlDialog.new(
+            dialog_title: "New Category",
+            preferences_key: "TakeoffCustomCat",
+            width: 300, height: 160,
+            left: 200, top: 200,
+            resizable: false,
+            style: UI::HtmlDialog::STYLE_DIALOG
+          )
+          cdlg.add_action_callback('ok') do |_ctx, cat_str|
+            cdlg.close rescue nil
+            cat = cat_str.to_s.strip
+            TakeoffTool.apply_category_to_selection(entities, cat) unless cat.empty?
           end
+          cdlg.add_action_callback('cancel') do |_ctx|
+            cdlg.close rescue nil
+          end
+          cdlg.set_html(<<~HTML
+            <!DOCTYPE html><html><head><meta charset="UTF-8">
+            <style>#{PICK_DIALOG_CSS}</style></head><body>
+            <h1>New Category</h1>
+            <label>Category Name</label>
+            <input id="cat" type="text" autofocus>
+            <div class="buttons">
+              <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
+              <button class="btn btn-ok" onclick="var v=document.getElementById('cat').value.trim();if(v)sketchup.ok(v);">OK</button>
+            </div>
+            <script>
+              document.addEventListener('keydown',function(e){
+                if(e.key==='Enter'){var v=document.getElementById('cat').value.trim();if(v)sketchup.ok(v);}
+                if(e.key==='Escape')sketchup.cancel();
+              });
+            </script>
+            </body></html>
+          HTML
+          )
+          cdlg.show
         end
       end
     end

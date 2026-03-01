@@ -5,7 +5,7 @@ module TakeoffTool
     def self.show(sr, ca, cca)
       if @dialog && @dialog.visible?; send_data(sr, ca, cca); return; end
 
-      @dialog = UI::HtmlDialog.new(dialog_title:"Takeoff Tool v5", preferences_key:"TakeoffDash",
+      @dialog = UI::HtmlDialog.new(dialog_title:"Form and Field \u2014 Takeoff Report", preferences_key:"TakeoffDash",
         width:1280, height:780, left:80, top:80, resizable:true, style:UI::HtmlDialog::STYLE_DIALOG)
       @dialog.set_file(File.join(PLUGIN_DIR,'ui','dashboard.html'))
 

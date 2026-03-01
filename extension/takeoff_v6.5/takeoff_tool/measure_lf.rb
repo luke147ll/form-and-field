@@ -25,6 +25,66 @@ module TakeoffTool
     'Crown Mold','Casing','Countertops','Railing','Drip Edge',
     'Casework','Roofing','Drywall','Custom']
 
+  PICK_DIALOG_CSS = <<~CSS.freeze
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 16px;
+      overflow: hidden;
+    }
+    h1 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #cba6f7;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #313244;
+    }
+    label {
+      display: block;
+      color: #a6adc8;
+      font-size: 12px;
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+    label:first-of-type { margin-top: 0; }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      background: #313244;
+      color: #cdd6f4;
+      border: 1px solid #585b70;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: #89b4fa; }
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      justify-content: flex-end;
+    }
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-ok { background: #cba6f7; color: #1e1e2e; }
+    .btn-ok:hover { background: #b4befe; }
+    .btn-cancel { background: #45475a; color: #cdd6f4; }
+    .btn-cancel:hover { background: #585b70; }
+  CSS
+
   class MeasureLFTool
 
     def initialize
@@ -247,33 +307,74 @@ module TakeoffTool
         chain.each_cons(2) { |a, b| total_inches += a.distance(b) }
       end
       total_ft = total_inches / 12.0
+      saved_segments = @segments.map { |c| c.dup }
+      lf_tool = self
 
-      cat = pick_category(total_ft)
-      unless cat
-        Sketchup.status_text = "LF Tool: Cancelled. Click to start a new measurement."
-        reset_full
-        view.invalidate
-        return
+      cat_options = LF_CATEGORIES.map { |c|
+        sel = c == (@last_cat || 'Trim') ? ' selected' : ''
+        "<option value=\"#{c}\"#{sel}>#{c}</option>"
+      }.join
+
+      html = <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8">
+        <style>#{PICK_DIALOG_CSS}</style></head><body>
+        <h1>LF Measurement &mdash; #{'%.1f' % total_ft} ft</h1>
+        <label>Category</label>
+        <select id="cat">#{cat_options}</select>
+        <label>Cost Code (optional)</label>
+        <input id="cc" type="text" value="#{(@last_cc || '').gsub('"', '&quot;')}">
+        <label>Note (optional)</label>
+        <input id="note" type="text" value="">
+        <div class="buttons">
+          <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
+          <button class="btn btn-ok" onclick="sketchup.ok(document.getElementById('cat').value,document.getElementById('cc').value,document.getElementById('note').value)">OK</button>
+        </div>
+        <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
+        </body></html>
+      HTML
+
+      @pick_dlg.close if @pick_dlg rescue nil
+      @pick_dlg = UI::HtmlDialog.new(
+        dialog_title: "LF Measurement",
+        preferences_key: "TakeoffLFPick",
+        width: 320, height: 280,
+        left: 200, top: 200,
+        resizable: false,
+        style: UI::HtmlDialog::STYLE_DIALOG
+      )
+
+      @pick_dlg.add_action_callback('ok') do |_ctx, cat_str, cc_str, note_str|
+        @pick_dlg.close rescue nil
+        cat = cat_str.to_s.strip
+        unless cat.empty?
+          lf_tool.send(:on_lf_ok, cat, cc_str.to_s, note_str.to_s,
+                        total_ft, total_inches, saved_segments, view)
+        end
       end
 
+      @pick_dlg.add_action_callback('cancel') do |_ctx|
+        @pick_dlg.close rescue nil
+        Sketchup.status_text = "LF Tool: Cancelled. Click to start a new measurement."
+        lf_tool.send(:reset_full)
+        view.invalidate
+      end
+
+      @pick_dlg.set_html(html)
+      @pick_dlg.show
+    end
+
+    def on_lf_ok(cat, cc, note, total_ft, total_inches, saved_segments, view)
+      @last_cat = cat
+      @last_cc = cc
+      @last_note = note
+      orig = @segments
+      @segments = saved_segments
       create_ribbon_artifact(cat, total_ft, total_inches)
       add_to_results(cat, total_ft, total_inches)
-
+      @segments = orig
       Sketchup.status_text = "LF Tool: Saved #{format_length(total_inches)} of #{cat}. Click to start a new measurement."
       reset_full
       view.invalidate
-    end
-
-    def pick_category(total_ft)
-      prompts = ['Category', 'Cost Code (optional)', 'Note (optional)']
-      defaults = [@last_cat || 'Trim', @last_cc || '', '']
-      list = [LF_CATEGORIES.join('|'), '', '']
-      result = UI.inputbox(prompts, defaults, list, "LF Measurement — #{('%.1f' % total_ft)} ft")
-      return nil unless result
-      @last_cat = result[0]
-      @last_cc = result[1]
-      @last_note = result[2]
-      result[0]
     end
 
     # ─── Create colored ribbon (thin face strip) for visibility ───

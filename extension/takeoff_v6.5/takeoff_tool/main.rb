@@ -66,6 +66,73 @@ module TakeoffTool
     @menu_loaded = true
   end
 
+  unless @toolbar_loaded
+    toolbar = UI::Toolbar.new("Form and Field")
+
+    cmd_scan = UI::Command.new("Scan Model") { StartupDialog.show }
+    cmd_scan.small_icon = File.join(PLUGIN_DIR, "icons", "scan_ufo_24.png")
+    cmd_scan.large_icon = File.join(PLUGIN_DIR, "icons", "scan_ufo_32.png")
+    cmd_scan.tooltip = "Scan Model"
+    cmd_scan.status_bar_text = "Scan the model and categorize all components"
+    toolbar.add_item(cmd_scan)
+
+    cmd_drill = UI::Command.new("Drill Bit") { DrillBit.toggle }
+    cmd_drill.small_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_24.png")
+    cmd_drill.large_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_32.png")
+    cmd_drill.tooltip = "Drill Bit - Click through nested components"
+    cmd_drill.status_bar_text = "Activate Drill Bit mode to select deeply nested components"
+    toolbar.add_item(cmd_drill)
+
+    cmd_nav = UI::Command.new("Precision Nav") { PrecisionNav.toggle }
+    cmd_nav.small_icon = File.join(PLUGIN_DIR, "icons", "nav_mode_24.png")
+    cmd_nav.large_icon = File.join(PLUGIN_DIR, "icons", "nav_mode_32.png")
+    cmd_nav.tooltip = "Precision Nav - Fly through the model"
+    cmd_nav.status_bar_text = "Activate fly camera navigation mode"
+    toolbar.add_item(cmd_nav)
+
+    cmd_identify = UI::Command.new("Identify") {
+      sel = Sketchup.active_model.selection
+      IdentifyDialog.show(sel) if sel && !sel.empty?
+    }
+    cmd_identify.small_icon = File.join(PLUGIN_DIR, "icons", "identify_24.png")
+    cmd_identify.large_icon = File.join(PLUGIN_DIR, "icons", "identify_32.png")
+    cmd_identify.tooltip = "Identify - Inspect selected component"
+    cmd_identify.status_bar_text = "Show details about the selected component"
+    toolbar.add_item(cmd_identify)
+
+    cmd_report = UI::Command.new("View Report") { TakeoffTool.open_dashboard }
+    cmd_report.small_icon = File.join(PLUGIN_DIR, "icons", "report_24.png")
+    cmd_report.large_icon = File.join(PLUGIN_DIR, "icons", "report_32.png")
+    cmd_report.tooltip = "View Report"
+    cmd_report.status_bar_text = "Open the takeoff dashboard"
+    toolbar.add_item(cmd_report)
+
+    # Dev reload button (only in debug mode)
+    if Sketchup.read_default("FormAndField", "debug_mode", false)
+      cmd_reload = UI::Command.new("Reload FF") {
+        load 'takeoff_tool/main.rb'
+        puts "Form and Field reloaded!"
+      }
+      cmd_reload.small_icon = File.join(PLUGIN_DIR, "icons", "report_24.png")
+      cmd_reload.large_icon = File.join(PLUGIN_DIR, "icons", "report_32.png")
+      cmd_reload.tooltip = "DEV: Reload Form and Field"
+      cmd_reload.status_bar_text = "Reload the Form and Field plugin (dev mode)"
+      toolbar.add_item(cmd_reload)
+    end
+
+    toolbar.show
+    @toolbar_loaded = true
+  end
+
+  unless @auto_load_done
+    UI.start_timer(1.0, false) do
+      if load_scan_from_model
+        puts "Takeoff: Scan data restored - dashboard ready"
+      end
+    end
+    @auto_load_done = true
+  end
+
   def self.run_scan(progress_dlg = nil)
     m = Sketchup.active_model
     return UI.messagebox("No model open.") unless m
@@ -113,6 +180,7 @@ module TakeoffTool
           safe = summary.gsub("\\", "\\\\").gsub("'", "\\\\'")
           progress_dlg.execute_script("if(typeof scanComplete==='function')scanComplete('#{safe}')") rescue nil
         end
+        save_scan_to_model
         open_dashboard
       end
     rescue => e
@@ -170,10 +238,159 @@ module TakeoffTool
     puts "Takeoff: Loaded #{count_cat} saved categories, #{count_cc} saved cost codes" if (count_cat + count_cc) > 0
   end
 
+  # Save model-level scan metadata
+  def self.save_scan_metadata(model)
+    model.set_attribute('FormAndField', 'scan_version', PLUGIN_VERSION)
+    model.set_attribute('FormAndField', 'scan_time', Time.now.to_i)
+    model.set_attribute('FormAndField', 'scan_count', @scan_results.length)
+    model.set_attribute('FormAndField', 'def_count',
+      model.definitions.count { |d| !d.image? && d.instances.length > 0 })
+  end
+
+  # Persist scan results to entity attributes so data survives between sessions
+  def self.save_scan_to_model
+    m = Sketchup.active_model
+    return unless m
+    save_scan_metadata(m)
+    count = 0
+    @scan_results.each do |r|
+      next if r[:source] == :manual_lf || r[:source] == :manual_sf
+      e = @entity_registry[r[:entity_id]]
+      next unless e && e.valid?
+      d = 'TakeoffScanData'
+      e.set_attribute(d, 'display_name', r[:display_name].to_s)
+      e.set_attribute(d, 'tag', r[:tag].to_s)
+      e.set_attribute(d, 'auto_category', r[:parsed][:auto_category].to_s)
+      e.set_attribute(d, 'auto_subcategory', (r[:parsed][:auto_subcategory] || '').to_s)
+      e.set_attribute(d, 'measurement_type', (r[:parsed][:measurement_type] || '').to_s)
+      e.set_attribute(d, 'category_source', (r[:parsed][:category_source] || '').to_s)
+      e.set_attribute(d, 'is_solid', r[:is_solid] ? true : false)
+      e.set_attribute(d, 'volume_ft3', r[:volume_ft3].to_f)
+      e.set_attribute(d, 'area_sf', r[:area_sf] ? r[:area_sf].to_f : 0.0)
+      e.set_attribute(d, 'linear_ft', r[:linear_ft].to_f)
+      e.set_attribute(d, 'instance_count', r[:instance_count].to_i)
+      e.set_attribute(d, 'material', (r[:material] || '').to_s)
+      e.set_attribute(d, 'ifc_type', (r[:ifc_type] || '').to_s)
+      e.set_attribute(d, 'element_type', (r[:parsed][:element_type] || '').to_s)
+      e.set_attribute(d, 'function', (r[:parsed][:function] || '').to_s)
+      e.set_attribute(d, 'parsed_material', (r[:parsed][:material] || '').to_s)
+      e.set_attribute(d, 'thickness', (r[:parsed][:thickness] || '').to_s)
+      e.set_attribute(d, 'size_nominal', (r[:parsed][:size_nominal] || '').to_s)
+      e.set_attribute(d, 'revit_id', (r[:parsed][:revit_id] || '').to_s)
+      count += 1
+    end
+    puts "Takeoff: Saved #{count} scan results to model"
+  rescue => e
+    puts "Takeoff: save_scan_to_model error: #{e.message}"
+  end
+
+  # Reconstruct scan results from saved entity attributes (no expensive recomputation)
+  def self.load_scan_from_model
+    m = Sketchup.active_model
+    return false unless m
+    return false unless m.get_attribute('FormAndField', 'scan_version')
+
+    puts "Takeoff: Loading saved scan data..."
+    @scan_results = []
+    @entity_registry = {}
+    @category_assignments = {}
+    @cost_code_assignments = {}
+
+    m.definitions.each do |defn|
+      next if defn.image?
+      defn.instances.each do |inst|
+        d = 'TakeoffScanData'
+        auto_cat = inst.get_attribute(d, 'auto_category')
+        next unless auto_cat && !auto_cat.empty?
+
+        dname = defn.name || ''
+        bb = inst.bounds
+        w = bb.width.to_f; h = bb.height.to_f; dp = bb.depth.to_f
+
+        vol_ft3 = (inst.get_attribute(d, 'volume_ft3') || 0.0).to_f
+        vi3 = vol_ft3 * 1728.0
+
+        parsed = {
+          raw: inst.get_attribute(d, 'display_name') || dname,
+          element_type: inst.get_attribute(d, 'element_type'),
+          function: inst.get_attribute(d, 'function'),
+          material: inst.get_attribute(d, 'parsed_material'),
+          thickness: inst.get_attribute(d, 'thickness'),
+          size_nominal: inst.get_attribute(d, 'size_nominal'),
+          revit_id: inst.get_attribute(d, 'revit_id'),
+          auto_category: auto_cat,
+          auto_subcategory: inst.get_attribute(d, 'auto_subcategory') || '',
+          measurement_type: inst.get_attribute(d, 'measurement_type'),
+          category_source: inst.get_attribute(d, 'category_source')
+        }
+        parsed.each { |k, v| parsed[k] = nil if v.is_a?(String) && v.empty? && k != :auto_subcategory }
+
+        asf_raw = inst.get_attribute(d, 'area_sf')
+        asf = (asf_raw && asf_raw.to_f > 0) ? asf_raw.to_f.round(2) : nil
+
+        result = {
+          entity_id: inst.entityID,
+          entity_type: inst.typename,
+          tag: inst.get_attribute(d, 'tag') || (inst.layer ? inst.layer.name : 'Untagged'),
+          definition_name: dname,
+          display_name: inst.get_attribute(d, 'display_name') || dname,
+          instance_name: (inst.name && !inst.name.empty?) ? inst.name : nil,
+          is_solid: inst.get_attribute(d, 'is_solid') || false,
+          instance_count: (inst.get_attribute(d, 'instance_count') || 1).to_i,
+          ifc_type: inst.get_attribute(d, 'ifc_type'),
+          volume_in3: vi3.round(2),
+          volume_ft3: vol_ft3.round(4),
+          volume_bf: (vi3 / 144.0).round(2),
+          bb_width_in: w.round(2), bb_height_in: h.round(2), bb_depth_in: dp.round(2),
+          linear_ft: (inst.get_attribute(d, 'linear_ft') || 0.0).to_f.round(2),
+          area_sf: asf,
+          material: inst.get_attribute(d, 'material'),
+          parsed: parsed, warnings: []
+        }
+        # Clean nil/empty ifc_type and material
+        result[:ifc_type] = nil if result[:ifc_type].is_a?(String) && result[:ifc_type].empty?
+        result[:material] = nil if result[:material].is_a?(String) && result[:material].empty?
+
+        @scan_results << result
+        @entity_registry[inst.entityID] = inst
+      end
+    end
+
+    @scan_results.sort_by! { |r| [r[:tag] || 'zzz', r[:display_name] || ''] }
+
+    load_saved_assignments
+    load_manual_measurements
+
+    # Change detection
+    saved_defs = m.get_attribute('FormAndField', 'def_count') || 0
+    current_defs = m.definitions.count { |dd| !dd.image? && dd.instances.length > 0 }
+    if saved_defs > 0 && (current_defs - saved_defs).abs > [saved_defs * 0.1, 5].max
+      puts "Takeoff: WARNING - Model changed since last scan (#{saved_defs} -> #{current_defs} active defs). Consider rescanning."
+    end
+
+    puts "Takeoff: Loaded #{@scan_results.length} elements from saved scan data"
+    true
+  rescue => e
+    puts "Takeoff: load_scan_from_model error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+    false
+  end
+
   def self.open_dashboard
     if @scan_results.empty?
-      r = UI.messagebox("No scan data. Run scan first?", MB_YESNO)
-      return r == IDYES ? run_scan : nil
+      unless load_scan_from_model
+        r = UI.messagebox("No scan data. Run scan first?", MB_YESNO)
+        return r == IDYES ? run_scan : nil
+      end
+    end
+    # Check staleness
+    m = Sketchup.active_model
+    if m
+      saved_defs = m.get_attribute('FormAndField', 'def_count') || 0
+      current_defs = m.definitions.count { |d| !d.image? && d.instances.length > 0 }
+      if saved_defs > 0 && (current_defs - saved_defs).abs > [saved_defs * 0.1, 5].max
+        r = UI.messagebox("Model appears to have changed since last scan.\nRescan now?", MB_YESNO)
+        return run_scan if r == IDYES
+      end
     end
     Dashboard.show(@scan_results, @category_assignments, @cost_code_assignments)
   end

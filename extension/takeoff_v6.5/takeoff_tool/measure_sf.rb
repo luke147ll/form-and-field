@@ -329,37 +329,77 @@ module TakeoffTool
     def finish_measurement(view)
       return if @picked_faces.empty?
 
-      cat = pick_category(@total_sf)
-      unless cat
-        Sketchup.status_text = "SF Tool: Category cancelled. Faces still selected. Enter to try again, Esc to cancel."
-        return
-      end
-
-      apply_final_color(cat)
-      grp = create_sf_record(cat)
-      add_to_results(cat, grp)
-
-      Sketchup.status_text = "SF Tool: Saved #{'%.1f' % @total_sf} SF of #{cat}. Click to start new measurement."
-      reset_full
-      view.invalidate
-    end
-
-    def pick_category(total_sf)
       if @preset_category
         @last_cat = @preset_category
         @last_cc = ''
         @last_note = ''
-        return @preset_category
+        on_sf_ok(@preset_category, '', '', view)
+        return
       end
-      prompts = ['Category', 'Cost Code (optional)', 'Note (optional)']
-      defaults = [@last_cat || 'Drywall', @last_cc || '', '']
-      list = [SF_CATEGORIES.join('|'), '', '']
-      result = UI.inputbox(prompts, defaults, list, "SF Measurement — #{'%.1f' % total_sf} SF")
-      return nil unless result
-      @last_cat = result[0]
-      @last_cc = result[1]
-      @last_note = result[2]
-      result[0]
+
+      sf_tool = self
+      total_sf = @total_sf
+
+      cat_options = SF_CATEGORIES.map { |c|
+        sel = c == (@last_cat || 'Drywall') ? ' selected' : ''
+        "<option value=\"#{c}\"#{sel}>#{c}</option>"
+      }.join
+
+      html = <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8">
+        <style>#{PICK_DIALOG_CSS}</style></head><body>
+        <h1>SF Measurement &mdash; #{'%.1f' % total_sf} SF</h1>
+        <label>Category</label>
+        <select id="cat">#{cat_options}</select>
+        <label>Cost Code (optional)</label>
+        <input id="cc" type="text" value="#{(@last_cc || '').gsub('"', '&quot;')}">
+        <label>Note (optional)</label>
+        <input id="note" type="text" value="">
+        <div class="buttons">
+          <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
+          <button class="btn btn-ok" onclick="sketchup.ok(document.getElementById('cat').value,document.getElementById('cc').value,document.getElementById('note').value)">OK</button>
+        </div>
+        <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
+        </body></html>
+      HTML
+
+      @pick_dlg.close if @pick_dlg rescue nil
+      @pick_dlg = UI::HtmlDialog.new(
+        dialog_title: "SF Measurement",
+        preferences_key: "TakeoffSFPick",
+        width: 320, height: 280,
+        left: 200, top: 200,
+        resizable: false,
+        style: UI::HtmlDialog::STYLE_DIALOG
+      )
+
+      @pick_dlg.add_action_callback('ok') do |_ctx, cat_str, cc_str, note_str|
+        @pick_dlg.close rescue nil
+        cat = cat_str.to_s.strip
+        unless cat.empty?
+          sf_tool.send(:on_sf_ok, cat, cc_str.to_s, note_str.to_s, view)
+        end
+      end
+
+      @pick_dlg.add_action_callback('cancel') do |_ctx|
+        @pick_dlg.close rescue nil
+        Sketchup.status_text = "SF Tool: Category cancelled. Faces still selected. Enter to try again, Esc to cancel."
+      end
+
+      @pick_dlg.set_html(html)
+      @pick_dlg.show
+    end
+
+    def on_sf_ok(cat, cc, note, view)
+      @last_cat = cat
+      @last_cc = cc
+      @last_note = note
+      apply_final_color(cat)
+      grp = create_sf_record(cat)
+      add_to_results(cat, grp)
+      Sketchup.status_text = "SF Tool: Saved #{'%.1f' % @total_sf} SF of #{cat}. Click to start new measurement."
+      reset_full
+      view.invalidate
     end
 
     def apply_final_color(cat)
