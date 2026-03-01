@@ -13,6 +13,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'drill_bit.rb')
   load File.join(PLUGIN_DIR, 'context_menu.rb')
   load File.join(PLUGIN_DIR, 'parse_logger.rb')
+  load File.join(PLUGIN_DIR, 'bug_reporter.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -62,6 +63,7 @@ module TakeoffTool
     sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_separator
+    sub.add_item('Bug Reporter') { TakeoffTool::BugReporter.show }
     sub.add_item('About') { UI.messagebox("#{PLUGIN_NAME} v#{PLUGIN_VERSION}\n\nInteractive construction takeoff tool.\nScans Revit imports and generates quantities.") }
     @menu_loaded = true
   end

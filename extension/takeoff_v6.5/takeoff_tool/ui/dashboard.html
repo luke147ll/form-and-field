@@ -16,6 +16,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .hb:hover{background:#45475a}.hb.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
 .hb.grn{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1}
 .hb.yel{background:#f9e2af;color:#1e1e2e;border-color:#f9e2af}
+.hb:disabled{opacity:0.35;cursor:default;pointer-events:none}
 .hb svg{width:16px;height:16px;vertical-align:middle}
 .sep{width:1px;height:18px;background:#45475a}
 
@@ -170,7 +171,9 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <h1>Form and Field</h1><div class="sep"></div>
   <button class="hb pri" onclick="call('highlightAll')">Highlight All</button>
   <button class="hb" onclick="call('clearHighlights')">Clear</button>
+  <button class="hb" onclick="call('clearMeasurementHighlights')" title="Clear SF face colors and hide LF ribbons" style="color:#f38ba8">Clear Paint</button>
   <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
+  <button class="hb" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Undo</button>
   <button class="hb grn" onclick="toggleCatPanel()">Multi-Isolate</button>
   <div class="sep"></div>
   <button class="hb" onclick="call('exportCSV')">CSV</button>
@@ -360,6 +363,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <script>
 var D=[],CA=[],CO=[],F=[],sc='definitionName',sd=1;
 var SEL={},lastCheckIdx=-1;
+var UNDO=[],UNDO_MAX=50;
 var openCats={};
 var VIS={},CATVIS={};
 var debugOn=false;
@@ -386,10 +390,10 @@ function uLabel(m){
 /* Returns action-button icon and onclick for measurement tool based on unit */
 function mtBtn(mt,gk){
   var gke=X2(gk);
-  if(mt==='lf')return'<button class="ib warn" onclick="call(\'activateLF\')" title="Measure LF">'+ICO_LF+'</button>';
+  if(mt==='lf')return'<button class="ib warn" onclick="call(\'activateLFForCat\',\''+gke+'\')" title="Measure LF">'+ICO_LF+'</button>';
   if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
   if(mt==='ea_sf')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
-  if(mt==='ea_bf')return'<button class="ib warn" onclick="call(\'activateLF\')" title="Measure LF">'+ICO_LF+'</button>';
+  if(mt==='ea_bf')return'<button class="ib warn" onclick="call(\'activateLFForCat\',\''+gke+'\')" title="Measure LF">'+ICO_LF+'</button>';
   return '';
 }
 
@@ -819,6 +823,7 @@ function bulkSetCat(){
   var v=document.getElementById('bulkCat').value;if(!v)return;
   if(v==='__custom__'){var n=prompt('New category name:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
   var ids=getSelIds();if(!ids.length)return;
+  recordUndo(ids,'category',v);
   callJSON('bulkSetCategory',{eids:ids,val:v});
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=v;}
   clearSel();filt();
@@ -826,6 +831,7 @@ function bulkSetCat(){
 function bulkSetCC(){
   var v=document.getElementById('bulkCC').value;if(!v)return;
   var ids=getSelIds();if(!ids.length)return;
+  recordUndo(ids,'costCode',v);
   callJSON('bulkSetCostCode',{eids:ids,val:v});
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].costCode=v;}
   clearSel();filt();
@@ -833,6 +839,7 @@ function bulkSetCC(){
 function bulkSetSize(){
   var v=document.getElementById('bulkSize').value.trim();if(!v)return;
   var ids=getSelIds();if(!ids.length)return;
+  recordUndo(ids,'sizeNominal',v);
   callJSON('bulkSetSize',{eids:ids,val:v});
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].sizeNominal=v;}
   clearSel();filt();
@@ -840,12 +847,14 @@ function bulkSetSize(){
 function bulkSetSub(){
   var v=document.getElementById('bulkSub').value.trim();if(!v)return;
   var ids=getSelIds();if(!ids.length)return;
+  recordUndo(ids,'subcategory',v);
   callJSON('bulkSetSubcategory',{eids:ids,val:v});
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].subcategory=v;}
   clearSel();buildDD();filt();
 }
 function bulkExclude(){
   var ids=getSelIds();if(!ids.length)return;
+  recordUndo(ids,'category','_IGNORE');
   callJSON('bulkSetCategory',{eids:ids,val:'_IGNORE'});
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category='_IGNORE';}
   clearSel();filt();
@@ -853,20 +862,84 @@ function bulkExclude(){
 function excludeCat(cat){
   var ids=[];for(var i=0;i<D.length;i++){if(D[i].category===cat)ids.push(D[i].entityId);}
   if(!ids.length)return;
+  recordUndo(ids,'category','_IGNORE');
   callJSON('bulkSetCategory',{eids:ids,val:'_IGNORE'});
   for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].category='_IGNORE';}
   filt();
 }
 
+/* ═══ UNDO ═══ */
+function getFieldVal(eid,field){for(var i=0;i<D.length;i++){if(String(D[i].entityId)===String(eid))return D[i][field]||'';}return '';}
+function recordUndo(ids,field,newVal){
+  var ch=[];for(var j=0;j<ids.length;j++){var old=getFieldVal(ids[j],field);if(old!==newVal)ch.push({eid:ids[j],field:field,oldVal:old,newVal:newVal});}
+  if(ch.length){UNDO.push(ch);if(UNDO.length>UNDO_MAX)UNDO.shift();updateUndoBtn();}
+}
+function updateUndoBtn(){var b=document.getElementById('undoBtn');if(b)b.disabled=!UNDO.length;}
+function doUndo(){
+  if(!UNDO.length)return;
+  var ch=UNDO.pop(),needFilt=false,needDD=false;
+  for(var c=0;c<ch.length;c++){
+    var x=ch[c],eid=x.eid,f=x.field,val=x.oldVal;
+    for(var i=0;i<D.length;i++){if(String(D[i].entityId)===String(eid)){D[i][f]=val;break;}}
+    if(f==='category'){callJSON('setCategory',{eid:eid,val:val});needFilt=true;}
+    else if(f==='costCode')callJSON('setCostCode',{eid:eid,val:val});
+    else if(f==='subcategory'){callJSON('setSubcategory',{eid:eid,val:val});needDD=true;}
+    else if(f==='sizeNominal')callJSON('setSize',{eid:eid,val:val});
+    var row=document.getElementById('r'+eid);
+    if(row){
+      if(f==='category'){var dd=row.querySelector('select.cs');if(dd)dd.value=val;}
+      else if(f==='costCode'){var dd2=row.querySelectorAll('select.cs')[1];if(dd2)dd2.value=val;}
+      else if(f==='subcategory'){var inp=row.querySelectorAll('input.sz')[0];if(inp)inp.value=val||'';}
+      else if(f==='sizeNominal'){var inp2=row.querySelectorAll('input.sz')[1];if(inp2)inp2.value=val||'';}
+      row.style.background='#4a2d2d';(function(r){setTimeout(function(){r.style.background='';},1500);})(row);
+    }
+  }
+  if(needDD)buildDD();
+  if(needFilt)filt();
+  updateUndoBtn();
+}
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();doUndo();}});
+
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){
   if(v==='__custom__'){var n=prompt('New category:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
-  callJSON('setCategory',{eid:eid,val:v});
-  for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].category=v;break;}}
+  var ids=(SEL[eid]&&getSelIds().length>1)?getSelIds():[String(eid)];
+  recordUndo(ids,'category',v);
+  if(ids.length>1){callJSON('bulkSetCategory',{eids:ids,val:v});}
+  else{callJSON('setCategory',{eid:eid,val:v});}
+  for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid)D[i].category=v;}
+  for(var j=0;j<ids.length;j++){
+    var row=document.getElementById('r'+ids[j]);
+    if(row){var dd=row.querySelector('select.cs');if(dd)dd.value=v;
+      row.style.background='#2d4a2d';(function(r){setTimeout(function(){r.style.background='';},1500);})(row);}
+  }
 }
-function doSetCC(eid,v){callJSON('setCostCode',{eid:eid,val:v});}
-function doSetSize(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();callJSON('setSize',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].sizeNominal=v;break;}}}
-function doSetSub(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();callJSON('setSubcategory',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].subcategory=v;break;}}buildDD();}
+function doSetCC(eid,v){
+  var ids=(SEL[eid]&&getSelIds().length>1)?getSelIds():[String(eid)];
+  recordUndo(ids,'costCode',v);
+  if(ids.length>1){callJSON('bulkSetCostCode',{eids:ids,val:v});}
+  else{callJSON('setCostCode',{eid:eid,val:v});}
+  for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid)D[i].costCode=v;}
+  for(var j=0;j<ids.length;j++){
+    var row=document.getElementById('r'+ids[j]);
+    if(row){var dd=row.querySelectorAll('select.cs')[1];if(dd)dd.value=v;
+      row.style.background='#2d4a2d';(function(r){setTimeout(function(){r.style.background='';},1500);})(row);}
+  }
+}
+function doSetSize(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();recordUndo([eid],'sizeNominal',v);callJSON('setSize',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].sizeNominal=v;break;}}}
+function doSetSub(el){
+  var eid=el.getAttribute('data-eid'),v=el.value.trim();
+  var ids=(SEL[eid]&&getSelIds().length>1)?getSelIds():[String(eid)];
+  recordUndo(ids,'subcategory',v);
+  for(var k=0;k<ids.length;k++){callJSON('setSubcategory',{eid:ids[k],val:v});}
+  for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid)D[i].subcategory=v;}
+  for(var j=0;j<ids.length;j++){
+    var row=document.getElementById('r'+ids[j]);
+    if(row){var inp=row.querySelectorAll('input.sz')[0];if(inp)inp.value=v;
+      row.style.background='#2d4a2d';(function(r){setTimeout(function(){r.style.background='';},1500);})(row);}
+  }
+  buildDD();
+}
 function setMT(cat,mt){
   for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].measurementType=mt;}
   callJSON('setMeasurementType',{cat:cat,mt:mt});filt();

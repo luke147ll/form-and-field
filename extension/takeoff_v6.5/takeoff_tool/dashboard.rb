@@ -163,6 +163,10 @@ module TakeoffTool
         Highlighter.clear_all
       end
 
+      @dialog.add_action_callback('clearMeasurementHighlights') do |_ctx|
+        Highlighter.clear_measurement_highlights
+      end
+
       @dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
         Highlighter.isolate_category(sr, ca, cat_str.to_s)
       end
@@ -219,6 +223,10 @@ module TakeoffTool
 
       @dialog.add_action_callback('activateLF') do |_ctx|
         TakeoffTool.activate_lf_tool
+      end
+
+      @dialog.add_action_callback('activateLFForCat') do |_ctx, cat_str|
+        TakeoffTool.activate_lf_tool_for_category(cat_str.to_s)
       end
 
       @dialog.add_action_callback('activateSF') do |_ctx|

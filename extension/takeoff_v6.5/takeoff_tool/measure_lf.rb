@@ -87,12 +87,13 @@ module TakeoffTool
 
   class MeasureLFTool
 
-    def initialize
+    def initialize(preset_category = nil)
       @segments = [[]]    # Array of arrays of Point3d — each sub-array is a connected chain
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
       @mouse_pt = nil
       @total_lf = 0.0
+      @preset_category = preset_category
     end
 
     def activate
@@ -101,6 +102,8 @@ module TakeoffTool
     end
 
     def deactivate(view)
+      @pick_dlg.close if @pick_dlg rescue nil
+      reset_full
       view.invalidate
     end
 
@@ -169,9 +172,8 @@ module TakeoffTool
       case key
       when 13 # Enter — finish
         finish_measurement(view) if total_points >= 2
-      when 27 # Escape — full cancel
-        cancel(view)
       end
+      # Escape (27) not handled — SketchUp natively pops the tool, triggering deactivate
     end
 
     # ─── Draw ───
@@ -238,9 +240,7 @@ module TakeoffTool
     end
 
     def cancel(view)
-      reset_full
-      Sketchup.status_text = "LF Tool: Cancelled. Click to start a new measurement."
-      view.invalidate
+      Sketchup.active_model.select_tool(nil)
     end
 
     def reset_full
@@ -310,8 +310,9 @@ module TakeoffTool
       saved_segments = @segments.map { |c| c.dup }
       lf_tool = self
 
+      default_cat = @preset_category || @last_cat || 'Trim'
       cat_options = LF_CATEGORIES.map { |c|
-        sel = c == (@last_cat || 'Trim') ? ' selected' : ''
+        sel = c == default_cat ? ' selected' : ''
         "<option value=\"#{c}\"#{sel}>#{c}</option>"
       }.join
 
@@ -327,7 +328,7 @@ module TakeoffTool
         <input id="note" type="text" value="">
         <div class="buttons">
           <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
-          <button class="btn btn-ok" onclick="sketchup.ok(document.getElementById('cat').value,document.getElementById('cc').value,document.getElementById('note').value)">OK</button>
+          <button class="btn btn-ok" onclick="sketchup.ok(JSON.stringify({cat:document.getElementById('cat').value,cc:document.getElementById('cc').value,note:document.getElementById('note').value}))">OK</button>
         </div>
         <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
         </body></html>
@@ -337,18 +338,26 @@ module TakeoffTool
       @pick_dlg = UI::HtmlDialog.new(
         dialog_title: "LF Measurement",
         preferences_key: "TakeoffLFPick",
-        width: 320, height: 280,
+        width: 320, height: 340,
         left: 200, top: 200,
         resizable: false,
         style: UI::HtmlDialog::STYLE_DIALOG
       )
 
-      @pick_dlg.add_action_callback('ok') do |_ctx, cat_str, cc_str, note_str|
+      @pick_dlg.add_action_callback('ok') do |_ctx, json_str|
         @pick_dlg.close rescue nil
-        cat = cat_str.to_s.strip
-        unless cat.empty?
-          lf_tool.send(:on_lf_ok, cat, cc_str.to_s, note_str.to_s,
-                        total_ft, total_inches, saved_segments, view)
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          cc = data['cc'].to_s
+          note = data['note'].to_s
+          unless cat.empty?
+            lf_tool.send(:on_lf_ok, cat, cc, note,
+                          total_ft, total_inches, saved_segments, view)
+          end
+        rescue => e
+          puts "Takeoff LF: OK callback error: #{e.message}"
         end
       end
 
@@ -589,5 +598,9 @@ module TakeoffTool
 
   def self.activate_lf_tool
     Sketchup.active_model.select_tool(MeasureLFTool.new)
+  end
+
+  def self.activate_lf_tool_for_category(cat)
+    Sketchup.active_model.select_tool(MeasureLFTool.new(cat))
   end
 end

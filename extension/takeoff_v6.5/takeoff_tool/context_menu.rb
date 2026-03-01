@@ -69,6 +69,43 @@ module TakeoffTool
           Sketchup.send_action("viewZoomToSelection")
         end
 
+        # Clear measurement highlights on selected entities
+        sub.add_item('Clear Highlight') do
+          model = Sketchup.active_model
+          next unless model
+          entities = sel.to_a
+          model.start_operation('Clear Selection HL', true)
+          count = 0
+          entities.each do |e|
+            # Faces inside components/groups
+            if e.respond_to?(:definition)
+              e.definition.entities.grep(Sketchup::Face).each do |face|
+                orig_name = face.get_attribute('FF_Original', 'material')
+                next unless orig_name
+                face.material = orig_name.empty? ? nil : model.materials[orig_name]
+                face.delete_attribute('FF_Original', 'material')
+                count += 1
+              end
+            end
+            # LF ribbon groups — hide them
+            if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type') == 'LF'
+              e.visible = false
+              count += 1
+            end
+            # Directly selected faces
+            if e.is_a?(Sketchup::Face)
+              orig_name = e.get_attribute('FF_Original', 'material')
+              if orig_name
+                e.material = orig_name.empty? ? nil : model.materials[orig_name]
+                e.delete_attribute('FF_Original', 'material')
+                count += 1
+              end
+            end
+          end
+          model.commit_operation
+          puts "Takeoff: Cleared highlights on #{count} items"
+        end
+
         sub.add_separator
 
         # Tool toggles
@@ -78,6 +115,10 @@ module TakeoffTool
 
         sub.add_item('Drill Bit') do
           TakeoffTool::DrillBit.toggle
+        end
+
+        sub.add_item('Report Bug') do
+          TakeoffTool::BugReporter.show('new')
         end
 
         sub.add_separator

@@ -129,7 +129,62 @@ module TakeoffTool
       @orig_instance.clear
       @orig_faces.clear
       @mats.clear
+
+      # Also clear persistent measurement highlights (SF face colors + LF ribbons)
+      clear_measurement_highlights_inner(m)
+
       m.commit_operation
+    end
+
+    def self.clear_measurement_highlights
+      m = Sketchup.active_model; return unless m
+      m.start_operation('Clear Measurement HL', true)
+      clear_measurement_highlights_inner(m)
+      m.commit_operation
+    end
+
+    def self.clear_measurement_highlights_inner(m)
+      restored = 0
+
+      # Restore SF-colored faces inside all definitions (components/groups)
+      m.definitions.each do |defn|
+        next if defn.image?
+        defn.entities.grep(Sketchup::Face).each do |face|
+          orig_name = face.get_attribute('FF_Original', 'material')
+          next unless orig_name
+          face.material = orig_name.empty? ? nil : m.materials[orig_name]
+          face.delete_attribute('FF_Original', 'material')
+          restored += 1
+        end
+      end
+
+      # Restore loose faces in model entities
+      m.entities.grep(Sketchup::Face).each do |face|
+        orig_name = face.get_attribute('FF_Original', 'material')
+        next unless orig_name
+        face.material = orig_name.empty? ? nil : m.materials[orig_name]
+        face.delete_attribute('FF_Original', 'material')
+        restored += 1
+      end
+
+      # Hide LF ribbon groups (preserves measurement data)
+      hidden = 0
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        if grp.get_attribute('TakeoffMeasurement', 'type') == 'LF' && grp.visible?
+          grp.visible = false
+          hidden += 1
+        end
+      end
+
+      # Clean up TO_SF_ and TO_LF_ materials
+      m.materials.to_a.each do |mt|
+        if mt.display_name =~ /\ATO_(SF|LF)_/
+          begin; m.materials.remove(mt); rescue; end
+        end
+      end
+
+      puts "Takeoff: Cleared measurement highlights (#{restored} faces restored, #{hidden} ribbons hidden)" if restored > 0 || hidden > 0
     end
 
     # ─── Visibility ───

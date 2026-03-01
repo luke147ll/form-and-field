@@ -47,6 +47,14 @@ module TakeoffTool
     end
 
     def deactivate(view)
+      @pick_dlg.close if @pick_dlg rescue nil
+      # Restore original materials on any unsaved picked faces
+      @picked_faces.each do |pf|
+        begin
+          pf[:face].material = pf[:original_mat]
+        rescue; end
+      end
+      reset_full
       view.invalidate
     end
 
@@ -157,9 +165,8 @@ module TakeoffTool
       case key
       when 13 # Enter
         finish_measurement(view) if @picked_faces.length >= 1
-      when 27 # Escape
-        cancel(view)
       end
+      # Escape (27) not handled — SketchUp natively pops the tool, triggering deactivate
     end
 
     # ─── Draw overlay ───
@@ -278,15 +285,7 @@ module TakeoffTool
     end
 
     def cancel(view)
-      # Restore original materials on all picked faces
-      @picked_faces.each do |pf|
-        begin
-          pf[:face].material = pf[:original_mat]
-        rescue; end
-      end
-      reset_full
-      Sketchup.status_text = "SF Tool: Cancelled. Click a face to start."
-      view.invalidate
+      Sketchup.active_model.select_tool(nil)
     end
 
     def reset_full
@@ -339,6 +338,7 @@ module TakeoffTool
 
       sf_tool = self
       total_sf = @total_sf
+      saved_faces = @picked_faces.dup
 
       cat_options = SF_CATEGORIES.map { |c|
         sel = c == (@last_cat || 'Drywall') ? ' selected' : ''
@@ -357,7 +357,7 @@ module TakeoffTool
         <input id="note" type="text" value="">
         <div class="buttons">
           <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
-          <button class="btn btn-ok" onclick="sketchup.ok(document.getElementById('cat').value,document.getElementById('cc').value,document.getElementById('note').value)">OK</button>
+          <button class="btn btn-ok" onclick="sketchup.ok(JSON.stringify({cat:document.getElementById('cat').value,cc:document.getElementById('cc').value,note:document.getElementById('note').value}))">OK</button>
         </div>
         <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
         </body></html>
@@ -367,17 +367,25 @@ module TakeoffTool
       @pick_dlg = UI::HtmlDialog.new(
         dialog_title: "SF Measurement",
         preferences_key: "TakeoffSFPick",
-        width: 320, height: 280,
+        width: 320, height: 340,
         left: 200, top: 200,
         resizable: false,
         style: UI::HtmlDialog::STYLE_DIALOG
       )
 
-      @pick_dlg.add_action_callback('ok') do |_ctx, cat_str, cc_str, note_str|
+      @pick_dlg.add_action_callback('ok') do |_ctx, json_str|
         @pick_dlg.close rescue nil
-        cat = cat_str.to_s.strip
-        unless cat.empty?
-          sf_tool.send(:on_sf_ok, cat, cc_str.to_s, note_str.to_s, view)
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          cc = data['cc'].to_s
+          note = data['note'].to_s
+          unless cat.empty?
+            sf_tool.send(:on_sf_ok, cat, cc, note, view, saved_faces, total_sf)
+          end
+        rescue => e
+          puts "Takeoff SF: OK callback error: #{e.message}"
         end
       end
 
@@ -390,7 +398,11 @@ module TakeoffTool
       @pick_dlg.show
     end
 
-    def on_sf_ok(cat, cc, note, view)
+    def on_sf_ok(cat, cc, note, view, saved_faces = nil, saved_total_sf = nil)
+      # Restore captured state if provided (async dialog path)
+      @picked_faces = saved_faces if saved_faces
+      @total_sf = saved_total_sf if saved_total_sf
+      return if @picked_faces.empty?
       @last_cat = cat
       @last_cc = cc
       @last_note = note
@@ -417,7 +429,10 @@ module TakeoffTool
 
       @picked_faces.each do |pf|
         begin
-          pf[:face].material = mat
+          f = pf[:face]
+          orig_name = pf[:original_mat] ? pf[:original_mat].display_name : ''
+          f.set_attribute('FF_Original', 'material', orig_name)
+          f.material = mat
         rescue => e
           puts "Takeoff SF: Failed to color face: #{e.message}"
         end
