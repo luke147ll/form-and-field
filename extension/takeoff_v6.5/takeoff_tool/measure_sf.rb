@@ -39,6 +39,7 @@ module TakeoffTool
       @hover_area = 0
       @total_sf = 0.0
       @preset_category = preset_category
+      @dialog_open = false
     end
 
     def activate
@@ -66,6 +67,7 @@ module TakeoffTool
     # ─── Mouse ───
 
     def onMouseMove(flags, x, y, view)
+      return if @dialog_open
       ph = view.pick_helper
       ph.do_pick(x, y)
 
@@ -116,6 +118,7 @@ module TakeoffTool
     end
 
     def onLButtonDown(flags, x, y, view)
+      return if @dialog_open
       return unless @hover_face
 
       face = @hover_face
@@ -131,6 +134,7 @@ module TakeoffTool
     end
 
     def onLButtonDoubleClick(flags, x, y, view)
+      return if @dialog_open
       if @picked_faces.length >= 1
         finish_measurement(view)
       elsif @hover_face
@@ -172,8 +176,8 @@ module TakeoffTool
     # ─── Draw overlay ───
 
     def draw(view)
-      # Yellow highlight on hovered face (if not already picked)
-      if @hover_face && !@picked_faces.find { |pf| pf[:face].equal?(@hover_face) }
+      # Yellow highlight on hovered face (if not already picked, and dialog not open)
+      if @hover_face && !@dialog_open && !@picked_faces.find { |pf| pf[:face].equal?(@hover_face) }
         draw_face_highlight(view, @hover_face, @hover_transform, Sketchup::Color.new(255, 255, 100, 60))
       end
 
@@ -391,14 +395,17 @@ module TakeoffTool
 
       @pick_dlg.add_action_callback('cancel') do |_ctx|
         @pick_dlg.close rescue nil
+        @dialog_open = false
         Sketchup.status_text = "SF Tool: Category cancelled. Faces still selected. Enter to try again, Esc to cancel."
       end
 
+      @dialog_open = true
       @pick_dlg.set_html(html)
       @pick_dlg.show
     end
 
     def on_sf_ok(cat, cc, note, view, saved_faces = nil, saved_total_sf = nil)
+      @dialog_open = false
       # Restore captured state if provided (async dialog path)
       @picked_faces = saved_faces if saved_faces
       @total_sf = saved_total_sf if saved_total_sf

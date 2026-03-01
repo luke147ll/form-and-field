@@ -13,6 +13,8 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'drill_bit.rb')
   load File.join(PLUGIN_DIR, 'context_menu.rb')
   load File.join(PLUGIN_DIR, 'parse_logger.rb')
+  load File.join(PLUGIN_DIR, 'ifc_parser.rb')
+  load File.join(PLUGIN_DIR, 'recat_log.rb')
   load File.join(PLUGIN_DIR, 'bug_reporter.rb')
 
   @scan_results = []

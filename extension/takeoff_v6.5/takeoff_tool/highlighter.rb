@@ -189,13 +189,90 @@ module TakeoffTool
 
     # ─── Visibility ───
 
+    # Walk up an entity's parent chain, collecting all ancestor
+    # groups/components and their layers.  IFC models nest elements
+    # inside IfcBuilding / IfcBuildingStorey containers — hiding a
+    # container hides everything inside it.
+    #
+    # entity.parent returns the ComponentDefinition the entity lives
+    # inside.  We need that definition's INSTANCES — those are the
+    # actual model objects whose visibility matters.  Walk from
+    # definition → instances → instance.parent → repeat until Model.
+    def self.collect_ancestors(entity)
+      ancestors = []
+      layers    = []
+      current   = entity
+
+      while current
+        # Record this entity's layer
+        if current.respond_to?(:layer) && current.layer
+          layers << current.layer
+        end
+
+        parent = current.respond_to?(:parent) ? current.parent : nil
+        break unless parent
+
+        if parent.is_a?(Sketchup::ComponentDefinition)
+          # Parent is a definition — find ALL instances (the visible objects)
+          parent.instances.each do |inst|
+            ancestors << inst
+            layers << inst.layer if inst.respond_to?(:layer) && inst.layer
+          end
+          # Continue walking up from the first instance
+          current = parent.instances.first
+        elsif parent.is_a?(Sketchup::Model)
+          break  # Reached the top
+        else
+          # Entities collection or other intermediate — keep walking
+          current = parent
+        end
+      end
+
+      [ancestors, layers]
+    end
+
+    # Ensure ancestors of visible entities + their layers stay visible
+    def self.ensure_ancestors_visible(visible_entities, m)
+      ancestor_ids = {}
+      ancestor_layer_names = { 'Layer0' => true, 'Untagged' => true }
+      visible_entities.each do |e|
+        ancs, lyrs = collect_ancestors(e)
+        ancs.each { |a| ancestor_ids[a.entityID] = a }
+        lyrs.each { |l| ancestor_layer_names[l.name] = true }
+      end
+      ancestor_ids.each_value do |a|
+        a.visible = true if a.valid? && !a.visible?
+      end
+      ancestor_layer_names.each_key do |ln|
+        l = m.layers[ln]
+        l.visible = true if l && !l.visible?
+      end
+    end
+
     def self.isolate_category(sr, ca, tc)
       m = Sketchup.active_model; return unless m
-      m.start_operation('Isolate', true)
+
+      # Phase 1: Determine which entities to show (before touching visibility)
+      visible = []
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-        e.visible = (cat == tc)
+        visible << e if cat == tc
+      end
+
+      # Phase 2: Collect ancestors BEFORE any hiding
+      keep_ids, keep_layers = build_keep_visible_set(visible)
+
+      # Phase 3: Apply visibility
+      m.start_operation('Isolate', true)
+      sr.each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
+        e.visible = !!keep_ids[e.entityID]
+      end
+      # Force ancestors visible (they may not be in sr)
+      keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
+      keep_layers.each_key do |ln|
+        l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
     end
@@ -204,11 +281,27 @@ module TakeoffTool
       m = Sketchup.active_model; return unless m
       cat_set = {}
       cats.each { |c| cat_set[c] = true }
-      m.start_operation('Isolate Multi', true)
+
+      # Phase 1
+      visible = []
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-        e.visible = !!cat_set[cat]
+        visible << e if cat_set[cat]
+      end
+
+      # Phase 2
+      keep_ids, keep_layers = build_keep_visible_set(visible)
+
+      # Phase 3
+      m.start_operation('Isolate Multi', true)
+      sr.each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
+        e.visible = !!keep_ids[e.entityID]
+      end
+      keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
+      keep_layers.each_key do |ln|
+        l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
       puts "HL: Isolated #{cats.length} categories: #{cats.join(', ')}"
@@ -235,10 +328,26 @@ module TakeoffTool
       m = Sketchup.active_model; return unless m
       id_set = {}
       ids.each { |id| id_set[id] = true }
+
+      # Phase 1
+      visible = []
+      sr.each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
+        visible << e if id_set[r[:entity_id]]
+      end
+
+      # Phase 2
+      keep_ids, keep_layers = build_keep_visible_set(visible)
+
+      # Phase 3
       m.start_operation('Isolate Entities', true)
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        e.visible = !!id_set[r[:entity_id]]
+        e.visible = !!keep_ids[e.entityID]
+      end
+      keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
+      keep_layers.each_key do |ln|
+        l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
       puts "HL: Isolated #{ids.length} entities"
@@ -265,19 +374,87 @@ module TakeoffTool
     def self.isolate_tag(tn)
       m = Sketchup.active_model; return unless m
       m.start_operation('Isolate Tag', true)
-      m.layers.each { |l| l.visible = (l.name == tn || l.name == 'Layer0' || l.name == 'Untagged') }
+
+      # Collect entities on the target tag and their ancestor layers
+      keep_layers = { 'Layer0' => true, 'Untagged' => true, tn => true }
+      TakeoffTool.entity_registry.each_value do |e|
+        next unless e && e.valid?
+        next unless e.respond_to?(:layer) && e.layer && e.layer.name == tn
+        _ancs, lyrs = collect_ancestors(e)
+        lyrs.each { |l| keep_layers[l.name] = true }
+      end
+
+      m.layers.each { |l| l.visible = !!keep_layers[l.name] }
       m.commit_operation
     end
 
     def self.show_all
       m = Sketchup.active_model; return unless m
       m.start_operation('Show All', true)
-      TakeoffTool.entity_registry.each { |_, e| e.visible = true if e && e.valid? }
+
+      # Show all registry entities
+      TakeoffTool.entity_registry.each_value { |e| e.visible = true if e && e.valid? }
+
+      # Walk model hierarchy to restore any hidden ancestor containers
+      show_hierarchy(m.entities)
+
+      # Show all layers
       m.layers.each { |l| l.visible = true }
       m.commit_operation
     end
 
+    # Show entities by ID and ensure their ancestors are visible
+    def self.show_entities_with_ancestors(ids)
+      m = Sketchup.active_model; return unless m
+      visible = []
+      m.start_operation('Show', true)
+      ids.each do |id|
+        e = TakeoffTool.find_entity(id.to_i)
+        next unless e && e.valid?
+        e.visible = true
+        visible << e
+      end
+      ensure_ancestors_visible(visible, m)
+      m.commit_operation
+    end
+
     private
+
+    # Build a complete set of entity IDs + layers that must stay visible.
+    # Includes all target entities AND every ancestor in their parent chains.
+    # Called BEFORE any visibility changes to avoid stale parent references.
+    def self.build_keep_visible_set(visible_entities)
+      keep_ids = {}
+      keep_layers = { 'Layer0' => true, 'Untagged' => true }
+
+      visible_entities.each do |e|
+        keep_ids[e.entityID] = e
+        # Add the entity's own layer
+        if e.respond_to?(:layer) && e.layer
+          keep_layers[e.layer.name] = true
+        end
+        # Walk up the parent chain
+        ancs, lyrs = collect_ancestors(e)
+        ancs.each { |a| keep_ids[a.entityID] = a }
+        lyrs.each { |l| keep_layers[l.name] = true }
+      end
+
+      [keep_ids, keep_layers]
+    end
+
+    # Recursively walk model hierarchy, making all groups/components visible.
+    # Used by show_all to restore hidden ancestor containers that aren't
+    # in the entity_registry (e.g. IfcBuilding, IfcBuildingStorey).
+    def self.show_hierarchy(ents)
+      ents.each do |e|
+        next unless e.valid?
+        if e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          e.visible = true unless e.visible?
+          defn = e.respond_to?(:definition) ? e.definition : nil
+          show_hierarchy(defn.entities) if defn
+        end
+      end
+    end
 
     # Apply highlight to an entity. Sets instance-level material.
     # Only paints faces if the definition is used by a single instance,

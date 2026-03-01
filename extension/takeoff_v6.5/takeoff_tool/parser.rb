@@ -94,6 +94,7 @@ module TakeoffTool
       'Outdoor Kitchen'      => 'ea',
       'Chimney'              => 'ea',
       'Structural Steel'     => 'lf',
+      'Timber Frame'         => 'ea_bf',
       'Ceiling Framing'      => 'sf',
       'Shower Doors'         => 'ea',
       'Garage Doors'         => 'ea',

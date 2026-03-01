@@ -4,7 +4,7 @@ module TakeoffTool
     'Masonry / Veneer','Siding','Exterior Finish','Soffit','Stucco','Decorative Metal',
     'Glass/Glazing','Wood Paneling',
     'Metal Roofing','Shingle Roofing','Roofing','Roof Framing','Roof Sheathing',
-    'Concrete','Flooring','Ceilings','Ceiling Framing','Structural Lumber','Structural Steel',
+    'Concrete','Flooring','Ceilings','Ceiling Framing','Structural Lumber','Structural Steel','Timber Frame',
     'Insulation','Membrane',
     'Foundation Slabs','Foundation Walls','Foundation Footings',
     'Windows','Doors','Garage Doors','Shower Doors','Casework','Countertops','Plumbing',
@@ -39,6 +39,7 @@ module TakeoffTool
       begin
         e.set_attribute('TakeoffAssignments', 'category', category)
         @category_assignments[eid] = category
+        RecatLog.log_change(eid, category)
         @entity_registry[eid] = e unless @entity_registry.key?(eid)
         count += 1
       rescue => err

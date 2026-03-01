@@ -119,8 +119,9 @@ module TakeoffTool
 
     def self.export_report
       bugs = load_bugs
-      if bugs.empty?
-        UI.messagebox("No bugs to export.")
+      recat_entries = RecatLog.load_entries rescue []
+      if bugs.empty? && recat_entries.empty?
+        UI.messagebox("No bugs or recategorizations to export.")
         return
       end
       m = Sketchup.active_model
@@ -152,6 +153,13 @@ module TakeoffTool
           lines << "Reported: #{b['timestamp']}"
           lines << ""
         end
+      end
+
+      # Append recategorization log
+      recat_text = RecatLog.export_text rescue ''
+      unless recat_text.strip.empty?
+        lines << ""
+        lines << recat_text
       end
 
       File.write(path, lines.join("\n"))

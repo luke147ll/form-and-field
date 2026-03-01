@@ -94,6 +94,7 @@ module TakeoffTool
       @mouse_pt = nil
       @total_lf = 0.0
       @preset_category = preset_category
+      @dialog_open = false
     end
 
     def activate
@@ -115,6 +116,7 @@ module TakeoffTool
     # ─── Mouse ───
 
     def onMouseMove(flags, x, y, view)
+      return if @dialog_open
       @ip.pick(view, x, y, @ip_start)
       @mouse_pt = @ip.position if @ip.valid?
       view.tooltip = @ip.tooltip if @ip.valid?
@@ -122,6 +124,7 @@ module TakeoffTool
     end
 
     def onLButtonDown(flags, x, y, view)
+      return if @dialog_open
       @ip.pick(view, x, y, @ip_start)
       return unless @ip.valid?
 
@@ -142,6 +145,7 @@ module TakeoffTool
     end
 
     def onLButtonDoubleClick(flags, x, y, view)
+      return if @dialog_open
       finish_measurement(view) if total_points >= 2
     end
 
@@ -199,9 +203,9 @@ module TakeoffTool
         view.draw_points(pts, 8, 2, Sketchup::Color.new(255, 200, 80))
       end
 
-      # Draw rubber-band to cursor
+      # Draw rubber-band to cursor (hidden while save dialog is open)
       chain = @segments.last
-      if chain.length >= 1 && @mouse_pt
+      if chain.length >= 1 && @mouse_pt && !@dialog_open
         view.drawing_color = Sketchup::Color.new(255, 80, 255, 128)
         view.line_width = 2
         view.line_stipple = '_'
@@ -363,16 +367,20 @@ module TakeoffTool
 
       @pick_dlg.add_action_callback('cancel') do |_ctx|
         @pick_dlg.close rescue nil
+        @dialog_open = false
         Sketchup.status_text = "LF Tool: Cancelled. Click to start a new measurement."
         lf_tool.send(:reset_full)
         view.invalidate
       end
 
+      @dialog_open = true
+      @mouse_pt = nil
       @pick_dlg.set_html(html)
       @pick_dlg.show
     end
 
     def on_lf_ok(cat, cc, note, total_ft, total_inches, saved_segments, view)
+      @dialog_open = false
       @last_cat = cat
       @last_cc = cc
       @last_note = note

@@ -25,6 +25,7 @@ module TakeoffTool
           puts "Takeoff: setCategory eid=#{eid} cat=#{cat}"
           ca[eid] = cat
           TakeoffTool.category_assignments = ca
+          RecatLog.log_change(eid, cat)
           # Persist to model
           TakeoffTool.save_assignment(eid, 'category', cat)
           send_data(sr, ca, cca)
@@ -190,13 +191,8 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('showEntities') do |_ctx, ids_str|
-        m = Sketchup.active_model
-        m.start_operation('Show', true)
-        ids_str.to_s.split(',').each do |id|
-          e = TakeoffTool.find_entity(id.to_i)
-          e.visible = true if e && e.valid?
-        end
-        m.commit_operation
+        ids = ids_str.to_s.split(',').map(&:to_i)
+        Highlighter.show_entities_with_ancestors(ids)
       end
 
       @dialog.add_action_callback('zoomToEntities') do |_ctx, ids_str|
@@ -248,6 +244,7 @@ module TakeoffTool
           eids.each do |eid|
             eid_i = eid.to_i
             ca[eid_i] = cat
+            RecatLog.log_change(eid_i, cat)
             TakeoffTool.save_assignment(eid_i, 'category', cat)
           end
           TakeoffTool.category_assignments = ca
