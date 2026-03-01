@@ -376,7 +376,7 @@ var D=[],CA=[],CO=[],F=[],sc='definitionName',sd=1;
 var SEL={},lastCheckIdx=-1;
 var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
-var VIS={},CATVIS={};
+var VIS={};
 var debugOn=false;
 
 /* SVG ICON TEMPLATES */
@@ -568,9 +568,10 @@ function catBadge(c){
 }
 function catNameSpan(c){
   var cls=c.replace(/[\s\/]+/g,'');
-  if(KNOWN_CATS[cls]) return '<span class="cname c-'+cls+'">'+X(c)+'</span>';
+  var dbl=' ondblclick="event.stopPropagation();startCatRename(\''+X2(c)+'\',this)"';
+  if(KNOWN_CATS[cls]) return '<span class="cname c-'+cls+'"'+dbl+'>'+X(c)+'</span>';
   var h=0;for(var i=0;i<c.length;i++)h=c.charCodeAt(i)+((h<<5)-h);
-  return '<span class="cname" style="background:hsl('+((h%360+360)%360)+',55%,70%)">'+X(c)+'</span>';
+  return '<span class="cname" style="background:hsl('+((h%360+360)%360)+',55%,70%)"'+dbl+'>'+X(c)+'</span>';
 }
 
 /* ═══ FILTER ═══ */
@@ -612,7 +613,11 @@ function pv(r){
   var m=r.measurementType||'volume';
   if(m==='ea'||m==='ea_bf'||m==='ea_sf')return(r.instanceCount||1)+uLabel(m);
   if(m==='lf'){var l=r.linearFt||0;return l>0?(l*(r.instanceCount||1)).toFixed(1)+uLabel(m):'--';}
-  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF?r.areaSF.toFixed(1)+uLabel(m):'--';
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets'){
+    if(r.areaSF)return r.areaSF.toFixed(1)+uLabel(m);
+    if(m==='sf_cy'&&r.volumeFt3)return(r.volumeFt3/27).toFixed(2)+' <span style="color:#a6adc8;font-size:10px">CY</span>';
+    return '--';
+  }
   if(m==='volume')return r.volumeFt3?r.volumeFt3.toFixed(2)+uLabel(m):'--';
   return '--';
 }
@@ -628,7 +633,7 @@ function pn(r){
   var m=r.measurementType||'volume';
   if(m==='ea'||m==='ea_bf'||m==='ea_sf')return r.instanceCount||1;
   if(m==='lf')return(r.linearFt||0)*(r.instanceCount||1);
-  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF||0;
+  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return r.areaSF||(m==='sf_cy'?(r.volumeFt3||0)/27:0);
   return r.volumeFt3||0;
 }
 function grpTotal(items){
@@ -644,7 +649,14 @@ function grpTotal(items){
   m=items[0].measurementType||'volume';
   if(m==='ea'||m==='ea_bf'||m==='ea_sf')return tot+uLabel(m);
   if(m==='lf')return tot.toFixed(1)+uLabel(m);
-  if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return tot.toFixed(1)+uLabel(m);
+  if(m==='sf_cy'){
+    var cy=0;for(i=0;i<items.length;i++)cy+=(items[i].volumeFt3||0)/27;
+    var parts=[];
+    if(tot>0)parts.push(tot.toFixed(1)+uLabel(m));
+    if(cy>0)parts.push(cy.toFixed(2)+' <span style="color:#a6adc8;font-size:10px">CY</span>');
+    return parts.join(' / ')||'--';
+  }
+  if(m==='sf'||m==='sf_sheets')return tot.toFixed(1)+uLabel(m);
   return tot.toFixed(2)+uLabel(m);
 }
 
@@ -668,7 +680,7 @@ function renderGroups(){
   var h='';
   for(var gi=0;gi<order.length;gi++){
     var gk=order[gi], items=groups[gk], isOpen=!!openCats[gk];
-    var catVis=CATVIS[gk]!==false;
+    var catVis=false;for(var ci=0;ci<items.length;ci++){if(VIS[items[ci].entityId]!==false){catVis=true;break;}}
 
     h+='<div class="cg'+(isOpen?' open':'')+'" id="cg_'+gi+'">';
     // ── HEADER ──
@@ -731,7 +743,7 @@ function renderGroups(){
         var thisSub=items[i].subcategory||'';
         if(thisSub!==curSub){
           curSub=thisSub;var subArr=[];for(var si3=i;si3<items.length&&(items[si3].subcategory||'')===curSub;si3++)subArr.push(items[si3]);
-          var sKey=gk+'|'+curSub,sOpen=openSubs[sKey]!==false;
+          var sKey=gk+'|'+curSub,sOpen=openSubs[sKey]===true;
           var sVis=false;for(var svi=0;svi<subArr.length;svi++)if(VIS[subArr[svi].entityId]!==false){sVis=true;break;}
           h+='<tr class="sc-hdr'+(sOpen?'':' closed')+'">';
           h+='<td class="ck"><input type="checkbox" onclick="event.stopPropagation()" onchange="selSubAll(\''+X2(gk)+'\',\''+X2(curSub)+'\',this.checked)"></td>';
@@ -747,7 +759,7 @@ function renderGroups(){
           h+='<button class="ib accent" onclick="event.stopPropagation();selSubItems(\''+X2(gk)+'\',\''+X2(curSub)+'\')" title="Select all">'+ICO_SEL+'</button>';
           h+='</span></td></tr>';
         }
-        if(openSubs[gk+'|'+curSub]===false)continue;
+        if(!openSubs[gk+'|'+curSub])continue;
       }
       var row=items[i], vi=FIDX.length;
       FIDX.push(row.entityId);
@@ -786,11 +798,11 @@ function renderGroups(){
 
 /* ═══ GROUP CONTROLS ═══ */
 function togCat(gi,gk){var el=document.getElementById('cg_'+gi);if(!el)return;var o=el.classList.contains('open');if(o){el.classList.remove('open');delete openCats[gk];el.querySelector('.cgh').classList.add('closed');}else{el.classList.add('open');openCats[gk]=true;el.querySelector('.cgh').classList.remove('closed');}}
-function expandAll(){for(var i=0;i<F.length;i++)openCats[F[i].category]=true;openSubs={};renderGroups();}
-function collapseAll(){openCats={};renderGroups();}
+function expandAll(){for(var i=0;i<F.length;i++){openCats[F[i].category]=true;var s=F[i].subcategory||'';if(s)openSubs[F[i].category+'|'+s]=true;}renderGroups();}
+function collapseAll(){openCats={};openSubs={};renderGroups();}
 
 /* ═══ SUBCATEGORY CONTROLS ═══ */
-function togSub(sKey){openSubs[sKey]=openSubs[sKey]===false;renderGroups();}
+function togSub(sKey){openSubs[sKey]=!openSubs[sKey];renderGroups();}
 function togSubVis(cat,sub){
   var anyVis=false,ids=[];
   for(var i=0;i<D.length;i++){if(D[i].category===cat&&(D[i].subcategory||'')===sub){if(VIS[D[i].entityId]!==false)anyVis=true;ids.push(D[i].entityId);}}
@@ -800,7 +812,7 @@ function togSubVis(cat,sub){
 function isoSub(cat,sub){
   for(var i=0;i<D.length;i++){var m=(D[i].category===cat&&(D[i].subcategory||'')===sub);VIS[D[i].entityId]=m;}
   var ids=[];for(var j=0;j<D.length;j++){if(D[j].category===cat&&(D[j].subcategory||'')===sub)ids.push(D[j].entityId);}
-  CATVIS={};if(ids.length)call('isolateEntities',ids.join(','));renderGroups();
+  if(ids.length)call('isolateEntities',ids.join(','));renderGroups();
 }
 function zoomSub(cat,sub){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat&&(F[i].subcategory||'')===sub)ids.push(F[i].entityId);}
@@ -817,13 +829,13 @@ function selSubAll(cat,sub,chk){
 
 /* ═══ VISIBILITY ═══ */
 function togCatVis(gk){
-  var vis=CATVIS[gk]!==false; CATVIS[gk]=!vis;
-  var ids=[];
   var gBy=document.getElementById('gBy').value||'category';
+  var anyVis=false,ids=[];
   for(var i=0;i<D.length;i++){
-    if(grpKey(D[i],gBy)===gk){ids.push(D[i].entityId);VIS[D[i].entityId]=!vis;}
+    if(grpKey(D[i],gBy)===gk){ids.push(D[i].entityId);if(VIS[D[i].entityId]!==false)anyVis=true;}
   }
-  if(ids.length) call(vis?'hideEntities':'showEntities',ids.join(','));
+  for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+  if(ids.length) call(anyVis?'hideEntities':'showEntities',ids.join(','));
   renderGroups();
 }
 function togItemVis(eid){
@@ -832,7 +844,6 @@ function togItemVis(eid){
   renderGroups();
 }
 function isoCat(cat){
-  for(var c in CATVIS) CATVIS[c]=false; CATVIS[cat]=true;
   for(var i=0;i<D.length;i++) VIS[D[i].entityId]=(D[i].category===cat);
   call('isolateCategory',cat); renderGroups();
 }
@@ -840,7 +851,7 @@ function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
 }
-function resetVis(){VIS={};CATVIS={};renderGroups();}
+function resetVis(){VIS={};renderGroups();}
 
 /* ═══ SELECTION ═══ */
 function ckClick(cb,ev){
@@ -881,8 +892,8 @@ function grpKey(r,gBy){
 function toggleCatPanel(){var p=document.getElementById('catPanel');p.className=p.className==='show'?'':'show';}
 function cpAll(v){var cks=document.querySelectorAll('.cpCk');for(var i=0;i<cks.length;i++)cks[i].checked=v;}
 function getCheckedCats(){var cks=document.querySelectorAll('.cpCk'),cats=[];for(var i=0;i<cks.length;i++)if(cks[i].checked)cats.push(cks[i].value);return cats;}
-function doMultiIsolate(){var c=getCheckedCats();if(c.length)callJSON('isolateCategories',{cats:c});}
-function doMultiHide(){var c=getCheckedCats();if(c.length)callJSON('hideCategories',{cats:c});}
+function doMultiIsolate(){var c=getCheckedCats();if(!c.length)return;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++)VIS[D[i].entityId]=!!s[D[i].category];callJSON('isolateCategories',{cats:c});renderGroups();}
+function doMultiHide(){var c=getCheckedCats();if(!c.length)return;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++){if(s[D[i].category])VIS[D[i].entityId]=false;}callJSON('hideCategories',{cats:c});renderGroups();}
 function doMultiHighlight(){var c=getCheckedCats();if(c.length)callJSON('highlightCategories',{cats:c});}
 
 /* ═══ BULK EDIT ═══ */
@@ -933,6 +944,42 @@ function excludeCat(cat){
   callJSON('bulkSetCategory',{eids:ids,val:'_IGNORE'});
   for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].category='_IGNORE';}
   filt();
+}
+
+/* ═══ RENAME CATEGORY ═══ */
+function startCatRename(oldName,el){
+  var sp=el;
+  var w=sp.offsetWidth,bg=getComputedStyle(sp).backgroundColor,fg=getComputedStyle(sp).color;
+  var inp=document.createElement('input');
+  inp.type='text';inp.value=oldName;
+  inp.style.cssText='font-size:11px;font-weight:600;border:1px solid #89b4fa;border-radius:3px;padding:1px 5px;outline:none;background:'+bg+';color:'+fg+';width:'+Math.max(w,60)+'px;font-family:inherit';
+  inp.setAttribute('data-old',oldName);
+  sp.parentNode.replaceChild(inp,sp);
+  inp.focus();inp.select();
+  var done=false;
+  function commit(){if(done)return;done=true;var nv=inp.value.trim();if(nv&&nv!==oldName)commitCatRename(oldName,nv);else renderGroups();}
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();commit();}if(e.key==='Escape'){e.preventDefault();done=true;renderGroups();}});
+}
+function commitCatRename(oldName,newName){
+  // Update D array
+  var ids=[];
+  for(var i=0;i<D.length;i++){if(D[i].category===oldName){D[i].category=newName;ids.push(D[i].entityId);}}
+  // Update CA list
+  var idx=CA.indexOf(oldName);
+  if(idx!==-1)CA.splice(idx,1);
+  if(CA.indexOf(newName)===-1)CA.push(newName);
+  CA.sort();
+  // Update openCats key
+  if(openCats[oldName]){openCats[newName]=true;delete openCats[oldName];}
+  // Update openSubs keys
+  var oldPfx=oldName+'|';
+  var subKeys=Object.keys(openSubs);
+  for(var s=0;s<subKeys.length;s++){if(subKeys[s].indexOf(oldPfx)===0){var tail=subKeys[s].substring(oldPfx.length);openSubs[newName+'|'+tail]=openSubs[subKeys[s]];delete openSubs[subKeys[s]];}}
+  // Rebuild dropdowns and re-render
+  buildBulkDDs();buildDD();filt();
+  // Persist to Ruby
+  callJSON('renameCategory',{oldName:oldName,newName:newName,eids:ids});
 }
 
 /* ═══ UNDO ═══ */

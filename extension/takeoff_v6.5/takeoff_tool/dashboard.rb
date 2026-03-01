@@ -254,6 +254,32 @@ module TakeoffTool
         end
       end
 
+      # Rename an entire category
+      @dialog.add_action_callback('renameCategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          old_name = data['oldName'].to_s
+          new_name = data['newName'].to_s
+          eids = data['eids'] || []
+          puts "Takeoff: renameCategory '#{old_name}' -> '#{new_name}' (#{eids.length} items)"
+          eids.each do |eid|
+            eid_i = eid.to_i
+            ca[eid_i] = new_name
+            TakeoffTool.save_assignment(eid_i, 'category', new_name)
+          end
+          # Update auto_category in scan_results so re-send stays consistent
+          sr.each do |r|
+            if r[:parsed] && r[:parsed][:auto_category] == old_name
+              r[:parsed][:auto_category] = new_name
+            end
+          end
+          TakeoffTool.category_assignments = ca
+        rescue => e
+          puts "Takeoff renameCategory error: #{e.message}"
+        end
+      end
+
       # Bulk set size for multiple entities at once
       @dialog.add_action_callback('bulkSetSize') do |_ctx, json_str|
         begin
