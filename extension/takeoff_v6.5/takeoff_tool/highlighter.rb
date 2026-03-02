@@ -173,7 +173,7 @@ module TakeoffTool
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
-        if mtype == 'LF' && grp.visible?
+        if (mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK') && grp.visible?
           grp.visible = false
           hidden += 1
         end
@@ -203,6 +203,8 @@ module TakeoffTool
           grp.visible = true
         elsif mtype == 'SF'
           show_sf_measurement_faces(m, grp)
+        elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
+          grp.visible = true
         end
         grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       end
@@ -228,6 +230,8 @@ module TakeoffTool
         grp.visible = true
       elsif mtype == 'SF'
         show_sf_measurement_faces(m, grp)
+      elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
+        grp.visible = true
       end
       grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       m.commit_operation
@@ -245,6 +249,8 @@ module TakeoffTool
         grp.visible = false
       elsif mtype == 'SF'
         hide_sf_measurement_faces(m, grp)
+      elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
+        grp.visible = false
       end
       grp.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
       m.commit_operation

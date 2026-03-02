@@ -582,20 +582,34 @@ module TakeoffTool
       face_count = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
       highlights_visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')
 
+      next if mtype == 'BENCHMARK'
+
       if mtype == 'SF'
         display = "📐 #{cat} — #{'%.1f' % total_sf} SF (#{face_count} face#{'s' if face_count>1})#{note && !note.empty? ? ' — ' + note : ''}"
         lf_val = 0.0
         sf_val = total_sf
+      elsif mtype == 'ELEV'
+        elev_label = grp.get_attribute('TakeoffMeasurement', 'elevation_label') || ''
+        display = "📍 #{elev_label}"
+        lf_val = 0.0
+        sf_val = 0.0
       else
         display = "📏 #{cat} — #{'%.1f' % total_ft} LF#{seg_count > 1 ? " (#{seg_count} segs)" : ''}#{note && !note.empty? ? ' — ' + note : ''}"
         lf_val = total_ft
         sf_val = 0.0
       end
 
+      el_type = mtype == 'ELEV' ? 'Elevation Tag' : 'Manual Measurement'
+      src = case mtype
+            when 'SF' then :manual_sf
+            when 'ELEV' then :elevation_tag
+            else :manual_lf
+            end
+
       result = {
         entity_id: grp.entityID,
-        tag: LF_TAG,
-        definition_name: "Manual #{mtype}: #{cat}",
+        tag: mtype == 'ELEV' ? (defined?(ELEV_TAG) ? ELEV_TAG : 'FF_Elevation_Tags') : LF_TAG,
+        definition_name: mtype == 'ELEV' ? 'Elevation Tag' : "Manual #{mtype}: #{cat}",
         display_name: display,
         material: '',
         is_solid: false,
@@ -609,14 +623,14 @@ module TakeoffTool
         warnings: [],
         parsed: {
           auto_category: cat,
-          element_type: 'Manual Measurement',
+          element_type: el_type,
           function: mtype,
           material: note,
           thickness: '',
           size_nominal: '',
           revit_id: nil
         },
-        source: mtype == 'SF' ? :manual_sf : :manual_lf
+        source: src
       }
 
       @entity_registry[grp.entityID] = grp

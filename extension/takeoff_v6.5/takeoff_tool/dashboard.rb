@@ -186,7 +186,7 @@ module TakeoffTool
           # Route measurement entities through highlight hide
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF'
+            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK'
               e.visible = false
             elsif mtype == 'SF'
               Highlighter.hide_sf_measurement_faces(m, e)
@@ -212,7 +212,7 @@ module TakeoffTool
           next unless e && e.valid?
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF'
+            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK'
               e.visible = true
             elsif mtype == 'SF'
               Highlighter.show_sf_measurement_faces(m, e)
@@ -453,6 +453,18 @@ module TakeoffTool
         send_measurement_data
       end
 
+      @dialog.add_action_callback('requestBenchmark') do |_ctx|
+        send_benchmark_data
+      end
+
+      @dialog.add_action_callback('activateBenchmark') do |_ctx|
+        TakeoffTool.activate_benchmark_tool
+      end
+
+      @dialog.add_action_callback('activateElevation') do |_ctx|
+        TakeoffTool.activate_elevation_tool
+      end
+
       # Isolate specific entities by ID
       @dialog.add_action_callback('isolateEntities') do |_ctx, ids_str|
         ids = ids_str.to_s.split(',').map(&:to_i)
@@ -570,6 +582,12 @@ module TakeoffTool
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
           entry[:unit] = 'SF'
           entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+        elsif mtype == 'ELEV'
+          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'elevation') || 0
+          entry[:unit] = grp.get_attribute('TakeoffMeasurement', 'benchmark_unit') || 'feet'
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'elevation_label') || ''
+        elsif mtype == 'BENCHMARK'
+          next  # Don't show benchmark point in measurement panel
         else
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0
           entry[:unit] = 'LF'
@@ -582,6 +600,16 @@ module TakeoffTool
       js = JSON.generate(measurements)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveMeasurements('#{esc}')")
+      send_benchmark_data
+    end
+
+    def self.send_benchmark_data
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      bmk = TakeoffTool.get_elevation_benchmark
+      js = bmk ? JSON.generate(bmk) : 'null'
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveBenchmark('#{esc}')")
     end
 
     def self.visible?

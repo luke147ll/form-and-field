@@ -222,6 +222,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <div class="sep"></div>
   <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg></button>
   <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg></button>
+  <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg></button>
   <button class="hb pri" onclick="call('openHyperParse')" title="Hyper Parse - Group and re-categorize visible entities" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#cba6f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/><line x1="4.5" y1="5.5" x2="8.5" y2="5.5" stroke-width="1.2"/><line x1="5" y1="7.5" x2="8" y2="7.5" stroke-width="1.2"/></svg>Hyper Parse</button>
   <div class="sep"></div>
   <button class="hb" onclick="expandAll()" title="Expand all" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
@@ -240,6 +241,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <button class="hb" onclick="toggleMeasPanel()">Close</button>
   </div>
   <div id="measBody"></div>
+</div>
+
+<!-- BENCHMARK INFO BAR -->
+<div id="bmkBar" style="display:none;background:#1a1a2e;border-bottom:1px solid #313244;padding:4px 12px;font-size:11px;flex-shrink:0;align-items:center;gap:6px">
+  <span style="color:#cba6f7;font-weight:600">Benchmark:</span>
+  <span id="bmkInfo" style="color:#89b4fa">Not set</span>
+  <button class="hb" onclick="call('activateBenchmark')" style="margin-left:8px;font-size:10px;padding:2px 8px">Set</button>
+  <button class="hb" onclick="call('activateElevation')" style="font-size:10px;padding:2px 8px;color:#cba6f7;border-color:#cba6f7">Tag</button>
 </div>
 
 <!-- BULK EDIT BAR -->
@@ -1059,7 +1068,8 @@ function renderMeasPanel(){
       h+='<div class="mp-item">';
       h+='<button class="ey'+(vis?'':' off')+'" onclick="togMeasVis('+it.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
       h+='<span class="mp-swatch" style="'+sw+'"></span>';
-      h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+X(it.type)+': '+(it.note?X(it.note):X(cat))+'</span>';
+      var desc=it.type==='ELEV'?(it.label||('EL. '+it.value)):(X(it.type)+': '+(it.note?X(it.note):X(cat)));
+      h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
       h+='<span class="mp-val">'+fmtMeasVal(it.value,it.unit)+'</span>';
       h+='<button class="mp-del" onclick="delMeas('+it.eid+')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
       h+='</div>';
@@ -1072,6 +1082,9 @@ function fmtMeasVal(val,unit){
   if(!val&&val!==0)return'--';
   if(unit==='SF')return val.toFixed(1)+' SF';
   if(unit==='LF')return val.toFixed(1)+' LF';
+  if(unit==='feet'){var ft=Math.floor(val),inc=Math.round(Math.abs(val-ft)*12);if(inc>=12){ft+=(val>=0?1:-1);inc=0;}return ft+"'-"+inc+'"';}
+  if(unit==='meters')return val.toFixed(3)+' m';
+  if(unit==='inches')return val.toFixed(1)+'"';
   return val.toFixed(1);
 }
 function togMeasCat(cat){openMeasCats[cat]=openMeasCats[cat]===false?true:false;renderMeasPanel();}
@@ -1080,6 +1093,26 @@ function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
 function hideMeasurements(){call('hideAllMeasurements');}
 function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});renderMeasPanel();});}
+
+/* ═══ BENCHMARK INFO ═══ */
+var BMK=null;
+function receiveBenchmark(json){
+  try{BMK=json==='null'||!json?null:JSON.parse(json);}catch(e){BMK=null;}
+  renderBenchmark();
+}
+function renderBenchmark(){
+  var bar=document.getElementById('bmkBar');
+  var info=document.getElementById('bmkInfo');
+  if(BMK){
+    bar.style.display='flex';
+    var v=BMK.elevation;
+    if(BMK.unit==='feet'){var ft=Math.floor(v),inc=Math.round(Math.abs(v-ft)*12);if(inc>=12){ft++;inc=0;}info.textContent=BMK.name+' = '+ft+"'-"+inc+'" ('+BMK.unit+')';}
+    else if(BMK.unit==='meters')info.textContent=BMK.name+' = '+v.toFixed(3)+' m';
+    else info.textContent=BMK.name+' = '+v+' '+BMK.unit;
+  }else{
+    bar.style.display='none';
+  }
+}
 
 /* ═══ BULK EDIT ═══ */
 function bulkSetCat(){

@@ -17,6 +17,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'recat_log.rb')
   load File.join(PLUGIN_DIR, 'hyper_parser.rb')
   load File.join(PLUGIN_DIR, 'bug_reporter.rb')
+  load File.join(PLUGIN_DIR, 'elevation_tool.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -60,6 +61,8 @@ module TakeoffTool
     sub.add_separator
     sub.add_item('📏 LF Measure Tool') { TakeoffTool.activate_lf_tool }
     sub.add_item('📐 SF Measure Tool') { TakeoffTool.activate_sf_tool }
+    sub.add_item('Set Elevation Benchmark') { TakeoffTool.activate_benchmark_tool }
+    sub.add_item('Elevation Tag Tool') { TakeoffTool.activate_elevation_tool }
     nav_cmd = UI::Command.new('Precision Navigation') { PrecisionNav.toggle }
     nav_cmd.set_validation_proc { PrecisionNav.enabled? ? MF_CHECKED : MF_UNCHECKED }
     sub.add_item(nav_cmd)
@@ -119,6 +122,22 @@ module TakeoffTool
     cmd_hp.status_bar_text = "Open Hyper Parse to group and re-categorize visible entities"
     cmd_hp.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_hp)
+
+    cmd_bmk = UI::Command.new("Set Benchmark") { TakeoffTool.activate_benchmark_tool }
+    cmd_bmk.small_icon = File.join(PLUGIN_DIR, "icons", "benchmark_24.png")
+    cmd_bmk.large_icon = File.join(PLUGIN_DIR, "icons", "benchmark_32.png")
+    cmd_bmk.tooltip = "Set Elevation Benchmark"
+    cmd_bmk.status_bar_text = "Click a face to set the elevation reference point"
+    cmd_bmk.set_validation_proc { MF_ENABLED }
+    toolbar.add_item(cmd_bmk)
+
+    cmd_elev = UI::Command.new("Elevation Tag") { TakeoffTool.activate_elevation_tool }
+    cmd_elev.small_icon = File.join(PLUGIN_DIR, "icons", "elevation_24.png")
+    cmd_elev.large_icon = File.join(PLUGIN_DIR, "icons", "elevation_32.png")
+    cmd_elev.tooltip = "Elevation Tag — Click faces to mark elevations"
+    cmd_elev.status_bar_text = "Click faces to place elevation reference tags"
+    cmd_elev.set_validation_proc { MF_ENABLED }
+    toolbar.add_item(cmd_elev)
 
     # Dev reload button (only in debug mode)
     if Sketchup.read_default("FormAndField", "debug_mode", false)
