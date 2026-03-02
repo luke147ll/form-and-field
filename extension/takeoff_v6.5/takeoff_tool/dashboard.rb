@@ -292,6 +292,43 @@ module TakeoffTool
         puts "Takeoff: addEmptyCategory '#{name}'"
       end
 
+      @dialog.add_action_callback('addSubcategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          name = data['name'].to_s.strip
+          TakeoffTool.add_subcategory(cat, name)
+        rescue => e
+          puts "Takeoff addSubcategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('renameSubcategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          old_name = data['oldName'].to_s.strip
+          new_name = data['newName'].to_s.strip
+          TakeoffTool.rename_subcategory(cat, old_name, new_name)
+        rescue => e
+          puts "Takeoff renameSubcategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('deleteSubcategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          name = data['name'].to_s.strip
+          TakeoffTool.remove_subcategory(cat, name)
+        rescue => e
+          puts "Takeoff deleteSubcategory error: #{e.message}"
+        end
+      end
+
       # Bulk set size for multiple entities at once
       @dialog.add_action_callback('bulkSetSize') do |_ctx, json_str|
         begin
@@ -440,7 +477,8 @@ module TakeoffTool
       cats = TakeoffTool.master_categories
 
       require 'json'
-      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc })
+      msub = TakeoffTool.master_subcategories
+      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")

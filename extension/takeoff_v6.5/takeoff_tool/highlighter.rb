@@ -18,6 +18,7 @@ module TakeoffTool
     @orig_instance = {}   # entityID => original instance material
     @orig_faces = {}      # entityID => array of [face, original_material]
     @mats = {}
+    @isolated_categories = nil  # nil = no isolation, Hash = { cat => true }
     end # unless defined?(COLORS)
 
     def self.highlight_all(sr, ca)
@@ -277,6 +278,7 @@ module TakeoffTool
         l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
+      @isolated_categories = { tc => true }
     end
 
     def self.isolate_categories(sr, ca, cats)
@@ -306,6 +308,7 @@ module TakeoffTool
         l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
+      @isolated_categories = cat_set.dup
       puts "HL: Isolated #{cats.length} categories: #{cats.join(', ')}"
     end
 
@@ -327,6 +330,7 @@ module TakeoffTool
     end
 
     def self.isolate_entities(sr, ids)
+      @isolated_categories = nil
       m = Sketchup.active_model; return unless m
       id_set = {}
       ids.each { |id| id_set[id] = true }
@@ -356,6 +360,7 @@ module TakeoffTool
     end
 
     def self.hide_categories(sr, ca, cats)
+      @isolated_categories = nil
       m = Sketchup.active_model; return unless m
       cat_set = {}
       cats.each { |c| cat_set[c] = true }
@@ -374,6 +379,7 @@ module TakeoffTool
     end
 
     def self.isolate_tag(tn)
+      @isolated_categories = nil
       m = Sketchup.active_model; return unless m
       m.start_operation('Isolate Tag', true)
 
@@ -391,6 +397,7 @@ module TakeoffTool
     end
 
     def self.show_all
+      @isolated_categories = nil
       m = Sketchup.active_model; return unless m
       m.start_operation('Show All', true)
 
@@ -418,6 +425,38 @@ module TakeoffTool
       end
       ensure_ancestors_visible(visible, m)
       m.commit_operation
+    end
+
+    def self.isolated_categories
+      @isolated_categories
+    end
+
+    # After an entity is reclassified, update its viewport visibility
+    # to match the current isolation. Returns true if entity was hidden.
+    def self.update_entity_isolation(eid, new_cat)
+      return nil unless @isolated_categories
+      e = TakeoffTool.find_entity(eid)
+      return nil unless e && e.valid?
+      m = Sketchup.active_model
+      return nil unless m
+
+      should_show = !!@isolated_categories[new_cat]
+
+      m.start_operation('Update Isolation', true)
+      if should_show && !e.visible?
+        e.visible = true
+        ancs, lyrs = collect_ancestors(e)
+        ancs.each { |a| a.visible = true if a.valid? && !a.visible? }
+        lyrs.each { |l| l.visible = true if l && !l.visible? }
+        if e.respond_to?(:layer) && e.layer
+          e.layer.visible = true unless e.layer.visible?
+        end
+      elsif !should_show && e.visible?
+        e.visible = false
+      end
+      m.commit_operation
+
+      !should_show
     end
 
     private

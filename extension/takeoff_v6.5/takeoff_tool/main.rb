@@ -24,10 +24,12 @@ module TakeoffTool
   @entity_registry = {}
   @custom_categories = []
   @master_categories = []
+  @master_subcategories = {}
 
   class << self
     attr_accessor :scan_results, :category_assignments, :cost_code_assignments,
-                  :entity_registry, :custom_categories, :master_categories
+                  :entity_registry, :custom_categories, :master_categories,
+                  :master_subcategories
   end
 
   def self.find_entity(eid)
@@ -164,6 +166,7 @@ module TakeoffTool
       load_custom_categories
       load_master_categories
       merge_scan_categories_into_master
+      load_master_subcategories
       load_manual_measurements
 
       Dashboard.scan_log_msg("Generating parse log...")
@@ -362,6 +365,18 @@ module TakeoffTool
         m.set_attribute('TakeoffMeasurementTypes', old_name, '')
       end
 
+      # Cascade subcategories key
+      if @master_subcategories.key?(old_name)
+        old_subs = @master_subcategories.delete(old_name)
+        if @master_subcategories.key?(new_name)
+          old_subs.each { |s| @master_subcategories[new_name] << s unless @master_subcategories[new_name].include?(s) }
+          @master_subcategories[new_name].sort_by!(&:downcase)
+        else
+          @master_subcategories[new_name] = old_subs
+        end
+        save_master_subcategories
+      end
+
       save_master_categories
       m.commit_operation
       broadcast_category_update
@@ -410,7 +425,9 @@ module TakeoffTool
       end
 
       @master_categories.delete(name)
+      @master_subcategories.delete(name)
       save_master_categories
+      save_master_subcategories
       m.commit_operation
       broadcast_category_update
       puts "Takeoff: Removed category '#{name}' — items moved to Uncategorized"
@@ -491,6 +508,202 @@ module TakeoffTool
       sort_master_categories!
       save_master_categories
       puts "Takeoff: Merged new categories into master list (#{@master_categories.length} total)"
+    end
+  end
+
+  # ─── Master Subcategories API ───
+
+  # Deep-copy of full hash
+  def self.master_subcategories
+    h = {}
+    @master_subcategories.each { |k, v| h[k] = v.dup }
+    h
+  end
+
+  # Array of subcategories for one category
+  def self.master_subcategories_for(cat)
+    (@master_subcategories[cat] || []).dup
+  end
+
+  # Add a subcategory under a category. Returns true if added.
+  def self.add_subcategory(cat, name)
+    return false if cat.nil? || name.nil?
+    cat = cat.to_s.strip
+    name = name.to_s.strip
+    return false if cat.empty? || name.empty?
+
+    @master_subcategories[cat] ||= []
+    return false if @master_subcategories[cat].include?(name)
+
+    @master_subcategories[cat] << name
+    @master_subcategories[cat].sort_by!(&:downcase)
+    save_master_subcategories
+    broadcast_category_update
+    puts "Takeoff: Added subcategory '#{name}' under '#{cat}'"
+    true
+  end
+
+  # Rename a subcategory. Atomic: updates master list + entity attrs + scan_results.
+  def self.rename_subcategory(cat, old_name, new_name)
+    return false if cat.nil? || old_name.nil? || new_name.nil?
+    cat = cat.to_s.strip
+    old_name = old_name.to_s.strip
+    new_name = new_name.to_s.strip
+    return false if cat.empty? || old_name.empty? || new_name.empty?
+    return false if old_name == new_name
+    return false unless @master_subcategories[cat]&.include?(old_name)
+
+    m = Sketchup.active_model
+    return false unless m
+
+    m.start_operation('Rename Subcategory', true)
+    begin
+      subs = @master_subcategories[cat]
+      if subs.include?(new_name)
+        # Merge: just remove old
+        subs.delete(old_name)
+      else
+        idx = subs.index(old_name)
+        subs[idx] = new_name if idx
+        subs.sort_by!(&:downcase)
+      end
+
+      # Update entity attributes
+      @entity_registry.each do |eid, e|
+        next unless e && e.valid?
+        begin
+          ecat = e.get_attribute('TakeoffAssignments', 'category')
+          esub = e.get_attribute('TakeoffAssignments', 'subcategory')
+          if ecat == cat && esub == old_name
+            e.set_attribute('TakeoffAssignments', 'subcategory', new_name)
+          end
+        rescue => err
+          puts "Takeoff: rename_subcategory entity error eid=#{eid}: #{err.message}"
+        end
+      end
+
+      # Update scan_results
+      @scan_results.each do |r|
+        if r[:parsed] && r[:parsed][:auto_category] == cat && r[:parsed][:auto_subcategory] == old_name
+          r[:parsed][:auto_subcategory] = new_name
+        end
+      end
+
+      save_master_subcategories
+      m.commit_operation
+      broadcast_category_update
+      puts "Takeoff: Renamed subcategory '#{old_name}' -> '#{new_name}' under '#{cat}'"
+      true
+    rescue => e
+      m.abort_operation
+      puts "Takeoff: rename_subcategory error: #{e.message}"
+      false
+    end
+  end
+
+  # Remove a subcategory. Clears subcategory to '' on affected entities.
+  def self.remove_subcategory(cat, name)
+    return false if cat.nil? || name.nil?
+    cat = cat.to_s.strip
+    name = name.to_s.strip
+    return false if cat.empty? || name.empty?
+    return false unless @master_subcategories[cat]&.include?(name)
+
+    m = Sketchup.active_model
+    return false unless m
+
+    m.start_operation('Remove Subcategory', true)
+    begin
+      @master_subcategories[cat].delete(name)
+
+      # Clear subcategory on affected entities
+      @entity_registry.each do |eid, e|
+        next unless e && e.valid?
+        begin
+          ecat = e.get_attribute('TakeoffAssignments', 'category')
+          esub = e.get_attribute('TakeoffAssignments', 'subcategory')
+          if ecat == cat && esub == name
+            e.set_attribute('TakeoffAssignments', 'subcategory', '')
+          end
+        rescue => err
+          puts "Takeoff: remove_subcategory entity error eid=#{eid}: #{err.message}"
+        end
+      end
+
+      # Clear in scan_results
+      @scan_results.each do |r|
+        if r[:parsed] && r[:parsed][:auto_category] == cat && r[:parsed][:auto_subcategory] == name
+          r[:parsed][:auto_subcategory] = ''
+        end
+      end
+
+      save_master_subcategories
+      m.commit_operation
+      broadcast_category_update
+      puts "Takeoff: Removed subcategory '#{name}' from '#{cat}'"
+      true
+    rescue => e
+      m.abort_operation
+      puts "Takeoff: remove_subcategory error: #{e.message}"
+      false
+    end
+  end
+
+  # Persist master subcategories to model attribute as JSON
+  def self.save_master_subcategories
+    m = Sketchup.active_model
+    return unless m
+    require 'json'
+    m.set_attribute('FormAndField', 'master_subcategories', JSON.generate(@master_subcategories))
+  end
+
+  # Load master subcategories from model attribute
+  def self.load_master_subcategories
+    m = Sketchup.active_model
+    return unless m
+    json = m.get_attribute('FormAndField', 'master_subcategories')
+    if json && !json.empty?
+      require 'json'
+      @master_subcategories = JSON.parse(json) rescue {}
+    else
+      @master_subcategories = {}
+    end
+    merge_scan_subcategories_into_master
+  end
+
+  # Discover subcategories from scan_results + entity attrs, group by category
+  def self.merge_scan_subcategories_into_master
+    changed = false
+
+    # From scan_results
+    (@scan_results || []).each do |r|
+      cat = r[:parsed][:auto_category]
+      sub = r[:parsed][:auto_subcategory]
+      next unless cat && !cat.empty? && sub && !sub.empty?
+      @master_subcategories[cat] ||= []
+      unless @master_subcategories[cat].include?(sub)
+        @master_subcategories[cat] << sub
+        changed = true
+      end
+    end
+
+    # From entity attributes
+    @entity_registry.each do |eid, e|
+      next unless e && e.valid?
+      cat = e.get_attribute('TakeoffAssignments', 'category')
+      sub = e.get_attribute('TakeoffAssignments', 'subcategory')
+      next unless cat && !cat.empty? && sub && !sub.empty?
+      @master_subcategories[cat] ||= []
+      unless @master_subcategories[cat].include?(sub)
+        @master_subcategories[cat] << sub
+        changed = true
+      end
+    end
+
+    if changed
+      @master_subcategories.each_value { |arr| arr.sort_by!(&:downcase) }
+      save_master_subcategories
+      puts "Takeoff: Merged subcategories into master list"
     end
   end
 
@@ -618,6 +831,7 @@ module TakeoffTool
     load_custom_categories
     load_master_categories
     merge_scan_categories_into_master
+    load_master_subcategories
     load_manual_measurements
 
     # Change detection

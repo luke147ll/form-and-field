@@ -20,11 +20,48 @@ module TakeoffTool
         style: UI::HtmlDialog::STYLE_DIALOG
       )
 
-      @dialog.add_action_callback('applyCategory') do |_ctx, cat_str|
-        cat = cat_str.to_s
+      @dialog.add_action_callback('applyCategory') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          cat = data['category'].to_s
+          sub = data['subcategory'].to_s
+        rescue
+          cat = arg_str.to_s
+          sub = ''
+        end
         next if cat.empty?
         TakeoffTool.apply_category_to_selection(@current_entities, cat)
-        @dialog.close rescue nil
+        unless sub.empty?
+          @current_entities.each do |e|
+            TakeoffTool.save_assignment(e.entityID, 'subcategory', sub)
+          end
+        end
+
+        # Update viewport isolation if active
+        hidden_count = 0
+        @current_entities.each do |e|
+          result = Highlighter.update_entity_isolation(e.entityID, cat)
+          hidden_count += 1 if result
+        end
+
+        # Build feedback message
+        n = @current_entities.length
+        if Highlighter.isolated_categories
+          if hidden_count > 0
+            if n == 1
+              msg = "Moved to #{cat} — hidden (not in current isolation)"
+            else
+              msg = "#{n} entities → #{cat} — #{hidden_count} hidden (not in current isolation)"
+            end
+          else
+            msg = n == 1 ? "Applied: #{cat}" : "#{n} entities → #{cat}"
+          end
+        else
+          msg = n == 1 ? "Applied: #{cat}" : "#{n} entities → #{cat}"
+        end
+
+        send_apply_result(cat, sub, msg, hidden_count > 0)
       end
 
       @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
@@ -32,6 +69,23 @@ module TakeoffTool
         next if name.empty?
         TakeoffTool.add_custom_category(name)
         puts "Takeoff: IdentifyDialog addCustomCategory '#{name}'"
+      end
+
+      @dialog.add_action_callback('requestSubcategoriesForCat') do |_ctx, cat_str|
+        send_subcategories_for(cat_str.to_s.strip)
+      end
+
+      @dialog.add_action_callback('addSubcategoryForCat') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          name = data['name'].to_s.strip
+          TakeoffTool.add_subcategory(cat, name)
+          send_subcategories_for(cat)
+        rescue => e
+          puts "Takeoff: IdentifyDialog addSubcategoryForCat error: #{e.message}"
+        end
       end
 
       html = @current_entities.length == 1 ? build_single(@current_entities.first) : build_multi(@current_entities)
@@ -145,6 +199,20 @@ module TakeoffTool
       opts + "\n<option value=\"__custom__\">+ Custom...</option>"
     end
 
+    def self.subcategory_options(cat, selected)
+      subs = TakeoffTool.master_subcategories_for(cat)
+      opts = '<option value="">--</option>'
+      subs.each do |s|
+        sel = s == selected ? ' selected' : ''
+        opts += "<option value=\"#{h(s)}\"#{sel}>#{h(s)}</option>"
+      end
+      # Include current value even if not in master list
+      if selected && !selected.empty? && !subs.include?(selected)
+        opts += "<option value=\"#{h(selected)}\" selected>#{h(selected)}</option>"
+      end
+      opts + "\n<option value=\"__custom_sub__\">+ Custom...</option>"
+    end
+
     def self.send_categories
       return unless @dialog && @dialog.visible?
       require 'json'
@@ -152,6 +220,23 @@ module TakeoffTool
       js = JSON.generate(cats)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCategories('#{esc}')") rescue nil
+    end
+
+    def self.send_subcategories_for(cat)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      subs = TakeoffTool.master_subcategories_for(cat)
+      js = JSON.generate(subs)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveSubcategories('#{esc}')") rescue nil
+    end
+
+    def self.send_apply_result(cat, sub, message, hidden)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      js = JSON.generate({ category: cat, subcategory: sub, message: message, hidden: hidden })
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveApplyResult('#{esc}')") rescue nil
     end
 
     MOCHA_CSS = <<~CSS.freeze unless defined?(MOCHA_CSS)
@@ -320,17 +405,38 @@ module TakeoffTool
       function onCatChange(sel){
         if(sel.value==='__custom__'){
           sel.value='';
-          showInputModal(function(name){
+          showInputModal('New category name',function(name){
+            var sub=document.getElementById('subSel');
+            var subVal=sub?sub.value:'';if(subVal==='__custom_sub__')subVal='';
+            sketchup.applyCategory(JSON.stringify({category:name,subcategory:subVal}));
             sketchup.addCustomCategory(name);
+          });
+          return;
+        }
+        // Request subcategories for selected category
+        if(sel.value) sketchup.requestSubcategoriesForCat(sel.value);
+        else updateSubSel([]);
+      }
+      function onSubChange(sel){
+        if(sel.value==='__custom_sub__'){
+          var cat=document.getElementById('catSel').value;
+          sel.value='';
+          if(!cat)return;
+          showInputModal('New subcategory for '+cat,function(name){
+            sketchup.applyCategory(JSON.stringify({category:cat,subcategory:name}));
+            sketchup.addSubcategoryForCat(JSON.stringify({cat:cat,name:name}));
           });
         }
       }
       function doApply(){
-        var v=document.getElementById('catSel').value;
-        if(v) sketchup.applyCategory(v);
+        var cat=document.getElementById('catSel').value;
+        var sub=document.getElementById('subSel').value;
+        if(sub==='__custom_sub__')sub='';
+        if(cat) sketchup.applyCategory(JSON.stringify({category:cat,subcategory:sub||''}));
       }
-      function showInputModal(cb){
+      function showInputModal(title,cb){
         _modalCb=cb;
+        document.getElementById('modalTitle').textContent=title;
         var inp=document.getElementById('modalInput');inp.value='';
         document.getElementById('inputModal').className='modal-bg show';
         setTimeout(function(){inp.focus();},50);
@@ -362,6 +468,99 @@ module TakeoffTool
           sel.appendChild(custom);
           if(cur)sel.value=cur;
         }catch(e){}
+      }
+      function receiveSubcategories(json){
+        try{
+          var subs=JSON.parse(json);
+          updateSubSel(subs);
+        }catch(e){}
+      }
+      function updateSubSel(subs){
+        var sel=document.getElementById('subSel');
+        if(!sel)return;
+        var cur=sel.value;
+        sel.innerHTML='<option value="">--</option>';
+        var found=false;
+        for(var i=0;i<subs.length;i++){
+          var o=document.createElement('option');
+          o.value=subs[i];o.textContent=subs[i];
+          if(subs[i]===cur){o.selected=true;found=true;}
+          sel.appendChild(o);
+        }
+        if(cur&&!found){var extra=document.createElement('option');extra.value=cur;extra.textContent=cur;extra.selected=true;sel.appendChild(extra);}
+        var custom=document.createElement('option');
+        custom.value='__custom_sub__';custom.textContent='+ Custom...';
+        sel.appendChild(custom);
+      }
+      function receiveApplyResult(json){
+        try{
+          var d=JSON.parse(json);
+          // Update category info row
+          var rows=document.querySelectorAll('.row');
+          for(var i=0;i<rows.length;i++){
+            var lbl=rows[i].querySelector('.label');
+            var val=rows[i].querySelector('.value');
+            if(!lbl||!val)continue;
+            if(lbl.textContent==='Category'){
+              val.textContent=d.category;
+              val.className='value cat-assigned';
+            }
+            if(lbl.textContent==='Subcategory'){
+              val.textContent=d.subcategory||'';
+            }
+          }
+          // Add subcategory row if it doesn't exist and we have one
+          if(d.subcategory){
+            var hasSub=false;
+            for(var j=0;j<rows.length;j++){
+              var l2=rows[j].querySelector('.label');
+              if(l2&&l2.textContent==='Subcategory'){hasSub=true;break;}
+            }
+            if(!hasSub){
+              for(var k=0;k<rows.length;k++){
+                var l3=rows[k].querySelector('.label');
+                if(l3&&l3.textContent==='Category'){
+                  var nr=document.createElement('div');nr.className='row';
+                  nr.innerHTML='<span class="label">Subcategory</span><span class="value">'+d.subcategory+'</span>';
+                  rows[k].parentNode.insertBefore(nr,rows[k].nextSibling);
+                  break;
+                }
+              }
+            }
+          }
+          // Update dropdowns
+          var catSel=document.getElementById('catSel');
+          if(catSel&&d.category){
+            var hasC=false;
+            for(var m=0;m<catSel.options.length;m++){if(catSel.options[m].value===d.category){hasC=true;break;}}
+            if(!hasC){var co=document.createElement('option');co.value=d.category;co.textContent=d.category;var cx=catSel.querySelector('option[value="__custom__"]');if(cx)catSel.insertBefore(co,cx);else catSel.appendChild(co);}
+            catSel.value=d.category;
+          }
+          var subSel=document.getElementById('subSel');
+          if(subSel&&d.subcategory){
+            var hasS=false;
+            for(var n=0;n<subSel.options.length;n++){if(subSel.options[n].value===d.subcategory){hasS=true;break;}}
+            if(!hasS){var so=document.createElement('option');so.value=d.subcategory;so.textContent=d.subcategory;var sx=subSel.querySelector('option[value="__custom_sub__"]');if(sx)subSel.insertBefore(so,sx);else subSel.appendChild(so);}
+            subSel.value=d.subcategory;
+          }
+          // Show feedback
+          showApplyMsg(d.message,d.hidden);
+        }catch(e){}
+      }
+      function showApplyMsg(msg,isHidden){
+        var el=document.getElementById('applyMsg');
+        if(!el){
+          el=document.createElement('div');el.id='applyMsg';
+          var btn=document.querySelector('.apply-btn');
+          if(btn)btn.parentNode.insertBefore(el,btn.nextSibling);
+          else document.body.appendChild(el);
+        }
+        el.textContent=msg;
+        el.style.cssText='margin-top:8px;padding:8px;border-radius:4px;font-size:11px;font-weight:600;text-align:center;'
+          +(isHidden?'background:#fab387;color:#1e1e2e':'background:#a6e3a1;color:#1e1e2e');
+        el.style.display='block';el.style.opacity='1';el.style.transition='none';
+        setTimeout(function(){el.style.transition='opacity 1s';el.style.opacity='0';},3000);
+        setTimeout(function(){el.style.display='none';},4200);
       }
     JS
 
@@ -405,6 +604,10 @@ module TakeoffTool
           <option value="">-- Select --</option>
           #{category_options(i[:category] || '')}
         </select>
+        <div class="sect-label" style="margin-top:6px">Subcategory</div>
+        <select id="subSel" onchange="onSubChange(this)">
+          #{subcategory_options(i[:category] || '', i[:subcategory] || '')}
+        </select>
         <button class="apply-btn" onclick="doApply()">Apply</button>
         #{MODAL_HTML}
         <script>#{IDENTIFY_JS}</script>
@@ -440,6 +643,11 @@ module TakeoffTool
         <select id="catSel" onchange="onCatChange(this)">
           <option value="">-- Select --</option>
           #{category_options('')}
+        </select>
+        <div class="sect-label" style="margin-top:6px">Subcategory</div>
+        <select id="subSel" onchange="onSubChange(this)">
+          <option value="">--</option>
+          <option value="__custom_sub__">+ Custom...</option>
         </select>
         <button class="apply-btn" onclick="doApply()">Apply</button>
         #{MODAL_HTML}

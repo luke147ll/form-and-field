@@ -126,6 +126,18 @@ module TakeoffTool
         puts "Takeoff: HyperParser addCustomCategory '#{name}'"
       end
 
+      @dialog.add_action_callback('addSubcategoryForCat') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          name = data['name'].to_s.strip
+          TakeoffTool.add_subcategory(cat, name)
+        rescue => e
+          puts "HyperParser: addSubcategoryForCat error: #{e.message}"
+        end
+      end
+
       @dialog.set_on_closed { cleanup }
       @dialog.show
     end
@@ -368,7 +380,8 @@ module TakeoffTool
       return unless @dialog && @dialog.visible?
       require 'json'
       cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
-      js = JSON.generate(cats)
+      payload = { categories: cats, subcategories: TakeoffTool.master_subcategories }
+      js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCategories('#{esc}')")
     end

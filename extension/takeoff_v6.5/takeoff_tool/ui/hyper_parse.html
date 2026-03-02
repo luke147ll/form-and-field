@@ -145,7 +145,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
     <label>Category</label>
     <select id="catSelect"><option value="">-- select --</option></select>
     <label>Subcategory</label>
-    <input type="text" id="subcatInput" placeholder="optional">
+    <select id="subcatSelect"><option value="">--</option></select>
     <span class="cnt" id="selCount">0 selected</span>
     <button class="btn grn" id="btnCommit" onclick="doCommit()" disabled>Commit</button>
   </div>
@@ -155,7 +155,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 <div class="toast" id="toast"></div>
 
 <script>
-var GROUPS=[], METHOD='', CATS=[], SELECTED={};
+var GROUPS=[], METHOD='', CATS=[], SUBCATS={}, SELECTED={};
 
 /* ═══ Communication ═══ */
 function call(n,a){
@@ -174,7 +174,13 @@ window.addEventListener('load', function(){
 /* ═══ Receive Categories ═══ */
 function receiveCategories(json){
   try{
-    CATS=JSON.parse(json);
+    var parsed=JSON.parse(json);
+    // Handle both old format (array) and new format (object)
+    if(Array.isArray(parsed)){
+      CATS=parsed;SUBCATS={};
+    }else{
+      CATS=parsed.categories||[];SUBCATS=parsed.subcategories||{};
+    }
     var sel=document.getElementById('catSelect');
     var cur=sel.value;
     sel.innerHTML='<option value="">-- select --</option>';
@@ -187,7 +193,24 @@ function receiveCategories(json){
     custom.value='__custom__';custom.textContent='+ Custom...';
     sel.appendChild(custom);
     if(cur)sel.value=cur;
+    updateSubcatDropdown();
   }catch(e){console.log('receiveCategories err: '+e.message);}
+}
+function updateSubcatDropdown(){
+  var cat=document.getElementById('catSelect').value;
+  var sel=document.getElementById('subcatSelect');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">--</option>';
+  var subs=(cat&&SUBCATS[cat])||[];
+  for(var i=0;i<subs.length;i++){
+    var o=document.createElement('option');
+    o.value=subs[i];o.textContent=subs[i];
+    if(subs[i]===cur)o.selected=true;
+    sel.appendChild(o);
+  }
+  var custom=document.createElement('option');
+  custom.value='__custom_sub__';custom.textContent='+ Custom...';
+  sel.appendChild(custom);
 }
 
 /* ═══ Parse ═══ */
@@ -312,17 +335,46 @@ document.addEventListener('change',function(e){
   if(e.target.id==='catSelect'){
     if(e.target.value==='__custom__'){
       e.target.value='';
-      showInputModal(function(name){
+      showInputModal('New category name',function(name){
+        var eids=getSelectedEids();
+        var subSel=document.getElementById('subcatSelect');
+        var sub=subSel.value;if(sub==='__custom_sub__')sub='';
+        if(eids.length>0){
+          callJSON('commitParse',{eids:eids,category:name,subcategory:sub});
+        }
         call('addCustomCategory',name);
+        document.getElementById('catSelect').value=name;
+        updateSubcatDropdown();
       });
+    } else {
+      updateSubcatDropdown();
     }
     updateSelCount();
+  }
+  if(e.target.id==='subcatSelect'){
+    if(e.target.value==='__custom_sub__'){
+      var cat=document.getElementById('catSelect').value;
+      e.target.value='';
+      showInputModal('New subcategory for '+cat,function(name){
+        if(!SUBCATS[cat])SUBCATS[cat]=[];
+        if(SUBCATS[cat].indexOf(name)===-1){SUBCATS[cat].push(name);SUBCATS[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+        var eids=getSelectedEids();
+        if(eids.length>0 && cat){
+          callJSON('commitParse',{eids:eids,category:cat,subcategory:name});
+        }
+        callJSON('addSubcategoryForCat',{cat:cat,name:name});
+        updateSubcatDropdown();
+        document.getElementById('subcatSelect').value=name;
+      });
+    }
   }
 });
 
 function doCommit(){
   var cat=document.getElementById('catSelect').value;
-  var sub=document.getElementById('subcatInput').value.trim();
+  var subSel=document.getElementById('subcatSelect');
+  var sub=subSel.value;
+  if(sub==='__custom_sub__')sub='';
   var eids=getSelectedEids();
   if(!cat||eids.length===0)return;
   callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
@@ -362,8 +414,9 @@ function showToast(msg,type){
 
 /* ═══ Input Modal ═══ */
 var _modalCb=null;
-function showInputModal(cb){
+function showInputModal(title,cb){
   _modalCb=cb;
+  document.getElementById('modalTitle').textContent=title||'Enter name';
   var inp=document.getElementById('modalInput');inp.value='';
   document.getElementById('inputModal').className='modal-bg show';
   setTimeout(function(){inp.focus();},50);
@@ -381,7 +434,7 @@ function cancelModal(){
 </script>
 <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
   <div class="modal-card">
-    <h3>New category name</h3>
+    <h3 id="modalTitle">New category name</h3>
     <input type="text" id="modalInput" onkeydown="if(event.key==='Enter')confirmModal();if(event.key==='Escape')cancelModal();">
     <div class="modal-btns">
       <button onclick="cancelModal()">Cancel</button>
