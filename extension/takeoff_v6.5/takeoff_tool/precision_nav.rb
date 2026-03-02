@@ -10,15 +10,41 @@ module TakeoffTool
         @looking = false
       end
       def activate
-        @nav = false; @keys = {}; @looking = false
-        Sketchup.status_text = "Precision Nav - press N to fly"
+        @keys = {}; @looking = false
+        # Switch to perspective if in parallel projection
+        cam = Sketchup.active_model.active_view.camera
+        cam.perspective = true unless cam.perspective?
+        # Immediately enter fly mode
+        @nav = true
+        Sketchup.status_text = "NAV ON | Arrows fly, PgUp/Dn rise/fall, +/- speed, click+drag look, N exit"
+        @tid = UI.start_timer(0.016, true) {
+          next unless @nav && !@keys.empty?
+          cam = Sketchup.active_model.active_view.camera
+          e = cam.eye; t = cam.target
+          fwd = (t - e).normalize
+          rt = fwd.cross(Z_AXIS)
+          next if rt.length < 0.001
+          rt.normalize!
+          s = @speed
+          mx=0.0;my=0.0;mz=0.0
+          if @keys[:f]; mx+=fwd.x*s; my+=fwd.y*s; mz+=fwd.z*s; end
+          if @keys[:b]; mx-=fwd.x*s; my-=fwd.y*s; mz-=fwd.z*s; end
+          if @keys[:r]; mx+=rt.x*s; my+=rt.y*s; mz+=rt.z*s; end
+          if @keys[:l]; mx-=rt.x*s; my-=rt.y*s; mz-=rt.z*s; end
+          if @keys[:u]; mz+=s; end
+          if @keys[:d]; mz-=s; end
+          next if mx==0&&my==0&&mz==0
+          o = Geom::Vector3d.new(mx,my,mz)
+          cam.set(e.offset(o), t.offset(o), cam.up)
+          Sketchup.active_model.active_view.invalidate
+        }
       end
       def deactivate(view)
         UI.stop_timer(@tid) if @tid; @tid = nil
         PrecisionNav.on_deactivate
       end
       def resume(view)
-        Sketchup.status_text = @nav ? "NAV ON | Arrows fly, PgUp/Dn rise/fall, +/- speed, click+drag look, N exit" : "Precision Nav - press N to fly"
+        Sketchup.status_text = @nav ? "NAV ON | Arrows fly, PgUp/Dn rise/fall, +/- speed, click+drag look, N exit" : "NAV OFF - press N to fly"
       end
       def onLButtonDown(flags, x, y, view)
         return false unless @nav
@@ -36,6 +62,8 @@ module TakeoffTool
           @nav = !@nav
           @keys = {}; @looking = false
           if @nav
+            cam = Sketchup.active_model.active_view.camera
+            cam.perspective = true unless cam.perspective?
             Sketchup.status_text = "NAV ON | Arrows fly, PgUp/Dn rise/fall, +/- speed, click+drag look, N exit"
             @tid = UI.start_timer(0.016, true) {
               next unless @nav && !@keys.empty?

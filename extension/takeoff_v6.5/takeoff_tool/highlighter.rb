@@ -133,20 +133,18 @@ module TakeoffTool
       @orig_faces.clear
       @mats.clear
 
-      # Also clear persistent measurement highlights (SF face colors + LF ribbons)
-      clear_measurement_highlights_inner(m)
-
       m.commit_operation
     end
 
     def self.clear_measurement_highlights
       m = Sketchup.active_model; return unless m
-      m.start_operation('Clear Measurement HL', true)
-      clear_measurement_highlights_inner(m)
+      m.start_operation('Hide Measurement HL', true)
+      hide_measurement_highlights_inner(m)
       m.commit_operation
     end
 
-    def self.clear_measurement_highlights_inner(m)
+    # Non-destructive hide: restores SF face materials but keeps FF_Original attrs
+    def self.hide_measurement_highlights_inner(m)
       restored = 0
 
       # Restore SF-colored faces inside all definitions (components/groups)
@@ -156,7 +154,7 @@ module TakeoffTool
           orig_name = face.get_attribute('FF_Original', 'material')
           next unless orig_name
           face.material = orig_name.empty? ? nil : m.materials[orig_name]
-          face.delete_attribute('FF_Original', 'material')
+          # Keep FF_Original attrs for re-show
           restored += 1
         end
       end
@@ -166,28 +164,232 @@ module TakeoffTool
         orig_name = face.get_attribute('FF_Original', 'material')
         next unless orig_name
         face.material = orig_name.empty? ? nil : m.materials[orig_name]
-        face.delete_attribute('FF_Original', 'material')
         restored += 1
       end
 
-      # Hide LF ribbon groups (preserves measurement data)
+      # Hide LF ribbon groups
       hidden = 0
       m.entities.grep(Sketchup::Group).each do |grp|
         next unless grp.valid?
-        if grp.get_attribute('TakeoffMeasurement', 'type') == 'LF' && grp.visible?
+        mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+        next unless mtype
+        if mtype == 'LF' && grp.visible?
           grp.visible = false
           hidden += 1
         end
+        grp.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
       end
 
-      # Clean up TO_SF_ and TO_LF_ materials
-      m.materials.to_a.each do |mt|
-        if mt.display_name =~ /\ATO_(SF|LF)_/
-          begin; m.materials.remove(mt); rescue; end
+      puts "Takeoff: Hid measurement highlights (#{restored} faces restored, #{hidden} ribbons hidden)" if restored > 0 || hidden > 0
+    end
+
+    # ─── Measurement visibility controls ───
+
+    def self.hide_measurement_highlights
+      m = Sketchup.active_model; return unless m
+      m.start_operation('Hide All Measurements', true)
+      hide_measurement_highlights_inner(m)
+      m.commit_operation
+    end
+
+    def self.show_all_measurement_highlights
+      m = Sketchup.active_model; return unless m
+      m.start_operation('Show All Measurements', true)
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+        next unless mtype
+        if mtype == 'LF'
+          grp.visible = true
+        elsif mtype == 'SF'
+          show_sf_measurement_faces(m, grp)
+        end
+        grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      end
+      m.commit_operation
+    end
+
+    def self.hide_all_measurement_highlights
+      m = Sketchup.active_model; return unless m
+      m.start_operation('Hide All Measurements', true)
+      hide_measurement_highlights_inner(m)
+      m.commit_operation
+    end
+
+    def self.show_measurement_highlight(grp_eid)
+      m = Sketchup.active_model; return unless m
+      grp = TakeoffTool.find_entity(grp_eid.to_i)
+      return unless grp && grp.valid?
+      mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+      return unless mtype
+
+      m.start_operation('Show Measurement', true)
+      if mtype == 'LF'
+        grp.visible = true
+      elsif mtype == 'SF'
+        show_sf_measurement_faces(m, grp)
+      end
+      grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      m.commit_operation
+    end
+
+    def self.hide_measurement_highlight(grp_eid)
+      m = Sketchup.active_model; return unless m
+      grp = TakeoffTool.find_entity(grp_eid.to_i)
+      return unless grp && grp.valid?
+      mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+      return unless mtype
+
+      m.start_operation('Hide Measurement', true)
+      if mtype == 'LF'
+        grp.visible = false
+      elsif mtype == 'SF'
+        hide_sf_measurement_faces(m, grp)
+      end
+      grp.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
+      m.commit_operation
+    end
+
+    def self.delete_measurement(grp_eid)
+      m = Sketchup.active_model; return unless m
+      grp = TakeoffTool.find_entity(grp_eid.to_i)
+      return unless grp && grp.valid?
+      mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+
+      m.start_operation('Delete Measurement', true)
+      if mtype == 'SF'
+        delete_sf_measurement_faces(m, grp)
+      end
+
+      # Remove from registries
+      eid = grp.entityID
+      TakeoffTool.entity_registry.delete(eid)
+      TakeoffTool.scan_results.reject! { |r| r[:entity_id] == eid }
+      TakeoffTool.category_assignments.delete(eid)
+      TakeoffTool.cost_code_assignments.delete(eid)
+
+      # Erase the group
+      grp.erase! if grp.valid?
+      m.commit_operation
+      puts "Takeoff: Deleted measurement eid=#{eid}"
+    end
+
+    private
+
+    # Resolve face references stored in group attrs
+    def self.resolve_face_refs(m, grp)
+      require 'json'
+      refs_json = grp.get_attribute('TakeoffMeasurement', 'face_refs')
+      return [] unless refs_json
+      begin
+        refs = JSON.parse(refs_json)
+      rescue
+        return []
+      end
+      faces = []
+      refs.each do |ref|
+        face = nil
+        # Try persistent_id first
+        pid = ref['pid']
+        if pid
+          face = find_face_by_persistent_id(m, pid)
+        end
+        # Fallback: defn + fidx
+        unless face
+          defn_name = ref['defn']
+          fidx = ref['fidx']
+          if defn_name && fidx && fidx >= 0
+            if defn_name == '__model__'
+              all_faces = m.entities.grep(Sketchup::Face)
+              face = all_faces[fidx] if fidx < all_faces.length
+            else
+              defn = m.definitions[defn_name]
+              if defn
+                all_faces = defn.entities.grep(Sketchup::Face)
+                face = all_faces[fidx] if fidx < all_faces.length
+              end
+            end
+          end
+        end
+        faces << face if face && face.valid?
+      end
+      faces
+    end
+
+    def self.find_face_by_persistent_id(m, pid)
+      # Search loose model entities
+      m.entities.grep(Sketchup::Face).each do |f|
+        return f if f.respond_to?(:persistent_id) && f.persistent_id == pid
+      end
+      # Search definitions
+      m.definitions.each do |defn|
+        next if defn.image?
+        defn.entities.grep(Sketchup::Face).each do |f|
+          return f if f.respond_to?(:persistent_id) && f.persistent_id == pid
         end
       end
+      nil
+    end
 
-      puts "Takeoff: Cleared measurement highlights (#{restored} faces restored, #{hidden} ribbons hidden)" if restored > 0 || hidden > 0
+    def self.show_sf_measurement_faces(m, grp)
+      require 'json'
+      mat_name = grp.get_attribute('TakeoffMeasurement', 'material_name')
+      rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
+      return unless mat_name
+
+      # Get or create the material
+      mat = m.materials[mat_name]
+      unless mat
+        rgba = begin; JSON.parse(rgba_json); rescue; [255, 100, 255, 140]; end
+        mat = m.materials.add(mat_name)
+        mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
+        mat.alpha = (rgba[3] || 140) / 255.0
+      end
+
+      faces = resolve_face_refs(m, grp)
+      faces.each do |face|
+        begin
+          # Save original material if not already saved
+          unless face.get_attribute('FF_Original', 'material')
+            orig_name = face.material ? face.material.display_name : ''
+            face.set_attribute('FF_Original', 'material', orig_name)
+          end
+          face.material = mat
+        rescue => e
+          puts "HL: show_sf face error: #{e.message}"
+        end
+      end
+    end
+
+    def self.hide_sf_measurement_faces(m, grp)
+      faces = resolve_face_refs(m, grp)
+      faces.each do |face|
+        begin
+          orig_name = face.get_attribute('FF_Original', 'material')
+          next unless orig_name
+          face.material = orig_name.empty? ? nil : m.materials[orig_name]
+          # Keep FF_Original attrs for re-show
+        rescue => e
+          puts "HL: hide_sf face error: #{e.message}"
+        end
+      end
+    end
+
+    def self.delete_sf_measurement_faces(m, grp)
+      faces = resolve_face_refs(m, grp)
+      faces.each do |face|
+        begin
+          orig_name = face.get_attribute('FF_Original', 'material')
+          if orig_name
+            face.material = orig_name.empty? ? nil : m.materials[orig_name]
+          end
+          face.delete_attribute('FF_Original', 'material')
+          face.delete_attribute('FF_Original', 'group_eid')
+          face.delete_attribute('FF_Original') rescue nil
+        rescue => e
+          puts "HL: delete_sf face error: #{e.message}"
+        end
+      end
     end
 
     # ─── Visibility ───
@@ -281,54 +483,6 @@ module TakeoffTool
       @isolated_categories = { tc => true }
     end
 
-    def self.isolate_categories(sr, ca, cats)
-      m = Sketchup.active_model; return unless m
-      cat_set = {}
-      cats.each { |c| cat_set[c] = true }
-
-      # Phase 1
-      visible = []
-      sr.each do |r|
-        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-        visible << e if cat_set[cat]
-      end
-
-      # Phase 2
-      keep_ids, keep_layers = build_keep_visible_set(visible)
-
-      # Phase 3
-      m.start_operation('Isolate Multi', true)
-      sr.each do |r|
-        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        e.visible = !!keep_ids[e.entityID]
-      end
-      keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
-      keep_layers.each_key do |ln|
-        l = m.layers[ln]; l.visible = true if l && !l.visible?
-      end
-      m.commit_operation
-      @isolated_categories = cat_set.dup
-      puts "HL: Isolated #{cats.length} categories: #{cats.join(', ')}"
-    end
-
-    def self.highlight_categories(sr, ca, cats)
-      m = Sketchup.active_model; return unless m; clear_all
-      cat_set = {}
-      cats.each { |c| cat_set[c] = true }
-      m.start_operation('Highlight Multi', true); n = 0
-      sr.each do |r|
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-        next unless cat_set[cat]
-        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        mat = gmat(m, cat)
-        apply_highlight(e, r[:entity_id], mat)
-        n += 1
-      end
-      m.commit_operation
-      puts "HL: Highlighted #{n} items across #{cats.length} categories"
-    end
-
     def self.isolate_entities(sr, ids)
       @isolated_categories = nil
       m = Sketchup.active_model; return unless m
@@ -357,25 +511,6 @@ module TakeoffTool
       end
       m.commit_operation
       puts "HL: Isolated #{ids.length} entities"
-    end
-
-    def self.hide_categories(sr, ca, cats)
-      @isolated_categories = nil
-      m = Sketchup.active_model; return unless m
-      cat_set = {}
-      cats.each { |c| cat_set[c] = true }
-      m.start_operation('Hide Categories', true)
-      n = 0
-      sr.each do |r|
-        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-        if cat_set[cat]
-          e.visible = false
-          n += 1
-        end
-      end
-      m.commit_operation
-      puts "HL: Hid #{n} items across #{cats.length} categories"
     end
 
     def self.isolate_tag(tn)

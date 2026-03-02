@@ -317,26 +317,43 @@ module TakeoffTool
       lf_tool = self
 
       default_cat = @preset_category || @last_cat || 'Trim'
-      cat_options = LF_CATEGORIES.map { |c|
+      all_cats = TakeoffTool.master_categories
+      cat_options = all_cats.map { |c|
         sel = c == default_cat ? ' selected' : ''
         "<option value=\"#{c}\"#{sel}>#{c}</option>"
       }.join
+      cat_options += '<option value="__custom__">+ Custom...</option>'
 
       html = <<~HTML
         <!DOCTYPE html><html><head><meta charset="UTF-8">
-        <style>#{PICK_DIALOG_CSS}</style></head><body>
+        <style>#{PICK_DIALOG_CSS}
+        body{overflow-y:auto}
+        #customRow{display:none;margin-top:8px}
+        #customRow.show{display:block}
+        #customName{width:100%;padding:8px 10px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:6px;font-size:13px;font-family:inherit}
+        #customName:focus{outline:none;border-color:#89b4fa}
+        </style></head><body>
         <h1>LF Measurement &mdash; #{'%.1f' % total_ft} ft</h1>
         <label>Category</label>
-        <select id="cat">#{cat_options}</select>
+        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
+        <div id="customRow"><label>New category name</label><input id="customName" type="text" placeholder="Enter name..."></div>
         <label>Cost Code (optional)</label>
         <input id="cc" type="text" value="#{(@last_cc || '').gsub('"', '&quot;')}">
         <label>Note (optional)</label>
         <input id="note" type="text" value="">
         <div class="buttons">
           <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
-          <button class="btn btn-ok" onclick="sketchup.ok(JSON.stringify({cat:document.getElementById('cat').value,cc:document.getElementById('cc').value,note:document.getElementById('note').value}))">OK</button>
+          <button class="btn btn-ok" onclick="doOk()">OK</button>
         </div>
-        <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
+        <script>
+        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
+        function doOk(){
+          var cat=document.getElementById('cat').value;
+          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
+          sketchup.ok(JSON.stringify({cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
+        }
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});
+        </script>
         </body></html>
       HTML
 
@@ -344,7 +361,7 @@ module TakeoffTool
       @pick_dlg = UI::HtmlDialog.new(
         dialog_title: "LF Measurement",
         preferences_key: "TakeoffLFPick",
-        width: 320, height: 340,
+        width: 320, height: 400,
         left: 200, top: 200,
         resizable: false,
         style: UI::HtmlDialog::STYLE_DIALOG
@@ -383,6 +400,8 @@ module TakeoffTool
 
     def on_lf_ok(cat, cc, note, total_ft, total_inches, saved_segments, view)
       @dialog_open = false
+      # Persist custom category if new
+      TakeoffTool.add_custom_category(cat) unless TakeoffTool.master_categories.include?(cat)
       @last_cat = cat
       @last_cc = cc
       @last_note = note
@@ -445,6 +464,10 @@ module TakeoffTool
       grp.set_attribute('TakeoffMeasurement', 'note', @last_note || '')
       grp.set_attribute('TakeoffMeasurement', 'segment_count', @segments.select{|c| c.length >= 2}.length)
       grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+      grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      grp.set_attribute('TakeoffMeasurement', 'material_name', mat_name)
+      require 'json'
+      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
 
       TakeoffTool.entity_registry[grp.entityID] = grp
 
@@ -557,6 +580,7 @@ module TakeoffTool
       note = grp.get_attribute('TakeoffMeasurement', 'note') || ''
       seg_count = grp.get_attribute('TakeoffMeasurement', 'segment_count') || 1
       face_count = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+      highlights_visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')
 
       if mtype == 'SF'
         display = "📐 #{cat} — #{'%.1f' % total_sf} SF (#{face_count} face#{'s' if face_count>1})#{note && !note.empty? ? ' — ' + note : ''}"

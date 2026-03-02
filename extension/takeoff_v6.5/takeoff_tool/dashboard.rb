@@ -164,10 +164,6 @@ module TakeoffTool
         Highlighter.clear_all
       end
 
-      @dialog.add_action_callback('clearMeasurementHighlights') do |_ctx|
-        Highlighter.clear_measurement_highlights
-      end
-
       @dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
         Highlighter.isolate_category(sr, ca, cat_str.to_s)
       end
@@ -183,16 +179,54 @@ module TakeoffTool
       @dialog.add_action_callback('hideEntities') do |_ctx, ids_str|
         m = Sketchup.active_model
         m.start_operation('Hide', true)
+        meas_changed = false
         ids_str.to_s.split(',').each do |id|
           e = TakeoffTool.find_entity(id.to_i)
-          e.visible = false if e && e.valid?
+          next unless e && e.valid?
+          # Route measurement entities through highlight hide
+          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
+            mtype = e.get_attribute('TakeoffMeasurement', 'type')
+            if mtype == 'LF'
+              e.visible = false
+            elsif mtype == 'SF'
+              Highlighter.hide_sf_measurement_faces(m, e)
+            end
+            e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
+            meas_changed = true
+          else
+            e.visible = false
+          end
         end
         m.commit_operation
+        send_measurement_data if meas_changed
       end
 
       @dialog.add_action_callback('showEntities') do |_ctx, ids_str|
+        m = Sketchup.active_model
         ids = ids_str.to_s.split(',').map(&:to_i)
-        Highlighter.show_entities_with_ancestors(ids)
+        meas_changed = false
+        m.start_operation('Show', true)
+        regular_ids = []
+        ids.each do |id|
+          e = TakeoffTool.find_entity(id)
+          next unless e && e.valid?
+          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
+            mtype = e.get_attribute('TakeoffMeasurement', 'type')
+            if mtype == 'LF'
+              e.visible = true
+            elsif mtype == 'SF'
+              Highlighter.show_sf_measurement_faces(m, e)
+            end
+            e.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+            meas_changed = true
+          else
+            e.visible = true
+            regular_ids << e
+          end
+        end
+        Highlighter.ensure_ancestors_visible(regular_ids, m) if regular_ids.any?
+        m.commit_operation
+        send_measurement_data if meas_changed
       end
 
       @dialog.add_action_callback('zoomToEntities') do |_ctx, ids_str|
@@ -288,8 +322,11 @@ module TakeoffTool
 
       @dialog.add_action_callback('addEmptyCategory') do |_ctx, name_str|
         name = name_str.to_s.strip
-        TakeoffTool.add_category(name) unless name.empty?
-        puts "Takeoff: addEmptyCategory '#{name}'"
+        unless name.empty?
+          TakeoffTool.add_category(name)
+          send_data(sr, ca, cca)
+          puts "Takeoff: addEmptyCategory '#{name}'"
+        end
       end
 
       @dialog.add_action_callback('addSubcategory') do |_ctx, json_str|
@@ -373,43 +410,47 @@ module TakeoffTool
         end
       end
 
-      # Isolate multiple categories at once
-      @dialog.add_action_callback('isolateCategories') do |_ctx, json_str|
+      # ─── Measurement visibility callbacks ───
+
+      @dialog.add_action_callback('toggleMeasurement') do |_ctx, json_str|
         begin
           require 'json'
           data = JSON.parse(json_str.to_s)
-          cats = data['cats'] || []
-          puts "Takeoff: isolateCategories #{cats.join(', ')}"
-          Highlighter.isolate_categories(sr, ca, cats)
+          eid = data['eid'].to_i
+          show = data['show']
+          if show
+            Highlighter.show_measurement_highlight(eid)
+          else
+            Highlighter.hide_measurement_highlight(eid)
+          end
         rescue => e
-          puts "Takeoff isolateCategories error: #{e.message}"
+          puts "Takeoff toggleMeasurement error: #{e.message}"
         end
       end
 
-      # Highlight multiple categories at once
-      @dialog.add_action_callback('highlightCategories') do |_ctx, json_str|
+      @dialog.add_action_callback('showAllMeasurements') do |_ctx|
+        Highlighter.show_all_measurement_highlights
+        send_measurement_data
+      end
+
+      @dialog.add_action_callback('hideAllMeasurements') do |_ctx|
+        Highlighter.hide_all_measurement_highlights
+        send_measurement_data
+      end
+
+      @dialog.add_action_callback('deleteMeasurement') do |_ctx, eid_str|
         begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          cats = data['cats'] || []
-          puts "Takeoff: highlightCategories #{cats.join(', ')}"
-          Highlighter.highlight_categories(sr, ca, cats)
+          eid = eid_str.to_s.to_i
+          Highlighter.delete_measurement(eid)
+          send_data(sr, ca, cca)
+          send_measurement_data
         rescue => e
-          puts "Takeoff highlightCategories error: #{e.message}"
+          puts "Takeoff deleteMeasurement error: #{e.message}"
         end
       end
 
-      # Hide multiple categories at once
-      @dialog.add_action_callback('hideCategories') do |_ctx, json_str|
-        begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          cats = data['cats'] || []
-          puts "Takeoff: hideCategories #{cats.join(', ')}"
-          Highlighter.hide_categories(sr, ca, cats)
-        rescue => e
-          puts "Takeoff hideCategories error: #{e.message}"
-        end
+      @dialog.add_action_callback('requestMeasurements') do |_ctx|
+        send_measurement_data
       end
 
       # Isolate specific entities by ID
@@ -452,12 +493,13 @@ module TakeoffTool
         auto_cc = has_assigned ? assigned : (sc.length == 1 ? sc[0] : '')
         has_overlap = sc.length > 1 && !has_assigned
 
-        mt = Parser.measurement_for(cat)
+        mt_default = Parser.measurement_for(cat)
+        mt = mt_default
         # Check for user override stored in model attributes
         m_override = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
         mt = m_override if m_override && !m_override.empty?
         {
-          entityId: r[:entity_id], tag: r[:tag],
+          entityId: r[:entity_id], tag: r[:tag], defaultMT: mt_default,
           definitionName: r[:display_name] || r[:definition_name],
           elementType: r[:parsed][:element_type], function: r[:parsed][:function],
           material: r[:parsed][:material] || r[:material], thickness: r[:parsed][:thickness],
@@ -476,12 +518,70 @@ module TakeoffTool
 
       cats = TakeoffTool.master_categories
 
+      # Build per-category measurement type map (for empty categories)
+      cat_mt = {}
+      cats.each do |c|
+        next if c == '_IGNORE'
+        def_mt = Parser.measurement_for(c)
+        ovr = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', c) rescue nil
+        cur_mt = (ovr && !ovr.empty?) ? ovr : def_mt
+        cat_mt[c] = { 'mt' => cur_mt, 'defaultMT' => def_mt }
+      end
+
       require 'json'
       msub = TakeoffTool.master_subcategories
-      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub })
+      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
+
+      send_measurement_data
+    end
+
+    def self.send_measurement_data
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      m = Sketchup.active_model
+      return unless m
+
+      measurements = []
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+        next unless mtype
+
+        cat = grp.get_attribute('TakeoffMeasurement', 'category') || 'Custom'
+        visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')
+        visible = false if visible.nil?
+        note = grp.get_attribute('TakeoffMeasurement', 'note') || ''
+        rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
+        color = begin; JSON.parse(rgba_json); rescue; nil; end
+
+        entry = {
+          eid: grp.entityID,
+          type: mtype,
+          category: cat,
+          visible: visible,
+          note: note,
+          color: color
+        }
+
+        if mtype == 'SF'
+          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+          entry[:unit] = 'SF'
+          entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+        else
+          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0
+          entry[:unit] = 'LF'
+          entry[:segments] = grp.get_attribute('TakeoffMeasurement', 'segment_count') || 1
+        end
+
+        measurements << entry
+      end
+
+      js = JSON.generate(measurements)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveMeasurements('#{esc}')")
     end
 
     def self.visible?

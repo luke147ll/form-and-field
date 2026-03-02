@@ -346,26 +346,44 @@ module TakeoffTool
       total_sf = @total_sf
       saved_faces = @picked_faces.dup
 
-      cat_options = SF_CATEGORIES.map { |c|
-        sel = c == (@last_cat || 'Drywall') ? ' selected' : ''
+      all_cats = TakeoffTool.master_categories
+      default_cat = @last_cat || 'Drywall'
+      cat_options = all_cats.map { |c|
+        sel = c == default_cat ? ' selected' : ''
         "<option value=\"#{c}\"#{sel}>#{c}</option>"
       }.join
+      cat_options += '<option value="__custom__">+ Custom...</option>'
 
       html = <<~HTML
         <!DOCTYPE html><html><head><meta charset="UTF-8">
-        <style>#{PICK_DIALOG_CSS}</style></head><body>
+        <style>#{PICK_DIALOG_CSS}
+        body{overflow-y:auto}
+        #customRow{display:none;margin-top:8px}
+        #customRow.show{display:block}
+        #customName{width:100%;padding:8px 10px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:6px;font-size:13px;font-family:inherit}
+        #customName:focus{outline:none;border-color:#89b4fa}
+        </style></head><body>
         <h1>SF Measurement &mdash; #{'%.1f' % total_sf} SF</h1>
         <label>Category</label>
-        <select id="cat">#{cat_options}</select>
+        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
+        <div id="customRow"><label>New category name</label><input id="customName" type="text" placeholder="Enter name..."></div>
         <label>Cost Code (optional)</label>
         <input id="cc" type="text" value="#{(@last_cc || '').gsub('"', '&quot;')}">
         <label>Note (optional)</label>
         <input id="note" type="text" value="">
         <div class="buttons">
           <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
-          <button class="btn btn-ok" onclick="sketchup.ok(JSON.stringify({cat:document.getElementById('cat').value,cc:document.getElementById('cc').value,note:document.getElementById('note').value}))">OK</button>
+          <button class="btn btn-ok" onclick="doOk()">OK</button>
         </div>
-        <script>document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});</script>
+        <script>
+        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
+        function doOk(){
+          var cat=document.getElementById('cat').value;
+          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
+          sketchup.ok(JSON.stringify({cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
+        }
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});
+        </script>
         </body></html>
       HTML
 
@@ -373,7 +391,7 @@ module TakeoffTool
       @pick_dlg = UI::HtmlDialog.new(
         dialog_title: "SF Measurement",
         preferences_key: "TakeoffSFPick",
-        width: 320, height: 340,
+        width: 320, height: 400,
         left: 200, top: 200,
         resizable: false,
         style: UI::HtmlDialog::STYLE_DIALOG
@@ -408,6 +426,8 @@ module TakeoffTool
 
     def on_sf_ok(cat, cc, note, view, saved_faces = nil, saved_total_sf = nil)
       @dialog_open = false
+      # Persist custom category if new
+      TakeoffTool.add_custom_category(cat) unless TakeoffTool.master_categories.include?(cat)
       # Restore captured state if provided (async dialog path)
       @picked_faces = saved_faces if saved_faces
       @total_sf = saved_total_sf if saved_total_sf
@@ -417,6 +437,12 @@ module TakeoffTool
       @last_note = note
       apply_final_color(cat)
       grp = create_sf_record(cat)
+      # Stamp group_eid on each face so we can link faces back to measurement group
+      @picked_faces.each do |pf|
+        begin
+          pf[:face].set_attribute('FF_Original', 'group_eid', grp.entityID)
+        rescue; end
+      end
       add_to_results(cat, grp)
       Sketchup.status_text = "SF Tool: Saved #{'%.1f' % @total_sf} SF of #{cat}. Click to start new measurement."
       reset_full
@@ -479,6 +505,34 @@ module TakeoffTool
       grp.set_attribute('TakeoffMeasurement', 'cost_code', @last_cc || '')
       grp.set_attribute('TakeoffMeasurement', 'note', @last_note || '')
       grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+      grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+
+      # Store face references for show/hide toggling
+      require 'json'
+      refs = @picked_faces.map do |pf|
+        f = pf[:face]
+        pid = f.respond_to?(:persistent_id) ? f.persistent_id : nil
+        parent = f.parent
+        defn_name = if parent.is_a?(Sketchup::ComponentDefinition)
+                      parent.name
+                    else
+                      '__model__'
+                    end
+        fidx = begin
+          parent_ents = parent.is_a?(Sketchup::ComponentDefinition) ? parent.entities : model.entities
+          parent_ents.grep(Sketchup::Face).index(f) || -1
+        rescue
+          -1
+        end
+        { 'pid' => pid, 'defn' => defn_name, 'fidx' => fidx }
+      end
+      grp.set_attribute('TakeoffMeasurement', 'face_refs', JSON.generate(refs))
+
+      # Store material info for re-coloring
+      rgba = SF_COLORS[cat] || SF_DEFAULT_COLOR
+      mat_name = "TO_SF_#{cat.gsub(/[\s\/]+/,'_')}"
+      grp.set_attribute('TakeoffMeasurement', 'material_name', mat_name)
+      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
 
       TakeoffTool.entity_registry[grp.entityID] = grp
 

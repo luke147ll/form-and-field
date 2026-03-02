@@ -33,13 +33,23 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .bulk select{max-width:130px}
 .bulk label{color:#a6adc8}
 
-/* MULTI-ISOLATE PANEL */
-#catPanel{display:none;background:#181825;border-bottom:1px solid #313244;padding:6px 12px;flex-shrink:0;max-height:180px;overflow-y:auto}
-#catPanel.show{display:block}
-.cpRow{display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0;font-size:11px;cursor:pointer}
-.cpRow:hover{color:#cdd6f4}
-.cpRow input{cursor:pointer}
-.cpBtn{margin-top:6px;display:flex;gap:5px;flex-wrap:wrap}
+/* MEASUREMENT PANEL */
+#measPanel{display:none;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;max-height:260px;overflow-y:auto}
+#measPanel.show{display:block}
+.mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e}
+.mp-cat{padding:4px 12px 2px 12px;cursor:pointer;user-select:none}
+.mp-cat-hdr{font-weight:600;font-size:11px;color:#a6e3a1;display:flex;align-items:center;gap:6px}
+.mp-cat-hdr .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:8px;width:10px}
+.mp-cat.closed .arr{transform:rotate(-90deg)}
+.mp-cat.closed .mp-cat-items{display:none}
+.mp-item{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 20px;font-size:11px}
+.mp-item:hover{background:#222236}
+.mp-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0;border:1px solid #45475a}
+.mp-desc{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cdd6f4}
+.mp-val{color:#89b4fa;font-weight:600;white-space:nowrap;min-width:60px;text-align:right}
+.mp-del{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center}
+.mp-del svg{stroke:#f38ba8;width:12px;height:12px}
+.mp-del:hover svg{stroke:#ff6b8a}
 
 /* FILTER BAR */
 .fbar{padding:5px 10px;background:#181825;border-bottom:1px solid #313244;display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
@@ -111,6 +121,7 @@ th.ck{width:20px;text-align:center;padding:1px}
 
 /* INLINE EDITABLE */
 select.cs{background:#313244;border:1px solid #45475a;color:#cdd6f4;font-size:10px;border-radius:3px;padding:1px 2px;max-width:110px;font-family:inherit}
+select.cs-unit{background:#1e1e2e;border:1px solid #89b4fa;color:#89b4fa;font-size:11px;font-weight:600;border-radius:3px;padding:2px 6px;font-family:inherit;cursor:pointer}select.cs-unit:hover{background:#313244;border-color:#b4befe}select.cs-unit:focus{outline:none;border-color:#cba6f7;box-shadow:0 0 0 1px #cba6f7}
 select.cs.fl{border-color:#fab387;background:#3e3020}
 .sz{background:transparent;border:1px solid transparent;color:#cdd6f4;font-size:10px;padding:1px 3px;border-radius:3px;width:65px;font-family:inherit;cursor:pointer}
 .sz:hover{border-color:#45475a}.sz:focus{border-color:#89b4fa;background:#313244;outline:none}
@@ -199,10 +210,10 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <h1>Form and Field</h1><div class="sep"></div>
   <button class="hb pri" onclick="call('highlightAll')">Highlight All</button>
   <button class="hb" onclick="call('clearHighlights')">Clear</button>
-  <button class="hb" onclick="call('clearMeasurementHighlights')" title="Clear SF face colors and hide LF ribbons" style="color:#f38ba8">Clear Paint</button>
+  <button class="hb" onclick="hideMeasurements()" title="Hide all measurement highlights" style="color:#f38ba8">Hide Meas.</button>
   <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
   <button class="hb" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Undo</button>
-  <button class="hb grn" onclick="toggleCatPanel()">Multi-Isolate</button>
+  <button class="hb grn" onclick="toggleMeasPanel()">Measurements</button>
   <button class="hb" onclick="promptNewCategory()" title="Add empty category">+ Category</button>
   <div class="sep"></div>
   <button class="hb" onclick="call('exportCSV')">CSV</button>
@@ -221,17 +232,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <!-- SUMMARY STRIP -->
 <div class="summary" id="sstrip"></div>
 
-<!-- MULTI-ISOLATE PANEL -->
-<div id="catPanel">
-  <div id="catChecks"></div>
-  <div class="cpBtn">
-    <button class="hb grn" onclick="doMultiIsolate()">Isolate</button>
-    <button class="hb" onclick="doMultiHide()" style="color:#f38ba8;border-color:#f38ba8">Hide</button>
-    <button class="hb pri" onclick="doMultiHighlight()">Highlight</button>
-    <button class="hb" onclick="cpAll(true)">All</button>
-    <button class="hb" onclick="cpAll(false)">None</button>
-    <button class="hb" onclick="toggleCatPanel()">Close</button>
+<!-- MEASUREMENT PANEL -->
+<div id="measPanel">
+  <div class="mp-toolbar">
+    <button class="hb grn" onclick="showAllMeas()">Show All</button>
+    <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8">Hide All</button>
+    <button class="hb" onclick="toggleMeasPanel()">Close</button>
   </div>
+  <div id="measBody"></div>
 </div>
 
 <!-- BULK EDIT BAR -->
@@ -258,6 +266,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <option value="category">Category</option>
     <option value="costCode">Cost Code</option>
     <option value="subcategory">Subcategory</option>
+    <option value="measurement">Measurements</option>
   </select>
   <span id="fCnt" style="margin-left:auto;color:#a6adc8;font-size:11px"></span>
 </div>
@@ -391,7 +400,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 </div>
 
 <script>
-var D=[],CA=[],CO=[],F=[],MSUB={},sc='definitionName',sd=1;
+var D=[],CA=[],CO=[],F=[],MSUB={},CATMT={},sc='definitionName',sd=1;
 var SEL={},lastCheckIdx=-1;
 var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
@@ -418,6 +427,23 @@ function uLabel(m){
   if(m==='sf'||m==='sf_cy'||m==='sf_sheets')return ICO_SF_SM;
   if(m==='ea'||m==='ea_bf'||m==='ea_sf')return' <span style="color:#a6adc8;font-size:10px">EA</span>';
   return' <span style="color:#a6adc8;font-size:10px">ft\u00B3</span>';
+}
+/* Returns filtered unit options based on the category's default measurement type */
+function unitOptionsFor(defMT){
+  var opts;
+  // Surface-based categories
+  if(defMT==='sf'||defMT==='sf_cy'||defMT==='sf_sheets')
+    opts=[['sf','SF'],['sf_cy','SF+CY'],['sf_sheets','SF+sht'],['ea','EA'],['lf','LF'],['volume','ft\u00B3']];
+  // Linear categories
+  else if(defMT==='lf')
+    opts=[['lf','LF'],['ea','EA'],['sf','SF'],['volume','ft\u00B3']];
+  // Count categories
+  else if(defMT==='ea'||defMT==='ea_bf'||defMT==='ea_sf')
+    opts=[['ea','EA'],['ea_bf','EA+BF'],['ea_sf','EA+SF'],['lf','LF'],['sf','SF'],['volume','ft\u00B3']];
+  // Volume/default
+  else
+    opts=[['volume','ft\u00B3'],['sf_cy','SF+CY'],['ea','EA'],['sf','SF'],['lf','LF']];
+  return opts;
 }
 /* Returns action-button icon and onclick for measurement tool based on unit */
 function mtBtn(mt,gk){
@@ -503,14 +529,14 @@ function callJSON(n,o){call(n,JSON.stringify(o));}
 function receiveData(json){
   try{
     var d=JSON.parse(json);
-    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];MSUB=d.masterSubcategories||{};
+    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];MSUB=d.masterSubcategories||{};CATMT=d.categoryMT||{};
     CA.sort(function(a,b){
       if(a==='_IGNORE')return 1;if(b==='_IGNORE')return -1;
       if(a==='Uncategorized')return 1;if(b==='Uncategorized')return -1;
       return a.localeCompare(b);
     });
     log('Loaded '+D.length+' rows');
-    buildDD();buildCatPanel();buildBulkDDs();
+    buildDD();buildBulkDDs();
     for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
     syncIsolation();
     filt();
@@ -548,17 +574,6 @@ function buildDD(){
   for(i=0;i<subs.length;i++)h+='<option>'+X(subs[i])+'</option>';
   document.getElementById('fSub').innerHTML=h;
   if(prevSub)document.getElementById('fSub').value=prevSub;
-}
-function buildCatPanel(){
-  var cm={},i,r;
-  for(i=0;i<D.length;i++){r=D[i];if(r.category&&r.category!=='_IGNORE'){if(!cm[r.category])cm[r.category]=0;cm[r.category]++;}}
-  // Include all categories from CA (master list), including empty ones
-  var cats=[];
-  for(i=0;i<CA.length;i++){if(CA[i]!=='_IGNORE')cats.push(CA[i]);}
-  cats.sort();
-  var h='';
-  for(i=0;i<cats.length;i++) h+='<label class="cpRow"><input type="checkbox" value="'+X(cats[i])+'" class="cpCk"> '+catBadge(cats[i])+' ('+(cm[cats[i]]||0)+')</label>';
-  document.getElementById('catChecks').innerHTML=h;
 }
 function buildBulkDDs(){
   var h='<option value="">--</option>';
@@ -700,6 +715,10 @@ function renderGroups(){
     if(gBy==='category') key=r.category||'Uncategorized';
     else if(gBy==='costCode') key=r.costCode||'(no code)';
     else if(gBy==='subcategory') key=r.subcategory||'(none)';
+    else if(gBy==='measurement'){
+      if(r.elementType==='Manual Measurement'){var lbl=r.definitionName||r.category||'Custom';key=(r.function==='SF'?'SF: ':'LF: ')+lbl;}
+      else key='Unmeasured';
+    }
     else key=r.category||'Uncategorized';
     if(!groups[key]){groups[key]=[];order.push(key);}
     groups[key].push(r);
@@ -715,7 +734,14 @@ function renderGroups(){
       if(!groups[CA[i]]){groups[CA[i]]=[];order.push(CA[i]);}
     }
   }
-  order.sort();
+  if(gBy==='measurement'){
+    order.sort(function(a,b){
+      var wa=a==='Unmeasured'?2:a.indexOf('SF: ')===0?0:1;
+      var wb=b==='Unmeasured'?2:b.indexOf('SF: ')===0?0:1;
+      if(wa!==wb)return wa-wb;
+      return a.localeCompare(b);
+    });
+  } else order.sort();
   FIDX=[];
   var h='';
   for(var gi=0;gi<order.length;gi++){
@@ -734,6 +760,7 @@ function renderGroups(){
     h+='<span class="arr">&#9660;</span>';
     // Name badge
     if(gBy==='category') h+=catNameSpan(gk);
+    else if(gBy==='measurement'&&gk!=='Unmeasured') h+='<span class="cname" style="background:'+(gk.indexOf('SF: ')===0?'#45475a':'#45475a')+';color:'+(gk.indexOf('SF: ')===0?'#a6e3a1':'#89b4fa')+'">'+X(gk)+'</span>';
     else h+='<span class="cname" style="background:#585b70;color:#cdd6f4">'+X(gk)+'</span>';
     h+='<span style="color:#6c7086;font-size:11px">('+items.length+')</span>';
     // Total
@@ -744,17 +771,21 @@ function renderGroups(){
     h+='<div class="cgb">';
     h+='<div class="cg-toolbar">';
     if(gBy==='category'){
-      var curMT=items.length?items[0].measurementType:'volume';
+      var cmt=CATMT[gk];
+      var curMT=items.length?items[0].measurementType:(cmt?cmt.mt:'volume');
+      var defMT=items.length?(items[0].defaultMT||curMT):(cmt?cmt.defaultMT:'volume');
       h+='<label style="color:#a6adc8">Unit:</label>';
-      h+='<select class="cs" onchange="setMT(\''+X2(gk)+'\',this.value)">';
-      var mts=[['ea','EA'],['lf','LF'],['sf','SF'],['sf_cy','SF+CY'],['sf_sheets','SF+sht'],['ea_bf','EA+BF'],['ea_sf','EA+SF'],['volume','ft3']];
+      h+='<select class="cs-unit" onchange="setMT(\''+X2(gk)+'\',this.value)">';
+      var mts=unitOptionsFor(defMT);
       for(var mi=0;mi<mts.length;mi++) h+='<option value="'+mts[mi][0]+'"'+(curMT===mts[mi][0]?' selected':'')+'>'+mts[mi][1]+'</option>';
       h+='</select>';
     }
     h+='<span class="cact">';
     if(gBy==='category'){
-      h+='<button class="ib accent" onclick="isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
-      h+='<button class="ib accent" onclick="zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">'+ICO_ZOOM+'</button>';
+      if(!isEmpty){
+        h+='<button class="ib accent" onclick="isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
+        h+='<button class="ib accent" onclick="zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">'+ICO_ZOOM+'</button>';
+      }
       h+=mtBtn(curMT,gk);
     }
     h+='<button class="ib accent" onclick="selGrpItems(\''+X2(gk)+'\')" title="Select all">'+ICO_SEL+'</button>';
@@ -988,16 +1019,67 @@ function grpKey(r,gBy){
   if(gBy==='category')return r.category||'Uncategorized';
   if(gBy==='costCode')return r.costCode||'(no code)';
   if(gBy==='subcategory')return r.subcategory||'(none)';
+  if(gBy==='measurement'){
+    if(r.elementType==='Manual Measurement'){
+      var lbl=r.definitionName||r.category||'Custom';
+      return(r.function==='SF'?'SF: ':'LF: ')+lbl;
+    }
+    return 'Unmeasured';
+  }
   return r.category||'Uncategorized';
 }
 
-/* ═══ MULTI-ISOLATE ═══ */
-function toggleCatPanel(){var p=document.getElementById('catPanel');p.className=p.className==='show'?'':'show';}
-function cpAll(v){var cks=document.querySelectorAll('.cpCk');for(var i=0;i<cks.length;i++)cks[i].checked=v;}
-function getCheckedCats(){var cks=document.querySelectorAll('.cpCk'),cats=[];for(var i=0;i<cks.length;i++)if(cks[i].checked)cats.push(cks[i].value);return cats;}
-function doMultiIsolate(){var c=getCheckedCats();if(!c.length)return;ISO_CATS={};for(var j=0;j<c.length;j++)ISO_CATS[c[j]]=true;for(var i=0;i<D.length;i++)VIS[D[i].entityId]=!!ISO_CATS[D[i].category];callJSON('isolateCategories',{cats:c});filt();}
-function doMultiHide(){var c=getCheckedCats();if(!c.length)return;ISO_CATS=null;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++){if(s[D[i].category])VIS[D[i].entityId]=false;}callJSON('hideCategories',{cats:c});filt();}
-function doMultiHighlight(){var c=getCheckedCats();if(c.length)callJSON('highlightCategories',{cats:c});}
+/* ═══ MEASUREMENT PANEL ═══ */
+var MEAS=[],openMeasCats={};
+function toggleMeasPanel(){var p=document.getElementById('measPanel');if(p.classList.contains('show')){p.classList.remove('show');}else{p.classList.add('show');call('requestMeasurements');}}
+function receiveMeasurements(json){
+  try{MEAS=JSON.parse(json);}catch(e){MEAS=[];log('MEAS parse err: '+e.message,'err');}
+  renderMeasPanel();
+}
+function renderMeasPanel(){
+  var bycat={},order=[],i,m;
+  for(i=0;i<MEAS.length;i++){
+    m=MEAS[i];var c=m.category||'Custom';
+    if(!bycat[c]){bycat[c]=[];order.push(c);}
+    bycat[c].push(m);
+  }
+  order.sort();
+  if(!MEAS.length){document.getElementById('measBody').innerHTML='<div style="padding:12px;color:#6c7086;font-size:11px;font-style:italic">No measurements yet. Use LF/SF tools to create measurements.</div>';return;}
+  var h='';
+  for(var gi=0;gi<order.length;gi++){
+    var cat=order[gi],items=bycat[cat],isOpen=openMeasCats[cat]!==false;
+    h+='<div class="mp-cat'+(isOpen?'':' closed')+'">';
+    h+='<div class="mp-cat-hdr" onclick="togMeasCat(\''+X2(cat)+'\')">';
+    h+='<span class="arr">&#9660;</span> '+X(cat)+' <span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
+    h+='</div>';
+    h+='<div class="mp-cat-items">';
+    for(var j=0;j<items.length;j++){
+      var it=items[j],vis=!!it.visible;
+      var sw=it.color?'background:rgba('+it.color[0]+','+it.color[1]+','+it.color[2]+',0.7)':'background:#7f849c';
+      h+='<div class="mp-item">';
+      h+='<button class="ey'+(vis?'':' off')+'" onclick="togMeasVis('+it.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+      h+='<span class="mp-swatch" style="'+sw+'"></span>';
+      h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+X(it.type)+': '+(it.note?X(it.note):X(cat))+'</span>';
+      h+='<span class="mp-val">'+fmtMeasVal(it.value,it.unit)+'</span>';
+      h+='<button class="mp-del" onclick="delMeas('+it.eid+')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+      h+='</div>';
+    }
+    h+='</div></div>';
+  }
+  document.getElementById('measBody').innerHTML=h;
+}
+function fmtMeasVal(val,unit){
+  if(!val&&val!==0)return'--';
+  if(unit==='SF')return val.toFixed(1)+' SF';
+  if(unit==='LF')return val.toFixed(1)+' LF';
+  return val.toFixed(1);
+}
+function togMeasCat(cat){openMeasCats[cat]=openMeasCats[cat]===false?true:false;renderMeasPanel();}
+function togMeasVis(eid,show){callJSON('toggleMeasurement',{eid:eid,show:show});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].visible=show;break;}}renderMeasPanel();}
+function showAllMeas(){call('showAllMeasurements');}
+function hideAllMeas(){call('hideAllMeasurements');}
+function hideMeasurements(){call('hideAllMeasurements');}
+function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});renderMeasPanel();});}
 
 /* ═══ BULK EDIT ═══ */
 function bulkSetCat(){
@@ -1257,7 +1339,11 @@ function doSetSub(el){
 }
 function setMT(cat,mt){
   for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].measurementType=mt;}
+  if(CATMT[cat])CATMT[cat].mt=mt;
   callJSON('setMeasurementType',{cat:cat,mt:mt});filt();
+  // Activate measurement tool when SF or LF unit is selected
+  if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets'||mt==='ea_sf')call('activateSFForCat',cat);
+  else if(mt==='lf'||mt==='ea_bf')call('activateLFForCat',cat);
 }
 
 function scrollToEntity(eid){
@@ -1299,11 +1385,13 @@ function addNewCategory(n){
 
 /* ═══ ADD / DELETE CATEGORY ═══ */
 function promptNewCategory(){
+  console.log('promptNewCategory called');
   showInputModal('New category name',function(name){
+    console.log('promptNewCategory OK: '+name);
     if(!name)return;
     if(CA.indexOf(name)===-1){CA.push(name);CA.sort();}
     call('addEmptyCategory',name);
-    buildDD();buildCatPanel();buildBulkDDs();filt();
+    buildDD();buildBulkDDs();filt();
   });
 }
 function deleteCat(cat){
@@ -1318,7 +1406,7 @@ function deleteCat(cat){
     delete MSUB[cat];
     // Clean openSubs
     var pfx=cat+'|';var sks=Object.keys(openSubs);for(var s=0;s<sks.length;s++){if(sks[s].indexOf(pfx)===0)delete openSubs[sks[s]];}
-    buildDD();buildCatPanel();buildBulkDDs();filt();
+    buildDD();buildBulkDDs();filt();
     call('deleteCategory',cat);
   });
 }
