@@ -521,17 +521,21 @@ function buildDD(){
     if(r.subcategory&&!subM[r.subcategory]){subM[r.subcategory]=1;subs.push(r.subcategory);}
   }
   cats.sort();ccs.sort();subs.sort();
+  var prevC=document.getElementById('fC').value;
+  var prevCC=document.getElementById('fCC').value;
+  var prevSub=document.getElementById('fSub').value;
   var h='<option value="">All</option>';
   for(i=0;i<cats.length;i++)h+='<option>'+X(cats[i])+'</option>';
-  h+='<option value="__addcat__">+ Add new category</option>';
   document.getElementById('fC').innerHTML=h;
+  if(prevC)document.getElementById('fC').value=prevC;
   h='<option value="">All</option>';
   for(i=0;i<ccs.length;i++)h+='<option>'+X(ccs[i])+'</option>';
   document.getElementById('fCC').innerHTML=h;
+  if(prevCC)document.getElementById('fCC').value=prevCC;
   h='<option value="">All</option>';
   for(i=0;i<subs.length;i++)h+='<option>'+X(subs[i])+'</option>';
-  h+='<option value="__addsub__">+ Add new subcategory</option>';
   document.getElementById('fSub').innerHTML=h;
+  if(prevSub)document.getElementById('fSub').value=prevSub;
 }
 function buildCatPanel(){
   var cm={},cats=[],i,r;
@@ -550,26 +554,8 @@ function buildBulkDDs(){
   for(var i=0;i<CO.length;i++)h+='<option value="'+CO[i].code+'">'+X(CO[i].full)+'</option>';
   document.getElementById('bulkCC').innerHTML=h;
 }
-function fCatChange(sel){
-  if(sel.value==='__addcat__'){
-    sel.value='';
-    showInputModal('New category name',function(n){
-      addNewCategory(n);
-      document.getElementById('fC').value=n;
-      filt();
-    });
-  }else{filt();}
-}
-function fSubChange(sel){
-  if(sel.value==='__addsub__'){
-    sel.value='';
-    showInputModal('New subcategory name',function(n){
-      buildDD();
-      document.getElementById('fSub').value=n;
-      filt();
-    });
-  }else{filt();}
-}
+function fCatChange(sel){filt();}
+function fSubChange(sel){filt();}
 
 /* ═══ CATEGORY BADGE ═══ */
 var KNOWN_CATS={'Drywall':1,'WallFraming':1,'Walls':1,'WallFinish':1,'WallStructure':1,'WallSheathing':1,
@@ -944,7 +930,7 @@ function bulkSetCat(){
       recordUndo(ids,'category',n);
       callJSON('bulkSetCategory',{eids:ids,val:n});
       for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=n;}
-      clearSel();filt();
+      clearSel();buildDD();filt();
     });
     return;
   }
@@ -1065,9 +1051,17 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){
   if(v==='__custom__'){
+    console.log('doSetCat: __custom__ clicked, eid='+eid);
+    // Revert dropdown to current category while modal is open
+    var curCat='';
+    for(var i=0;i<D.length;i++){if(D[i].entityId==eid){curCat=D[i].category;break;}}
+    var row=document.getElementById('r'+eid);
+    if(row){var dd=row.querySelector('select.cs');if(dd)dd.value=curCat;}
     showInputModal('New category name',function(n){
       addNewCategory(n);
       applySetCat(eid,n);
+      buildDD();
+      filt();
     });
     return;
   }
