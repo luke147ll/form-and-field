@@ -15,6 +15,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'parse_logger.rb')
   load File.join(PLUGIN_DIR, 'ifc_parser.rb')
   load File.join(PLUGIN_DIR, 'recat_log.rb')
+  load File.join(PLUGIN_DIR, 'hyper_parser.rb')
   load File.join(PLUGIN_DIR, 'bug_reporter.rb')
 
   @scan_results = []
@@ -61,6 +62,7 @@ module TakeoffTool
     sub.add_item('Highlight by Category') { Highlighter.highlight_all(@scan_results, @category_assignments) }
     sub.add_item('Clear Highlights') { Highlighter.clear_all }
     sub.add_item('Show All Elements') { Highlighter.show_all }
+    sub.add_item('Hyper Parse') { HyperParser.show_dialog }
     sub.add_separator
     sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
@@ -110,6 +112,13 @@ module TakeoffTool
     cmd_report.tooltip = "View Report"
     cmd_report.status_bar_text = "Open the takeoff dashboard"
     toolbar.add_item(cmd_report)
+
+    cmd_hp = UI::Command.new("Hyper Parse") { HyperParser.show_dialog }
+    cmd_hp.small_icon = File.join(PLUGIN_DIR, "icons", "hyper_parse_24.png")
+    cmd_hp.large_icon = File.join(PLUGIN_DIR, "icons", "hyper_parse_32.png")
+    cmd_hp.tooltip = "Hyper Parse - Re-categorize visible entities"
+    cmd_hp.status_bar_text = "Open Hyper Parse to group and re-categorize visible entities"
+    toolbar.add_item(cmd_hp)
 
     # Dev reload button (only in debug mode)
     if Sketchup.read_default("FormAndField", "debug_mode", false)

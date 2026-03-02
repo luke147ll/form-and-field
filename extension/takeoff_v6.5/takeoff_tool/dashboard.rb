@@ -233,6 +233,10 @@ module TakeoffTool
         TakeoffTool.activate_sf_tool_for_category(cat_str.to_s)
       end
 
+      @dialog.add_action_callback('openHyperParse') do |_ctx|
+        HyperParser.show_dialog
+      end
+
       # Bulk set category for multiple entities at once
       @dialog.add_action_callback('bulkSetCategory') do |_ctx, json_str|
         begin

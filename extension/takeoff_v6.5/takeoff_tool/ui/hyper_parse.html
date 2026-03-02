@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hyper Parse</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e;color:#cdd6f4;overflow:hidden;display:flex;flex-direction:column;height:100vh}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#181825}::-webkit-scrollbar-thumb{background:#45475a;border-radius:4px}
+
+/* HEADER */
+.header{background:#181825;border-bottom:1px solid #313244;padding:10px 14px;flex-shrink:0}
+.header h1{font-size:15px;font-weight:700;color:#cba6f7;margin-bottom:2px}
+.header .status{font-size:11px;color:#6c7086}
+
+/* STEP PANELS */
+.step{padding:10px 14px;flex-shrink:0}
+.step-title{font-size:11px;font-weight:600;color:#a6adc8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+
+/* METHOD GRID */
+.method-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.method-card{background:#313244;border:1px solid #45475a;border-radius:6px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .15s}
+.method-card:hover{border-color:#cba6f7;background:#3b3b52}
+.method-card.active{border-color:#cba6f7;background:#2d2040}
+.method-card.disabled{opacity:0.35;cursor:default;pointer-events:none}
+.method-card .mc-icon{font-size:20px;margin-bottom:4px}
+.method-card .mc-label{font-size:11px;font-weight:600;color:#cdd6f4}
+.method-card.disabled .mc-label{color:#6c7086}
+.method-card .mc-sub{font-size:9px;color:#6c7086;margin-top:2px}
+
+/* RESULTS AREA */
+.results-area{flex:1;display:flex;flex-direction:column;overflow:hidden;display:none}
+.results-area.show{display:flex}
+.results-toolbar{background:#181825;border-bottom:1px solid #313244;padding:6px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.results-toolbar .info{font-size:11px;color:#89b4fa;font-weight:600}
+.results-toolbar .spacer{flex:1}
+.btn{padding:3px 8px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap}
+.btn:hover{background:#45475a}
+.btn.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
+.btn.pri:hover{background:#b48eeb}
+.btn.grn{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1;font-weight:600}
+.btn.grn:hover{background:#8fd48a}
+.btn:disabled{opacity:0.35;cursor:default;pointer-events:none}
+.btn.sm{padding:2px 6px;font-size:10px}
+
+/* RESULTS LIST */
+.results-list{flex:1;overflow-y:auto;padding:4px 0}
+.group-row{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid #252535;cursor:pointer;transition:background .1s}
+.group-row:hover{background:#222236}
+.group-row.selected{background:#2d2040;border-left:3px solid #cba6f7;padding-left:11px}
+.group-row input[type=checkbox]{cursor:pointer;accent-color:#cba6f7}
+.group-swatch{width:16px;height:16px;border-radius:3px;border:1px solid #45475a;flex-shrink:0}
+.group-label{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-count{font-size:11px;color:#89b4fa;font-weight:600;min-width:30px;text-align:right}
+.group-hl{flex-shrink:0}
+
+/* COMMIT BAR */
+.commit-bar{background:#181825;border-top:1px solid #313244;padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.commit-bar select,.commit-bar input[type=text]{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:3px 6px;font-size:11px;font-family:inherit}
+.commit-bar select{max-width:180px;flex:1}
+.commit-bar input[type=text]{width:120px}
+.commit-bar label{font-size:10px;color:#a6adc8}
+.commit-bar .cnt{font-size:11px;color:#cba6f7;font-weight:600;margin-left:auto}
+
+/* TOAST */
+.toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:6px;font-size:12px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.ok{background:#a6e3a1;color:#1e1e2e}
+.toast.err{background:#f38ba8;color:#1e1e2e}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Hyper Parse</h1>
+  <div class="status" id="statusText">Pick a parse method to group visible entities</div>
+</div>
+
+<!-- STEP 1: Parse Method -->
+<div class="step" id="step1">
+  <div class="step-title">Parse Method</div>
+  <div class="method-grid">
+    <div class="method-card" onclick="doParse('name')" id="mc-name">
+      <div class="mc-icon">Aa</div>
+      <div class="mc-label">By Name</div>
+      <div class="mc-sub">Group by display name</div>
+    </div>
+    <div class="method-card" onclick="doParse('color')" id="mc-color">
+      <div class="mc-icon">&#9632;</div>
+      <div class="mc-label">By Color</div>
+      <div class="mc-sub">Group by material color</div>
+    </div>
+    <div class="method-card disabled">
+      <div class="mc-icon">&#9647;</div>
+      <div class="mc-label">Volume</div>
+      <div class="mc-sub">Coming Soon</div>
+    </div>
+    <div class="method-card disabled">
+      <div class="mc-icon">&#9721;</div>
+      <div class="mc-label">Face Profile</div>
+      <div class="mc-sub">Coming Soon</div>
+    </div>
+    <div class="method-card disabled">
+      <div class="mc-icon">&#8736;</div>
+      <div class="mc-label">Face Angle</div>
+      <div class="mc-sub">Coming Soon</div>
+    </div>
+    <div class="method-card disabled">
+      <div class="mc-icon">&#8594;</div>
+      <div class="mc-label">Object Vector</div>
+      <div class="mc-sub">Coming Soon</div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: Results + Commit -->
+<div class="results-area" id="resultsArea">
+  <!-- Toolbar -->
+  <div class="results-toolbar">
+    <span class="info" id="resultsInfo"></span>
+    <span class="spacer"></span>
+    <button class="btn sm" onclick="selectAll()">Select All</button>
+    <button class="btn sm" onclick="selectNone()">Select None</button>
+    <button class="btn sm" id="btnSampler" onclick="call('activateColorSampler')" style="display:none">Sampler</button>
+    <button class="btn sm" onclick="clearPreview()">Clear Preview</button>
+    <button class="btn sm" onclick="backToMethods()">Back</button>
+  </div>
+
+  <!-- Group list -->
+  <div class="results-list" id="resultsList"></div>
+
+  <!-- Commit bar -->
+  <div class="commit-bar">
+    <label>Category</label>
+    <select id="catSelect"><option value="">-- select --</option></select>
+    <label>Subcategory</label>
+    <input type="text" id="subcatInput" placeholder="optional">
+    <span class="cnt" id="selCount">0 selected</span>
+    <button class="btn grn" id="btnCommit" onclick="doCommit()" disabled>Commit</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+var GROUPS=[], METHOD='', CATS=[], SELECTED={};
+
+/* ═══ Communication ═══ */
+function call(n,a){
+  try{
+    if(window.sketchup&&typeof window.sketchup[n]==='function'){if(a!==undefined)window.sketchup[n](a);else window.sketchup[n]();}
+    else{if(a!==undefined)window.location='skp:'+n+'@'+a;else window.location='skp:'+n;}
+  }catch(e){console.log('call ERR: '+n+' '+e.message);}
+}
+function callJSON(n,o){call(n,JSON.stringify(o));}
+
+/* ═══ Init ═══ */
+window.addEventListener('load', function(){
+  call('requestCategories');
+});
+
+/* ═══ Receive Categories ═══ */
+function receiveCategories(json){
+  try{
+    CATS=JSON.parse(json);
+    var sel=document.getElementById('catSelect');
+    sel.innerHTML='<option value="">-- select --</option>';
+    CATS.forEach(function(c){
+      var o=document.createElement('option');
+      o.value=c; o.textContent=c;
+      sel.appendChild(o);
+    });
+  }catch(e){console.log('receiveCategories err: '+e.message);}
+}
+
+/* ═══ Parse ═══ */
+function doParse(method){
+  METHOD=method;
+  SELECTED={};
+  // Highlight active card
+  document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
+  var card=document.getElementById('mc-'+method);
+  if(card)card.classList.add('active');
+  // Show/hide sampler button
+  document.getElementById('btnSampler').style.display=(method==='color'?'inline-block':'none');
+  // Set status
+  document.getElementById('statusText').textContent='Parsing by '+method+'...';
+  // Call ruby
+  if(method==='name') call('parseByName');
+  else if(method==='color') call('parseByColor');
+}
+
+/* ═══ Receive Parse Results ═══ */
+function receiveParseResults(json){
+  try{
+    var d=JSON.parse(json);
+    GROUPS=d.groups||[];
+    METHOD=d.method||METHOD;
+    var total=d.total_visible||0;
+    document.getElementById('statusText').textContent=total+' visible entities, '+GROUPS.length+' groups (by '+METHOD+')';
+    document.getElementById('resultsInfo').textContent=GROUPS.length+' groups';
+    renderGroups();
+    document.getElementById('resultsArea').classList.add('show');
+  }catch(e){console.log('receiveParseResults err: '+e.message);}
+}
+
+function renderGroups(){
+  var html='';
+  GROUPS.forEach(function(g,i){
+    var checked=SELECTED[i]?'checked':'';
+    var selClass=SELECTED[i]?'selected':'';
+    var swatch='';
+    if(METHOD==='color'&&g.color){
+      swatch='<div class="group-swatch" style="background:'+g.color+'"></div>';
+    }
+    html+='<div class="group-row '+selClass+'" data-idx="'+i+'" onclick="toggleGroup('+i+',event)">';
+    html+='<input type="checkbox" '+checked+' onclick="toggleGroup('+i+',event)">';
+    html+=swatch;
+    html+='<span class="group-label" title="'+esc(g.label)+'">'+esc(g.label)+'</span>';
+    html+='<span class="group-count">'+g.count+'</span>';
+    html+='<button class="btn sm group-hl" onclick="hlGroup('+i+',event)">Highlight</button>';
+    html+='</div>';
+  });
+  document.getElementById('resultsList').innerHTML=html;
+  updateSelCount();
+}
+
+function esc(s){
+  if(!s)return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleGroup(idx,e){
+  if(e)e.stopPropagation();
+  SELECTED[idx]=!SELECTED[idx];
+  if(!SELECTED[idx]) delete SELECTED[idx];
+  renderGroups();
+}
+
+function selectAll(){
+  GROUPS.forEach(function(_,i){SELECTED[i]=true;});
+  renderGroups();
+}
+function selectNone(){
+  SELECTED={};
+  renderGroups();
+}
+
+function updateSelCount(){
+  var eids=getSelectedEids();
+  var n=eids.length;
+  document.getElementById('selCount').textContent=n+' selected';
+  document.getElementById('btnCommit').disabled=(n===0||!document.getElementById('catSelect').value);
+}
+
+function getSelectedEids(){
+  var eids=[];
+  for(var idx in SELECTED){
+    if(SELECTED[idx]&&GROUPS[idx]){
+      eids=eids.concat(GROUPS[idx].eids);
+    }
+  }
+  return eids;
+}
+
+/* ═══ Highlight ═══ */
+function hlGroup(idx,e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  if(!GROUPS[idx])return;
+  callJSON('highlightGroup',{eids:GROUPS[idx].eids});
+}
+function clearPreview(){
+  call('clearPreview');
+}
+
+/* ═══ Color Sampler ═══ */
+function receiveColorSample(json){
+  try{
+    var d=JSON.parse(json);
+    var hex=d.hex; var name=d.name;
+    // Find matching group by color or label
+    GROUPS.forEach(function(g,i){
+      if(g.color&&g.color.toLowerCase()===hex.toLowerCase()){
+        SELECTED[i]=true;
+      }else if(g.label===name){
+        SELECTED[i]=true;
+      }
+    });
+    renderGroups();
+  }catch(e){console.log('receiveColorSample err: '+e.message);}
+}
+
+/* ═══ Commit ═══ */
+document.addEventListener('change',function(e){
+  if(e.target.id==='catSelect') updateSelCount();
+});
+
+function doCommit(){
+  var cat=document.getElementById('catSelect').value;
+  var sub=document.getElementById('subcatInput').value.trim();
+  var eids=getSelectedEids();
+  if(!cat||eids.length===0)return;
+  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
+}
+
+function receiveCommitResult(json){
+  try{
+    var d=JSON.parse(json);
+    if(d.success){
+      showToast(d.message,'ok');
+      // Re-parse with same method
+      SELECTED={};
+      if(METHOD==='name') call('parseByName');
+      else if(METHOD==='color') call('parseByColor');
+    }else{
+      showToast(d.message||'Error','err');
+    }
+  }catch(e){console.log('receiveCommitResult err: '+e.message);}
+}
+
+/* ═══ Navigation ═══ */
+function backToMethods(){
+  clearPreview();
+  document.getElementById('resultsArea').classList.remove('show');
+  document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
+  GROUPS=[];SELECTED={};METHOD='';
+  document.getElementById('statusText').textContent='Pick a parse method to group visible entities';
+}
+
+/* ═══ Toast ═══ */
+function showToast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show '+(type||'ok');
+  setTimeout(function(){t.className='toast';},3000);
+}
+</script>
+</body>
+</html>
