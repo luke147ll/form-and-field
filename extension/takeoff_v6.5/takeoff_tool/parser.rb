@@ -1,6 +1,7 @@
 module TakeoffTool
   module Parser
 
+    unless defined?(TAG_CATEGORY_MAP)
     TAG_CATEGORY_MAP = {
       'Walls' => 'Walls', 'Roofs' => 'Roofing', 'Structural Framing' => 'Structural Lumber',
       'Structural Columns' => 'Structural Lumber', 'Floors' => 'Flooring',
@@ -102,6 +103,7 @@ module TakeoffTool
       'Window Treatments'    => 'ea',
       'Outdoor Features'     => 'ea',
     }
+    end # unless defined?(TAG_CATEGORY_MAP)
 
     def self.measurement_for(category)
       CATEGORY_MEASUREMENTS[category] || 'volume'
@@ -441,7 +443,7 @@ module TakeoffTool
 
     # ─── Material-based Classification ───
 
-    GENERIC_CATEGORIES = ['Ceilings', 'Structural Lumber', 'Generic Models', 'Uncategorized', 'Walls'].freeze
+    GENERIC_CATEGORIES = ['Ceilings', 'Structural Lumber', 'Generic Models', 'Uncategorized', 'Walls'].freeze unless defined?(GENERIC_CATEGORIES)
 
     def self.generic_category?(cat)
       GENERIC_CATEGORIES.include?(cat)
@@ -474,7 +476,7 @@ module TakeoffTool
       'IfcRailing' => 'Railings',
       'IfcWindow' => 'Windows',
       'IfcDoor' => 'Doors',
-    }
+    } unless defined?(IFC_CATEGORY_MAP)
 
     def self.classify_by_ifc(ifc_type)
       return nil unless ifc_type

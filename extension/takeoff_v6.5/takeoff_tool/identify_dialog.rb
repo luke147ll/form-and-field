@@ -1,7 +1,10 @@
 module TakeoffTool
   module IdentifyDialog
+    unless defined?(@_identify_loaded)
+    @_identify_loaded = true
     @dialog = nil
     @current_entities = []
+    end
 
     def self.show(selection)
       @dialog.close if @dialog && @dialog.visible? rescue nil
@@ -22,6 +25,13 @@ module TakeoffTool
         next if cat.empty?
         TakeoffTool.apply_category_to_selection(@current_entities, cat)
         @dialog.close rescue nil
+      end
+
+      @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        next if name.empty?
+        TakeoffTool.add_custom_category(name)
+        puts "Takeoff: IdentifyDialog addCustomCategory '#{name}'"
       end
 
       html = @current_entities.length == 1 ? build_single(@current_entities.first) : build_multi(@current_entities)
@@ -128,13 +138,23 @@ module TakeoffTool
 
     def self.category_options(selected)
       cats = TakeoffTool.build_context_categories.reject { |c| c == '_IGNORE' }
-      cats.map { |c|
+      opts = cats.map { |c|
         sel = c == selected ? ' selected' : ''
         "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
       }.join("\n")
+      opts + "\n<option value=\"__custom__\">+ Custom...</option>"
     end
 
-    MOCHA_CSS = <<~CSS.freeze
+    def self.send_categories
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      cats = TakeoffTool.build_context_categories.reject { |c| c == '_IGNORE' }
+      js = JSON.generate(cats)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveCategories('#{esc}')") rescue nil
+    end
+
+    MOCHA_CSS = <<~CSS.freeze unless defined?(MOCHA_CSS)
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         font-family: 'Segoe UI', system-ui, sans-serif;
@@ -269,6 +289,82 @@ module TakeoffTool
       }
     CSS
 
+    MODAL_CSS = <<~CSS.freeze unless defined?(MODAL_CSS)
+      .modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200}
+      .modal-bg.show{display:block}
+      .modal-card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;z-index:201;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+      .modal-card h3{font-size:13px;font-weight:600;color:#cdd6f4;margin-bottom:12px}
+      .modal-card input[type=text]{width:100%;background:#1e1e2e;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box}
+      .modal-card input[type=text]:focus{border-color:#cba6f7}
+      .modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+      .modal-btns button{padding:6px 16px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:12px;font-family:inherit}
+      .modal-btns button.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
+      .modal-btns button:hover{opacity:0.85}
+    CSS
+
+    MODAL_HTML = <<~HTML.freeze unless defined?(MODAL_HTML)
+      <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
+        <div class="modal-card">
+          <h3 id="modalTitle">New category name</h3>
+          <input type="text" id="modalInput" onkeydown="if(event.key==='Enter')confirmModal();if(event.key==='Escape')cancelModal();">
+          <div class="modal-btns">
+            <button onclick="cancelModal()">Cancel</button>
+            <button class="pri" onclick="confirmModal()">OK</button>
+          </div>
+        </div>
+      </div>
+    HTML
+
+    IDENTIFY_JS = <<~JS.freeze unless defined?(IDENTIFY_JS)
+      var _modalCb=null;
+      function onCatChange(sel){
+        if(sel.value==='__custom__'){
+          sel.value='';
+          showInputModal(function(name){
+            sketchup.addCustomCategory(name);
+          });
+        }
+      }
+      function doApply(){
+        var v=document.getElementById('catSel').value;
+        if(v) sketchup.applyCategory(v);
+      }
+      function showInputModal(cb){
+        _modalCb=cb;
+        var inp=document.getElementById('modalInput');inp.value='';
+        document.getElementById('inputModal').className='modal-bg show';
+        setTimeout(function(){inp.focus();},50);
+      }
+      function confirmModal(){
+        var v=document.getElementById('modalInput').value.trim();
+        document.getElementById('inputModal').className='modal-bg';
+        if(v&&_modalCb)_modalCb(v);
+        _modalCb=null;
+      }
+      function cancelModal(){
+        document.getElementById('inputModal').className='modal-bg';
+        _modalCb=null;
+      }
+      function receiveCategories(json){
+        try{
+          var cats=JSON.parse(json);
+          var sel=document.getElementById('catSel');
+          var cur=sel.value;
+          sel.innerHTML='<option value="">-- Select --</option>';
+          cats.forEach(function(c){
+            var o=document.createElement('option');
+            o.value=c;o.textContent=c;
+            if(c===cur)o.selected=true;
+            sel.appendChild(o);
+          });
+          var custom=document.createElement('option');
+          custom.value='__custom__';custom.textContent='+ Custom...';
+          sel.appendChild(custom);
+          if(cur)sel.value=cur;
+        }catch(e){}
+      }
+    JS
+
     def self.build_single(entity)
       i = entity_info(entity)
       dim = "#{fmt_dim(i[:w])} &times; #{fmt_dim(i[:h])} &times; #{fmt_dim(i[:d])}"
@@ -290,7 +386,7 @@ module TakeoffTool
       end
 
       <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}</style></head><body>
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
         <h1>Identify</h1>
         <div class="entity-name">#{h(i[:name])}</div>
         #{defn_line}
@@ -305,11 +401,13 @@ module TakeoffTool
         <div class="row"><span class="label">Instances</span><span class="value">#{i[:instance_count]}</span></div>
         <hr>
         <div class="sect-label">Set Category</div>
-        <select id="catSel">
+        <select id="catSel" onchange="onCatChange(this)">
           <option value="">-- Select --</option>
           #{category_options(i[:category] || '')}
         </select>
-        <button class="apply-btn" onclick="var v=document.getElementById('catSel').value;if(v)sketchup.applyCategory(v);">Apply</button>
+        <button class="apply-btn" onclick="doApply()">Apply</button>
+        #{MODAL_HTML}
+        <script>#{IDENTIFY_JS}</script>
         </body></html>
       HTML
     end
@@ -331,7 +429,7 @@ module TakeoffTool
       }.join("\n")
 
       <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}</style></head><body>
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
         <h1>Identify &mdash; #{count} entities selected</h1>
         <div class="sect-label">Definitions</div>
         <ul class="def-list">
@@ -339,11 +437,13 @@ module TakeoffTool
         </ul>
         <hr>
         <div class="sect-label">Set Category (all #{count})</div>
-        <select id="catSel">
+        <select id="catSel" onchange="onCatChange(this)">
           <option value="">-- Select --</option>
           #{category_options('')}
         </select>
-        <button class="apply-btn" onclick="var v=document.getElementById('catSel').value;if(v)sketchup.applyCategory(v);">Apply</button>
+        <button class="apply-btn" onclick="doApply()">Apply</button>
+        #{MODAL_HTML}
+        <script>#{IDENTIFY_JS}</script>
         </body></html>
       HTML
     end

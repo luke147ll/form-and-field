@@ -16,11 +16,14 @@ module TakeoffTool
     'Furniture','Railings','Stairs','Specialty Equipment',
     'Electrical Equipment','Electrical Fixtures','Rooms',
     'Generic Models','Uncategorized','_IGNORE'
-  ].freeze
+  ].freeze unless defined?(BASE_CATEGORIES)
 
-  # Build a dynamic category list: base + custom from assignments + auto-parsed from scan
+  # Build a dynamic category list: base + user-created + assignments + auto-parsed from scan
   def self.build_context_categories
     cats = BASE_CATEGORIES.dup
+    (@custom_categories || []).each do |c|
+      cats << c unless cats.include?(c)
+    end
     @category_assignments.each_value do |c|
       cats << c unless cats.include?(c)
     end

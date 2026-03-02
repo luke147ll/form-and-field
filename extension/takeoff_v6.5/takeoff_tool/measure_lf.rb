@@ -1,4 +1,5 @@
 module TakeoffTool
+  unless defined?(LF_TAG)
   LF_TAG = 'TO_Measurements'
   RIBBON_WIDTH = 1.5  # inches — width of the visual ribbon artifact
 
@@ -84,6 +85,7 @@ module TakeoffTool
     .btn-cancel { background: #45475a; color: #cdd6f4; }
     .btn-cancel:hover { background: #585b70; }
   CSS
+  end # unless defined?(LF_TAG)
 
   class MeasureLFTool
 

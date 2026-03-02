@@ -1,4 +1,5 @@
 module TakeoffTool
+  unless defined?(SF_COLORS)
   SF_COLORS = {
     'Drywall'         => [249, 226, 175, 140],
     'Roofing'         => [150, 170, 210, 140],
@@ -29,6 +30,7 @@ module TakeoffTool
     'Masonry / Veneer','Siding','Soffit','Insulation','Membrane',
     'Wall Framing','Wall Finish','Exterior Finish',
     'Tile','Backsplash','Shower Walls','Custom']
+  end # unless defined?(SF_COLORS)
 
   class MeasureSFTool
 

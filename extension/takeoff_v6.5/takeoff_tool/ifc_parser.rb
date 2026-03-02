@@ -1,6 +1,7 @@
 module TakeoffTool
   module IFCParser
 
+    unless defined?(MEMBER_TYPE_MAP)
     # ─── Framing/structural member type keywords ───
     # Single-word keywords checked with rightmost-match logic.
     # Map: keyword → subcategory for grouping.
@@ -41,6 +42,7 @@ module TakeoffTool
       IfcSlab IfcWall IfcWallStandardCase IfcRoof IfcCovering IfcSpace
       IfcCurtainWall IfcFooting IfcPile].freeze
     STEEL_OVERRIDE_RE = /\b(Steel|Iron|Galvanized)\b/i
+    REBAR_MAT_RE      = /\bConcrete\s*Steel\b|\bRebar\b|\bReinforc(?:ing\s*Steel|ement)\b/i
     CONCRETE_MAT_RE   = /^Concrete|\bCMU\b|\bBlock\b|\bMasonry\b|\bGrout\b/i
 
     # ─── Foundation / concrete keywords: [regex, category, subcategory] ───
@@ -100,6 +102,7 @@ module TakeoffTool
       'IfcPlate'             => 'Structural Steel',
       'IfcMechanicalFastener' => 'Hardware',
     }.freeze
+    end # unless defined?(MEMBER_TYPE_MAP)
 
     # ═══════════════════════════════════════════════════════════════════
     # Detection: does this model have IFC-style tags/layers?
@@ -370,6 +373,28 @@ module TakeoffTool
 
     def self.try_material_override(name, tag, mat, bb)
       return nil unless mat
+
+      # Rebar / Reinforcement (check before generic concrete)
+      if mat =~ REBAR_MAT_RE
+        return {
+          raw: name,
+          element_type: 'Reinforcement',
+          function: 'Rebar',
+          material: mat,
+          thickness: nil,
+          size_nominal: nil,
+          revit_id: nil,
+          auto_category: 'Concrete',
+          auto_subcategory: 'Rebar/Reinforcement',
+          measurement_type: 'lf',
+          category_source: 'material',
+          ifc_parsed: {
+            material_type: 'steel',
+            dimensions: nil,
+            confidence: :high
+          }
+        }
+      end
 
       # Concrete material → Concrete / Foundation (any tag)
       if mat =~ CONCRETE_MAT_RE

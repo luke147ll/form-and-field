@@ -237,6 +237,14 @@ module TakeoffTool
         HyperParser.show_dialog
       end
 
+      @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        unless name.empty?
+          TakeoffTool.add_custom_category(name)
+          puts "Takeoff: addCustomCategory '#{name}'"
+        end
+      end
+
       # Bulk set category for multiple entities at once
       @dialog.add_action_callback('bulkSetCategory') do |_ctx, json_str|
         begin
@@ -429,28 +437,7 @@ module TakeoffTool
         }
       end
 
-      cats = ['Drywall','Wall Framing','Walls','Wall Finish','Wall Structure','Wall Sheathing',
-        'Masonry / Veneer','Siding','Exterior Finish','Soffit','Stucco','Decorative Metal',
-        'Glass/Glazing','Wood Paneling',
-        'Metal Roofing','Shingle Roofing','Roofing','Roof Framing','Roof Sheathing',
-        'Concrete','Flooring','Ceilings','Ceiling Framing','Structural Lumber','Structural Steel',
-        'Insulation','Membrane',
-        'Foundation Slabs','Foundation Walls','Foundation Footings',
-        'Windows','Doors','Garage Doors','Shower Doors','Casework','Countertops','Plumbing',
-        'Hardware','Trim','Fascia','Gutters','Flashing','Baseboard',
-        'Crown Mold','Casing','Railing','Drip Edge',
-        'Tile','Backsplash','Shower Walls','Sheathing',
-        'Appliances','Bath Accessories','Outdoor Kitchen','Chimney',
-        'HVAC','Snow Guards','Lighting Fixtures','Window Treatments','Outdoor Features',
-        'Furniture','Railings','Stairs','Specialty Equipment',
-        'Electrical Equipment','Electrical Fixtures','Rooms',
-        'Generic Models','Uncategorized','_IGNORE']
-
-      # Merge in any custom categories from assignments or auto-parsed
-      all_cats = cats.dup
-      ca.each_value { |c| all_cats << c unless all_cats.include?(c) }
-      sr.each { |r| c = r[:parsed][:auto_category]; all_cats << c if c && !all_cats.include?(c) }
-      cats = all_cats
+      cats = TakeoffTool.build_context_categories
 
       require 'json'
       js = JSON.generate({ rows: rows, categories: cats, costCodes: cc })

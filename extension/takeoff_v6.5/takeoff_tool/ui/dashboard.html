@@ -52,6 +52,8 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 
 /* CATEGORY GROUPS */
 .cg{border-bottom:1px solid #252535;margin-bottom:1px}
+.cg.iso-active{border-left:3px solid #cba6f7}
+.cg.iso-dimmed{opacity:0.55}
 .cgh{padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;background:#1a1a2e;user-select:none}
 .cgh:hover{background:#222236}
 .cgh .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:9px;width:12px}
@@ -173,6 +175,15 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .c-CrownMold{background:#c8b0a0}.c-Casing{background:#b0a0c0}.c-Railing{background:#a0b0c0}
 .c-DripEdge{background:#90b0a0}.c-Tile{background:#a0c8b4}.c-Backsplash{background:#b4c8c8}
 .c-ShowerWalls{background:#90b8c8}.c-_IGNORE{background:#585b70;color:#a6adc8}
+
+/* INPUT MODAL */
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200}
+.modal-bg.show{display:block}
+.modal-card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;z-index:201;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.modal-card h3{font-size:13px;font-weight:600;color:#cdd6f4;margin-bottom:12px}
+.modal-card input[type=text]{width:100%;background:#1e1e2e;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box}
+.modal-card input[type=text]:focus{border-color:#cba6f7}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 </style>
 </head>
 <body>
@@ -378,6 +389,7 @@ var SEL={},lastCheckIdx=-1;
 var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
 var VIS={};
+var ISO_CATS=null;
 var debugOn=false;
 
 /* SVG ICON TEMPLATES */
@@ -492,6 +504,7 @@ function receiveData(json){
     log('Loaded '+D.length+' rows');
     buildDD();buildCatPanel();buildBulkDDs();
     for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
+    syncIsolation();
     filt();
   }catch(e){
     log('PARSE: '+e.message,'err');
@@ -539,16 +552,22 @@ function buildBulkDDs(){
 }
 function fCatChange(sel){
   if(sel.value==='__addcat__'){
-    var n=prompt('New category name:');
-    if(n&&n.trim()){n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}buildDD();buildBulkDDs();sel.value=n;}
-    else{sel.value='';} filt();
+    sel.value='';
+    showInputModal('New category name',function(n){
+      addNewCategory(n);
+      document.getElementById('fC').value=n;
+      filt();
+    });
   }else{filt();}
 }
 function fSubChange(sel){
   if(sel.value==='__addsub__'){
-    var n=prompt('New subcategory name:');
-    if(n&&n.trim()){n=n.trim();buildDD();sel.value=n;}
-    else{sel.value='';} filt();
+    sel.value='';
+    showInputModal('New subcategory name',function(n){
+      buildDD();
+      document.getElementById('fSub').value=n;
+      filt();
+    });
   }else{filt();}
 }
 
@@ -683,7 +702,8 @@ function renderGroups(){
     var gk=order[gi], items=groups[gk], isOpen=!!openCats[gk];
     var catVis=false;for(var ci=0;ci<items.length;ci++){if(VIS[items[ci].entityId]!==false){catVis=true;break;}}
 
-    h+='<div class="cg'+(isOpen?' open':'')+'" id="cg_'+gi+'">';
+    var isoClass=ISO_CATS?(ISO_CATS[gk]?' iso-active':' iso-dimmed'):'';
+    h+='<div class="cg'+(isOpen?' open':'')+isoClass+'" id="cg_'+gi+'">';
     // ── HEADER ──
     h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')">';
     // Eye toggle
@@ -811,6 +831,7 @@ function togSubVis(cat,sub){
   if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));renderGroups();
 }
 function isoSub(cat,sub){
+  ISO_CATS=null;
   for(var i=0;i<D.length;i++){var m=(D[i].category===cat&&(D[i].subcategory||'')===sub);VIS[D[i].entityId]=m;}
   var ids=[];for(var j=0;j<D.length;j++){if(D[j].category===cat&&(D[j].subcategory||'')===sub)ids.push(D[j].entityId);}
   if(ids.length)call('isolateEntities',ids.join(','));renderGroups();
@@ -830,6 +851,7 @@ function selSubAll(cat,sub,chk){
 
 /* ═══ VISIBILITY ═══ */
 function togCatVis(gk){
+  ISO_CATS=null;
   var gBy=document.getElementById('gBy').value||'category';
   var anyVis=false,ids=[];
   for(var i=0;i<D.length;i++){
@@ -837,22 +859,36 @@ function togCatVis(gk){
   }
   for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
   if(ids.length) call(anyVis?'hideEntities':'showEntities',ids.join(','));
-  renderGroups();
+  filt();
 }
 function togItemVis(eid){
+  ISO_CATS=null;
   var vis=VIS[eid]!==false; VIS[eid]=!vis;
   call(vis?'hideEntities':'showEntities',''+eid);
-  renderGroups();
+  filt();
 }
 function isoCat(cat){
+  ISO_CATS={};ISO_CATS[cat]=true;
   for(var i=0;i<D.length;i++) VIS[D[i].entityId]=(D[i].category===cat);
-  call('isolateCategory',cat); renderGroups();
+  call('isolateCategory',cat); filt();
 }
 function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
 }
-function resetVis(){VIS={};renderGroups();}
+function resetVis(){ISO_CATS=null;VIS={};filt();}
+function syncIsolation(){
+  if(!ISO_CATS)return;
+  var toHide=[],toShow=[];
+  for(var i=0;i<D.length;i++){
+    var r=D[i],want=!!ISO_CATS[r.category],cur=VIS[r.entityId]!==false;
+    VIS[r.entityId]=want;
+    if(want&&!cur)toShow.push(r.entityId);
+    else if(!want&&cur)toHide.push(r.entityId);
+  }
+  if(toHide.length)call('hideEntities',toHide.join(','));
+  if(toShow.length)call('showEntities',toShow.join(','));
+}
 
 /* ═══ SELECTION ═══ */
 function ckClick(cb,ev){
@@ -893,14 +929,25 @@ function grpKey(r,gBy){
 function toggleCatPanel(){var p=document.getElementById('catPanel');p.className=p.className==='show'?'':'show';}
 function cpAll(v){var cks=document.querySelectorAll('.cpCk');for(var i=0;i<cks.length;i++)cks[i].checked=v;}
 function getCheckedCats(){var cks=document.querySelectorAll('.cpCk'),cats=[];for(var i=0;i<cks.length;i++)if(cks[i].checked)cats.push(cks[i].value);return cats;}
-function doMultiIsolate(){var c=getCheckedCats();if(!c.length)return;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++)VIS[D[i].entityId]=!!s[D[i].category];callJSON('isolateCategories',{cats:c});renderGroups();}
-function doMultiHide(){var c=getCheckedCats();if(!c.length)return;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++){if(s[D[i].category])VIS[D[i].entityId]=false;}callJSON('hideCategories',{cats:c});renderGroups();}
+function doMultiIsolate(){var c=getCheckedCats();if(!c.length)return;ISO_CATS={};for(var j=0;j<c.length;j++)ISO_CATS[c[j]]=true;for(var i=0;i<D.length;i++)VIS[D[i].entityId]=!!ISO_CATS[D[i].category];callJSON('isolateCategories',{cats:c});filt();}
+function doMultiHide(){var c=getCheckedCats();if(!c.length)return;ISO_CATS=null;var s={};for(var j=0;j<c.length;j++)s[c[j]]=true;for(var i=0;i<D.length;i++){if(s[D[i].category])VIS[D[i].entityId]=false;}callJSON('hideCategories',{cats:c});filt();}
 function doMultiHighlight(){var c=getCheckedCats();if(c.length)callJSON('highlightCategories',{cats:c});}
 
 /* ═══ BULK EDIT ═══ */
 function bulkSetCat(){
   var v=document.getElementById('bulkCat').value;if(!v)return;
-  if(v==='__custom__'){var n=prompt('New category name:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
+  if(v==='__custom__'){
+    document.getElementById('bulkCat').value='';
+    showInputModal('New category name',function(n){
+      addNewCategory(n);
+      var ids=getSelIds();if(!ids.length)return;
+      recordUndo(ids,'category',n);
+      callJSON('bulkSetCategory',{eids:ids,val:n});
+      for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=n;}
+      clearSel();filt();
+    });
+    return;
+  }
   var ids=getSelIds();if(!ids.length)return;
   recordUndo(ids,'category',v);
   callJSON('bulkSetCategory',{eids:ids,val:v});
@@ -1017,7 +1064,16 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){
-  if(v==='__custom__'){var n=prompt('New category:');if(!n||!n.trim())return;n=n.trim();if(CA.indexOf(n)===-1){CA.push(n);CA.sort();buildBulkDDs();}v=n;}
+  if(v==='__custom__'){
+    showInputModal('New category name',function(n){
+      addNewCategory(n);
+      applySetCat(eid,n);
+    });
+    return;
+  }
+  applySetCat(eid,v);
+}
+function applySetCat(eid,v){
   var ids=(SEL[eid]&&getSelIds().length>1)?getSelIds():[String(eid)];
   recordUndo(ids,'category',v);
   if(ids.length>1){callJSON('bulkSetCategory',{eids:ids,val:v});}
@@ -1072,7 +1128,42 @@ function X(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function X2(s){return s?String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"):'';}
 function T(s,n){return s&&s.length>n?s.substr(0,n)+'...':s||'';}
 
+/* ═══ INPUT MODAL ═══ */
+var _modalCb=null;
+function showInputModal(title,cb){
+  _modalCb=cb;
+  document.getElementById('modalTitle').textContent=title;
+  var inp=document.getElementById('modalInput');inp.value='';
+  document.getElementById('inputModal').className='modal-bg show';
+  setTimeout(function(){inp.focus();},50);
+}
+function confirmModal(){
+  var v=document.getElementById('modalInput').value.trim();
+  document.getElementById('inputModal').className='modal-bg';
+  if(v&&_modalCb)_modalCb(v);
+  _modalCb=null;
+}
+function cancelModal(){
+  document.getElementById('inputModal').className='modal-bg';
+  _modalCb=null;
+}
+function addNewCategory(n){
+  if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
+  call('addCustomCategory',n);
+  buildDD();buildBulkDDs();
+}
+
 window.onload=function(){log('init');setTimeout(function(){call('requestData');},200);};
 </script>
+<div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
+  <div class="modal-card">
+    <h3 id="modalTitle">Enter name</h3>
+    <input type="text" id="modalInput" onkeydown="if(event.key==='Enter')confirmModal();if(event.key==='Escape')cancelModal();">
+    <div class="modal-btns">
+      <button class="hb" onclick="cancelModal()">Cancel</button>
+      <button class="hb pri" onclick="confirmModal()">OK</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

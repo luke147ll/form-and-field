@@ -1,5 +1,6 @@
 module TakeoffTool
   module Scanner
+    unless defined?(CONFIDENCE_SCORES)
     # ─── Confidence scoring for multi-strategy parser ───
     CONFIDENCE_SCORES = { high: 4, medium: 3, low: 2, none: 1 }.freeze
 
@@ -15,6 +16,7 @@ module TakeoffTool
     FRAMING_MAT_RE    = /^Framing\d*$/i
     ENGINEERED_MAT_RE = /\b(LVL|Microlam|PSL|LSL|Parallam|Glulam)\b/i
     STEEL_MAT_RE      = /\b(Steel|Iron|Galvanized)\b/i
+    REBAR_MAT_RE      = /\bConcrete\s*Steel\b|\bRebar\b|\bReinforc(?:ing\s*Steel|ement)\b/i
     CONCRETE_MAT_RE   = /^Concrete|\bCMU\b|\bBlock\b|\bMasonry\b|\bGrout\b/i
 
     # ─── Foundation / concrete keywords: [regex, category, subcategory] ───
@@ -28,12 +30,45 @@ module TakeoffTool
       [/\bSlab\b/i,          'Foundation Slabs',    'Slab'],
     ].freeze
 
+    # ─── Material-only fallback (Strategy 6: material display_name only) ───
+    # Catches generic ComponentNNNN items that have clear material names.
+    # Checked ONLY when all other strategies left the entity uncategorized.
+    MATERIAL_FALLBACK_MAP = [
+      # Rebar/Reinforcement (before generic concrete)
+      [/\bConcrete\s*Steel\b|\bRebar\b|\bReinforc(?:ing\s*Steel|ement)\b/i, 'Concrete', 'Rebar/Reinforcement'],
+      # Wood species → Timber Frame (hardwood always = timber)
+      [/\b(Oak|White\s*Oak|Red\s*Oak|Cedar|Douglas\s*Fir|Walnut|Cherry|Maple|Poplar|Ash|Birch|Hemlock|Spruce)\b/i, 'Timber Frame', nil],
+      # Generic framing material
+      [/^Framing\d*$/i, 'Structural Lumber', nil],
+      # Engineered wood
+      [/\b(LVL|Microlam|PSL|LSL|Parallam|Glulam)\b/i, 'Structural Lumber', nil],
+      # Fir/Pine (softwood — could be structural or finish)
+      [/\b(Fir|Pine)\b/i, 'Structural Lumber', nil],
+      # Steel/Iron
+      [/\b(Steel|Iron|Galvanized)\b/i, 'Structural Steel', nil],
+      # Concrete (generic)
+      [/^Concrete|\bCMU\b|\bBlock\b|\bMasonry\b|\bGrout\b/i, 'Concrete', nil],
+      # Drywall
+      [/\b(Drywall|Gypsum|GWB|Sheetrock)\b/i, 'Drywall', nil],
+      # Insulation
+      [/\b(Insulation|Batt|Rigid\s+Foam)\b/i, 'Insulation', nil],
+      # Sheathing
+      [/\b(Sheathing|OSB|Plywood)\b/i, 'Sheathing', nil],
+      # Siding
+      [/\b(Siding|Hardie)\b/i, 'Siding', nil],
+      # Membrane
+      [/\bMembrane\b/i, 'Membrane', nil],
+      # Tile
+      [/\b(Tile|Porcelain|Ceramic)\b/i, 'Tile', nil],
+    ].freeze
+
     # ─── Keyword scan patterns (Strategy 5: last resort) ───
     KEYWORD_MAP = [
       [/\bDrywall\b|\bGypsum\b|\bGWB\b/i, 'Drywall'],
       [/\bInsulation\b|\bBatt\b|\bRigid\s+Foam\b/i, 'Insulation'],
       [/\bSheathing\b|\bOSB\b|\bPlywood\b/i, 'Sheathing'],
       [/\bSiding\b|\bLap\s+Siding\b|\bHardie\b/i, 'Siding'],
+      [/\bRebar\b|\bReinforc(?:ing)?\b/i, 'Concrete'],
       [/\bConcrete\b|\bCMU\b/i, 'Concrete'],
       [/\bRafter\b|\bJoist\b|\bBeam\b|\bPost\b|\bStud\b/i, 'Structural Lumber'],
       [/\bWindow\b/i, 'Windows'],
@@ -45,6 +80,7 @@ module TakeoffTool
       [/\bMembrane\b/i, 'Membrane'],
       [/\bFloor\b/i, 'Flooring'],
     ].freeze
+    end # unless defined?(CONFIDENCE_SCORES)
 
     # ═══════════════════════════════════════════════════════════
     # scan_model — Main entry point
@@ -218,7 +254,8 @@ module TakeoffTool
     #   1+2. IFC Parser        (HIGH/MEDIUM)  — IFC models only
     #   3.   Material + BBox   (MEDIUM)        — all models
     #   4.   Existing Parser   (HIGH/LOW)      — all models (Revit names, tags)
-    #   5.   Keyword Scan      (LOW)           — all models (last resort)
+    #   5.   Keyword Scan      (LOW)           — all models (name+tag+mat keywords)
+    #   6.   Material Fallback (LOW)           — all models (material name only)
     # ═══════════════════════════════════════════════════════════
 
     def self.scan_entity(inst, defn, display, tag, mat, ifc_type)
@@ -251,6 +288,10 @@ module TakeoffTool
 
       # Strategy 5: Generic keyword scan (last resort)
       r = try_keyword_scan(display, tag, mat)
+      candidates << r if r
+
+      # Strategy 6: Material-only fallback (catches generic ComponentNNNN with clear materials)
+      r = try_material_fallback(display, mat)
       candidates << r if r
 
       # Pick highest confidence — first match wins ties
@@ -286,6 +327,8 @@ module TakeoffTool
         return mat_bbox_wood(display, mat, dims)
       elsif mat =~ STEEL_MAT_RE
         return mat_bbox_steel(display, mat, dims)
+      elsif mat =~ REBAR_MAT_RE
+        return mat_bbox_rebar(display, mat, dims)
       elsif mat =~ CONCRETE_MAT_RE
         return mat_bbox_concrete(display, mat, dims)
       end
@@ -451,6 +494,30 @@ module TakeoffTool
       }
     end
 
+    # ─── Rebar / Reinforcement ─────────────────────────────────
+
+    def self.mat_bbox_rebar(display, mat, dims)
+      {
+        raw: display,
+        element_type: 'Reinforcement',
+        function: 'Rebar',
+        material: mat,
+        thickness: nil,
+        size_nominal: nil,
+        revit_id: nil,
+        auto_category: 'Concrete',
+        auto_subcategory: 'Rebar/Reinforcement',
+        measurement_type: 'lf',
+        category_source: 'material_bbox',
+        confidence: :medium,
+        ifc_parsed: {
+          material_type: 'steel',
+          dimensions: nil,
+          confidence: :medium
+        }
+      }
+    end
+
     # ═══════════════════════════════════════════════════════════
     # Strategy 5: Generic Keyword Scan
     #
@@ -475,6 +542,39 @@ module TakeoffTool
             auto_subcategory: nil,
             measurement_type: Parser.measurement_for(cat),
             category_source: 'keyword',
+            confidence: :low
+          }
+        end
+      end
+      nil
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # Strategy 6: Material-Only Fallback
+    #
+    # Checks ONLY the material display_name against keyword lists.
+    # Catches generic ComponentNNNN items that have clear materials
+    # (e.g. material "Oak" on "Component2235").
+    # Runs last, lowest confidence.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.try_material_fallback(display, mat)
+      return nil unless mat && !mat.empty?
+
+      MATERIAL_FALLBACK_MAP.each do |re, cat, subcat|
+        if mat =~ re
+          return {
+            raw: display,
+            element_type: nil,
+            function: nil,
+            material: mat,
+            thickness: nil,
+            size_nominal: nil,
+            revit_id: nil,
+            auto_category: cat,
+            auto_subcategory: subcat,
+            measurement_type: Parser.measurement_for(cat),
+            category_source: 'material_fallback',
             confidence: :low
           }
         end

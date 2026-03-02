@@ -1,5 +1,6 @@
 module TakeoffTool
   module Highlighter
+    unless defined?(COLORS)
     COLORS = {
       'Drywall'=>[255,240,140],'Wall Framing'=>[255,180,100],'Walls'=>[240,200,160],
       'Wall Finish'=>[240,220,160],'Wall Structure'=>[220,170,120],'Wall Sheathing'=>[230,210,160],
@@ -17,6 +18,7 @@ module TakeoffTool
     @orig_instance = {}   # entityID => original instance material
     @orig_faces = {}      # entityID => array of [face, original_material]
     @mats = {}
+    end # unless defined?(COLORS)
 
     def self.highlight_all(sr, ca)
       m = Sketchup.active_model

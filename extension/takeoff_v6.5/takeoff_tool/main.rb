@@ -22,9 +22,10 @@ module TakeoffTool
   @category_assignments = {}
   @cost_code_assignments = {}
   @entity_registry = {}
+  @custom_categories = []
 
   class << self
-    attr_accessor :scan_results, :category_assignments, :cost_code_assignments, :entity_registry
+    attr_accessor :scan_results, :category_assignments, :cost_code_assignments, :entity_registry, :custom_categories
   end
 
   def self.find_entity(eid)
@@ -163,6 +164,7 @@ module TakeoffTool
 
       Dashboard.scan_log_msg("Loading saved assignments...")
       load_saved_assignments
+      load_custom_categories
       load_manual_measurements
 
       Dashboard.scan_log_msg("Generating parse log...")
@@ -249,6 +251,44 @@ module TakeoffTool
       end
     end
     puts "Takeoff: Loaded #{count_cat} saved categories, #{count_cc} saved cost codes" if (count_cat + count_cc) > 0
+  end
+
+  # Add a user-created custom category name and persist to model attributes
+  def self.add_custom_category(name)
+    return if name.nil? || name.strip.empty?
+    name = name.strip
+    return if BASE_CATEGORIES.include?(name)
+    return if @custom_categories.include?(name)
+    @custom_categories << name
+    save_custom_categories
+    refresh_all_category_dialogs
+  end
+
+  # Push updated category list to every open dialog
+  def self.refresh_all_category_dialogs
+    if Dashboard.visible?
+      Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
+    end
+    HyperParser.send_categories if defined?(HyperParser) && HyperParser.respond_to?(:send_categories)
+    IdentifyDialog.send_categories if defined?(IdentifyDialog) && IdentifyDialog.respond_to?(:send_categories)
+  end
+
+  def self.save_custom_categories
+    m = Sketchup.active_model
+    return unless m
+    require 'json'
+    m.set_attribute('FormAndField', 'custom_categories', JSON.generate(@custom_categories))
+  end
+
+  def self.load_custom_categories
+    m = Sketchup.active_model
+    return unless m
+    json = m.get_attribute('FormAndField', 'custom_categories')
+    if json && !json.empty?
+      require 'json'
+      @custom_categories = JSON.parse(json) rescue []
+      puts "Takeoff: Loaded #{@custom_categories.length} custom categories" if @custom_categories.length > 0
+    end
   end
 
   # Save model-level scan metadata
@@ -372,6 +412,7 @@ module TakeoffTool
     @scan_results.sort_by! { |r| [r[:tag] || 'zzz', r[:display_name] || ''] }
 
     load_saved_assignments
+    load_custom_categories
     load_manual_measurements
 
     # Change detection

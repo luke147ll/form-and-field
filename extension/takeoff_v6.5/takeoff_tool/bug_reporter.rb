@@ -1,5 +1,6 @@
 module TakeoffTool
   module BugReporter
+    unless defined?(CATEGORIES)
     @dialog = nil
 
     CATEGORIES = [
@@ -16,6 +17,7 @@ module TakeoffTool
       'Minor'      => '#f9e2af',
       'Suggestion' => '#89b4fa'
     }.freeze
+    end # unless defined?(CATEGORIES)
 
     def self.load_bugs
       m = Sketchup.active_model

@@ -119,6 +119,13 @@ module TakeoffTool
         activate_color_sampler
       end
 
+      @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        next if name.empty?
+        TakeoffTool.add_custom_category(name)
+        puts "Takeoff: HyperParser addCustomCategory '#{name}'"
+      end
+
       @dialog.set_on_closed { cleanup }
       @dialog.show
     end
