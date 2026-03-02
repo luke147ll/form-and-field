@@ -77,17 +77,19 @@ module TakeoffTool
     toolbar = UI::Toolbar.new("Form and Field")
 
     cmd_scan = UI::Command.new("Scan Model") { StartupDialog.show }
-    cmd_scan.small_icon = File.join(PLUGIN_DIR, "icons", "scan_ufo_24.png")
-    cmd_scan.large_icon = File.join(PLUGIN_DIR, "icons", "scan_ufo_32.png")
+    cmd_scan.small_icon = File.join(PLUGIN_DIR, "icons", "scan_model_24.png")
+    cmd_scan.large_icon = File.join(PLUGIN_DIR, "icons", "scan_model_32.png")
     cmd_scan.tooltip = "Scan Model"
     cmd_scan.status_bar_text = "Scan the model and categorize all components"
+    cmd_scan.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_scan)
 
-    cmd_drill = UI::Command.new("Drill Bit") { DrillBit.toggle }
+    cmd_drill = UI::Command.new("Ray Gun") { DrillBit.toggle }
     cmd_drill.small_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_24.png")
     cmd_drill.large_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_32.png")
-    cmd_drill.tooltip = "Drill Bit - Click through nested components"
-    cmd_drill.status_bar_text = "Activate Drill Bit mode to select deeply nested components"
+    cmd_drill.tooltip = "Ray Gun - Click through nested components"
+    cmd_drill.status_bar_text = "Activate Ray Gun mode to select deeply nested components"
+    cmd_drill.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_drill)
 
     cmd_nav = UI::Command.new("Precision Nav") { PrecisionNav.toggle }
@@ -95,23 +97,15 @@ module TakeoffTool
     cmd_nav.large_icon = File.join(PLUGIN_DIR, "icons", "nav_mode_32.png")
     cmd_nav.tooltip = "Precision Nav - Fly through the model"
     cmd_nav.status_bar_text = "Activate fly camera navigation mode"
+    cmd_nav.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_nav)
 
-    cmd_identify = UI::Command.new("Identify") {
-      sel = Sketchup.active_model.selection
-      IdentifyDialog.show(sel) if sel && !sel.empty?
-    }
-    cmd_identify.small_icon = File.join(PLUGIN_DIR, "icons", "identify_24.png")
-    cmd_identify.large_icon = File.join(PLUGIN_DIR, "icons", "identify_32.png")
-    cmd_identify.tooltip = "Identify - Inspect selected component"
-    cmd_identify.status_bar_text = "Show details about the selected component"
-    toolbar.add_item(cmd_identify)
-
     cmd_report = UI::Command.new("View Report") { TakeoffTool.open_dashboard }
-    cmd_report.small_icon = File.join(PLUGIN_DIR, "icons", "report_24.png")
-    cmd_report.large_icon = File.join(PLUGIN_DIR, "icons", "report_32.png")
+    cmd_report.small_icon = File.join(PLUGIN_DIR, "icons", "dashboard_24.png")
+    cmd_report.large_icon = File.join(PLUGIN_DIR, "icons", "dashboard_32.png")
     cmd_report.tooltip = "View Report"
     cmd_report.status_bar_text = "Open the takeoff dashboard"
+    cmd_report.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_report)
 
     cmd_hp = UI::Command.new("Hyper Parse") { HyperParser.show_dialog }
@@ -119,6 +113,7 @@ module TakeoffTool
     cmd_hp.large_icon = File.join(PLUGIN_DIR, "icons", "hyper_parse_32.png")
     cmd_hp.tooltip = "Hyper Parse - Re-categorize visible entities"
     cmd_hp.status_bar_text = "Open Hyper Parse to group and re-categorize visible entities"
+    cmd_hp.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_hp)
 
     # Dev reload button (only in debug mode)
