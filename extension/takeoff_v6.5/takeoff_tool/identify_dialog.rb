@@ -137,7 +137,7 @@ module TakeoffTool
     end
 
     def self.category_options(selected)
-      cats = TakeoffTool.build_context_categories.reject { |c| c == '_IGNORE' }
+      cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
       opts = cats.map { |c|
         sel = c == selected ? ' selected' : ''
         "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
@@ -148,7 +148,7 @@ module TakeoffTool
     def self.send_categories
       return unless @dialog && @dialog.visible?
       require 'json'
-      cats = TakeoffTool.build_context_categories.reject { |c| c == '_IGNORE' }
+      cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
       js = JSON.generate(cats)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCategories('#{esc}')") rescue nil

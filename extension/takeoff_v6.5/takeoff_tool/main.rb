@@ -23,9 +23,11 @@ module TakeoffTool
   @cost_code_assignments = {}
   @entity_registry = {}
   @custom_categories = []
+  @master_categories = []
 
   class << self
-    attr_accessor :scan_results, :category_assignments, :cost_code_assignments, :entity_registry, :custom_categories
+    attr_accessor :scan_results, :category_assignments, :cost_code_assignments,
+                  :entity_registry, :custom_categories, :master_categories
   end
 
   def self.find_entity(eid)
@@ -160,6 +162,8 @@ module TakeoffTool
       Dashboard.scan_log_msg("Loading saved assignments...")
       load_saved_assignments
       load_custom_categories
+      load_master_categories
+      merge_scan_categories_into_master
       load_manual_measurements
 
       Dashboard.scan_log_msg("Generating parse log...")
@@ -252,20 +256,16 @@ module TakeoffTool
   def self.add_custom_category(name)
     return if name.nil? || name.strip.empty?
     name = name.strip
-    return if BASE_CATEGORIES.include?(name)
-    return if @custom_categories.include?(name)
-    @custom_categories << name
-    save_custom_categories
-    refresh_all_category_dialogs
+    unless @custom_categories.include?(name)
+      @custom_categories << name
+      save_custom_categories
+    end
+    add_category(name)
   end
 
   # Push updated category list to every open dialog
   def self.refresh_all_category_dialogs
-    if Dashboard.visible?
-      Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
-    end
-    HyperParser.send_categories if defined?(HyperParser) && HyperParser.respond_to?(:send_categories)
-    IdentifyDialog.send_categories if defined?(IdentifyDialog) && IdentifyDialog.respond_to?(:send_categories)
+    broadcast_category_update
   end
 
   def self.save_custom_categories
@@ -283,6 +283,214 @@ module TakeoffTool
       require 'json'
       @custom_categories = JSON.parse(json) rescue []
       puts "Takeoff: Loaded #{@custom_categories.length} custom categories" if @custom_categories.length > 0
+    end
+  end
+
+  # ═══ MASTER CATEGORY API ═══
+
+  # Returns the canonical sorted category list (defensive copy)
+  def self.master_categories
+    @master_categories.dup
+  end
+
+  # Add a category to the master list. No-op if duplicate or empty. Returns boolean.
+  def self.add_category(name)
+    return false if name.nil? || name.to_s.strip.empty?
+    name = name.to_s.strip
+    return false if @master_categories.include?(name)
+    @master_categories << name
+    sort_master_categories!
+    save_master_categories
+    broadcast_category_update
+    true
+  end
+
+  # Atomic rename: updates master list, entity attrs, assignments, scan results, measurement types.
+  # If new_name already exists, merges (removes old, keeps new, reassigns entities).
+  def self.rename_category(old_name, new_name)
+    return false if old_name.nil? || new_name.nil?
+    old_name = old_name.to_s.strip
+    new_name = new_name.to_s.strip
+    return false if old_name.empty? || new_name.empty?
+    return false if old_name == new_name
+    return false if old_name == 'Uncategorized' || old_name == '_IGNORE'
+
+    m = Sketchup.active_model
+    return false unless m
+
+    m.start_operation('Rename Category', true)
+    begin
+      # Update master list
+      if @master_categories.include?(new_name)
+        # Merge: remove old, keep new
+        @master_categories.delete(old_name)
+      else
+        idx = @master_categories.index(old_name)
+        @master_categories[idx] = new_name if idx
+      end
+      sort_master_categories!
+
+      # Update every entity attribute
+      @entity_registry.each do |eid, e|
+        next unless e && e.valid?
+        begin
+          cat = e.get_attribute('TakeoffAssignments', 'category')
+          if cat == old_name
+            e.set_attribute('TakeoffAssignments', 'category', new_name)
+          end
+        rescue => err
+          puts "Takeoff: rename_category entity error eid=#{eid}: #{err.message}"
+        end
+      end
+
+      # Update @category_assignments
+      @category_assignments.each do |eid, cat|
+        @category_assignments[eid] = new_name if cat == old_name
+      end
+
+      # Update @scan_results auto_category
+      @scan_results.each do |r|
+        if r[:parsed] && r[:parsed][:auto_category] == old_name
+          r[:parsed][:auto_category] = new_name
+        end
+      end
+
+      # Update TakeoffMeasurementTypes model attr
+      mt_val = m.get_attribute('TakeoffMeasurementTypes', old_name) rescue nil
+      if mt_val && !mt_val.to_s.empty?
+        m.set_attribute('TakeoffMeasurementTypes', new_name, mt_val)
+        m.set_attribute('TakeoffMeasurementTypes', old_name, '')
+      end
+
+      save_master_categories
+      m.commit_operation
+      broadcast_category_update
+      puts "Takeoff: Renamed category '#{old_name}' -> '#{new_name}'"
+      true
+    rescue => e
+      m.abort_operation
+      puts "Takeoff: rename_category error: #{e.message}"
+      false
+    end
+  end
+
+  # Remove a category: moves all items to Uncategorized, removes from list.
+  def self.remove_category(name)
+    return false if name.nil?
+    name = name.to_s.strip
+    return false if name == 'Uncategorized' || name == '_IGNORE'
+    return false unless @master_categories.include?(name)
+
+    m = Sketchup.active_model
+    return false unless m
+
+    m.start_operation('Remove Category', true)
+    begin
+      # Move all items in this category to Uncategorized
+      @entity_registry.each do |eid, e|
+        next unless e && e.valid?
+        begin
+          cat = e.get_attribute('TakeoffAssignments', 'category')
+          if cat == name
+            e.set_attribute('TakeoffAssignments', 'category', 'Uncategorized')
+          end
+        rescue => err
+          puts "Takeoff: remove_category entity error eid=#{eid}: #{err.message}"
+        end
+      end
+
+      @category_assignments.each do |eid, cat|
+        @category_assignments[eid] = 'Uncategorized' if cat == name
+      end
+
+      @scan_results.each do |r|
+        if r[:parsed] && r[:parsed][:auto_category] == name
+          r[:parsed][:auto_category] = 'Uncategorized'
+        end
+      end
+
+      @master_categories.delete(name)
+      save_master_categories
+      m.commit_operation
+      broadcast_category_update
+      puts "Takeoff: Removed category '#{name}' — items moved to Uncategorized"
+      true
+    rescue => e
+      m.abort_operation
+      puts "Takeoff: remove_category error: #{e.message}"
+      false
+    end
+  end
+
+  # Persist master categories to model attribute as JSON
+  def self.save_master_categories
+    m = Sketchup.active_model
+    return unless m
+    require 'json'
+    m.set_attribute('FormAndField', 'master_categories', JSON.generate(@master_categories))
+  end
+
+  # Load master categories from model attribute. On first load, migrates from all sources.
+  def self.load_master_categories
+    m = Sketchup.active_model
+    return unless m
+    json = m.get_attribute('FormAndField', 'master_categories')
+    if json && !json.empty?
+      require 'json'
+      @master_categories = JSON.parse(json) rescue []
+    else
+      # First load — migrate from all existing sources
+      cats = BASE_CATEGORIES.dup
+      (@custom_categories || []).each { |c| cats << c unless cats.include?(c) }
+      @category_assignments.each_value { |c| cats << c unless cats.include?(c) }
+      (@scan_results || []).each do |r|
+        c = r[:parsed][:auto_category]
+        cats << c if c && !cats.include?(c)
+      end
+      @master_categories = cats
+      puts "Takeoff: Migrated #{@master_categories.length} categories to master list"
+    end
+    # Always ensure Uncategorized + _IGNORE exist
+    @master_categories << 'Uncategorized' unless @master_categories.include?('Uncategorized')
+    @master_categories << '_IGNORE' unless @master_categories.include?('_IGNORE')
+    sort_master_categories!
+    save_master_categories
+  end
+
+  # Sort with _IGNORE always at the end
+  def self.sort_master_categories!
+    @master_categories.sort_by! { |c| c == '_IGNORE' ? 'zzz' : c.downcase }
+  end
+
+  # Push updated category list to every open dialog
+  def self.broadcast_category_update
+    if Dashboard.visible?
+      Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
+    end
+    HyperParser.send_categories if defined?(HyperParser) && HyperParser.respond_to?(:send_categories)
+    IdentifyDialog.send_categories if defined?(IdentifyDialog) && IdentifyDialog.respond_to?(:send_categories)
+  end
+
+  # Add any scan-discovered categories not already in master list
+  def self.merge_scan_categories_into_master
+    changed = false
+    (@scan_results || []).each do |r|
+      c = r[:parsed][:auto_category]
+      if c && !c.empty? && !@master_categories.include?(c)
+        @master_categories << c
+        changed = true
+      end
+    end
+    @category_assignments.each_value do |c|
+      if c && !c.empty? && !@master_categories.include?(c)
+        @master_categories << c
+        changed = true
+      end
+    end
+    if changed
+      sort_master_categories!
+      save_master_categories
+      puts "Takeoff: Merged new categories into master list (#{@master_categories.length} total)"
     end
   end
 
@@ -408,6 +616,8 @@ module TakeoffTool
 
     load_saved_assignments
     load_custom_categories
+    load_master_categories
+    merge_scan_categories_into_master
     load_manual_measurements
 
     # Change detection

@@ -18,20 +18,9 @@ module TakeoffTool
     'Generic Models','Uncategorized','_IGNORE'
   ].freeze unless defined?(BASE_CATEGORIES)
 
-  # Build a dynamic category list: base + user-created + assignments + auto-parsed from scan
+  # Build a dynamic category list — delegates to master_categories (canonical source)
   def self.build_context_categories
-    cats = BASE_CATEGORIES.dup
-    (@custom_categories || []).each do |c|
-      cats << c unless cats.include?(c)
-    end
-    @category_assignments.each_value do |c|
-      cats << c unless cats.include?(c)
-    end
-    @scan_results.each do |r|
-      c = r[:parsed][:auto_category]
-      cats << c if c && !cats.include?(c)
-    end
-    cats.sort_by { |c| c == '_IGNORE' ? 'zzz' : c.downcase }
+    master_categories
   end
 
   def self.apply_category_to_selection(entities, category)

@@ -266,30 +266,30 @@ module TakeoffTool
         end
       end
 
-      # Rename an entire category
+      # Rename an entire category (delegates to atomic TakeoffTool.rename_category)
       @dialog.add_action_callback('renameCategory') do |_ctx, json_str|
         begin
           require 'json'
           data = JSON.parse(json_str.to_s)
-          old_name = data['oldName'].to_s
-          new_name = data['newName'].to_s
-          eids = data['eids'] || []
-          puts "Takeoff: renameCategory '#{old_name}' -> '#{new_name}' (#{eids.length} items)"
-          eids.each do |eid|
-            eid_i = eid.to_i
-            ca[eid_i] = new_name
-            TakeoffTool.save_assignment(eid_i, 'category', new_name)
-          end
-          # Update auto_category in scan_results so re-send stays consistent
-          sr.each do |r|
-            if r[:parsed] && r[:parsed][:auto_category] == old_name
-              r[:parsed][:auto_category] = new_name
-            end
-          end
-          TakeoffTool.category_assignments = ca
+          old_name = data['oldName'].to_s.strip
+          new_name = data['newName'].to_s.strip
+          puts "Takeoff: renameCategory '#{old_name}' -> '#{new_name}'"
+          TakeoffTool.rename_category(old_name, new_name)
         rescue => e
           puts "Takeoff renameCategory error: #{e.message}"
         end
+      end
+
+      @dialog.add_action_callback('deleteCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        TakeoffTool.remove_category(name)
+        puts "Takeoff: deleteCategory '#{name}'"
+      end
+
+      @dialog.add_action_callback('addEmptyCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        TakeoffTool.add_category(name) unless name.empty?
+        puts "Takeoff: addEmptyCategory '#{name}'"
       end
 
       # Bulk set size for multiple entities at once
@@ -437,7 +437,7 @@ module TakeoffTool
         }
       end
 
-      cats = TakeoffTool.build_context_categories
+      cats = TakeoffTool.master_categories
 
       require 'json'
       js = JSON.generate({ rows: rows, categories: cats, costCodes: cc })

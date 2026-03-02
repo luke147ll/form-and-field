@@ -197,6 +197,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
   <button class="hb" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Undo</button>
   <button class="hb grn" onclick="toggleCatPanel()">Multi-Isolate</button>
+  <button class="hb" onclick="promptNewCategory()" title="Add empty category">+ Category</button>
   <div class="sep"></div>
   <button class="hb" onclick="call('exportCSV')">CSV</button>
   <button class="hb pri" onclick="call('exportHTML')">Report</button>
@@ -399,6 +400,7 @@ var ICO_ZOOM='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" vie
 var ICO_ISO='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>';
 var ICO_SEL='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>';
 var ICO_X='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+var ICO_TRASH='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 var ICO_LF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>';
 var ICO_SF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
 /* Tiny inline unit icons for value cells (12px, no hover behavior) */
@@ -513,10 +515,12 @@ function receiveData(json){
 }
 
 function buildDD(){
-  var catM={},ccM={},subM={},cats=[],ccs=[],subs=[],i,r;
+  var ccM={},subM={},ccs=[],subs=[],i,r;
+  // Category filter sourced from CA (master list), excluding _IGNORE
+  var cats=[];
+  for(i=0;i<CA.length;i++){if(CA[i]!=='_IGNORE')cats.push(CA[i]);}
   for(i=0;i<D.length;i++){
     r=D[i];
-    if(r.category&&r.category!=='_IGNORE'&&!catM[r.category]){catM[r.category]=1;cats.push(r.category);}
     if(r.costCode&&!ccM[r.costCode]){ccM[r.costCode]=1;ccs.push(r.costCode);}
     if(r.subcategory&&!subM[r.subcategory]){subM[r.subcategory]=1;subs.push(r.subcategory);}
   }
@@ -538,11 +542,14 @@ function buildDD(){
   if(prevSub)document.getElementById('fSub').value=prevSub;
 }
 function buildCatPanel(){
-  var cm={},cats=[],i,r;
-  for(i=0;i<D.length;i++){r=D[i];if(r.category&&r.category!=='_IGNORE'){if(!cm[r.category]){cm[r.category]=0;cats.push(r.category);}cm[r.category]++;}}
+  var cm={},i,r;
+  for(i=0;i<D.length;i++){r=D[i];if(r.category&&r.category!=='_IGNORE'){if(!cm[r.category])cm[r.category]=0;cm[r.category]++;}}
+  // Include all categories from CA (master list), including empty ones
+  var cats=[];
+  for(i=0;i<CA.length;i++){if(CA[i]!=='_IGNORE')cats.push(CA[i]);}
   cats.sort();
   var h='';
-  for(i=0;i<cats.length;i++) h+='<label class="cpRow"><input type="checkbox" value="'+X(cats[i])+'" class="cpCk"> '+catBadge(cats[i])+' ('+cm[cats[i]]+')</label>';
+  for(i=0;i<cats.length;i++) h+='<label class="cpRow"><input type="checkbox" value="'+X(cats[i])+'" class="cpCk"> '+catBadge(cats[i])+' ('+(cm[cats[i]]||0)+')</label>';
   document.getElementById('catChecks').innerHTML=h;
 }
 function buildBulkDDs(){
@@ -681,12 +688,26 @@ function renderGroups(){
     if(!groups[key]){groups[key]=[];order.push(key);}
     groups[key].push(r);
   }
+  // When grouped by category and no search/filter active, include empty categories from CA
+  var fS=document.getElementById('fS').value;
+  var fC=document.getElementById('fC').value;
+  var fCC=document.getElementById('fCC').value;
+  var fSub=document.getElementById('fSub').value;
+  if(gBy==='category'&&!fS&&!fC&&!fCC&&!fSub){
+    for(i=0;i<CA.length;i++){
+      if(CA[i]==='_IGNORE')continue;
+      if(!groups[CA[i]]){groups[CA[i]]=[];order.push(CA[i]);}
+    }
+  }
   order.sort();
   FIDX=[];
   var h='';
   for(var gi=0;gi<order.length;gi++){
     var gk=order[gi], items=groups[gk], isOpen=!!openCats[gk];
     var catVis=false;for(var ci=0;ci<items.length;ci++){if(VIS[items[ci].entityId]!==false){catVis=true;break;}}
+
+    var isEmpty=items.length===0;
+    if(isEmpty)catVis=true; // default visible for empty cats
 
     var isoClass=ISO_CATS?(ISO_CATS[gk]?' iso-active':' iso-dimmed'):'';
     h+='<div class="cg'+(isOpen?' open':'')+isoClass+'" id="cg_'+gi+'">';
@@ -722,7 +743,13 @@ function renderGroups(){
     }
     h+='<button class="ib accent" onclick="selGrpItems(\''+X2(gk)+'\')" title="Select all">'+ICO_SEL+'</button>';
     if(gBy==='category') h+='<button class="ib danger" onclick="excludeCat(\''+X2(gk)+'\')" title="Exclude">'+ICO_X+'</button>';
+    if(gBy==='category'&&gk!=='Uncategorized'&&gk!=='_IGNORE') h+='<button class="ib danger" onclick="deleteCat(\''+X2(gk)+'\')" title="Delete category">'+ICO_TRASH+'</button>';
     h+='</span></div>';
+    if(isEmpty){
+      h+='<div style="padding:12px 34px;color:#6c7086;font-size:11px;font-style:italic">No items in this category</div>';
+      h+='</div></div>';
+      continue;
+    }
     h+='<table><thead><tr>';
     h+='<th class="ck"><input type="checkbox" onchange="selGrpAll(\''+X2(gk)+'\',this.checked)"></th>';
     h+='<th style="width:18px;text-align:center;padding:4px 2px" title="Visibility"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></th>';
@@ -996,24 +1023,19 @@ function startCatRename(oldName,el){
   inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();commit();}if(e.key==='Escape'){e.preventDefault();done=true;renderGroups();}});
 }
 function commitCatRename(oldName,newName){
-  // Update D array
-  var ids=[];
-  for(var i=0;i<D.length;i++){if(D[i].category===oldName){D[i].category=newName;ids.push(D[i].entityId);}}
-  // Update CA list
+  // Optimistic JS-side update
+  for(var i=0;i<D.length;i++){if(D[i].category===oldName)D[i].category=newName;}
   var idx=CA.indexOf(oldName);
   if(idx!==-1)CA.splice(idx,1);
   if(CA.indexOf(newName)===-1)CA.push(newName);
   CA.sort();
-  // Update openCats key
   if(openCats[oldName]){openCats[newName]=true;delete openCats[oldName];}
-  // Update openSubs keys
   var oldPfx=oldName+'|';
   var subKeys=Object.keys(openSubs);
   for(var s=0;s<subKeys.length;s++){if(subKeys[s].indexOf(oldPfx)===0){var tail=subKeys[s].substring(oldPfx.length);openSubs[newName+'|'+tail]=openSubs[subKeys[s]];delete openSubs[subKeys[s]];}}
-  // Rebuild dropdowns and re-render
   buildBulkDDs();buildDD();filt();
-  // Persist to Ruby
-  callJSON('renameCategory',{oldName:oldName,newName:newName,eids:ids});
+  // Persist to Ruby (Ruby handles entity attrs atomically)
+  callJSON('renameCategory',{oldName:oldName,newName:newName});
 }
 
 /* ═══ UNDO ═══ */
@@ -1147,6 +1169,48 @@ function addNewCategory(n){
   buildDD();buildBulkDDs();
 }
 
+/* ═══ ADD / DELETE CATEGORY ═══ */
+function promptNewCategory(){
+  showInputModal('New category name',function(name){
+    if(!name)return;
+    if(CA.indexOf(name)===-1){CA.push(name);CA.sort();}
+    call('addEmptyCategory',name);
+    buildDD();buildCatPanel();buildBulkDDs();filt();
+  });
+}
+function deleteCat(cat){
+  if(cat==='Uncategorized'||cat==='_IGNORE')return;
+  var cnt=0;for(var i=0;i<D.length;i++){if(D[i].category===cat)cnt++;}
+  var msg=cnt>0?'Delete "'+cat+'" and move '+cnt+' item'+(cnt>1?'s':'')+' to Uncategorized?':'Delete empty category "'+cat+'"?';
+  showConfirmModal(msg,function(){
+    // Optimistic update
+    for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].category='Uncategorized';}
+    var idx=CA.indexOf(cat);if(idx!==-1)CA.splice(idx,1);
+    delete openCats[cat];
+    // Clean openSubs
+    var pfx=cat+'|';var sks=Object.keys(openSubs);for(var s=0;s<sks.length;s++){if(sks[s].indexOf(pfx)===0)delete openSubs[sks[s]];}
+    buildDD();buildCatPanel();buildBulkDDs();filt();
+    call('deleteCategory',cat);
+  });
+}
+
+/* ═══ CONFIRM MODAL ═══ */
+var _confirmCb=null;
+function showConfirmModal(msg,cb){
+  _confirmCb=cb;
+  document.getElementById('confirmMsg').textContent=msg;
+  document.getElementById('confirmModal').className='modal-bg show';
+}
+function doConfirm(){
+  document.getElementById('confirmModal').className='modal-bg';
+  if(_confirmCb)_confirmCb();
+  _confirmCb=null;
+}
+function cancelConfirm(){
+  document.getElementById('confirmModal').className='modal-bg';
+  _confirmCb=null;
+}
+
 window.onload=function(){log('init');setTimeout(function(){call('requestData');},200);};
 </script>
 <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
@@ -1156,6 +1220,16 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');}
     <div class="modal-btns">
       <button class="hb" onclick="cancelModal()">Cancel</button>
       <button class="hb pri" onclick="confirmModal()">OK</button>
+    </div>
+  </div>
+</div>
+<div id="confirmModal" class="modal-bg" onclick="if(event.target===this)cancelConfirm()">
+  <div class="modal-card">
+    <h3 style="color:#f38ba8">Delete Category</h3>
+    <p id="confirmMsg" style="font-size:12px;color:#cdd6f4;line-height:1.5;margin-bottom:4px"></p>
+    <div class="modal-btns">
+      <button class="hb" onclick="cancelConfirm()">Cancel</button>
+      <button class="hb" onclick="doConfirm()" style="background:#f38ba8;color:#1e1e2e;border-color:#f38ba8;font-weight:600">Delete</button>
     </div>
   </div>
 </div>
