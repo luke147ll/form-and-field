@@ -47,13 +47,15 @@ module TakeoffTool
 
     # ─── Foundation / concrete keywords: [regex, category, subcategory] ───
     FOUNDATION_KW = [
-      [/\bGrade\s*Beam\b/i,  'Concrete',            'Grade Beam'],
-      [/\bPier\b/i,          'Concrete',            'Pier'],
-      [/\bPiling\b/i,        'Foundation Footings', 'Piling'],
-      [/\bFooting\b/i,       'Foundation Footings', 'Footing'],
-      [/\bFoundation\b/i,    'Concrete',            'Foundation'],
-      [/\bCaisson\b/i,       'Foundation Footings', 'Caisson'],
-      [/\bSlab\b/i,          'Foundation Slabs',    'Slab'],
+      [/\bSlab\s+on\s+Grade\b|\bSOG\b/i, 'Concrete', 'Slab on Grade'],
+      [/\bGrade\s*Beam\b/i,  'Concrete', 'Grade Beam'],
+      [/\bPier\b/i,          'Concrete', 'Piers'],
+      [/\bColumn\b/i,        'Concrete', 'Piers'],
+      [/\bPiling\b/i,        'Concrete', 'Footings'],
+      [/\bFooting\b|\bFTG\b/i, 'Concrete', 'Footings'],
+      [/\bCaisson\b/i,       'Concrete', 'Footings'],
+      [/\bFoundation\b/i,    'Concrete', 'Foundation'],
+      [/\bSlab\b/i,          'Concrete', 'Slabs'],
     ].freeze
 
     # ─── Steel designation patterns ───
@@ -92,8 +94,8 @@ module TakeoffTool
       'IfcStairFlight'       => 'Stairs',
       'IfcRailing'           => 'Railings',
       'IfcCovering'          => 'Wall Finish',
-      'IfcFooting'           => 'Foundation Footings',
-      'IfcPile'              => 'Foundation Footings',
+      'IfcFooting'           => 'Concrete',
+      'IfcPile'              => 'Concrete',
       'IfcCurtainWall'       => 'Glass/Glazing',
       'IfcSpace'             => 'Rooms',
       'IfcBeam'              => 'Structural Lumber',
@@ -172,7 +174,7 @@ module TakeoffTool
       return result if result
 
       # 5. Timber/Lumber with NxN size (species override: hardwood = always Timber)
-      result = try_timber(display, mat)
+      result = try_timber(display, mat, tag)
       return result if result
 
       # 6. Steel name patterns (W, HSS, L, C, WT, PL)
@@ -495,11 +497,18 @@ module TakeoffTool
 
     # ─── Timber / Structural Lumber (NxN size pattern) ───────────────
 
-    def self.try_timber(name, mat)
+    # IFC tag → member type fallback when name has no keyword
+    IFC_MEMBER_TYPE = {
+      'IfcBeam'   => ['Beam', 'Beam'],
+      'IfcColumn' => ['Post', 'Post'],
+      'IfcMember' => ['Member', 'Beam'],
+    }.freeze
+
+    def self.try_timber(name, mat, tag = nil)
       size = nil
       remainder = nil
 
-      # Try fractional pattern first (more specific)
+      # Try fractional pattern first (more specific) — anchored at start
       if name =~ TIMBER_FRAC_RE
         size = $1.strip
         remainder = $2.strip
@@ -508,22 +517,31 @@ module TakeoffTool
         remainder = $2.strip
       end
 
-      return nil unless size && remainder
+      # If no start-anchored match, try NxN anywhere in name
+      # Catches "Dimension Lumber, 8x12", "Rough Sawn Lumber, 10x12", etc.
+      if !size && name =~ /(\d+\s*x\s*\d+)/i
+        size = $1.strip
+        remainder = name.dup
+      end
+
+      return nil unless size
 
       # Multi-word keywords first (highest priority)
+      # Search full name (not just remainder) for member type keywords
+      search_text = remainder || name
       member_type = nil
       subcat = nil
-      if remainder =~ /\bCollar\s*Tie\b/i
+      if search_text =~ /\bCollar\s*Tie\b/i
         member_type = 'Collar Tie'; subcat = 'Tie'
-      elsif remainder =~ /\bRim\s*Board\b/i
+      elsif search_text =~ /\bRim\s*Board\b/i
         member_type = 'Rim Board'; subcat = 'Joist'
-      elsif remainder =~ /\bRim\s*Joist\b/i
+      elsif search_text =~ /\bRim\s*Joist\b/i
         member_type = 'Rim Joist'; subcat = 'Joist'
       else
-        # Single-word: find rightmost match
+        # Single-word: find rightmost match in full name
         match_pos = -1
         MEMBER_TYPE_MAP.each do |kw, sub|
-          pos = remainder =~ /\b#{kw}\b/i
+          pos = search_text =~ /\b#{kw}\b/i
           if pos && pos >= match_pos
             match_pos = pos
             member_type = kw
@@ -531,6 +549,13 @@ module TakeoffTool
           end
         end
       end
+
+      # No keyword in name — derive member type from IFC tag
+      if !member_type && tag && IFC_MEMBER_TYPE[tag]
+        member_type, subcat = IFC_MEMBER_TYPE[tag]
+      end
+
+      # Must have either a keyword or IFC tag to classify
       return nil unless member_type
 
       # "Plate" with known non-wood material → let steel handle it

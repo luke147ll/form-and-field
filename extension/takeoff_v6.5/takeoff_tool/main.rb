@@ -185,6 +185,7 @@ module TakeoffTool
       load_custom_categories
       load_master_categories
       merge_scan_categories_into_master
+      prune_empty_categories
       load_master_subcategories
       load_manual_measurements
 
@@ -470,7 +471,7 @@ module TakeoffTool
     m.set_attribute('FormAndField', 'master_categories', JSON.generate(@master_categories))
   end
 
-  # Load master categories from model attribute. On first load, migrates from all sources.
+  # Load master categories from model attribute. On first load, builds from actual scan data only.
   def self.load_master_categories
     m = Sketchup.active_model
     return unless m
@@ -479,8 +480,8 @@ module TakeoffTool
       require 'json'
       @master_categories = JSON.parse(json) rescue []
     else
-      # First load — migrate from all existing sources
-      cats = BASE_CATEGORIES.dup
+      # First load — only include categories with actual entities + user-created
+      cats = []
       (@custom_categories || []).each { |c| cats << c unless cats.include?(c) }
       @category_assignments.each_value { |c| cats << c unless cats.include?(c) }
       (@scan_results || []).each do |r|
@@ -488,7 +489,7 @@ module TakeoffTool
         cats << c if c && !cats.include?(c)
       end
       @master_categories = cats
-      puts "Takeoff: Migrated #{@master_categories.length} categories to master list"
+      puts "Takeoff: Built master list from scan data (#{@master_categories.length} categories)"
     end
     # Always ensure Uncategorized + _IGNORE exist
     @master_categories << 'Uncategorized' unless @master_categories.include?('Uncategorized')
@@ -531,6 +532,33 @@ module TakeoffTool
       sort_master_categories!
       save_master_categories
       puts "Takeoff: Merged new categories into master list (#{@master_categories.length} total)"
+    end
+  end
+
+  # Remove categories with 0 entities unless user-created (custom) or essential
+  def self.prune_empty_categories
+    # Collect all categories that have at least one entity
+    in_use = {}
+    (@scan_results || []).each do |r|
+      eid = r[:entity_id]
+      cat = @category_assignments[eid] || r[:parsed][:auto_category]
+      in_use[cat] = true if cat && !cat.empty?
+    end
+
+    # Keep: in-use, user-created, Uncategorized, _IGNORE
+    keep = {}
+    in_use.each_key { |c| keep[c] = true }
+    (@custom_categories || []).each { |c| keep[c] = true }
+    keep['Uncategorized'] = true
+    keep['_IGNORE'] = true
+
+    before = @master_categories.length
+    @master_categories.reject! { |c| !keep[c] }
+    removed = before - @master_categories.length
+    if removed > 0
+      sort_master_categories!
+      save_master_categories
+      puts "Takeoff: Pruned #{removed} empty categories (#{@master_categories.length} remaining)"
     end
   end
 
@@ -913,6 +941,7 @@ module TakeoffTool
     load_custom_categories
     load_master_categories
     merge_scan_categories_into_master
+    prune_empty_categories
     load_master_subcategories
     load_manual_measurements
 

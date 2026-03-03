@@ -327,7 +327,7 @@ module TakeoffTool
       @dialog.add_action_callback('addEmptyCategory') do |_ctx, name_str|
         name = name_str.to_s.strip
         unless name.empty?
-          TakeoffTool.add_category(name)
+          TakeoffTool.add_custom_category(name)
           send_data(sr, ca, cca)
           puts "Takeoff: addEmptyCategory '#{name}'"
         end

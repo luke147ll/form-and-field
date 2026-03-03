@@ -66,7 +66,7 @@ module TakeoffTool
     KEYWORD_MAP = [
       [/\bDrywall\b|\bGypsum\b|\bGWB\b/i, 'Drywall'],
       [/\bInsulation\b|\bBatt\b|\bRigid\s+Foam\b/i, 'Insulation'],
-      [/\bSheathing\b|\bOSB\b|\bPlywood\b/i, 'Sheathing'],
+      [/\bSheathing\b|\bShtg\b|\bOSB\b|\bPlywood\b/i, 'Sheathing'],
       [/\bSiding\b|\bLap\s+Siding\b|\bHardie\b/i, 'Siding'],
       [/\bRebar\b|\bReinforc(?:ing)?\b/i, 'Concrete'],
       [/\bConcrete\b|\bCMU\b/i, 'Concrete'],
@@ -211,6 +211,43 @@ module TakeoffTool
         parsed[:thickness] = ft if ft
       end
 
+      # ─── Dimension enrichment: set size_nominal from BB when parser didn't ───
+      dims = [w, h, d].sort  # dims[0]=shortest, dims[1]=middle, dims[2]=longest
+      cat = parsed[:auto_category]
+      subcat = parsed[:auto_subcategory]
+
+      if !parsed[:size_nominal] || parsed[:size_nominal].to_s.empty?
+        if cat == 'Concrete' && (subcat =~ /Footing/i || subcat == 'Grade Beam')
+          # Footings: width x depth (two shortest dims)
+          fw = dims[1]; fd = dims[0]
+          parsed[:size_nominal] = "#{fw.round(1)}\" x #{fd.round(1)}\""
+          parsed[:thickness] ||= "#{fd.round(1)}\""
+        elsif cat == 'Concrete' && subcat =~ /Slab|Grade/i
+          # Slabs: thickness only (shortest dim)
+          parsed[:size_nominal] = "#{dims[0].round(1)}\""
+          parsed[:thickness] ||= "#{dims[0].round(1)}\""
+        elsif cat == 'Concrete' && subcat =~ /Wall/i
+          # Concrete walls: thickness (shortest dim)
+          parsed[:size_nominal] = "#{dims[0].round(1)}\""
+          parsed[:thickness] ||= "#{dims[0].round(1)}\""
+        elsif cat == 'Concrete' && subcat =~ /Pier/i
+          # Piers: width x depth (two shortest dims)
+          fw = dims[1]; fd = dims[0]
+          parsed[:size_nominal] = "#{fw.round(1)}\" x #{fd.round(1)}\""
+        elsif cat =~ /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Foundation Walls|Drywall|Stucco|Siding/i
+          # Walls: thickness (shortest dim)
+          parsed[:size_nominal] ||= parsed[:thickness]
+          if !parsed[:size_nominal] || parsed[:size_nominal].to_s.empty?
+            parsed[:size_nominal] = "#{dims[0].round(1)}\""
+          end
+        end
+      end
+
+      # Ensure area_sf for concrete slabs/walls from BB if missing
+      if !area && cat == 'Concrete' && subcat =~ /Slab|Grade|Wall/i && dims[0] > 0
+        area = (dims[1] * dims[2]) / 144.0
+      end
+
       results << {
         entity_id: inst.entityID, entity_type: inst.typename, tag: tag,
         definition_name: dname, display_name: display, instance_name: iname,
@@ -259,6 +296,22 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════
 
     def self.scan_entity(inst, defn, display, tag, mat, ifc_type)
+      # Strategy 0: Steel shape early-exit — W shapes, HSS, L-angles, C-channels
+      # These are definitively structural steel regardless of material or other attributes
+      if display =~ /\bW\d+[xX]\d+\b/ ||
+         display =~ /^W-Wide Flange\b/i ||
+         display =~ /\bHSS\d/i ||
+         display =~ /\b[LC]\d+[xX]\d+\b/
+        return {
+          raw: display, element_type: 'Steel Shape', function: nil,
+          material: mat, thickness: nil, size_nominal: display[/[\w\d]+[xX][\d.]+/],
+          revit_id: nil, auto_category: 'Structural Steel',
+          auto_subcategory: display[/^(W|HSS|[LC])\d*/] || 'Steel',
+          measurement_type: Parser.measurement_for('Structural Steel'),
+          category_source: 'name', confidence: :high
+        }
+      end
+
       candidates = []
 
       # Strategy 1+2: IFC-aware parser (name-based = HIGH, tag-based = MEDIUM)

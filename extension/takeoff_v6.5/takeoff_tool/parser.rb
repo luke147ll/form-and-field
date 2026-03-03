@@ -165,15 +165,16 @@ module TakeoffTool
         elsif d =~ /^Foundation\s*-\s*(.*)/i
           r[:function]='Foundation'; r[:material]=xmat($1); r[:thickness]=xdim($1)
           if d =~ /Concrete/i
-            r[:auto_category]='Foundation Walls'
-            r[:auto_subcategory]='Concrete'
+            r[:auto_category]='Concrete'
+            r[:auto_subcategory]='Walls'
             r[:thickness] ||= xthick_inch(d)
+            r[:size_nominal] = r[:thickness]
           else
             r[:auto_category]='Wall Structure'
           end
         elsif d =~ /^(Structure|Core)\s*-\s*(.*)/i
           r[:function]=$1; r[:material]=xmat($2); r[:thickness]=xdim($2); r[:auto_category]='Wall Structure'
-        elsif d =~ /Sheathing|Plywood|OSB/i
+        elsif d =~ /Sheathing|Shtg|Plywood|OSB/i
           r[:function]='Sheathing'; r[:material]=xmat(d); r[:thickness]=xdim(d); r[:auto_category]='Wall Sheathing'
         elsif d =~ /^Insulation/i
           r[:function]='Insulation'; r[:material]=xmat(d); r[:thickness]=xdim(d); r[:auto_category]='Insulation'
@@ -194,6 +195,23 @@ module TakeoffTool
           r[:material]=xmat(d); r[:auto_category]='Masonry / Veneer'; r[:auto_subcategory]='Exterior'
         elsif d =~ /J-Wall\s+Int\s+Stud/i
           r[:material]=xmat(d); r[:auto_category]='Wall Framing'; r[:auto_subcategory]='Interior'
+        elsif d =~ /Stem\s*Wall/i
+          r[:function]='Foundation'; r[:material]=xmat(d); r[:thickness]=xdim(d)
+          r[:auto_category]='Foundation Walls'
+          sz = d[/(\d+)\s*["″]?\s*Stem/i, 1]
+          r[:auto_subcategory] = sz ? "#{sz}\" Stemwall" : 'Stemwall'
+        elsif d =~ /\bCMU\b/i
+          r[:material]=xmat(d); r[:thickness]=xdim(d)
+          r[:auto_category]='Masonry / Veneer'
+          sz = d[/(\d+)"\s*CMU/i, 1] || d[/(\d+)\s*"\s*CMU/i, 1]
+          r[:auto_subcategory] = sz ? "#{sz}\" CMU" : 'CMU'
+        elsif material && material =~ /\bConcrete\b/i && material !~ /\bSteel\b/i
+          r[:function]='Foundation'; r[:material]=xmat(d); r[:thickness]=xdim(d)
+          r[:auto_category]='Concrete'; r[:auto_subcategory]='Walls'
+          r[:size_nominal] = r[:thickness]
+        elsif d =~ /\b(2x\d+)\s+Wall/i
+          r[:function]='Framing'; r[:material]=xmat(d); r[:thickness]=xdim(d)
+          r[:auto_category]='Wall Framing'; r[:auto_subcategory]=$1
         else
           r[:material]=d; r[:auto_category]='Walls'
         end
@@ -202,11 +220,11 @@ module TakeoffTool
       elsif rem =~ /^Basic Roof,?\s*(.*)/i
         r[:element_type]='Basic Roof'; d=$1.strip
         r[:category_source] = 'name'
-        if d =~ /^Finish\s*-\s*(.*)/i
+        if d =~ /Sheathing|Shtg|Plywood|OSB/i
+          r[:function]='Sheathing'; r[:material]=xmat(d); r[:thickness]=xdim(d); r[:auto_category]='Roof Sheathing'
+        elsif d =~ /^Finish\s*-\s*(.*)/i
           r[:function]='Finish'; det=$1.strip; r[:material]=xmat(det); r[:thickness]=xdim(det)
           r[:auto_category] = det=~/Standing Seam|Metal/i ? 'Metal Roofing' : det=~/Shingle|Asphalt/i ? 'Shingle Roofing' : 'Roofing'
-        elsif d =~ /Sheathing|Plywood|OSB/i
-          r[:function]='Sheathing'; r[:material]=xmat(d); r[:thickness]=xdim(d); r[:auto_category]='Roof Sheathing'
         elsif d =~ /Framing|Structure/i
           r[:function]='Framing'; r[:thickness]=xdim(d); r[:auto_category]='Roof Framing'
         else
@@ -244,20 +262,53 @@ module TakeoffTool
       elsif rem =~ /Foundation Slab/i
         r[:element_type]='Foundation Slab'; r[:category_source]='name'
         r[:material]=xmat(rem); r[:thickness]=xdim(rem) || xthick_inch(rem)
-        r[:auto_category]='Foundation Slabs'
+        r[:auto_category]='Concrete'
+        r[:auto_subcategory] = rem =~ /Slab\s+on\s+Grade|SOG/i ? 'Slab on Grade' : 'Slabs'
+        r[:size_nominal] = r[:thickness]
 
       # ─── Wall Foundation (footings) ───
       elsif rem =~ /Wall Foundation/i
         r[:element_type]='Wall Foundation'; r[:category_source]='name'
         r[:material]=xmat(rem); r[:thickness]=xdim(rem) || xthick_inch(rem)
-        r[:auto_category]='Foundation Footings'
+        r[:auto_category]='Concrete'; r[:auto_subcategory]='Footings'
+        r[:size_nominal] = r[:thickness]
 
       # ─── Floor ───
       elsif rem =~ /^Basic Floor|^Floor/i
         r[:element_type]='Basic Floor'; d=rem.sub(/^Basic Floor,?\s*|^Floor,?\s*/i,'')
         r[:material]=xmat(d); r[:thickness]=xdim(d)
-        r[:auto_category] = d=~/Concrete|Slab/i ? 'Concrete' : 'Flooring'
+        if d =~ /Slab\s+on\s+Grade|SOG/i
+          r[:auto_category]='Concrete'; r[:auto_subcategory]='Slab on Grade'
+          r[:size_nominal] = r[:thickness]
+        elsif d =~ /Concrete|Slab/i
+          r[:auto_category]='Concrete'; r[:auto_subcategory]='Slabs'
+          r[:size_nominal] = r[:thickness]
+        else
+          r[:auto_category]='Flooring'
+        end
         r[:category_source] = 'name'
+
+      # ─── Concrete elements (standalone slab/footing/pier names) ───
+      elsif rem =~ /\bSlab\s+on\s+Grade\b|\bSOG\b/i
+        r[:element_type]='Concrete Slab'; r[:category_source]='name'
+        r[:material]=xmat(rem); r[:thickness]=xdim(rem) || xthick_inch(rem)
+        r[:auto_category]='Concrete'; r[:auto_subcategory]='Slab on Grade'
+        r[:size_nominal] = r[:thickness]
+      elsif rem =~ /\b(?:CONC|Concrete)\s*Slab\b|\bSlab\b/i && rem !~ /^Basic Floor|^Floor/i
+        r[:element_type]='Concrete Slab'; r[:category_source]='name'
+        r[:material]=xmat(rem); r[:thickness]=xdim(rem) || xthick_inch(rem)
+        r[:auto_category]='Concrete'; r[:auto_subcategory]='Slabs'
+        r[:size_nominal] = r[:thickness]
+      elsif rem =~ /\bFooting\b|\bFTG\b/i
+        r[:element_type]='Footing'; r[:category_source]='name'
+        r[:material]=xmat(rem); r[:thickness]=xdim(rem) || xthick_inch(rem)
+        r[:auto_category]='Concrete'; r[:auto_subcategory]='Footings'
+        r[:size_nominal] = r[:thickness]
+      elsif rem =~ /\b(?:Pier|Column)\b/i && material && material =~ /\bConcrete\b/i
+        r[:element_type]='Concrete Pier'; r[:category_source]='name'
+        r[:material]=xmat(rem); r[:thickness]=xdim(rem)
+        r[:auto_category]='Concrete'; r[:auto_subcategory]='Piers'
+        r[:size_nominal] = r[:thickness]
 
       # ─── Lumber ───
       elsif rem =~ /Rough Sawn Lumber|Dimensional Lumber|Lumber/i
