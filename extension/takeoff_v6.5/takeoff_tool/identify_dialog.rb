@@ -4,10 +4,39 @@ module TakeoffTool
     @_identify_loaded = true
     @dialog = nil
     @current_entities = []
+    @observer = nil
+    end
+
+    # SelectionObserver for live updates
+    class SelObserver < Sketchup::SelectionObserver
+      def onSelectionBulkChange(sel)
+        IdentifyDialog.on_selection_changed(sel)
+      end
+      def onSelectionCleared(sel)
+        IdentifyDialog.on_selection_changed(sel)
+      end
+    end
+
+    def self.on_selection_changed(sel)
+      return unless @dialog && @dialog.visible?
+      entities = sel.to_a.select { |e| e.respond_to?(:entityID) }
+      return if entities.empty?
+      @current_entities = entities
+      html_body = entities.length == 1 ? build_single_body(entities.first) : build_multi_body(entities)
+      esc = html_body.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\n")
+      @dialog.execute_script("updateContent('#{esc}')") rescue nil
+    end
+
+    def self.detach_observer
+      return unless @observer
+      sel = Sketchup.active_model&.selection
+      sel.remove_observer(@observer) if sel
+      @observer = nil
     end
 
     def self.show(selection)
       @dialog.close if @dialog && @dialog.visible? rescue nil
+      detach_observer
       @current_entities = selection.to_a.select { |e| e.respond_to?(:entityID) }
       return if @current_entities.empty?
 
@@ -90,7 +119,15 @@ module TakeoffTool
 
       html = @current_entities.length == 1 ? build_single(@current_entities.first) : build_multi(@current_entities)
       @dialog.set_html(html)
+      @dialog.set_on_closed { detach_observer }
       @dialog.show
+
+      # Attach selection observer for live updates
+      sel = Sketchup.active_model&.selection
+      if sel
+        @observer = SelObserver.new
+        sel.add_observer(@observer)
+      end
     end
 
     private
@@ -402,6 +439,11 @@ module TakeoffTool
 
     IDENTIFY_JS = <<~JS.freeze unless defined?(IDENTIFY_JS)
       var _modalCb=null;
+      function updateContent(html){
+        var container=document.getElementById('idContent');
+        if(container){container.innerHTML=html;}
+        else{document.body.innerHTML=html+'<div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()"><div class="modal-card"><h3 id="modalTitle">New category name</h3><input type="text" id="modalInput" onkeydown="if(event.key===\\'Enter\\')confirmModal();if(event.key===\\'Escape\\')cancelModal();"><div class="modal-btns"><button onclick="cancelModal()">Cancel</button><button class="pri" onclick="confirmModal()">OK</button></div></div></div>';}
+      }
       function onCatChange(sel){
         if(sel.value==='__custom__'){
           sel.value='';
@@ -564,7 +606,7 @@ module TakeoffTool
       }
     JS
 
-    def self.build_single(entity)
+    def self.build_single_body(entity)
       i = entity_info(entity)
       dim = "#{fmt_dim(i[:w])} &times; #{fmt_dim(i[:h])} &times; #{fmt_dim(i[:d])}"
 
@@ -585,7 +627,6 @@ module TakeoffTool
       end
 
       <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
         <h1>Identify</h1>
         <div class="entity-name">#{h(i[:name])}</div>
         #{defn_line}
@@ -609,13 +650,10 @@ module TakeoffTool
           #{subcategory_options(i[:category] || '', i[:subcategory] || '')}
         </select>
         <button class="apply-btn" onclick="doApply()">Apply</button>
-        #{MODAL_HTML}
-        <script>#{IDENTIFY_JS}</script>
-        </body></html>
       HTML
     end
 
-    def self.build_multi(entities)
+    def self.build_multi_body(entities)
       count = entities.length
 
       # Unique definitions with counts
@@ -632,7 +670,6 @@ module TakeoffTool
       }.join("\n")
 
       <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
         <h1>Identify &mdash; #{count} entities selected</h1>
         <div class="sect-label">Definitions</div>
         <ul class="def-list">
@@ -650,6 +687,25 @@ module TakeoffTool
           <option value="__custom_sub__">+ Custom...</option>
         </select>
         <button class="apply-btn" onclick="doApply()">Apply</button>
+      HTML
+    end
+
+    def self.build_single(entity)
+      body = build_single_body(entity)
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
+        <div id="idContent">#{body}</div>
+        #{MODAL_HTML}
+        <script>#{IDENTIFY_JS}</script>
+        </body></html>
+      HTML
+    end
+
+    def self.build_multi(entities)
+      body = build_multi_body(entities)
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>#{MOCHA_CSS}#{MODAL_CSS}</style></head><body>
+        <div id="idContent">#{body}</div>
         #{MODAL_HTML}
         <script>#{IDENTIFY_JS}</script>
         </body></html>

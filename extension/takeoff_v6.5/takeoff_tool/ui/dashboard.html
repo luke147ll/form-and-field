@@ -226,6 +226,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .modal-card input[type=text]{width:100%;background:#1e1e2e;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box}
 .modal-card input[type=text]:focus{border-color:#cba6f7}
 .modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+/* CONTEXT MENU */
+.ctx-menu{display:none;position:fixed;z-index:300;background:#313244;border:1px solid #45475a;border-radius:6px;padding:4px 0;box-shadow:0 4px 16px rgba(0,0,0,0.5);min-width:160px}
+.ctx-menu.show{display:block}
+.ctx-item{padding:6px 14px;font-size:11px;color:#cdd6f4;cursor:pointer;display:flex;align-items:center;gap:6px}
+.ctx-item:hover{background:#45475a}
+.ctx-item svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+.ctx-sep{height:1px;background:#45475a;margin:3px 0}
 </style>
 </head>
 <body>
@@ -955,7 +963,7 @@ function renderGroups(){
           var sVis=false;for(var svi=0;svi<subArr.length;svi++)if(VIS[subArr[svi].entityId]!==false){sVis=true;break;}
           var scCols=gBy==='category'?9:10;
           var scNone=curSub?'':'sc-none';
-          h+='<tr class="sc-hdr'+(sOpen?'':' closed')+(scNone?' '+scNone:'')+'">';
+          h+='<tr class="sc-hdr'+(sOpen?'':' closed')+(scNone?' '+scNone:'')+'" oncontextmenu="onSubHdrContext(event,\''+X2(gk)+'\',\''+X2(curSub)+'\')">';
           h+='<td class="ck"><input type="checkbox" onclick="event.stopPropagation()" onchange="selSubAll(\''+X2(gk)+'\',\''+X2(curSub)+'\',this.checked)"></td>';
           h+='<td colspan="'+scCols+'" onclick="togSub(\''+X2(sKey)+'\')">';
           h+='<span class="arr">&#9660;</span> ';
@@ -1019,7 +1027,7 @@ function renderGroups(){
       for(var esi=0;esi<msubs.length;esi++){
         if(!usedSubs[msubs[esi]]){
           var esKey=gk+'|'+msubs[esi],esOpen=openSubs[esKey]===true;
-          h+='<tr class="sc-hdr'+(esOpen?'':' closed')+'">';
+          h+='<tr class="sc-hdr'+(esOpen?'':' closed')+'" oncontextmenu="onSubHdrContext(event,\''+X2(gk)+'\',\''+X2(msubs[esi])+'\')">';
           h+='<td class="ck"></td>';
           h+='<td colspan="9" onclick="togSub(\''+X2(esKey)+'\')">';
           h+='<span class="arr">&#9660;</span> ';
@@ -1528,7 +1536,7 @@ function doSetCC(eid,v){
 function doSetSize(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();recordUndo([eid],'sizeNominal',v);callJSON('setSize',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].sizeNominal=v;break;}}}
 function buildSubSelect(row){
   var cat=row.category||'Uncategorized',cur=row.subcategory||'';
-  var subs=MSUB[cat]||[],h='<select class="cs" data-eid="'+row.entityId+'" onchange="doSetSub2(this)" style="max-width:90px">';
+  var subs=MSUB[cat]||[],h='<select class="cs" data-eid="'+row.entityId+'" onchange="doSetSub2(this)" oncontextmenu="onSubSelContext(event,this)" style="max-width:90px">';
   h+='<option value="">--</option>';
   var inList=false;
   for(var i=0;i<subs.length;i++){
@@ -1608,12 +1616,12 @@ function T(s,n){return s&&s.length>n?s.substr(0,n)+'...':s||'';}
 
 /* ═══ INPUT MODAL ═══ */
 var _modalCb=null;
-function showInputModal(title,cb){
+function showInputModal(title,cb,defaultVal){
   _modalCb=cb;
   document.getElementById('modalTitle').textContent=title;
-  var inp=document.getElementById('modalInput');inp.value='';
+  var inp=document.getElementById('modalInput');inp.value=defaultVal||'';
   document.getElementById('inputModal').className='modal-bg show';
-  setTimeout(function(){inp.focus();},50);
+  setTimeout(function(){inp.focus();inp.select();},50);
 }
 function confirmModal(){
   var v=document.getElementById('modalInput').value.trim();
@@ -1670,17 +1678,9 @@ function promptAddSubcategory(cat){
   });
 }
 function startSubRename(cat,oldSub,el){
-  var sp=el;
-  var w=sp.offsetWidth;
-  var inp=document.createElement('input');
-  inp.type='text';inp.value=oldSub;
-  inp.style.cssText='font-size:11px;font-weight:600;border:1px solid #89b4fa;border-radius:3px;padding:1px 5px;outline:none;background:#1e1e2e;color:#cdd6f4;width:'+Math.max(w,60)+'px;font-family:inherit';
-  sp.parentNode.replaceChild(inp,sp);
-  inp.focus();inp.select();
-  var done=false;
-  function commit(){if(done)return;done=true;var nv=inp.value.trim();if(nv&&nv!==oldSub)commitSubRename(cat,oldSub,nv);else filt();}
-  inp.addEventListener('blur',commit);
-  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();commit();}if(e.key==='Escape'){e.preventDefault();done=true;filt();}});
+  showInputModal('Rename subcategory "'+oldSub+'"',function(nv){
+    if(nv&&nv!==oldSub)commitSubRename(cat,oldSub,nv);
+  },oldSub);
 }
 function commitSubRename(cat,oldSub,newSub){
   // Optimistic JS-side update
@@ -1708,6 +1708,62 @@ function deleteSubcategory(cat,sub){
     buildDD();buildBulkDDs();filt();
     callJSON('deleteSubcategory',{cat:cat,name:sub});
   });
+}
+
+/* ═══ CONTEXT MENU ═══ */
+var _ctxData=null;
+function showCtxMenu(x,y,items){
+  var m=document.getElementById('ctxMenu');
+  var h='';
+  for(var i=0;i<items.length;i++){
+    if(items[i].sep){h+='<div class="ctx-sep"></div>';continue;}
+    h+='<div class="ctx-item" onclick="hideCtxMenu();('+items[i].fn+')()">'+(items[i].icon||'')+items[i].label+'</div>';
+  }
+  m.innerHTML=h;
+  m.style.left=Math.min(x,window.innerWidth-180)+'px';
+  m.style.top=Math.min(y,window.innerHeight-items.length*30-10)+'px';
+  m.classList.add('show');
+}
+function hideCtxMenu(){document.getElementById('ctxMenu').classList.remove('show');}
+document.addEventListener('click',function(){hideCtxMenu();});
+document.addEventListener('contextmenu',function(e){hideCtxMenu();});
+
+function onSubHdrContext(e,cat,sub){
+  if(!sub)return;
+  e.preventDefault();e.stopPropagation();
+  _ctxData={cat:cat,sub:sub};
+  var ico='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  var delIco='<svg viewBox="0 0 24 24" style="stroke:#f38ba8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  showCtxMenu(e.clientX,e.clientY,[
+    {label:'Rename Subcategory',icon:ico,fn:'renameSubModal'},
+    {sep:true},
+    {label:'Delete Subcategory',icon:delIco,fn:'deleteSubCtx'}
+  ]);
+}
+function renameSubModal(){
+  if(!_ctxData)return;
+  var cat=_ctxData.cat,sub=_ctxData.sub;
+  showInputModal('Rename subcategory "'+sub+'"',function(nv){
+    if(nv&&nv!==sub)commitSubRename(cat,sub,nv);
+  },sub);
+}
+function deleteSubCtx(){
+  if(!_ctxData)return;
+  deleteSubcategory(_ctxData.cat,_ctxData.sub);
+}
+
+function onSubSelContext(e,sel){
+  var eid=sel.getAttribute('data-eid'),curSub=sel.value;
+  if(!curSub||curSub==='__custom_sub__')return;
+  e.preventDefault();
+  var cat='';
+  for(var i=0;i<D.length;i++){if(String(D[i].entityId)===String(eid)){cat=D[i].category;break;}}
+  if(!cat)return;
+  _ctxData={cat:cat,sub:curSub,eid:eid};
+  var ico='<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  showCtxMenu(e.clientX,e.clientY,[
+    {label:'Rename "'+curSub+'"',icon:ico,fn:'renameSubModal'}
+  ]);
 }
 
 /* ═══ CONFIRM MODAL ═══ */
@@ -1749,5 +1805,6 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');}
     </div>
   </div>
 </div>
+<div id="ctxMenu" class="ctx-menu"></div>
 </body>
 </html>
