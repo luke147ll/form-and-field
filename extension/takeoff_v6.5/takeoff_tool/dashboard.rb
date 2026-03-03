@@ -472,8 +472,98 @@ module TakeoffTool
         Highlighter.isolate_entities(sr, ids)
       end
 
+      # ═══ ASSEMBLIES ═══
+
+      @dialog.add_action_callback('loadAssemblies') do |_ctx|
+        send_assemblies
+      end
+
+      @dialog.add_action_callback('createAssembly') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s.strip
+          ids = data['entityIds'] || []
+          notes = data['notes'].to_s
+          next if name.empty? || ids.empty?
+          TakeoffTool.create_assembly(name, ids, notes)
+          puts "Takeoff: Created assembly '#{name}' with #{ids.length} entities"
+          send_assemblies
+        rescue => e
+          puts "Takeoff createAssembly error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('deleteAssembly') do |_ctx, name_str|
+        begin
+          name = name_str.to_s.strip
+          TakeoffTool.delete_assembly(name)
+          puts "Takeoff: Deleted assembly '#{name}'"
+          send_assemblies
+        rescue => e
+          puts "Takeoff deleteAssembly error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('renameAssembly') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          old_name = data['oldName'].to_s.strip
+          new_name = data['newName'].to_s.strip
+          next if old_name.empty? || new_name.empty?
+          TakeoffTool.rename_assembly(old_name, new_name)
+          puts "Takeoff: Renamed assembly '#{old_name}' -> '#{new_name}'"
+          send_assemblies
+        rescue => e
+          puts "Takeoff renameAssembly error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('updateAssembly') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s.strip
+          next if name.empty?
+          ids = data['entityIds']
+          notes = data.key?('notes') ? data['notes'].to_s : nil
+          TakeoffTool.update_assembly(name, entity_ids: ids, notes: notes)
+          puts "Takeoff: Updated assembly '#{name}'"
+          send_assemblies
+        rescue => e
+          puts "Takeoff updateAssembly error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('createAssemblyFromSelection') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s.strip
+          notes = data['notes'].to_s
+          sel = Sketchup.active_model&.selection
+          next unless sel && !sel.empty? && !name.empty?
+          ids = sel.to_a.select { |e| e.respond_to?(:entityID) }.map(&:entityID)
+          next if ids.empty?
+          TakeoffTool.create_assembly(name, ids, notes)
+          puts "Takeoff: Created assembly '#{name}' from selection (#{ids.length} entities)"
+          send_assemblies
+        rescue => e
+          puts "Takeoff createAssemblyFromSelection error: #{e.message}"
+        end
+      end
 
       @dialog.show
+    end
+
+    def self.send_assemblies
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      assemblies = TakeoffTool.load_assemblies
+      js = JSON.generate(assemblies)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveAssemblies('#{esc}')")
     end
 
     def self.scroll_to_entity(eid)
@@ -548,6 +638,7 @@ module TakeoffTool
       @dialog.execute_script("receiveData('#{esc}')")
 
       send_measurement_data
+      send_assemblies
     end
 
     def self.send_measurement_data

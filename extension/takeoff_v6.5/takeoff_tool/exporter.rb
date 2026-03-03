@@ -97,6 +97,54 @@ module TakeoffTool
               mt, (r[:warnings]||[]).join('; ')
             ].map{|v| ce(v.to_s)}.join(',')
           end
+
+          # ── ASSEMBLIES ──
+          assemblies = TakeoffTool.load_assemblies
+          unless assemblies.empty?
+            f.puts ""
+            f.puts ""
+            f.puts ce("ASSEMBLIES")
+
+            # Build entity lookup for quick access
+            eid_to_row = {}
+            sr.each { |r| eid_to_row[r[:entity_id]] = r }
+
+            assemblies.each do |name, asm|
+              f.puts ""
+              f.puts ce("ASSEMBLY: #{name}")
+              f.puts "#{ce('Items')},#{ce(asm['count'].to_s)},#{ce('Created')},#{ce(asm['created'] || '')},#{ce('Notes')},#{ce(asm['notes'] || '')}"
+              f.puts ['Cost Code','Category','Tag','Name','Type','Function',
+                      'Material','Thickness','Size','Qty',
+                      'BF','Area SF','Linear Ft','Vol ft3','Measurement'
+                     ].map{|h|ce(h)}.join(',')
+
+              asm_rows = (asm['entity_ids'] || []).map { |eid| eid_to_row[eid] }.compact
+              asm_deduped = dedup_rows(asm_rows, ca, cca)
+              asm_deduped.each do |g|
+                r = g[:r]
+                amt = Parser.measurement_for(g[:cat])
+                f.puts [
+                  g[:cost_code], g[:cat], r[:tag],
+                  r[:display_name]||r[:definition_name],
+                  r[:parsed][:element_type], r[:parsed][:function],
+                  r[:parsed][:material]||r[:material], r[:parsed][:thickness],
+                  r[:parsed][:size_nominal], g[:total_qty],
+                  g[:total_bf].round(1), g[:total_area_sf].round(1),
+                  g[:total_linear_ft].round(1), g[:total_vol_ft3].round(2),
+                  amt
+                ].map{|v| ce(v.to_s)}.join(',')
+              end
+
+              # Assembly totals
+              asm_summary = build_summary(asm_rows, ca, cca)
+              asm_summary.each do |s|
+                f.puts [ce(''), ce(s[:category]), ce(''), ce('SUBTOTAL'), ce(''), ce(''),
+                        ce(''), ce(''), ce(''), ce(s[:count].to_s),
+                        ce(''), ce(''), ce(''), ce(''), ce(s[:primary])
+                       ].join(',')
+              end
+            end
+          end
         end
         UI.messagebox("CSV exported:\n#{path}")
       rescue => e

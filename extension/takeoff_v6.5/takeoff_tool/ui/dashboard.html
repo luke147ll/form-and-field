@@ -56,6 +56,15 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .fbar input[type=text],.fbar select{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 5px;font-size:11px;font-family:inherit}
 .fbar input[type=text]{width:140px}.fbar select{max-width:140px}
 .fbar label{font-size:11px;color:#a6adc8}
+.fiso-btn{background:transparent;border:1px solid #45475a;border-radius:4px;color:#a6adc8;cursor:pointer;padding:2px 8px;display:flex;align-items:center;gap:4px;font-size:11px}
+.fiso-btn:hover{border-color:#cba6f7;color:#cdd6f4}
+.fiso-btn.active{background:#cba6f733;border-color:#cba6f7;color:#cba6f7}
+.fbar2{padding:3px 10px 5px;background:#181825;border-bottom:1px solid #313244;display:none;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.fbar2.show{display:flex}
+.fbar2 select{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 5px;font-size:11px;font-family:inherit;max-width:160px}
+.fbar2 label{font-size:11px;color:#a6adc8}
+.clr-btn{background:none;border:1px solid #45475a;border-radius:3px;color:#f38ba8;cursor:pointer;padding:2px 7px;font-size:10px;font-family:inherit}
+.clr-btn:hover{border-color:#f38ba8;background:#f38ba811}
 
 /* MAIN SCROLLABLE */
 .tp{flex:1;overflow:auto;padding:0}
@@ -91,6 +100,22 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 /* Dimmed "(no subcategory)" rows */
 .sc-hdr.sc-none td{opacity:0.55}
 .sc-hdr.sc-none .sc-name{color:#6c7086;font-style:italic}
+
+/* ASSEMBLY PANEL */
+#asmPanel{display:none;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;max-height:280px;overflow-y:auto}
+#asmPanel.show{display:block}
+.asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center}
+.asm-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;border-bottom:1px solid #252535;cursor:pointer}
+.asm-item:hover{background:#222236}
+.asm-item.active{background:#2d2040;border-left:3px solid #cba6f7;padding-left:9px}
+.asm-name{font-weight:600;color:#cdd6f4;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asm-cnt{color:#89b4fa;font-weight:600;font-size:11px;min-width:30px;text-align:right}
+.asm-date{color:#6c7086;font-size:10px;min-width:70px;text-align:right}
+.asm-acts{display:flex;gap:3px;align-items:center}
+.asm-acts button{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:#a6adc8}
+.asm-acts button:hover{color:#cdd6f4}
+.asm-notes{color:#6c7086;font-size:10px;font-style:italic;margin-left:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asm-empty{padding:12px;color:#6c7086;font-size:11px;text-align:center;font-style:italic}
 
 /* EYE TOGGLE */
 .ey{background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;display:inline-flex;align-items:center}
@@ -214,6 +239,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
   <button class="hb" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Undo</button>
   <button class="hb grn" onclick="toggleMeasPanel()">Measurements</button>
+  <button class="hb" onclick="toggleAsmPanel()" style="color:#f9e2af;border-color:#f9e2af">Assemblies</button>
   <button class="hb" onclick="promptNewCategory()" title="Add empty category">+ Category</button>
   <div class="sep"></div>
   <button class="hb" onclick="call('exportCSV')">CSV</button>
@@ -243,6 +269,16 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <div id="measBody"></div>
 </div>
 
+<!-- ASSEMBLY PANEL -->
+<div id="asmPanel">
+  <div class="asm-toolbar">
+    <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#f9e2af;border-color:#f9e2af">Save Filtered</button>
+    <button class="hb" onclick="toggleAsmPanel()">Close</button>
+    <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
+  </div>
+  <div id="asmBody"></div>
+</div>
+
 <!-- BENCHMARK INFO BAR -->
 <div id="bmkBar" style="display:none;background:#1a1a2e;border-bottom:1px solid #313244;padding:4px 12px;font-size:11px;flex-shrink:0;align-items:center;gap:6px">
   <span style="color:#cba6f7;font-weight:600">Benchmark:</span>
@@ -266,10 +302,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <!-- FILTER BAR -->
 <div class="fbar">
   <button onclick="call('showAll');resetVis()" title="Reset Visibility (Show All)" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+  <button id="fisoBtn" onclick="togFilterIso()" title="Isolate filtered items in viewport" class="fiso-btn"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span id="fisoLbl">Isolate</span></button>
   <input type="text" id="fS" oninput="filt()" placeholder="Search...">
   <label>Category:</label><select id="fC" onchange="fCatChange(this)"><option value="">All</option></select>
   <label>Code:</label><select id="fCC" onchange="filt()"><option value="">All</option></select>
   <label>Sub:</label><select id="fSub" onchange="fSubChange(this)"><option value="">All</option></select>
+  <label id="fAsmL" style="display:none">Assembly:</label><select id="fAsm" onchange="filt()" style="display:none;background:#313244;border:1px solid #f9e2af;color:#f9e2af;border-radius:3px;padding:2px 5px;font-size:11px;font-family:inherit;max-width:160px"><option value="">All</option></select>
   <div class="sep"></div>
   <label>Group:</label><select id="gBy" onchange="filt()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 4px;font-size:11px;font-family:inherit">
     <option value="category">Category</option>
@@ -277,7 +315,15 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <option value="subcategory">Subcategory</option>
     <option value="measurement">Measurements</option>
   </select>
+  <button class="clr-btn" onclick="clearAllFilters()" title="Clear all filters">Clear</button>
   <span id="fCnt" style="margin-left:auto;color:#a6adc8;font-size:11px"></span>
+</div>
+<div class="fbar2" id="fbar2">
+  <label id="fMatL">Material:</label><select id="fMat" onchange="filt()"><option value="">All</option></select>
+  <label id="fSizeL">Size:</label><select id="fSize" onchange="filt()"><option value="">All</option></select>
+  <label id="fTagL">Tag:</label><select id="fTag" onchange="filt()"><option value="">All</option></select>
+  <label id="fEtL">Type:</label><select id="fEt" onchange="filt()"><option value="">All</option></select>
+  <label id="fFnL">Function:</label><select id="fFn" onchange="filt()"><option value="">All</option></select>
 </div>
 
 <!-- MAIN CONTENT -->
@@ -415,6 +461,8 @@ var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
 var VIS={};
 var ISO_CATS=null;
+var FISO=false;
+var ASMB={};
 var debugOn=false;
 
 /* SVG ICON TEMPLATES */
@@ -557,17 +605,31 @@ function receiveData(json){
 
 function buildDD(){
   var ccM={},subM={},ccs=[],subs=[],i,r;
+  var matM={},sizeM={},tagM={},etM={},fnM={};
+  var mats=[],sizes=[],tags=[],ets=[],fns=[];
   // Category filter sourced from CA (master list), excluding _IGNORE
   var cats=[];
   for(i=0;i<CA.length;i++){if(CA[i]!=='_IGNORE')cats.push(CA[i]);}
   for(i=0;i<D.length;i++){
-    r=D[i];
-    if(r.costCode&&!ccM[r.costCode]){ccM[r.costCode]=1;ccs.push(r.costCode);}
-    if(r.subcategory&&!subM[r.subcategory]){subM[r.subcategory]=1;subs.push(r.subcategory);}
+    r=D[i];if(r.category==='_IGNORE')continue;
+    if(r.costCode&&!ccM[r.costCode]){ccM[r.costCode]=0;ccs.push(r.costCode);}
+    if(r.costCode)ccM[r.costCode]++;
+    if(r.subcategory&&!subM[r.subcategory]){subM[r.subcategory]=0;subs.push(r.subcategory);}
+    if(r.subcategory)subM[r.subcategory]++;
+    if(r.material&&!matM[r.material]){matM[r.material]=0;mats.push(r.material);}
+    if(r.material)matM[r.material]++;
+    if(r.sizeNominal&&!sizeM[r.sizeNominal]){sizeM[r.sizeNominal]=0;sizes.push(r.sizeNominal);}
+    if(r.sizeNominal)sizeM[r.sizeNominal]++;
+    if(r.tag&&!tagM[r.tag]){tagM[r.tag]=0;tags.push(r.tag);}
+    if(r.tag)tagM[r.tag]++;
+    if(r.elementType&&!etM[r.elementType]){etM[r.elementType]=0;ets.push(r.elementType);}
+    if(r.elementType)etM[r.elementType]++;
+    if(r.function&&!fnM[r.function]){fnM[r.function]=0;fns.push(r.function);}
+    if(r.function)fnM[r.function]++;
   }
   // Merge master subcategories into sub filter
-  for(var mk in MSUB){if(MSUB.hasOwnProperty(mk)){var ma=MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!subM[ma[mi]]){subM[ma[mi]]=1;subs.push(ma[mi]);}}}}
-  cats.sort();ccs.sort();subs.sort();
+  for(var mk in MSUB){if(MSUB.hasOwnProperty(mk)){var ma=MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!subM[ma[mi]]){subM[ma[mi]]=0;subs.push(ma[mi]);}}}}
+  cats.sort();ccs.sort();subs.sort();mats.sort();sizes.sort();tags.sort();ets.sort();fns.sort();
   var prevC=document.getElementById('fC').value;
   var prevCC=document.getElementById('fCC').value;
   var prevSub=document.getElementById('fSub').value;
@@ -576,13 +638,35 @@ function buildDD(){
   document.getElementById('fC').innerHTML=h;
   if(prevC)document.getElementById('fC').value=prevC;
   h='<option value="">All</option>';
-  for(i=0;i<ccs.length;i++)h+='<option>'+X(ccs[i])+'</option>';
+  for(i=0;i<ccs.length;i++)h+='<option value="'+X(ccs[i])+'">'+X(ccs[i])+' ('+ccM[ccs[i]]+')</option>';
   document.getElementById('fCC').innerHTML=h;
   if(prevCC)document.getElementById('fCC').value=prevCC;
   h='<option value="">All</option>';
-  for(i=0;i<subs.length;i++)h+='<option>'+X(subs[i])+'</option>';
+  for(i=0;i<subs.length;i++){var sc=subM[subs[i]];h+='<option value="'+X(subs[i])+'">'+X(subs[i])+(sc?' ('+sc+')':'')+'</option>';}
   document.getElementById('fSub').innerHTML=h;
   if(prevSub)document.getElementById('fSub').value=prevSub;
+  // Attribute filter dropdowns
+  buildAttrDD('fMat','fMatL',mats,matM,1);
+  buildAttrDD('fSize','fSizeL',sizes,sizeM,1);
+  buildAttrDD('fTag','fTagL',tags,tagM,2);
+  buildAttrDD('fEt','fEtL',ets,etM,1);
+  buildAttrDD('fFn','fFnL',fns,fnM,1);
+  // Show second row only if any attribute filters have data
+  var bar2=document.getElementById('fbar2');
+  if(mats.length||sizes.length||tags.length>1||ets.length||fns.length){bar2.classList.add('show');}
+  else{bar2.classList.remove('show');}
+}
+function buildAttrDD(selId,lblId,vals,counts,minVals){
+  var sel=document.getElementById(selId),lbl=document.getElementById(lblId);
+  if(!sel)return;
+  var prev=sel.value;
+  var need=minVals||1;
+  if(vals.length<need){sel.style.display='none';lbl.style.display='none';sel.value='';return;}
+  sel.style.display='';lbl.style.display='';
+  var h='<option value="">All</option>';
+  for(var i=0;i<vals.length;i++){var c=counts[vals[i]]||0;h+='<option value="'+X(vals[i])+'">'+X(vals[i])+' ('+c+')</option>';}
+  sel.innerHTML=h;
+  if(prev)sel.value=prev;
 }
 function buildBulkDDs(){
   var h='<option value="">--</option>';
@@ -603,6 +687,19 @@ function buildBulkDDs(){
 }
 function fCatChange(sel){filt();}
 function fSubChange(sel){filt();}
+function clearAllFilters(){
+  document.getElementById('fS').value='';
+  document.getElementById('fC').value='';
+  document.getElementById('fCC').value='';
+  document.getElementById('fSub').value='';
+  document.getElementById('fMat').value='';
+  document.getElementById('fSize').value='';
+  document.getElementById('fTag').value='';
+  document.getElementById('fEt').value='';
+  document.getElementById('fFn').value='';
+  document.getElementById('fAsm').value='';
+  filt();
+}
 
 /* ═══ CATEGORY BADGE ═══ */
 var KNOWN_CATS={'Drywall':1,'WallFraming':1,'Walls':1,'WallFinish':1,'WallStructure':1,'WallSheathing':1,
@@ -633,23 +730,39 @@ function filt(){
   var c=document.getElementById('fC').value;
   var fcc=document.getElementById('fCC').value;
   var fsub=document.getElementById('fSub').value;
+  var fmat=document.getElementById('fMat').value;
+  var fsize=document.getElementById('fSize').value;
+  var ftag=document.getElementById('fTag').value;
+  var fet=document.getElementById('fEt').value;
+  var ffn=document.getElementById('fFn').value;
+  var fasm=document.getElementById('fAsm').value;
+  var asmIds=null;
+  if(fasm&&ASMB[fasm]){asmIds={};var ai=ASMB[fasm].entity_ids||[];for(var ak=0;ak<ai.length;ak++)asmIds[ai[ak]]=true;}
   var i,r,x,tot=0;
   F=[];
   for(i=0;i<D.length;i++){
     r=D[i];
     if(r.category==='_IGNORE')continue;
     tot++;
+    if(asmIds&&!asmIds[r.entityId])continue;
     if(c&&r.category!==c)continue;
     if(fcc&&r.costCode!==fcc)continue;
     if(fsub&&r.subcategory!==fsub)continue;
+    if(fmat&&(r.material||'')!==fmat)continue;
+    if(fsize&&(r.sizeNominal||'')!==fsize)continue;
+    if(ftag&&(r.tag||'')!==ftag)continue;
+    if(fet&&(r.elementType||'')!==fet)continue;
+    if(ffn&&(r.function||'')!==ffn)continue;
     if(s){
-      x=(r.definitionName||'')+' '+(r.material||'')+' '+(r.category||'')+' '+(r.costCode||'')+' '+(r.sizeNominal||'')+' '+(r.subcategory||'');
+      x=(r.definitionName||'')+' '+(r.material||'')+' '+(r.category||'')+' '+(r.costCode||'')+' '+(r.sizeNominal||'')+' '+(r.subcategory||'')+' '+(r.tag||'')+' '+(r.elementType||'')+' '+(r.function||'');
       if(x.toLowerCase().indexOf(s)===-1)continue;
     }
     F.push(r);
   }
   document.getElementById('fCnt').textContent=F.length+' / '+tot;
   strip();renderGroups();updateBulkBar();
+  if(FISO)applyFilterIsolation();
+  updateFisoBtn();
 }
 
 function strip(){
@@ -957,7 +1070,7 @@ function selSubAll(cat,sub,chk){
 
 /* ═══ VISIBILITY ═══ */
 function togCatVis(gk){
-  ISO_CATS=null;
+  ISO_CATS=null;FISO=false;updateFisoBtn();
   var gBy=document.getElementById('gBy').value||'category';
   var anyVis=false,ids=[];
   for(var i=0;i<D.length;i++){
@@ -968,7 +1081,7 @@ function togCatVis(gk){
   filt();
 }
 function togItemVis(eid){
-  ISO_CATS=null;
+  ISO_CATS=null;FISO=false;updateFisoBtn();
   var vis=VIS[eid]!==false; VIS[eid]=!vis;
   call(vis?'hideEntities':'showEntities',''+eid);
   filt();
@@ -982,8 +1095,9 @@ function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
 }
-function resetVis(){ISO_CATS=null;VIS={};filt();}
+function resetVis(){ISO_CATS=null;VIS={};FISO=false;updateFisoBtn();filt();}
 function syncIsolation(){
+  if(FISO){applyFilterIsolation();return;}
   if(!ISO_CATS)return;
   var toHide=[],toShow=[];
   for(var i=0;i<D.length;i++){
@@ -994,6 +1108,107 @@ function syncIsolation(){
   }
   if(toHide.length)call('hideEntities',toHide.join(','));
   if(toShow.length)call('showEntities',toShow.join(','));
+}
+
+/* ═══ FILTER ISOLATION ═══ */
+function togFilterIso(){
+  FISO=!FISO;
+  if(FISO){applyFilterIsolation();}
+  else{call('showAll');resetVis();}
+  updateFisoBtn();
+}
+function applyFilterIsolation(){
+  if(!FISO)return;
+  var ids=[];
+  for(var i=0;i<F.length;i++)ids.push(F[i].entityId);
+  for(var j=0;j<D.length;j++)VIS[D[j].entityId]=false;
+  for(var k=0;k<ids.length;k++)VIS[ids[k]]=true;
+  ISO_CATS=null;
+  if(ids.length>0){call('isolateEntities',ids.join(','));}
+  else{var allIds=[];for(var m=0;m<D.length;m++)allIds.push(D[m].entityId);if(allIds.length)call('hideEntities',allIds.join(','));}
+  renderGroups();
+}
+function updateFisoBtn(){
+  var btn=document.getElementById('fisoBtn');if(!btn)return;
+  var lbl=document.getElementById('fisoLbl');
+  if(FISO){btn.classList.add('active');btn.title='Showing '+F.length+' filtered items — click to show all';lbl.textContent=F.length;}
+  else{btn.classList.remove('active');btn.title='Isolate filtered items in viewport';lbl.textContent='Isolate';}
+}
+
+/* ═══ ASSEMBLIES ═══ */
+function receiveAssemblies(json){
+  try{ASMB=JSON.parse(json)||{};}catch(e){ASMB={};}
+  buildAsmDD();
+  renderAsmPanel();
+}
+function toggleAsmPanel(){
+  var p=document.getElementById('asmPanel');
+  if(p.classList.contains('show')){p.classList.remove('show');}
+  else{p.classList.add('show');call('loadAssemblies');}
+}
+function renderAsmPanel(){
+  var body=document.getElementById('asmBody');
+  var keys=Object.keys(ASMB).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  document.getElementById('asmCount').textContent=keys.length+' assemblies';
+  if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Save Filtered" or right-click in viewport.</div>';return;}
+  var h='';
+  var fasm=document.getElementById('fAsm').value;
+  for(var i=0;i<keys.length;i++){
+    var name=keys[i],a=ASMB[name],active=fasm===name?' active':'';
+    h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+X(name).replace(/'/g,"\\'")+'\')">'+
+      '<span class="asm-name" title="'+X(name)+'">'+X(name)+'</span>'+
+      (a.notes?'<span class="asm-notes" title="'+X(a.notes)+'">'+X(a.notes)+'</span>':'')+
+      '<span class="asm-cnt">'+a.count+'</span>'+
+      '<span class="asm-date">'+X(a.created||'')+'</span>'+
+      '<span class="asm-acts">'+
+        '<button onclick="event.stopPropagation();renameAssemblyPrompt(\''+X(name).replace(/'/g,"\\'")+'\');" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
+        '<button onclick="event.stopPropagation();editAssemblyNotes(\''+X(name).replace(/'/g,"\\'")+'\');" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'+
+        '<button onclick="event.stopPropagation();deleteAssemblyConfirm(\''+X(name).replace(/'/g,"\\'")+'\');" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
+      '</span></div>';
+  }
+  body.innerHTML=h;
+}
+function buildAsmDD(){
+  var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
+  var keys=Object.keys(ASMB);
+  if(!keys.length){sel.style.display='none';lbl.style.display='none';sel.value='';return;}
+  sel.style.display='';lbl.style.display='';
+  var prev=sel.value;
+  keys.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var h='<option value="">All</option>';
+  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(keys[i])+' ('+a.count+')</option>';}
+  sel.innerHTML=h;
+  if(prev)sel.value=prev;
+}
+function filterByAssembly(name){
+  var sel=document.getElementById('fAsm');
+  sel.value=(sel.value===name)?'':name;
+  filt();
+  renderAsmPanel();
+}
+function saveFilteredAsAssembly(){
+  if(!F.length){alert('No filtered items to save.');return;}
+  var name=prompt('Assembly name:');
+  if(!name||!name.trim())return;
+  var notes=prompt('Notes (optional):','');
+  var ids=[];
+  for(var i=0;i<F.length;i++)ids.push(F[i].entityId);
+  callJSON('createAssembly',{name:name.trim(),entityIds:ids,notes:notes||''});
+}
+function deleteAssemblyConfirm(name){
+  if(!confirm('Delete assembly "'+name+'"?'))return;
+  call('deleteAssembly',name);
+}
+function renameAssemblyPrompt(name){
+  var nv=prompt('Rename assembly:',name);
+  if(!nv||!nv.trim()||nv.trim()===name)return;
+  callJSON('renameAssembly',{oldName:name,newName:nv.trim()});
+}
+function editAssemblyNotes(name){
+  var a=ASMB[name];if(!a)return;
+  var nv=prompt('Notes for "'+name+'":',a.notes||'');
+  if(nv===null)return;
+  callJSON('updateAssembly',{name:name,notes:nv});
 }
 
 /* ═══ SELECTION ═══ */

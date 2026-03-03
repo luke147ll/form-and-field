@@ -28,13 +28,18 @@ module TakeoffTool
 
       summary = build_summary(entries, scan_results, model_name)
 
-      desktop = File.join(ENV['USERPROFILE'] || Dir.home, 'Desktop')
-      unless File.directory?(desktop)
-        desktop = Dir.home
-      end
-      puts "ParseLogger: Writing to #{desktop}"
-      write_json(desktop, entries, summary)
-      write_text(desktop, entries, summary)
+      # Prompt user for save location (debug mode only)
+      model_base = model_name.sub(/\.[^.]+$/, '')
+      timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
+      default_name = "ParseLog_#{model_base}_#{timestamp}"
+
+      path = UI.savepanel("Save Parse Log", nil, "#{default_name}.json")
+      return 0 unless path
+
+      dir = File.dirname(path)
+      base = File.basename(path, '.*')
+      write_json(dir, base, entries, summary)
+      write_text(dir, base, entries, summary)
       entries.length
     rescue => e
       puts "ParseLogger: generate error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
@@ -412,9 +417,9 @@ module TakeoffTool
 
     # ── JSON Output ──────────────────────────────────────
 
-    def self.write_json(desktop, entries, summary)
+    def self.write_json(dir, base, entries, summary)
       require 'json'
-      json_path = File.join(desktop, 'FormAndField_ParseLog.json')
+      json_path = File.join(dir, "#{base}.json")
       puts "ParseLogger: JSON path: #{json_path}"
       begin
         data = { summary: summary, entities: entries }
@@ -428,8 +433,8 @@ module TakeoffTool
 
     # ── Text Output ──────────────────────────────────────
 
-    def self.write_text(desktop, entries, summary)
-      txt_path = File.join(desktop, 'FormAndField_ParseLog.txt')
+    def self.write_text(dir, base, entries, summary)
+      txt_path = File.join(dir, "#{base}.txt")
       puts "ParseLogger: Text path: #{txt_path}"
       begin
         File.open(txt_path, 'w:UTF-8') do |f|

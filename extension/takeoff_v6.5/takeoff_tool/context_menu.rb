@@ -99,6 +99,66 @@ module TakeoffTool
           puts "Takeoff: Cleared highlights on #{count} items"
         end
 
+        # Create Assembly from selection
+        sub.add_item('Create Assembly') do
+          entities = sel.to_a.select { |e| e.respond_to?(:entityID) }
+          if entities.empty?
+            UI.messagebox("No valid entities selected.")
+          else
+            adlg = UI::HtmlDialog.new(
+              dialog_title: "Create Assembly",
+              preferences_key: "TakeoffCreateAsm",
+              width: 340, height: 200,
+              left: 200, top: 200,
+              resizable: false,
+              style: UI::HtmlDialog::STYLE_DIALOG
+            )
+            adlg.add_action_callback('ok') do |_ctx, json_str|
+              adlg.close rescue nil
+              begin
+                require 'json'
+                data = JSON.parse(json_str.to_s)
+                name = data['name'].to_s.strip
+                notes = data['notes'].to_s
+                unless name.empty?
+                  ids = entities.map(&:entityID)
+                  TakeoffTool.create_assembly(name, ids, notes)
+                  puts "Takeoff: Created assembly '#{name}' from #{ids.length} selected entities"
+                  Dashboard.send_assemblies if Dashboard.visible?
+                end
+              rescue => e
+                puts "Takeoff: Create assembly error: #{e.message}"
+              end
+            end
+            adlg.add_action_callback('cancel') do |_ctx|
+              adlg.close rescue nil
+            end
+            adlg.set_html(<<~HTML
+              <!DOCTYPE html><html><head><meta charset="UTF-8">
+              <style>#{PICK_DIALOG_CSS}</style></head><body>
+              <h1>Create Assembly</h1>
+              <p style="font-size:11px;color:#a6adc8;margin-bottom:8px">#{entities.length} entities selected</p>
+              <label>Name</label>
+              <input id="aname" type="text" autofocus>
+              <label style="margin-top:6px">Notes (optional)</label>
+              <input id="anotes" type="text">
+              <div class="buttons">
+                <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
+                <button class="btn btn-ok" onclick="var n=document.getElementById('aname').value.trim();if(n)sketchup.ok(JSON.stringify({name:n,notes:document.getElementById('anotes').value}));">Create</button>
+              </div>
+              <script>
+                document.addEventListener('keydown',function(e){
+                  if(e.key==='Enter'){var n=document.getElementById('aname').value.trim();if(n)sketchup.ok(JSON.stringify({name:n,notes:document.getElementById('anotes').value}));}
+                  if(e.key==='Escape')sketchup.cancel();
+                });
+              </script>
+              </body></html>
+            HTML
+            )
+            adlg.show
+          end
+        end
+
         sub.add_separator
 
         # Tool toggles
