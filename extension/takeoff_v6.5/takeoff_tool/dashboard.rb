@@ -26,8 +26,10 @@ module TakeoffTool
           ca[eid] = cat
           TakeoffTool.category_assignments = ca
           RecatLog.log_change(eid, cat)
-          # Persist to model
+          # Persist to model — clear subcategory on category change
           TakeoffTool.save_assignment(eid, 'category', cat)
+          TakeoffTool.save_assignment(eid, 'subcategory', '')
+          sr.each { |r| if r[:entity_id] == eid; r[:parsed][:auto_subcategory] = ''; break; end }
           send_data(sr, ca, cca)
         rescue => e
           puts "Takeoff setCategory error: #{e.message}"
@@ -292,6 +294,8 @@ module TakeoffTool
             ca[eid_i] = cat
             RecatLog.log_change(eid_i, cat)
             TakeoffTool.save_assignment(eid_i, 'category', cat)
+            TakeoffTool.save_assignment(eid_i, 'subcategory', '')
+            sr.each { |r| if r[:entity_id] == eid_i; r[:parsed][:auto_subcategory] = ''; break; end }
           end
           TakeoffTool.category_assignments = ca
           send_data(sr, ca, cca)

@@ -1349,7 +1349,7 @@ function bulkSetCat(){
       recordUndo(ids,'category',n);
       // Assign FIRST (queues bulkSetCategory callback in Ruby)
       callJSON('bulkSetCategory',{eids:ids,val:n});
-      for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=n;}
+      for(var i=0;i<D.length;i++){if(SEL[D[i].entityId]){D[i].category=n;D[i].subcategory='';}}
       // Then persist new category (queues addCustomCategory → broadcast will include assignment)
       call('addCustomCategory',n);
       clearSel();buildDD();buildBulkDDs();filt();
@@ -1359,7 +1359,7 @@ function bulkSetCat(){
   var ids=getSelIds();if(!ids.length)return;
   recordUndo(ids,'category',v);
   callJSON('bulkSetCategory',{eids:ids,val:v});
-  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].category=v;}
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId]){D[i].category=v;D[i].subcategory='';}}
   clearSel();filt();
 }
 function bulkSetCC(){
@@ -1514,7 +1514,7 @@ function applySetCat(eid,v){
   recordUndo(ids,'category',v);
   if(ids.length>1){callJSON('bulkSetCategory',{eids:ids,val:v});}
   else{callJSON('setCategory',{eid:eid,val:v});}
-  for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid)D[i].category=v;}
+  for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid){D[i].category=v;D[i].subcategory='';}}
   for(var j=0;j<ids.length;j++){
     var row=document.getElementById('r'+ids[j]);
     if(row){var dd=row.querySelector('select.cs');if(dd)dd.value=v;

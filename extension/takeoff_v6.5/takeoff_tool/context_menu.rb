@@ -30,9 +30,19 @@ module TakeoffTool
       eid = e.entityID
       begin
         e.set_attribute('TakeoffAssignments', 'category', category)
+        e.set_attribute('TakeoffAssignments', 'subcategory', '')
         @category_assignments[eid] = category
         RecatLog.log_change(eid, category)
         @entity_registry[eid] = e unless @entity_registry.key?(eid)
+        # Clear subcategory in scan results
+        if @scan_results
+          @scan_results.each do |r|
+            if r[:entity_id] == eid
+              r[:parsed][:auto_subcategory] = ''
+              break
+            end
+          end
+        end
         count += 1
       rescue => err
         puts "Takeoff: context menu error eid=#{eid}: #{err.message}"

@@ -2,8 +2,11 @@ module TakeoffTool
   module HyperParser
     @dialog = nil
     @orig_instance = {}   # eid => original material (for preview restore)
+    @orig_faces = {}      # defn_eid => [[face, orig_material], ...]
     @hp_mats = {}         # name => Sketchup::Material
     @preview_active = false
+    @hp_observer = nil
+    @sampler_active = false
 
     # ─── Color Sampler Tool ───
     # One-shot pick tool: user clicks an entity, we grab its material color
@@ -48,6 +51,16 @@ module TakeoffTool
 
       def onCancel(reason, view)
         Sketchup.active_model.select_tool(nil)
+      end
+    end
+
+    # ─── Selection Observer for Sampler ───
+    class HPSelObserver < Sketchup::SelectionObserver
+      def onSelectionBulkChange(sel)
+        HyperParser.on_selection_changed(sel)
+      end
+      def onSelectionCleared(sel)
+        HyperParser.on_selection_changed(sel)
       end
     end
 
@@ -117,6 +130,36 @@ module TakeoffTool
 
       @dialog.add_action_callback('activateColorSampler') do |_ctx|
         activate_color_sampler
+      end
+
+      @dialog.add_action_callback('activateObjectSampler') do |_ctx|
+        activate_object_sampler
+      end
+
+      @dialog.add_action_callback('findSimilar') do |_ctx, json_str|
+        begin
+          require 'json'
+          filter_props = JSON.parse(json_str.to_s)
+          eids = parse_by_sample(filter_props)
+          send_sample_matches(eids)
+        rescue => e
+          puts "HyperParser: findSimilar error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('findSimilarCount') do |_ctx, json_str|
+        begin
+          require 'json'
+          filter_props = JSON.parse(json_str.to_s)
+          count = parse_by_sample(filter_props).length
+          send_similar_count(count)
+        rescue => e
+          puts "HyperParser: findSimilarCount error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('deactivateObjectSampler') do |_ctx|
+        deactivate_object_sampler
       end
 
       @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
@@ -254,18 +297,34 @@ module TakeoffTool
       @preview_active = true
 
       bright = hp_mat(m, 'TO_HP_bright', [203, 166, 247], 0.9)
-      dim    = hp_mat(m, 'TO_HP_dim', [69, 71, 90], 0.3)
 
       eid_set = {}
       eids.each { |id| eid_set[id] = true }
 
-      # Paint all visible scan results: bright for selected, dim for others
+      painted_defs = {}
+
+      # Paint only matched entities (bright) — skip dimming others
       visible_scan_results.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id])
         next unless e && e.valid?
         eid = r[:entity_id]
+        next unless eid_set[eid]
+
+        # Save and set instance material
         @orig_instance[eid] = e.material
-        e.material = eid_set[eid] ? bright : dim
+        e.material = bright
+
+        # Paint faces inside definition for full visibility
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        if defn && !painted_defs[defn.entityID]
+          painted_defs[defn.entityID] = true
+          face_list = []
+          defn.entities.grep(Sketchup::Face).each do |face|
+            face_list << [face, face.material]
+            face.material = bright
+          end
+          @orig_faces[defn.entityID] = face_list if face_list.length > 0
+        end
       end
 
       m.commit_operation
@@ -278,6 +337,15 @@ module TakeoffTool
 
       m.start_operation('HP Clear', true)
 
+      # Restore face materials (before instance materials)
+      @orig_faces.each do |_defn_id, face_list|
+        face_list.each do |face, orig_mat|
+          begin; face.material = orig_mat if face.valid?; rescue; end
+        end
+      end
+      @orig_faces.clear
+
+      # Restore instance materials
       @orig_instance.each do |eid, orig_mat|
         e = TakeoffTool.find_entity(eid)
         if e && e.valid?
@@ -315,15 +383,13 @@ module TakeoffTool
         TakeoffTool.save_assignment(eid, 'category', category)
         RecatLog.log_change(eid, category, subcategory.empty? ? nil : subcategory)
 
-        if !subcategory.empty?
-          TakeoffTool.save_assignment(eid, 'subcategory', subcategory)
-        end
+        TakeoffTool.save_assignment(eid, 'subcategory', subcategory)
 
         # Update scan result auto_category so dashboard stays consistent
         sr.each do |r|
           if r[:entity_id] == eid
             r[:parsed][:auto_category] = category
-            r[:parsed][:auto_subcategory] = subcategory unless subcategory.empty?
+            r[:parsed][:auto_subcategory] = subcategory
             break
           end
         end
@@ -356,10 +422,155 @@ module TakeoffTool
       Sketchup.active_model.select_tool(ColorSamplerTool.new(callback))
     end
 
+    # ─── Object Sampler (Ray Gun + SelectionObserver) ───
+
+    def self.activate_object_sampler
+      attach_sampler_observer
+      sel = Sketchup.active_model&.selection
+      if sel && sel.length == 1
+        # Already have a selection — send properties immediately
+        entity = sel.first
+        if entity && entity.valid?
+          props = extract_entity_properties(entity)
+          eid = entity.respond_to?(:entityID) ? entity.entityID : 0
+          send_sampled_properties(eid, props)
+        end
+      else
+        # No selection — activate DrillBit (Ray Gun) to help user pick
+        DrillBit.activate
+      end
+    end
+
+    def self.deactivate_object_sampler
+      detach_sampler_observer
+      DrillBit.deactivate if DrillBit.active?
+    end
+
+    def self.on_selection_changed(sel)
+      return unless @dialog && @dialog.visible? && @sampler_active
+      return unless sel && sel.length == 1
+      entity = sel.first
+      return unless entity && entity.valid?
+      props = extract_entity_properties(entity)
+      eid = entity.respond_to?(:entityID) ? entity.entityID : 0
+      send_sampled_properties(eid, props)
+    end
+
+    def self.attach_sampler_observer
+      detach_sampler_observer
+      sel = Sketchup.active_model&.selection
+      return unless sel
+      @hp_observer = HPSelObserver.new
+      sel.add_observer(@hp_observer)
+      @sampler_active = true
+    end
+
+    def self.detach_sampler_observer
+      return unless @hp_observer
+      sel = Sketchup.active_model&.selection
+      sel.remove_observer(@hp_observer) if sel
+      @hp_observer = nil
+      @sampler_active = false
+    end
+
+    def self.extract_entity_properties(entity)
+      props = []
+      return props unless entity && entity.valid?
+
+      eid = entity.respond_to?(:entityID) ? entity.entityID : nil
+
+      # Definition name
+      if entity.respond_to?(:definition)
+        props << { key: 'Definition', value: entity.definition.name }
+      end
+
+      # Scan result parsed metadata
+      if eid
+        sr = TakeoffTool.scan_results
+        if sr
+          match = sr.find { |r| r[:entity_id] == eid }
+          if match
+            dn = match[:display_name] || match[:definition_name]
+            props << { key: 'Display Name', value: dn } if dn && !dn.to_s.empty?
+            p = match[:parsed] || {}
+            props << { key: 'Element Type', value: p[:element_type] } if p[:element_type] && !p[:element_type].to_s.empty?
+            props << { key: 'Function', value: p[:function] } if p[:function] && !p[:function].to_s.empty?
+            props << { key: 'Tag', value: p[:tag] } if p[:tag] && !p[:tag].to_s.empty?
+            props << { key: 'Size', value: p[:size] } if p[:size] && !p[:size].to_s.empty?
+          end
+        end
+      end
+
+      # Material
+      mat = nil
+      if entity.respond_to?(:material) && entity.material
+        mat = entity.material
+      elsif entity.respond_to?(:definition)
+        face = entity.definition.entities.grep(Sketchup::Face).first
+        mat = face.material if face
+      end
+      if mat
+        props << { key: 'Material', value: mat.display_name }
+        if mat.color
+          c = mat.color
+          hex = "#%02x%02x%02x" % [c.red, c.green, c.blue]
+          props << { key: 'Color', value: hex, type: 'color' }
+        end
+      end
+
+      # Layer
+      if entity.respond_to?(:layer) && entity.layer
+        props << { key: 'Layer', value: entity.layer.name }
+      end
+
+      # Entity type
+      etype = entity.is_a?(Sketchup::ComponentInstance) ? 'Component' :
+              entity.is_a?(Sketchup::Group) ? 'Group' : entity.class.name.split('::').last
+      props << { key: 'Entity Type', value: etype }
+
+      # Bounding box dimensions
+      if entity.respond_to?(:bounds)
+        bb = entity.bounds
+        dims = [bb.width.to_f, bb.height.to_f, bb.depth.to_f].sort.reverse
+        props << { key: 'Width', value: "%.2f" % dims[0] }
+        props << { key: 'Height', value: "%.2f" % dims[1] }
+        props << { key: 'Depth', value: "%.2f" % dims[2] }
+      end
+
+      props
+    end
+
+    def self.parse_by_sample(filter_props)
+      results = visible_scan_results
+      matching_eids = []
+
+      results.each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid?
+
+        entity_props = extract_entity_properties(e)
+        prop_hash = {}
+        entity_props.each { |pr| prop_hash[pr[:key]] = pr[:value] }
+
+        match = true
+        filter_props.each do |key, value|
+          if prop_hash[key] != value
+            match = false
+            break
+          end
+        end
+
+        matching_eids << r[:entity_id] if match
+      end
+
+      matching_eids
+    end
+
     # ─── Cleanup ───
 
     def self.cleanup
       clear_preview
+      detach_sampler_observer
       @dialog = nil
     end
 
@@ -392,6 +603,29 @@ module TakeoffTool
       js = JSON.generate({ success: success, message: message })
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCommitResult('#{esc}')")
+    end
+
+    def self.send_sampled_properties(eid, props)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      payload = { entity_id: eid, properties: props }
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveSampledProperties('#{esc}')")
+    end
+
+    def self.send_sample_matches(eids)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      payload = { count: eids.length, eids: eids }
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveSampleMatches('#{esc}')")
+    end
+
+    def self.send_similar_count(count)
+      return unless @dialog && @dialog.visible?
+      @dialog.execute_script("receiveSimilarCount(#{count})")
     end
 
     def self.hp_mat(m, name, rgb, alpha)
