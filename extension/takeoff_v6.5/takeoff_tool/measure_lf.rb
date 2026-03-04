@@ -583,6 +583,7 @@ module TakeoffTool
       highlights_visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')
 
       next if mtype == 'BENCHMARK'
+      next if mtype == 'NOTE'
 
       if mtype == 'SF'
         display = "📐 #{cat} — #{'%.1f' % total_sf} SF (#{face_count} face#{'s' if face_count>1})#{note && !note.empty? ? ' — ' + note : ''}"

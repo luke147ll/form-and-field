@@ -133,28 +133,35 @@ module TakeoffTool
       @orig_instance.each do |eid, orig_mat|
         e = TakeoffTool.find_entity(eid)
         if e && e.valid?
-          begin; e.material = orig_mat; rescue; end
-        end
-      end
-
-      # Restore face materials
-      @orig_faces.each do |eid, face_list|
-        face_list.each do |face, orig_mat|
           begin
-            face.material = orig_mat if face.valid?
-          rescue
+            mat_to_set = orig_mat
+            # If saved material reference is no longer valid, look up by name
+            if mat_to_set && mat_to_set.respond_to?(:valid?) && !mat_to_set.valid?
+              name = mat_to_set.respond_to?(:display_name) ? mat_to_set.display_name : nil
+              mat_to_set = name ? m.materials[name] : nil
+            end
+            e.material = mat_to_set
+          rescue => ex
+            puts "HL: restore instance eid=#{eid} failed: #{ex.message}"
+            # Fallback: remove any material rather than leaving highlight stuck
+            begin; e.material = nil; rescue; end
           end
         end
       end
 
-      # Clean up highlight materials
-      @mats.each do |_, mt|
-        begin; m.materials.remove(mt) if mt && mt.valid?; rescue; end
+      # Restore face materials
+      @orig_faces.each do |_eid, face_list|
+        restore_face_list(face_list)
       end
+
+      # Don't remove highlight materials from the model — if any face/entity
+      # wasn't properly restored, removing the material causes SketchUp to
+      # replace it with nil (flat beige), which is worse than keeping the
+      # highlight color. Unused materials can be purged by the user.
+      @mats.clear
 
       @orig_instance.clear
       @orig_faces.clear
-      @mats.clear
 
       m.commit_operation
       # Only clear active flag if this is a user-initiated clear (not an internal clear before re-highlight)
@@ -188,7 +195,10 @@ module TakeoffTool
 
       m.start_operation('Color ' + cat_name, true)
 
-      # Clear existing highlights for this category first (in case color changed)
+      # Restore existing highlights for this category before re-applying with new color.
+      # IMPORTANT: Do NOT delete from @orig_instance/@orig_faces here — keep the
+      # true originals so apply_highlight (which uses `unless key?`) preserves them.
+      # This prevents the original from being lost if a restore silently fails.
       sr.each do |r|
         eid = r[:entity_id]
         cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
@@ -196,11 +206,9 @@ module TakeoffTool
         e = TakeoffTool.find_entity(eid); next unless e && e.valid?
         if @orig_instance.key?(eid)
           begin; e.material = @orig_instance[eid]; rescue; end
-          @orig_instance.delete(eid)
         end
         if @orig_faces.key?(eid)
-          @orig_faces[eid].each { |face, om| begin; face.material = om if face.valid?; rescue; end }
-          @orig_faces.delete(eid)
+          restore_face_list(@orig_faces[eid])
         end
       end
 
@@ -248,12 +256,22 @@ module TakeoffTool
         next unless cat == cat_name
         e = TakeoffTool.find_entity(eid); next unless e && e.valid?
         if @orig_instance.key?(eid)
-          begin; e.material = @orig_instance[eid]; rescue; end
+          begin
+            mat_to_set = @orig_instance[eid]
+            if mat_to_set && mat_to_set.respond_to?(:valid?) && !mat_to_set.valid?
+              name = mat_to_set.respond_to?(:display_name) ? mat_to_set.display_name : nil
+              mat_to_set = name ? m.materials[name] : nil
+            end
+            e.material = mat_to_set
+          rescue => ex
+            puts "HL: clear_category restore eid=#{eid} failed: #{ex.message}"
+            begin; e.material = nil; rescue; end
+          end
           @orig_instance.delete(eid)
           n += 1
         end
         if @orig_faces.key?(eid)
-          @orig_faces[eid].each { |face, om| begin; face.material = om if face.valid?; rescue; end }
+          restore_face_list(@orig_faces[eid])
           @orig_faces.delete(eid)
         end
       end
@@ -772,8 +790,10 @@ module TakeoffTool
     # Also paints faces (and nested component faces) to override
     # face-level materials common in IFC imports.
     def self.apply_highlight(entity, eid, mat)
-      # Save and set instance-level material
-      @orig_instance[eid] = entity.material
+      # Only save the original if we haven't already — prevents overwriting
+      # the TRUE original with a highlight material from a previous cycle
+      # when restore silently fails and re-highlight re-saves.
+      @orig_instance[eid] = entity.material unless @orig_instance.key?(eid)
       entity.material = mat
 
       defn = nil
@@ -785,9 +805,14 @@ module TakeoffTool
 
       if defn && defn.respond_to?(:entities) && defn.respond_to?(:instances)
         if defn.instances.length <= 1
-          face_list = []
-          paint_faces_recursive(defn.entities, mat, face_list)
-          @orig_faces[eid] = face_list if face_list.length > 0
+          if @orig_faces.key?(eid)
+            # Already have saved originals — just repaint without overwriting the save
+            repaint_faces_recursive(defn.entities, mat)
+          else
+            face_list = []
+            paint_faces_recursive(defn.entities, mat, face_list)
+            @orig_faces[eid] = face_list if face_list.length > 0
+          end
         end
       end
 
@@ -797,12 +822,30 @@ module TakeoffTool
       false
     end
 
+    # Repaint faces without saving originals (used when originals are already saved).
+    def self.repaint_faces_recursive(ents, mat)
+      ents.grep(Sketchup::Face).each do |face|
+        face.material = mat
+        face.back_material = mat
+      end
+      ents.each do |child|
+        next unless child.valid?
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
+        child.material = mat
+        repaint_faces_recursive(child_defn.entities, mat)
+      end
+    end
+
     # Recursively paint faces inside a definition and its nested children.
-    # Saves [face, original_material] pairs into face_list for restore.
+    # Saves [face, front_mat, back_mat] triples for faces, [inst, mat] pairs for instances.
     def self.paint_faces_recursive(ents, mat, face_list)
       ents.grep(Sketchup::Face).each do |face|
-        face_list << [face, face.material]
+        face_list << [face, face.material, face.back_material]
         face.material = mat
+        face.back_material = mat
       end
       # Recurse into nested components/groups
       ents.each do |child|
@@ -816,6 +859,37 @@ module TakeoffTool
         face_list << [child, child.material] if child.respond_to?(:material)
         child.material = mat
         paint_faces_recursive(child_defn.entities, mat, face_list)
+      end
+    end
+
+    # Restore saved face/instance materials from a face_list.
+    # Handles both [face, front, back] triples and [inst, mat] pairs.
+    def self.restore_face_list(face_list)
+      face_list.each do |entry|
+        begin
+          obj = entry[0]
+          next unless obj.valid?
+          saved_mat = entry[1]
+          # If saved material reference is no longer valid, look up by name
+          if saved_mat && saved_mat.respond_to?(:valid?) && !saved_mat.valid?
+            name = saved_mat.respond_to?(:display_name) ? saved_mat.display_name : nil
+            saved_mat = name ? Sketchup.active_model.materials[name] : nil
+          end
+          obj.material = saved_mat
+          # Restore back_material for faces (3-element entries)
+          if entry.length > 2 && obj.respond_to?(:back_material=)
+            saved_back = entry[2]
+            if saved_back && saved_back.respond_to?(:valid?) && !saved_back.valid?
+              name = saved_back.respond_to?(:display_name) ? saved_back.display_name : nil
+              saved_back = name ? Sketchup.active_model.materials[name] : nil
+            end
+            obj.back_material = saved_back
+          end
+        rescue => ex
+          puts "HL: restore face error: #{ex.message}"
+          # Fallback: clear the material rather than leaving highlight stuck
+          begin; obj.material = nil; rescue; end
+        end
       end
     end
 

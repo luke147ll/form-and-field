@@ -21,6 +21,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'hyper_parser.rb')
   load File.join(PLUGIN_DIR, 'bug_reporter.rb')
   load File.join(PLUGIN_DIR, 'elevation_tool.rb')
+  load File.join(PLUGIN_DIR, 'note_tool.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
 
   @scan_results = []
@@ -67,6 +68,7 @@ module TakeoffTool
     sub.add_item('📐 SF Measure Tool') { TakeoffTool.activate_sf_tool }
     sub.add_item('Set Elevation Benchmark') { TakeoffTool.activate_benchmark_tool }
     sub.add_item('Elevation Tag Tool') { TakeoffTool.activate_elevation_tool }
+    sub.add_item('Note Tag Tool') { TakeoffTool.activate_note_tool }
     nav_cmd = UI::Command.new('Precision Navigation') { PrecisionNav.toggle }
     nav_cmd.set_validation_proc { PrecisionNav.enabled? ? MF_CHECKED : MF_UNCHECKED }
     sub.add_item(nav_cmd)
@@ -143,6 +145,14 @@ module TakeoffTool
     cmd_elev.status_bar_text = "Click faces to place elevation reference tags"
     cmd_elev.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_elev)
+
+    cmd_note = UI::Command.new("Note Tag") { TakeoffTool.activate_note_tool }
+    cmd_note.small_icon = File.join(PLUGIN_DIR, "icons", "note_tag_24.png")
+    cmd_note.large_icon = File.join(PLUGIN_DIR, "icons", "note_tag_32.png")
+    cmd_note.tooltip = "Note Tag — Click to place text annotations"
+    cmd_note.status_bar_text = "Click a point to place a text note annotation"
+    cmd_note.set_validation_proc { MF_ENABLED }
+    toolbar.add_item(cmd_note)
 
     # Dev reload button (only in debug mode)
     if Sketchup.read_default("FormAndField", "debug_mode", false)

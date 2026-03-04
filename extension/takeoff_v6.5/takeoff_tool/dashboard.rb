@@ -214,7 +214,7 @@ module TakeoffTool
           # Route measurement entities through highlight hide
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK'
+            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
               e.visible = false
             elsif mtype == 'SF'
               Highlighter.hide_sf_measurement_faces(m, e)
@@ -240,7 +240,7 @@ module TakeoffTool
           next unless e && e.valid?
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK'
+            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
               e.visible = true
             elsif mtype == 'SF'
               Highlighter.show_sf_measurement_faces(m, e)
@@ -510,6 +510,29 @@ module TakeoffTool
         end
       end
 
+      @dialog.add_action_callback('updateNoteText') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          new_text = data['text'].to_s.strip
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'NOTE'
+            m = Sketchup.active_model
+            m.start_operation('Update Note Text', true)
+            grp.set_attribute('TakeoffMeasurement', 'note', new_text)
+            m.commit_operation
+            send_measurement_data
+          end
+        rescue => e
+          puts "Takeoff updateNoteText error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('activateNote') do |_ctx|
+        TakeoffTool.activate_note_tool
+      end
+
       @dialog.add_action_callback('requestBenchmark') do |_ctx|
         send_benchmark_data
       end
@@ -539,7 +562,7 @@ module TakeoffTool
           key = data['key'].to_s
           color = data['color'].to_s
           colors = load_custom_colors
-          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities'}
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
           section = plural[type] || (type + 's')
           colors[section] ||= {}
           colors[section][key] = color
@@ -559,7 +582,7 @@ module TakeoffTool
           type = data['type'].to_s
           key = data['key'].to_s
           colors = load_custom_colors
-          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities'}
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
           section = plural[type] || (type + 's')
           if colors[section]
             colors[section].delete(key)
@@ -696,6 +719,30 @@ module TakeoffTool
       return unless @dialog && @dialog.visible?
       require 'json'
       assemblies = TakeoffTool.load_assemblies
+
+      # Build entity→category lookup from scan results
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      eid_cat = {}
+      sr.each do |r|
+        eid_cat[r[:entity_id].to_i] = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+      end
+
+      # Add category breakdown to each assembly
+      assemblies.each do |_name, asm|
+        eids = asm['entity_ids'] || []
+        breakdown = {}
+        eids.each do |eid|
+          cat = eid_cat[eid.to_i] || 'Uncategorized'
+          breakdown[cat] ||= 0
+          breakdown[cat] += 1
+        end
+        total = eids.length.to_f
+        asm['breakdown'] = breakdown.map { |cat, count|
+          { 'category' => cat, 'count' => count, 'percent' => (total > 0 ? (count / total * 100).round(1) : 0) }
+        }.sort_by { |b| -b['count'] }
+      end
+
       js = JSON.generate(assemblies)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveAssemblies('#{esc}')")
@@ -835,6 +882,13 @@ module TakeoffTool
           entry[:unit] = grp.get_attribute('TakeoffMeasurement', 'benchmark_unit') || 'feet'
           entry[:label] = grp.get_attribute('TakeoffMeasurement', 'elevation_label') || ''
           entry[:custom_label] = grp.get_attribute('TakeoffMeasurement', 'custom_label') || ''
+        elsif mtype == 'NOTE'
+          entry[:value] = 0
+          entry[:unit] = ''
+          entry[:label_type] = grp.get_attribute('TakeoffMeasurement', 'label_type') || ''
+          entry[:author] = grp.get_attribute('TakeoffMeasurement', 'author') || ''
+          entry[:created] = grp.get_attribute('TakeoffMeasurement', 'timestamp') || ''
+          entry[:point] = grp.get_attribute('TakeoffMeasurement', 'point') || ''
         elsif mtype == 'BENCHMARK'
           next  # Don't show benchmark point in measurement panel
         else

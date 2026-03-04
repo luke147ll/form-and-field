@@ -35,7 +35,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .bulk label{color:#a6adc8}
 
 /* MEASUREMENT PANEL */
-/* measPanel/asmPanel display controlled by .sec-panel class */
+/* MEASUREMENT + ASSEMBLY PANEL ITEMS */
 .mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;flex-shrink:0}
 .mp-cat{padding:4px 12px 2px 12px;cursor:pointer;user-select:none}
 .mp-cat-hdr{font-weight:600;font-size:11px;color:#a6e3a1;display:flex;align-items:center;gap:6px}
@@ -87,8 +87,49 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .cat-bar button{background:none;border:1px solid #313244;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;padding:2px 5px;color:#6c7086}
 .cat-bar button:hover{border-color:#45475a;color:#a6adc8}
 /* ADD CATEGORY BUTTON */
-.add-cat-btn{display:block;width:100%;padding:8px 12px;background:transparent;border:1px dashed #45475a;border-radius:0;color:#6c7086;cursor:pointer;font-size:11px;font-family:inherit;text-align:left}
+.add-cat-btn{display:block;width:100%;padding:5px 10px;background:transparent;border:1px dashed #45475a;border-radius:0;color:#6c7086;cursor:pointer;font-size:11px;font-family:inherit;text-align:left;margin-bottom:0}
 .add-cat-btn:hover{border-color:#a6adc8;color:#a6adc8;background:#1a1a2e}
+
+/* PANEL DRAG HANDLE (between category list and tab bar) */
+.panel-drag-handle{height:8px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#181825;position:relative;z-index:5;transition:background .15s ease}
+.panel-drag-handle:hover{background:#1e1e2e}
+.panel-drag-handle:hover .drag-handle-line{background:#cba6f7;width:60px}
+.drag-handle-line{width:40px;height:3px;border-radius:2px;background:#45475a;transition:all .2s ease}
+.panel-drag-handle.dragging .drag-handle-line{background:#cba6f7;width:80px}
+.panel-drag-handle::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#cba6f7,#89b4fa,#94e2d5);opacity:0.6}
+
+/* TAB BAR */
+.info-tabs{display:flex;position:relative;background:#181825;padding:0 8px;flex-shrink:0;border-bottom:1px solid #313244}
+.info-tab{padding:10px 16px 8px;font-size:12px;font-weight:500;color:#6c7086;cursor:pointer;transition:color .2s ease;position:relative;user-select:none}
+.info-tab:hover{color:#a6adc8}
+.info-tab.active{color:#cba6f7}
+.info-tab-underline{position:absolute;bottom:0;height:2px;background:#cba6f7;border-radius:1px 1px 0 0;transition:left .25s cubic-bezier(.16,1,.3,1),width .25s cubic-bezier(.16,1,.3,1)}
+
+/* INFO PANEL */
+.info-panel{flex:0 0 auto;min-height:120px;max-height:40%;overflow:hidden;background:#1e1e2e;display:flex;flex-direction:column}
+.info-content{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.info-content.active{display:flex}
+.info-panel .sec-scroll::-webkit-scrollbar{width:6px}
+.info-panel .sec-scroll::-webkit-scrollbar-track{background:#181825}
+.info-panel .sec-scroll::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
+
+/* NOTE ROWS */
+.note-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid #313244;transition:background .1s ease}
+.note-row:hover{background:rgba(203,166,247,0.03)}
+.note-row:last-child{border-bottom:none}
+.note-icon{font-size:14px;font-weight:700;flex-shrink:0;width:20px;text-align:center;padding-top:1px}
+.note-body{flex:1;min-width:0}
+.note-text{font-size:12px;color:#cdd6f4;line-height:1.3;word-wrap:break-word}
+.note-meta{display:flex;align-items:center;gap:4px;margin-top:3px}
+.note-author{font-size:10px;color:#cba6f7;font-weight:500}
+.note-sep{font-size:8px;color:#585b70}
+.note-time{font-size:10px;color:#6c7086}
+.note-actions{display:flex;gap:4px;opacity:0;transition:opacity .1s ease}
+.note-row:hover .note-actions{opacity:1}
+.note-action{font-size:10px;color:#6c7086;cursor:pointer;padding:2px 5px;border-radius:3px;transition:all .1s ease}
+.note-action:hover{color:#cba6f7;background:rgba(203,166,247,0.08)}
+.note-action.delete:hover{color:#f38ba8;background:rgba(243,139,168,0.08)}
+.notes-empty{padding:20px;text-align:center;font-size:11px;color:#585b70}
 
 /* MAIN LAYOUT — three independent scroll areas */
 .tp{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;min-height:0}
@@ -106,11 +147,8 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .sec-panel .sec-scroll::-webkit-scrollbar-track{background:#181825}
 .sec-panel .sec-scroll::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
 
-/* RESIZE HANDLE */
-.sec-resize{height:6px;cursor:ns-resize;background:#1e1e2e;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-top:1px solid #45475a}
-.sec-resize:hover{background:#313244}
-.sec-resize::after{content:'';display:block;width:24px;height:2px;border-radius:1px;background:#585b70}
-.sec-resize:hover::after{background:#a6adc8}
+/* RESIZE HANDLE (legacy — kept for compatibility) */
+.sec-resize{display:none}
 
 /* SCROLL FADE — bottom edge indicator */
 .sec-scroll-fade{pointer-events:none;position:absolute;bottom:0;left:0;right:0;height:20px;background:linear-gradient(transparent,#181825cc);opacity:0;transition:opacity .15s}
@@ -165,6 +203,16 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .asm-item .ey{margin-right:2px;flex-shrink:0}
 .asm-iso{background:none;border:1px solid #45475a;border-radius:3px;cursor:pointer;padding:1px 5px;font-size:9px;color:#a6adc8;font-family:inherit;white-space:nowrap;flex-shrink:0}
 .asm-iso:hover{background:#45475a;color:#cdd6f4;border-color:#89b4fa}
+/* ASSEMBLY EXPAND ARROW + BREAKDOWN */
+.asm-expand-arrow{font-size:8px;color:#585b70;transition:transform .2s ease;flex-shrink:0;width:12px;text-align:center;cursor:pointer}
+.asm-expand-arrow.expanded{transform:rotate(90deg)}
+.asm-expand-arrow:hover{color:#a6adc8}
+.asm-breakdown{padding:4px 8px 8px 40px;border-bottom:1px solid #313244}
+.asm-bd-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.asm-bd-badge{font-size:10px;padding:1px 8px;border-radius:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asm-bd-count{font-family:'JetBrains Mono',monospace;font-size:10px;color:#a6e3a1;min-width:32px;text-align:right}
+.asm-bd-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:#6c7086;min-width:40px;text-align:right}
+.asm-bd-empty{font-size:10px;color:#585b70;padding:4px 0;font-style:italic}
 
 /* CATPPUCCIN MODAL */
 .ff-modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center}
@@ -396,45 +444,64 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <div class="sec-scroll-fade" id="dpFade"></div>
   </div>
 
-  <!-- MEASUREMENTS SECTION -->
-  <div class="sec-hdr meas-hdr" id="measHdr" onclick="toggleMeasSection()">
-    <span class="sec-arr" id="measArr">&#9654;</span>
-    <span class="sec-title">Measurements</span>
-    <span class="sec-cnt" id="measHdrCnt"></span>
+  <!-- DRAG HANDLE (between category list and info panel) -->
+  <div class="panel-drag-handle" id="infoPanelDragHandle">
+    <div class="drag-handle-line"></div>
   </div>
-  <div class="sec-panel" id="measPanel" style="height:150px">
-    <div class="sec-resize" onmousedown="startResize(event,'measPanel')"></div>
-    <div class="mp-toolbar">
-      <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>LF</button>
-      <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
-      <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg>Elev</button>
-      <span style="flex:1"></span>
-      <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
-      <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
+
+  <!-- TAB BAR -->
+  <div class="info-tabs" id="infoTabs">
+    <div class="info-tab active" data-tab="measurements" onclick="switchInfoTab('measurements')">Measurements</div>
+    <div class="info-tab" data-tab="notes" onclick="switchInfoTab('notes')">Notes</div>
+    <div class="info-tab" data-tab="assemblies" onclick="switchInfoTab('assemblies')">Assemblies</div>
+    <div class="info-tab-underline" id="tabUnderline"></div>
+  </div>
+
+  <!-- INFO PANEL -->
+  <div class="info-panel" id="infoPanel" style="height:200px">
+    <!-- MEASUREMENTS TAB -->
+    <div class="info-content active" id="tab_measurements">
+      <div class="mp-toolbar">
+        <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>LF</button>
+        <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
+        <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg>Elev</button>
+        <span style="flex:1"></span>
+        <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
+        <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
+      </div>
+      <div class="sec-scroll" id="measScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
+        <div id="measBody"></div>
+        <div class="sec-scroll-fade" id="measFade"></div>
+      </div>
     </div>
-    <div class="sec-scroll" id="measScroll">
-      <div id="measBody"></div>
-      <div class="sec-scroll-fade" id="measFade"></div>
+
+    <!-- NOTES TAB -->
+    <div class="info-content" id="tab_notes">
+      <div class="mp-toolbar">
+        <button class="hb" onclick="call('activateNote')" title="Place Note Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#89b4fa;border-color:#89b4fa"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 10l-4 4H3a1 1 0 01-1-1V3a1 1 0 011-1h10a1 1 0 011 1v7z"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg>Note</button>
+        <span style="flex:1"></span>
+        <span style="color:#6c7086;font-size:10px" id="notesCount"></span>
+      </div>
+      <div class="sec-scroll" id="notesScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
+        <div id="notesList"></div>
+        <div id="notesEmpty" class="notes-empty">No notes yet. Use the Note Tag tool to add annotations.</div>
+        <div class="sec-scroll-fade" id="notesFade"></div>
+      </div>
+    </div>
+
+    <!-- ASSEMBLIES TAB -->
+    <div class="info-content" id="tab_assemblies">
+      <div class="asm-toolbar">
+        <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">Create Assembly</button>
+        <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
+      </div>
+      <div class="sec-scroll" id="asmScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
+        <div id="asmBody"></div>
+        <div class="sec-scroll-fade" id="asmFade"></div>
+      </div>
     </div>
   </div>
 
-  <!-- ASSEMBLIES SECTION -->
-  <div class="sec-hdr asm-hdr" id="asmHdr" onclick="toggleAsmPanel()">
-    <span class="sec-arr" id="asmArr">&#9654;</span>
-    <span class="sec-title">Assemblies</span>
-    <span class="sec-cnt" id="asmHdrCnt"></span>
-  </div>
-  <div class="sec-panel" id="asmPanel" style="height:150px">
-    <div class="sec-resize" onmousedown="startResize(event,'asmPanel')"></div>
-    <div class="asm-toolbar">
-      <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">Create Assembly</button>
-      <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
-    </div>
-    <div class="sec-scroll" id="asmScroll">
-      <div id="asmBody"></div>
-      <div class="sec-scroll-fade" id="asmFade"></div>
-    </div>
-  </div>
 </div>
 <div id="dbg"></div>
 
@@ -1212,24 +1279,26 @@ function updateAdvDot(){
 }
 
 /* ═══ MEASUREMENTS SECTION ═══ */
-function toggleMeasSection(){
-  var p=document.getElementById('measPanel');
-  var hdr=document.getElementById('measHdr');
-  if(p.classList.contains('show')){
-    p.classList.remove('show');hdr.classList.remove('open');
-  } else {
-    p.classList.add('show');hdr.classList.add('open');call('requestMeasurements');
-    setTimeout(function(){checkScrollFade('measScroll','measFade');},50);
+function toggleMeasSection(){ /* no-op — tabs replaced collapsible sections */ }
+function updateMeasHdrCnt(){
+  // Update tab label with count
+  var tab=document.querySelector('.info-tab[data-tab="measurements"]');
+  if(tab){
+    var nonNote=MEAS.filter(function(m){return m.type!=='NOTE';});
+    tab.textContent='Measurements'+(nonNote.length?' ('+nonNote.length+')':'');
+  }
+  // Update notes tab count
+  var ntab=document.querySelector('.info-tab[data-tab="notes"]');
+  if(ntab){
+    var notes=MEAS.filter(function(m){return m.type==='NOTE';});
+    ntab.textContent='Notes'+(notes.length?' ('+notes.length+')':'');
+    document.getElementById('notesCount').textContent=notes.length+' notes';
   }
 }
-function updateMeasHdrCnt(){
-  var cnt=document.getElementById('measHdrCnt');
-  if(cnt)cnt.textContent=MEAS.length?'('+MEAS.length+')':'';
-}
 
-/* ═══ PANEL RESIZE ═══ */
+/* ═══ PANEL RESIZE — drag handle between category list and info panel ═══ */
 var _resizing=null,_resizeStartY=0,_resizeStartH=0;
-var panelHeights={measPanel:150,asmPanel:150};
+var panelHeights={infoPanel:200};
 function startResize(e,panelId){
   e.preventDefault();e.stopPropagation();
   _resizing=panelId;
@@ -1237,6 +1306,8 @@ function startResize(e,panelId){
   _resizeStartH=document.getElementById(panelId).offsetHeight;
   document.body.style.cursor='ns-resize';
   document.body.style.userSelect='none';
+  var dh=document.getElementById('infoPanelDragHandle');
+  if(dh)dh.classList.add('dragging');
 }
 document.addEventListener('mousemove',function(e){
   if(!_resizing)return;
@@ -1253,7 +1324,14 @@ document.addEventListener('mouseup',function(){
   _resizing=null;
   document.body.style.cursor='';
   document.body.style.userSelect='';
+  var dh=document.getElementById('infoPanelDragHandle');
+  if(dh)dh.classList.remove('dragging');
 });
+/* Wire up the drag handle */
+(function(){
+  var dh=document.getElementById('infoPanelDragHandle');
+  if(dh)dh.addEventListener('mousedown',function(e){startResize(e,'infoPanel');});
+})();
 
 /* ═══ SCROLL FADE INDICATOR ═══ */
 function checkScrollFade(scrollId,fadeId){
@@ -1266,6 +1344,7 @@ function checkScrollFade(scrollId,fadeId){
 function checkAllScrollFades(){
   checkScrollFade('measScroll','measFade');
   checkScrollFade('asmScroll','asmFade');
+  checkScrollFade('notesScroll','notesFade');
   checkScrollFade('dp','dpFade');
 }
 /* Listen for scroll events on all scrollable areas */
@@ -1273,6 +1352,7 @@ document.addEventListener('scroll',function(e){
   var t=e.target;
   if(t.id==='measScroll')checkScrollFade('measScroll','measFade');
   else if(t.id==='asmScroll')checkScrollFade('asmScroll','asmFade');
+  else if(t.id==='notesScroll')checkScrollFade('notesScroll','notesFade');
   else if(t.id==='dp')checkScrollFade('dp','dpFade');
 },true);
 
@@ -1415,23 +1495,15 @@ function receiveAssemblies(json){
   buildAsmDD();
   renderAsmPanel();
 }
-function toggleAsmPanel(){
-  var p=document.getElementById('asmPanel');
-  var hdr=document.getElementById('asmHdr');
-  if(p.classList.contains('show')){
-    p.classList.remove('show');hdr.classList.remove('open');
-  } else {
-    p.classList.add('show');hdr.classList.add('open');call('loadAssemblies');
-    setTimeout(function(){checkScrollFade('asmScroll','asmFade');},50);
-  }
-}
+function toggleAsmPanel(){ /* no-op — tabs replaced collapsible sections */ }
+var expandedAssemblies={};
 function renderAsmPanel(){
   var body=document.getElementById('asmBody');
   var keys=Object.keys(ASMB).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   document.getElementById('asmCount').textContent=keys.length+' assemblies';
-  // Update collapsed header count
-  var hdrCnt=document.getElementById('asmHdrCnt');
-  if(hdrCnt)hdrCnt.textContent=keys.length?'('+keys.length+')':'';
+  // Update tab count
+  var atab=document.querySelector('.info-tab[data-tab="assemblies"]');
+  if(atab)atab.textContent='Assemblies'+(keys.length?' ('+keys.length+')':'');
   if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Create Assembly" or right-click in viewport.</div>';return;}
   var h='';
   var fasm=document.getElementById('fAsm').value;
@@ -1441,10 +1513,13 @@ function renderAsmPanel(){
     var aVis=ASMVIS[name]!==false;
     var ne=X(name).replace(/'/g,"\\'");
     var asmCol=(CCOL.assemblies||{})[name]||'';
+    var isExp=!!expandedAssemblies[name];
+    var safeN=X(name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
     h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+ne+'\')">'+
       '<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis(\''+ne+'\')" title="'+(aVis?'Hide':'Show')+'">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>'+
       '<button class="asm-iso" onclick="event.stopPropagation();isoAsm(\''+ne+'\')" title="Isolate — hide everything except this assembly">Isolate</button>'+
       buildColorDot('assembly',name,asmCol)+
+      '<span class="asm-expand-arrow'+(isExp?' expanded':'')+'" id="asmArrow_'+safeN+'" onclick="event.stopPropagation();toggleAsmBreakdown(\''+ne+'\')">&#9654;</span>'+
       '<span class="asm-name" title="'+X(name)+'">'+X(name)+'</span>'+
       (a.notes?'<span class="asm-notes" title="'+X(a.notes)+'">'+X(a.notes)+'</span>':'')+
       '<span class="asm-cnt">'+aCnt+'</span>'+
@@ -1454,9 +1529,42 @@ function renderAsmPanel(){
         '<button onclick="event.stopPropagation();editAssemblyNotes(\''+ne+'\');" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'+
         '<button onclick="event.stopPropagation();deleteAssemblyConfirm(\''+ne+'\');" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
       '</span></div>';
+    // Assembly category breakdown (collapsible)
+    h+='<div class="asm-breakdown" id="asmBreakdown_'+safeN+'" style="display:'+(isExp?'block':'none')+'">'+renderAsmBreakdown(a.breakdown)+'</div>';
   }
   body.innerHTML=h;
   setTimeout(function(){checkScrollFade('asmScroll','asmFade');},20);
+}
+function renderAsmBreakdown(breakdown){
+  if(!breakdown||!breakdown.length)return'<div class="asm-bd-empty">No items</div>';
+  var h='';
+  for(var i=0;i<breakdown.length;i++){
+    var b=breakdown[i];
+    var cat=b.category||'Uncategorized';
+    var bg=getBadgeColor(cat);
+    h+='<div class="asm-bd-row">'+
+      '<span class="asm-bd-badge" style="background:'+bg+';color:#1e1e2e">'+X(cat)+'</span>'+
+      '<span class="asm-bd-count">'+b.count+'</span>'+
+      '<span class="asm-bd-pct">'+b.percent+'%</span>'+
+      '</div>';
+  }
+  return h;
+}
+function getBadgeColor(cat){
+  // Use custom color if set, otherwise use category default color
+  var custom=(CCOL.categories||{})[cat];
+  if(custom)return custom;
+  return getDefaultColor(cat);
+}
+function toggleAsmBreakdown(name){
+  var safeN=X(name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  var bd=document.getElementById('asmBreakdown_'+safeN);
+  var arrow=document.getElementById('asmArrow_'+safeN);
+  if(!bd)return;
+  var isOpen=bd.style.display!=='none';
+  bd.style.display=isOpen?'none':'block';
+  if(arrow)arrow.classList.toggle('expanded',!isOpen);
+  if(isOpen){delete expandedAssemblies[name];}else{expandedAssemblies[name]=true;}
 }
 function buildAsmDD(){
   var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
@@ -1571,11 +1679,14 @@ function receiveMeasurements(json){
   try{MEAS=JSON.parse(json);}catch(e){MEAS=[];log('MEAS parse err: '+e.message,'err');}
   updateMeasHdrCnt();
   renderMeasPanel();
+  renderNotesPanel();
 }
 function renderMeasPanel(){
   var bycat={},order=[],i,m;
   for(i=0;i<MEAS.length;i++){
-    m=MEAS[i];var c=m.category||'Custom';
+    m=MEAS[i];
+    if(m.type==='NOTE') continue; // Notes shown in Notes tab
+    var c=m.category||'Custom';
     if(!bycat[c]){bycat[c]=[];order.push(c);}
     bycat[c].push(m);
   }
@@ -1591,15 +1702,21 @@ function renderMeasPanel(){
     h+='<div class="mp-cat-items">';
     for(var j=0;j<items.length;j++){
       var it=items[j],vis=!!it.visible;
-      var sw=it.color?'background:rgba('+it.color[0]+','+it.color[1]+','+it.color[2]+',0.7)':'background:#7f849c';
+      var measCol=(CCOL.measurements||{})[''+it.eid]||'';
       h+='<div class="mp-item">';
       h+='<button class="ey'+(vis?'':' off')+'" onclick="togMeasVis('+it.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-      h+='<span class="mp-swatch" style="'+sw+'"></span>';
+      h+=buildColorDot('measurement',''+it.eid,measCol);
       if(it.type==='ELEV'){
         var cl=it.custom_label||'';
         var elbl=it.label||('EL. '+it.value);
         var desc=cl?(X(cl)+' '+elbl):elbl;
         h+='<span class="mp-desc" ondblclick="editElevLabel('+it.eid+',this)" title="Double-click to edit label">'+desc+'</span>';
+      } else if(it.type==='NOTE'){
+        var lt=it.label_type||'';
+        var prefix=lt&&lt!=='None'?(lt+': '):'';
+        var noteText=it.note||'(empty)';
+        var short=noteText.length>40?noteText.substring(0,37)+'...':noteText;
+        h+='<span class="mp-desc" ondblclick="editNoteText('+it.eid+',this)" title="'+X(noteText)+'">'+X(prefix+short)+'</span>';
       } else {
         var desc=X(it.type)+': '+(it.note?X(it.note):X(cat));
         h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
@@ -1614,6 +1731,7 @@ function renderMeasPanel(){
   setTimeout(function(){checkScrollFade('measScroll','measFade');},20);
 }
 function fmtMeasVal(val,unit){
+  if(unit==='')return'';
   if(!val&&val!==0)return'--';
   if(unit==='SF')return val.toFixed(1)+' SF';
   if(unit==='LF')return val.toFixed(1)+' LF';
@@ -1647,6 +1765,28 @@ function editElevLabel(eid,span){
     renderMeasPanel();
   }
   inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();finish();}if(e.key==='Escape'){done=true;renderMeasPanel();}});
+  inp.addEventListener('blur',finish);
+}
+
+function editNoteText(eid,span){
+  var it=MEAS.find(function(m){return m.eid===eid;});
+  if(!it)return;
+  var cur=it.note||'';
+  var inp=document.createElement('input');
+  inp.type='text';inp.value=cur;
+  inp.style.cssText='background:#313244;color:#cdd6f4;border:1px solid #89b4fa;border-radius:3px;padding:1px 4px;font-size:11px;width:100%;outline:none;';
+  span.textContent='';span.appendChild(inp);
+  inp.focus();inp.select();
+  var done=false;
+  function finish(){
+    if(done)return;done=true;
+    var val=inp.value.trim();
+    it.note=val;
+    callJSON('updateNoteText',{eid:eid,text:val});
+    renderMeasPanel();
+    renderNotesPanel();
+  }
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();finish();}if(e.key==='Escape'){done=true;renderMeasPanel();renderNotesPanel();}});
   inp.addEventListener('blur',finish);
 }
 
@@ -1976,7 +2116,7 @@ function buildStaticDot(color){
   if(!color)return '';
   return '<span class="color-dot-static" style="background:'+color+'"></span>';
 }
-var PLURAL_MAP={category:'categories',subcategory:'subcategories',assembly:'assemblies',entity:'entities'};
+var PLURAL_MAP={category:'categories',subcategory:'subcategories',assembly:'assemblies',entity:'entities',measurement:'measurements'};
 var colorClickTimer=null;
 
 function handleColorClick(event,type,key){
@@ -2051,7 +2191,7 @@ function pickColor(event,type,key,hex){
     call('highlightCategoryColor',key);
   }
 
-  renderGroups();renderAsmPanel();
+  renderGroups();renderAsmPanel();renderMeasPanel();
 }
 
 function resetColor(event,type,key){
@@ -2073,7 +2213,7 @@ function resetColor(event,type,key){
     deactivateCategoryColor(key);
   }
 
-  renderGroups();renderAsmPanel();
+  renderGroups();renderAsmPanel();renderMeasPanel();
 }
 
 function activateCategoryColor(key){
@@ -2282,7 +2422,104 @@ function cancelConfirm(){
   _confirmCb=null;
 }
 
-window.onload=function(){log('init');setTimeout(function(){call('requestData');},200);};
+/* ═══ TABBED INFO PANEL ═══ */
+var activeInfoTab='measurements';
+function switchInfoTab(tabName){
+  activeInfoTab=tabName;
+  document.querySelectorAll('.info-tab').forEach(function(tab){
+    tab.classList.toggle('active',tab.dataset.tab===tabName);
+  });
+  var activeTab=document.querySelector('.info-tab[data-tab="'+tabName+'"]');
+  var underline=document.getElementById('tabUnderline');
+  if(activeTab&&underline){
+    underline.style.left=activeTab.offsetLeft+'px';
+    underline.style.width=activeTab.offsetWidth+'px';
+  }
+  document.querySelectorAll('.info-content').forEach(function(panel){
+    panel.classList.remove('active');
+  });
+  var target=document.getElementById('tab_'+tabName);
+  if(target)target.classList.add('active');
+  // Request fresh data for the tab
+  if(tabName==='measurements')call('requestMeasurements');
+  else if(tabName==='assemblies')call('loadAssemblies');
+  else if(tabName==='notes')renderNotesPanel();
+  setTimeout(checkAllScrollFades,50);
+}
+function initTabUnderline(){
+  var activeTab=document.querySelector('.info-tab.active');
+  var underline=document.getElementById('tabUnderline');
+  if(activeTab&&underline){
+    underline.style.left=activeTab.offsetLeft+'px';
+    underline.style.width=activeTab.offsetWidth+'px';
+  }
+}
+window.addEventListener('resize',function(){initTabUnderline();});
+
+/* ═══ NOTES PANEL ═══ */
+function renderNotesPanel(){
+  var list=document.getElementById('notesList');
+  var empty=document.getElementById('notesEmpty');
+  var notes=MEAS.filter(function(m){return m.type==='NOTE';});
+  if(!notes.length){
+    list.innerHTML='';
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+  notes.sort(function(a,b){return(b.created||'').localeCompare(a.created||'');});
+  var h='';
+  for(var i=0;i<notes.length;i++){
+    var n=notes[i];
+    var colorStyle=n.color?'color:rgb('+n.color[0]+','+n.color[1]+','+n.color[2]+')':'color:#6c7086';
+    var icon=noteIconForType(n.label_type);
+    var lt=n.label_type||'';
+    var prefix=lt&&lt!=='None'?(lt+': '):'';
+    h+='<div class="note-row">';
+    h+='<div class="note-icon" style="'+colorStyle+'">'+icon+'</div>';
+    h+='<div class="note-body">';
+    h+='<div class="note-text" ondblclick="editNoteText('+n.eid+',this)">'+X(prefix+(n.note||''))+'</div>';
+    h+='<div class="note-meta">';
+    h+='<span class="note-author">'+X(n.author||'Unknown')+'</span>';
+    h+='<span class="note-sep">&middot;</span>';
+    h+='<span class="note-time">'+formatTimestamp(n.created)+'</span>';
+    h+='</div></div>';
+    h+='<div class="note-actions">';
+    h+='<span class="note-action" onclick="zoomToNote('+n.eid+')" title="Zoom to">Z</span>';
+    h+='<span class="note-action delete" onclick="deleteNote('+n.eid+')" title="Delete">&times;</span>';
+    h+='</div></div>';
+  }
+  list.innerHTML=h;
+  setTimeout(function(){checkScrollFade('notesScroll','notesFade');},20);
+}
+function noteIconForType(type){
+  if(!type)return'\u2022';
+  switch(type.toLowerCase()){
+    case 'warning':return'\u26A0';
+    case 'info':return'\u2139';
+    case 'action':return'\u25B6';
+    case 'question':return'?';
+    case 'note':return'\u270E';
+    default:return'\u2022';
+  }
+}
+function formatTimestamp(ts){
+  if(!ts)return'';
+  var d=new Date(ts.replace(' ','T'));
+  if(isNaN(d.getTime()))return ts;
+  var now=new Date();
+  var diffMs=now-d;
+  var diffMins=Math.floor(diffMs/60000);
+  var diffHrs=Math.floor(diffMs/3600000);
+  if(diffMins<1)return'just now';
+  if(diffMins<60)return diffMins+'m ago';
+  if(diffHrs<24)return diffHrs+'h ago';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function zoomToNote(eid){call('zoomToEntity',''+eid);}
+function deleteNote(eid){showConfirmModal('Delete this note? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();renderNotesPanel();});}
+
+window.onload=function(){log('init');setTimeout(function(){call('requestData');initTabUnderline();},200);};
 </script>
 <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
   <div class="modal-card">

@@ -209,6 +209,7 @@ module TakeoffTool
       @hover_transform = nil
       @tags_placed = 0
       @benchmark = nil
+      @pick_mode = :none
     end
 
     def activate
@@ -221,6 +222,7 @@ module TakeoffTool
       @hover_face = nil
       @hover_transform = nil
       @tags_placed = 0
+      @pick_mode = :none
       update_status
     end
 
@@ -235,9 +237,10 @@ module TakeoffTool
 
     def onMouseMove(flags, x, y, view)
       @ip.pick(view, x, y)
+
+      # PickHelper for face highlighting in draw()
       ph = view.pick_helper
       ph.do_pick(x, y)
-
       face = nil; xform = nil
       ph.count.times do |i|
         leaf = ph.leaf_at(i)
@@ -251,24 +254,50 @@ module TakeoffTool
           face = path.last; xform = ph.transformation_at(0)
         end
       end
-
       @hover_face = face
       @hover_transform = xform || Geom::Transformation.new
 
+      # Determine pick mode for status bar and draw
+      @pick_mode = :none
+      @pick_mode, _, _ = determine_pick_mode(@ip, view) if @ip.valid?
+
+      # Tooltip with elevation
       if @ip.valid? && @benchmark
         elev = TakeoffTool.calculate_elevation(@ip.position)
         if elev
           tip = TakeoffTool.format_elevation(elev, @benchmark['unit'])
-          if @hover_face
-            sa = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
-            if sa > ELEV_HORIZONTAL_THRESHOLD && sa < ELEV_WALL_THRESHOLD
-              tip = "#{tip}  (#{sa.round(1)} slope)"
-            elsif sa >= ELEV_WALL_THRESHOLD
-              tip = "#{tip}  (wall)"
+          case @pick_mode
+          when :sloped_face
+            if @hover_face
+              sa = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
+              tip = "#{tip}  (#{sa.round(1)}° slope)"
             end
+          when :wall_face
+            tip = "#{tip}  (wall)"
           end
+          ip_tip = @ip.tooltip
+          tip = "#{ip_tip} — #{tip}" if ip_tip && !ip_tip.empty?
           view.tooltip = tip
         end
+      end
+
+      # Status bar with pick mode
+      if @ip.valid?
+        placed = @tags_placed > 0 ? " (#{@tags_placed} placed)" : ""
+        ip_tip = @ip.tooltip
+        case @pick_mode
+        when :point
+          mode_str = ip_tip && !ip_tip.empty? ? "Point [#{ip_tip}]" : "Point"
+        when :flat_face
+          mode_str = "Flat Face"
+        when :sloped_face
+          mode_str = "Sloped Face"
+        when :wall_face
+          mode_str = "Wall (cannot tag)"
+        else
+          mode_str = "Click to place"
+        end
+        Sketchup.status_text = "Elevation Tag#{placed}: #{mode_str}"
       end
 
       view.invalidate
@@ -283,27 +312,40 @@ module TakeoffTool
       @ip.pick(view, x, y)
       return unless @ip.valid?
       return unless @benchmark
-      return unless @hover_face
       return if @pending_label  # Already waiting for label input
 
       click_pt = @ip.position.clone
-      face = @hover_face
-      transform = @hover_transform
-      face_pid = (face.persistent_id rescue nil)
-      slope_angle = TakeoffTool.face_slope_angle(face, transform)
+      mode, _, pick_face = determine_pick_mode(@ip, view)
 
-      if slope_angle >= ELEV_WALL_THRESHOLD
+      case mode
+      when :point
+        # Simple elevation at a point — no face analysis
+        @pending_label = {
+          click_pt: click_pt, face: nil, transform: Geom::Transformation.new,
+          face_pid: nil, slope_angle: 0.0, view: view
+        }
+      when :flat_face
+        xform = @ip.transformation || Geom::Transformation.new
+        @pending_label = {
+          click_pt: click_pt, face: pick_face, transform: xform,
+          face_pid: (pick_face.persistent_id rescue nil),
+          slope_angle: 0.0, view: view
+        }
+      when :sloped_face
+        xform = @ip.transformation || Geom::Transformation.new
+        slope_angle = TakeoffTool.face_slope_angle(pick_face, xform)
+        @pending_label = {
+          click_pt: click_pt, face: pick_face, transform: xform,
+          face_pid: (pick_face.persistent_id rescue nil),
+          slope_angle: slope_angle, view: view
+        }
+      when :wall_face
         Sketchup.status_text = "Cannot tag vertical/wall faces."
+        return
+      else
         return
       end
 
-      # Store context for after label dialog
-      @pending_label = {
-        click_pt: click_pt, face: face, transform: transform,
-        face_pid: face_pid, slope_angle: slope_angle, view: view
-      }
-
-      # Show label input dialog
       show_label_dialog(view)
     end
 
@@ -328,12 +370,15 @@ module TakeoffTool
       return unless ctx
 
       face = ctx[:face]
-      return unless face.valid?
+      # If we have a face, verify it's still valid
+      if face && !face.valid?
+        return
+      end
 
       # Duplicate check — remove existing tag on this face
       TakeoffTool.remove_existing_face_tag(ctx[:face_pid])
 
-      if ctx[:slope_angle] > ELEV_HORIZONTAL_THRESHOLD
+      if face && ctx[:slope_angle] > ELEV_HORIZONTAL_THRESHOLD
         analysis = TakeoffTool.analyze_face_slope(face, ctx[:transform])
         return unless analysis
         elev = TakeoffTool.calculate_elevation(ctx[:click_pt])
@@ -356,8 +401,10 @@ module TakeoffTool
     end
 
     def draw(view)
+      @ip.draw(view) if @ip.valid?
+
+      # Face highlight based on slope (uses PickHelper hover data)
       if @hover_face
-        # Color face highlight based on slope
         hl_color = Sketchup::Color.new(203, 166, 247, 40)  # mauve default
         sa = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
         if sa > ELEV_HORIZONTAL_THRESHOLD && sa < ELEV_WALL_THRESHOLD
@@ -368,20 +415,25 @@ module TakeoffTool
         draw_face_highlight(view, @hover_face, @hover_transform, hl_color)
       end
 
+      # Cursor elevation text — colored by pick mode
       if @ip.valid? && @benchmark
         elev = TakeoffTool.calculate_elevation(@ip.position)
         if elev
           label = TakeoffTool.format_elevation(elev, @benchmark['unit'])
-          draw_color = Sketchup::Color.new(203, 166, 247)
-          if @hover_face
-            sa = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
-            if sa > ELEV_HORIZONTAL_THRESHOLD && sa < ELEV_WALL_THRESHOLD
-              label = "#{label}  (#{sa.round(1)} slope)"
-              draw_color = Sketchup::Color.new(*ELEV_SLOPE_COLOR)
-            elsif sa >= ELEV_WALL_THRESHOLD
-              label = "#{label}  (wall)"
-              draw_color = Sketchup::Color.new(243, 139, 168)
+          case @pick_mode
+          when :point
+            draw_color = Sketchup::Color.new(166, 227, 161)  # green — point pick
+          when :sloped_face
+            if @hover_face
+              sa = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
+              label = "#{label}  (#{sa.round(1)}° slope)"
             end
+            draw_color = Sketchup::Color.new(*ELEV_SLOPE_COLOR)
+          when :wall_face
+            label = "#{label}  (wall)"
+            draw_color = Sketchup::Color.new(243, 139, 168)
+          else
+            draw_color = Sketchup::Color.new(203, 166, 247)  # mauve — flat face / default
           end
           screen = view.screen_coords(@ip.position)
           screen.y -= 25
@@ -411,9 +463,85 @@ module TakeoffTool
       end
     end
 
+    # ── Pick mode detection ──
+    # Returns [mode, position, face] where mode is:
+    #   :point       — vertex, edge, or near-edge pick (no face analysis)
+    #   :flat_face   — horizontal face (normal mostly vertical)
+    #   :sloped_face — angled face like a roof
+    #   :wall_face   — vertical/near-vertical face (rejected for tagging)
+    #   :none        — nothing valid
+    def determine_pick_mode(ip, view)
+      vertex = ip.vertex
+      edge = ip.edge
+      face = ip.face
+      xform = ip.transformation || Geom::Transformation.new
+
+      # PRIORITY 1: Vertex snap — always a point pick
+      if vertex
+        return :point, ip.position, nil
+      end
+
+      # PRIORITY 2: Edge without face — point pick
+      if edge && !face
+        return :point, ip.position, nil
+      end
+
+      # PRIORITY 3: Edge + face — 8-pixel buffer zone
+      # If close to the edge in screen space, treat as point pick
+      if edge && face
+        begin
+          pick_2d = view.screen_coords(ip.position)
+          e_start_2d = view.screen_coords(xform * edge.start.position)
+          e_end_2d = view.screen_coords(xform * edge.end.position)
+          dist = point_to_line_distance_2d(pick_2d, e_start_2d, e_end_2d)
+          if dist < 8
+            return :point, ip.position, nil
+          end
+        rescue
+          # If screen_coords fails, treat as point pick near edge
+          return :point, ip.position, nil
+        end
+      end
+
+      # On a face — classify by slope angle
+      if face
+        normal = TakeoffTool.get_world_normal(face, xform)
+        z_dot = normal.dot(Geom::Vector3d.new(0, 0, 1)).abs
+        z_dot = [z_dot, 1.0].min
+        slope_angle = Math.acos(z_dot) * 180.0 / Math::PI
+
+        if slope_angle >= ELEV_WALL_THRESHOLD
+          return :wall_face, ip.position, face
+        elsif slope_angle > ELEV_HORIZONTAL_THRESHOLD
+          return :sloped_face, ip.position, face
+        else
+          return :flat_face, ip.position, face
+        end
+      end
+
+      # Fallback: valid InputPoint but no geometry — treat as point
+      return :point, ip.position, nil if ip.valid?
+      return :none, nil, nil
+    end
+
+    # 2D point-to-line-segment distance for screen-space buffer zone
+    def point_to_line_distance_2d(pt, line_start, line_end)
+      px = pt.x; py = pt.y
+      x1 = line_start.x; y1 = line_start.y
+      x2 = line_end.x; y2 = line_end.y
+      dx = x2 - x1; dy = y2 - y1
+      len_sq = dx * dx + dy * dy
+      return Math.sqrt((px - x1)**2 + (py - y1)**2) if len_sq == 0
+      t = ((px - x1) * dx + (py - y1) * dy) / len_sq
+      t = [[t, 0].max, 1].min
+      cx = x1 + t * dx
+      cy = y1 + t * dy
+      Math.sqrt((px - cx)**2 + (py - cy)**2)
+    end
+
     def update_status
       placed = @tags_placed > 0 ? " (#{@tags_placed} placed)" : ""
-      Sketchup.status_text = "Elevation Tag#{placed}: Click faces to place elevation tags. ESC to exit."
+      Sketchup.status_text = "Elevation Tag#{placed}: Click any point to place elevation tag. ESC to exit."
       Sketchup.vcb_label = "Benchmark"
       Sketchup.vcb_value = @benchmark ? "#{@benchmark['name']} (#{@benchmark['elevation']} #{@benchmark['unit']})" : "Not set"
     end
@@ -683,8 +811,8 @@ module TakeoffTool
     ])
     ents.transform_entities(orient, ents.to_a)
 
-    # Scale based on face size
-    scale = face_tag_scale(face, transform)
+    # Scale based on face size (default 1.0 if no face)
+    scale = face ? face_tag_scale(face, transform) : 1.0
     if (scale - 1.0).abs > 0.01
       sc = Geom::Transformation.scaling(ORIGIN, scale)
       ents.transform_entities(sc, ents.to_a)
