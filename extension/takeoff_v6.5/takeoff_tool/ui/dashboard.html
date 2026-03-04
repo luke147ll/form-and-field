@@ -35,9 +35,8 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .bulk label{color:#a6adc8}
 
 /* MEASUREMENT PANEL */
-#measPanel{display:none;background:#181825;border-bottom:1px solid #313244}
-#measPanel.show{display:block}
-.mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e}
+/* measPanel/asmPanel display controlled by .sec-panel class */
+.mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;flex-shrink:0}
 .mp-cat{padding:4px 12px 2px 12px;cursor:pointer;user-select:none}
 .mp-cat-hdr{font-weight:600;font-size:11px;color:#a6e3a1;display:flex;align-items:center;gap:6px}
 .mp-cat-hdr .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:8px;width:10px}
@@ -73,7 +72,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .fadv-dot{width:6px;height:6px;border-radius:50%;background:#f9e2af;display:none;flex-shrink:0}
 .fadv-dot.on{display:inline-block}
 /* COLLAPSIBLE SECTION HEADERS */
-.sec-hdr{background:#313244;border-bottom:1px solid #45475a;padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;border-left:3px solid transparent}
+.sec-hdr{background:#313244;border-bottom:1px solid #45475a;padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;border-left:3px solid transparent;flex-shrink:0}
 .sec-hdr:hover{background:#3a3a4e}
 .sec-hdr .sec-arr{font-size:10px;color:#a6adc8;transition:transform .15s;display:inline-block;width:12px}
 .sec-hdr.open .sec-arr{transform:rotate(90deg)}
@@ -91,8 +90,31 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .add-cat-btn{display:block;width:100%;padding:8px 12px;background:transparent;border:1px dashed #45475a;border-radius:0;color:#6c7086;cursor:pointer;font-size:11px;font-family:inherit;text-align:left}
 .add-cat-btn:hover{border-color:#a6adc8;color:#a6adc8;background:#1a1a2e}
 
-/* MAIN SCROLLABLE */
-.tp{flex:1;overflow:auto;padding:0}
+/* MAIN LAYOUT — three independent scroll areas */
+.tp{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;min-height:0}
+.dp-wrap{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+#dp{flex:1;overflow-y:auto;min-height:0}
+#dp::-webkit-scrollbar{width:6px}
+#dp::-webkit-scrollbar-track{background:#181825}
+#dp::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
+
+/* PANEL WRAPPERS — resizable scroll areas */
+.sec-panel{display:none;flex-direction:column;flex-shrink:0;position:relative}
+.sec-panel.show{display:flex}
+.sec-panel .sec-scroll{overflow-y:auto;flex:1;min-height:0;position:relative}
+.sec-panel .sec-scroll::-webkit-scrollbar{width:6px}
+.sec-panel .sec-scroll::-webkit-scrollbar-track{background:#181825}
+.sec-panel .sec-scroll::-webkit-scrollbar-thumb{background:#45475a;border-radius:3px}
+
+/* RESIZE HANDLE */
+.sec-resize{height:6px;cursor:ns-resize;background:#1e1e2e;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-top:1px solid #45475a}
+.sec-resize:hover{background:#313244}
+.sec-resize::after{content:'';display:block;width:24px;height:2px;border-radius:1px;background:#585b70}
+.sec-resize:hover::after{background:#a6adc8}
+
+/* SCROLL FADE — bottom edge indicator */
+.sec-scroll-fade{pointer-events:none;position:absolute;bottom:0;left:0;right:0;height:20px;background:linear-gradient(transparent,#181825cc);opacity:0;transition:opacity .15s}
+.sec-scroll-fade.vis{opacity:1}
 
 /* CATEGORY GROUPS */
 .cg{border-bottom:1px solid #252535;margin-bottom:1px}
@@ -127,9 +149,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .sc-hdr.sc-none .sc-name{color:#6c7086;font-style:italic}
 
 /* ASSEMBLY PANEL */
-#asmPanel{display:none;background:#181825;border-bottom:1px solid #313244}
-#asmPanel.show{display:block}
-.asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center}
+.asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center;flex-shrink:0}
 .asm-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;border-bottom:1px solid #252535;cursor:pointer}
 .asm-item:hover{background:#222236}
 .asm-item.active{background:#2d2040;border-left:3px solid #cba6f7;padding-left:9px}
@@ -354,17 +374,22 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button onclick="collapseAll()" title="Collapse all categories"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg></button>
 </div>
 
-<!-- MAIN SCROLLABLE AREA -->
+<!-- MAIN FLEX LAYOUT — three independent scroll areas -->
 <div class="tp">
-  <div id="dp"></div>
+  <!-- CATEGORY LIST (flex:1, scrolls independently) -->
+  <div class="dp-wrap">
+    <div id="dp"></div>
+    <div class="sec-scroll-fade" id="dpFade"></div>
+  </div>
 
-  <!-- MEASUREMENTS COLLAPSIBLE SECTION -->
+  <!-- MEASUREMENTS SECTION -->
   <div class="sec-hdr meas-hdr" id="measHdr" onclick="toggleMeasSection()">
     <span class="sec-arr" id="measArr">&#9654;</span>
     <span class="sec-title">Measurements</span>
     <span class="sec-cnt" id="measHdrCnt"></span>
   </div>
-  <div id="measPanel">
+  <div class="sec-panel" id="measPanel" style="height:150px">
+    <div class="sec-resize" onmousedown="startResize(event,'measPanel')"></div>
     <div class="mp-toolbar">
       <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>LF</button>
       <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
@@ -373,21 +398,28 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
       <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
       <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
     </div>
-    <div id="measBody"></div>
+    <div class="sec-scroll" id="measScroll">
+      <div id="measBody"></div>
+      <div class="sec-scroll-fade" id="measFade"></div>
+    </div>
   </div>
 
-  <!-- ASSEMBLIES COLLAPSIBLE SECTION -->
+  <!-- ASSEMBLIES SECTION -->
   <div class="sec-hdr asm-hdr" id="asmHdr" onclick="toggleAsmPanel()">
     <span class="sec-arr" id="asmArr">&#9654;</span>
     <span class="sec-title">Assemblies</span>
     <span class="sec-cnt" id="asmHdrCnt"></span>
   </div>
-  <div id="asmPanel">
+  <div class="sec-panel" id="asmPanel" style="height:150px">
+    <div class="sec-resize" onmousedown="startResize(event,'asmPanel')"></div>
     <div class="asm-toolbar">
       <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">Create Assembly</button>
       <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
     </div>
-    <div id="asmBody"></div>
+    <div class="sec-scroll" id="asmScroll">
+      <div id="asmBody"></div>
+      <div class="sec-scroll-fade" id="asmFade"></div>
+    </div>
   </div>
 </div>
 <div id="dbg"></div>
@@ -1101,6 +1133,7 @@ function renderGroups(){
   }
   if(gBy==='category') h+='<button class="add-cat-btn" onclick="promptNewCategory()">+ Add Category</button>';
   document.getElementById('dp').innerHTML=h||'<div style="padding:20px;color:#6c7086">No items match.</div>';
+  setTimeout(function(){checkScrollFade('dp','dpFade');},20);
 }
 
 /* ═══ GROUP CONTROLS ═══ */
@@ -1160,12 +1193,62 @@ function toggleMeasSection(){
     p.classList.remove('show');hdr.classList.remove('open');
   } else {
     p.classList.add('show');hdr.classList.add('open');call('requestMeasurements');
+    setTimeout(function(){checkScrollFade('measScroll','measFade');},50);
   }
 }
 function updateMeasHdrCnt(){
   var cnt=document.getElementById('measHdrCnt');
   if(cnt)cnt.textContent=MEAS.length?'('+MEAS.length+')':'';
 }
+
+/* ═══ PANEL RESIZE ═══ */
+var _resizing=null,_resizeStartY=0,_resizeStartH=0;
+var panelHeights={measPanel:150,asmPanel:150};
+function startResize(e,panelId){
+  e.preventDefault();e.stopPropagation();
+  _resizing=panelId;
+  _resizeStartY=e.clientY;
+  _resizeStartH=document.getElementById(panelId).offsetHeight;
+  document.body.style.cursor='ns-resize';
+  document.body.style.userSelect='none';
+}
+document.addEventListener('mousemove',function(e){
+  if(!_resizing)return;
+  var dy=_resizeStartY-e.clientY;
+  var maxH=Math.floor(window.innerHeight*0.6);
+  var h=Math.max(80,Math.min(maxH,_resizeStartH+dy));
+  var p=document.getElementById(_resizing);
+  p.style.height=h+'px';
+  panelHeights[_resizing]=h;
+  checkAllScrollFades();
+});
+document.addEventListener('mouseup',function(){
+  if(!_resizing)return;
+  _resizing=null;
+  document.body.style.cursor='';
+  document.body.style.userSelect='';
+});
+
+/* ═══ SCROLL FADE INDICATOR ═══ */
+function checkScrollFade(scrollId,fadeId){
+  var s=document.getElementById(scrollId);
+  var f=document.getElementById(fadeId);
+  if(!s||!f)return;
+  var hasMore=s.scrollHeight>s.clientHeight&&(s.scrollTop+s.clientHeight)<s.scrollHeight-4;
+  if(hasMore)f.classList.add('vis');else f.classList.remove('vis');
+}
+function checkAllScrollFades(){
+  checkScrollFade('measScroll','measFade');
+  checkScrollFade('asmScroll','asmFade');
+  checkScrollFade('dp','dpFade');
+}
+/* Listen for scroll events on all scrollable areas */
+document.addEventListener('scroll',function(e){
+  var t=e.target;
+  if(t.id==='measScroll')checkScrollFade('measScroll','measFade');
+  else if(t.id==='asmScroll')checkScrollFade('asmScroll','asmFade');
+  else if(t.id==='dp')checkScrollFade('dp','dpFade');
+},true);
 
 /* ═══ VISIBILITY ═══ */
 function togCatVis(gk){
@@ -1313,6 +1396,7 @@ function toggleAsmPanel(){
     p.classList.remove('show');hdr.classList.remove('open');
   } else {
     p.classList.add('show');hdr.classList.add('open');call('loadAssemblies');
+    setTimeout(function(){checkScrollFade('asmScroll','asmFade');},50);
   }
 }
 function renderAsmPanel(){
@@ -1344,6 +1428,7 @@ function renderAsmPanel(){
       '</span></div>';
   }
   body.innerHTML=h;
+  setTimeout(function(){checkScrollFade('asmScroll','asmFade');},20);
 }
 function buildAsmDD(){
   var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
@@ -1491,6 +1576,7 @@ function renderMeasPanel(){
     h+='</div></div>';
   }
   document.getElementById('measBody').innerHTML=h;
+  setTimeout(function(){checkScrollFade('measScroll','measFade');},20);
 }
 function fmtMeasVal(val,unit){
   if(!val&&val!==0)return'--';
