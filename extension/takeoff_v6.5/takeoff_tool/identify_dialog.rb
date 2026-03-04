@@ -60,6 +60,18 @@ module TakeoffTool
           sub = ''
         end
         next if cat.empty?
+        # Learning system: capture before apply
+        if @current_entities.length > 0
+          first_e = @current_entities.first
+          old_cat = first_e.get_attribute('TakeoffAssignments', 'category') rescue nil
+          old_cat ||= 'Uncategorized'
+          begin
+            LearningSystem.capture(first_e.entityID, old_cat, cat,
+              new_subcategory: sub.empty? ? nil : sub)
+          rescue => le
+            puts "Identify learning capture error: #{le.message}"
+          end
+        end
         TakeoffTool.apply_category_to_selection(@current_entities, cat)
         unless sub.empty?
           @current_entities.each do |e|

@@ -400,6 +400,16 @@ module TakeoffTool
       TakeoffTool.category_assignments = ca
       puts "HyperParser: Committed #{count} entities to '#{category}'"
 
+      # Learning system: capture from first entity
+      if eids.length > 0
+        begin
+          LearningSystem.capture(eids.first, 'Uncategorized', category,
+            new_subcategory: subcategory.empty? ? nil : subcategory)
+        rescue => le
+          puts "HyperParser learning capture error: #{le.message}"
+        end
+      end
+
       # Refresh dashboard if open
       if Dashboard.visible?
         Dashboard.send_data(sr, ca, TakeoffTool.cost_code_assignments)

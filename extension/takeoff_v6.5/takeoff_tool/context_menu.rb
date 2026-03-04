@@ -25,10 +25,13 @@ module TakeoffTool
 
   def self.apply_category_to_selection(entities, category)
     count = 0
+    first_old_cat = nil
     entities.each do |e|
       next unless e.respond_to?(:set_attribute) && e.respond_to?(:entityID)
       eid = e.entityID
       begin
+        old_cat = e.get_attribute('TakeoffAssignments', 'category') rescue nil
+        first_old_cat ||= old_cat || 'Uncategorized'
         e.set_attribute('TakeoffAssignments', 'category', category)
         e.set_attribute('TakeoffAssignments', 'subcategory', '')
         @category_assignments[eid] = category
@@ -49,6 +52,15 @@ module TakeoffTool
       end
     end
     puts "Takeoff: Set #{count} entities to category '#{category}'"
+
+    # Learning system: capture from first entity
+    if entities.length > 0 && first_old_cat
+      begin
+        LearningSystem.capture(entities.first.entityID, first_old_cat, category)
+      rescue => le
+        puts "Context menu learning capture error: #{le.message}"
+      end
+    end
 
     # Refresh dashboard if open
     if Dashboard.visible?

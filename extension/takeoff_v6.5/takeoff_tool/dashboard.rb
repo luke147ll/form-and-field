@@ -23,6 +23,7 @@ module TakeoffTool
           eid = data['eid'].to_i
           cat = data['val'].to_s
           puts "Takeoff: setCategory eid=#{eid} cat=#{cat}"
+          old_cat = ca[eid] || sr.find { |r| r[:entity_id] == eid }&.dig(:parsed, :auto_category) || 'Uncategorized'
           ca[eid] = cat
           TakeoffTool.category_assignments = ca
           RecatLog.log_change(eid, cat)
@@ -30,7 +31,10 @@ module TakeoffTool
           TakeoffTool.save_assignment(eid, 'category', cat)
           TakeoffTool.save_assignment(eid, 'subcategory', '')
           sr.each { |r| if r[:entity_id] == eid; r[:parsed][:auto_subcategory] = ''; break; end }
+          # Learning system: capture reclassification
+          begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           send_data(sr, ca, cca)
+          TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff setCategory error: #{e.message}"
         end
@@ -289,8 +293,11 @@ module TakeoffTool
           eids = data['eids'] || []
           cat = data['val'].to_s
           puts "Takeoff: bulkSetCategory #{eids.length} items -> #{cat}"
+          first_old_cat = nil
           eids.each do |eid|
             eid_i = eid.to_i
+            old_cat = ca[eid_i] || sr.find { |r| r[:entity_id] == eid_i }&.dig(:parsed, :auto_category) || 'Uncategorized'
+            first_old_cat ||= old_cat
             ca[eid_i] = cat
             RecatLog.log_change(eid_i, cat)
             TakeoffTool.save_assignment(eid_i, 'category', cat)
@@ -298,7 +305,12 @@ module TakeoffTool
             sr.each { |r| if r[:entity_id] == eid_i; r[:parsed][:auto_subcategory] = ''; break; end }
           end
           TakeoffTool.category_assignments = ca
+          # Learning system: capture from first entity in bulk
+          if eids.length > 0 && first_old_cat
+            begin; LearningSystem.capture(eids.first.to_i, first_old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
+          end
           send_data(sr, ca, cca)
+          TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff bulkSetCategory error: #{e.message}"
         end
@@ -596,14 +608,30 @@ module TakeoffTool
         assigned = cca[r[:entity_id]]
         # Only show as overlap if multiple codes AND user hasn't picked one yet
         has_assigned = assigned && !assigned.empty?
-        auto_cc = has_assigned ? assigned : (sc.length == 1 ? sc[0] : '')
-        has_overlap = sc.length > 1 && !has_assigned
+
+        # Check for parser-assigned cost code from cost_code_map
+        parser_cc = r[:parsed][:cost_code]
+        auto_cc = if has_assigned
+          assigned
+        elsif parser_cc && !parser_cc.to_s.empty?
+          parser_cc
+        elsif sc.length == 1
+          sc[0]
+        else
+          ''
+        end
+        has_overlap = sc.length > 1 && !has_assigned && !parser_cc
 
         mt_default = Parser.measurement_for(cat)
         mt = mt_default
         # Check for user override stored in model attributes
         m_override = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
         mt = m_override if m_override && !m_override.empty?
+
+        # Confidence flag for interactive scanner
+        conf_pct = InteractiveScanner.confidence_pct(r) rescue 100
+        flagged = conf_pct >= InteractiveScanner::MEDIUM_CONFIDENCE && conf_pct < InteractiveScanner::HIGH_CONFIDENCE
+
         {
           entityId: r[:entity_id], tag: r[:tag], defaultMT: mt_default,
           definitionName: r[:display_name] || r[:definition_name],
@@ -618,7 +646,9 @@ module TakeoffTool
           subcategory: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || '',
           suggestedCodes: sc, hasOverlap: has_overlap,
           warnings: r[:warnings] || [],
-          revitId: r[:parsed][:revit_id], ifcType: r[:ifc_type]
+          revitId: r[:parsed][:revit_id], ifcType: r[:ifc_type],
+          flagged: flagged, confidencePct: conf_pct,
+          categorySource: r[:parsed][:category_source]
         }
       end
 

@@ -2,6 +2,9 @@ module TakeoffTool
 
   load File.join(PLUGIN_DIR, 'scanner.rb')
   load File.join(PLUGIN_DIR, 'parser.rb')
+  load File.join(PLUGIN_DIR, 'cost_code_parser.rb')
+  load File.join(PLUGIN_DIR, 'learning_system.rb')
+  load File.join(PLUGIN_DIR, 'interactive_scanner.rb')
   load File.join(PLUGIN_DIR, 'dashboard.rb')
   load File.join(PLUGIN_DIR, 'startup_dialog.rb')
   load File.join(PLUGIN_DIR, 'exporter.rb')
@@ -18,6 +21,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'hyper_parser.rb')
   load File.join(PLUGIN_DIR, 'bug_reporter.rb')
   load File.join(PLUGIN_DIR, 'elevation_tool.rb')
+  load File.join(PLUGIN_DIR, 'scan_backup.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -71,6 +75,7 @@ module TakeoffTool
     sub.add_item('Clear Highlights') { Highlighter.clear_all }
     sub.add_item('Show All Elements') { Highlighter.show_all }
     sub.add_item('Hyper Parse') { HyperParser.show_dialog }
+    sub.add_item('Learned Rules') { LearningSystem.show_dialog }
     sub.add_separator
     sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
@@ -161,8 +166,20 @@ module TakeoffTool
       if load_scan_from_model
         puts "Takeoff: Scan data restored - dashboard ready"
       end
+      # Check for backup newer than last save (crash recovery)
+      begin
+        ScanBackup.check_for_recovery
+      rescue => e
+        puts "Takeoff: ScanBackup recovery check error: #{e.message}"
+      end
     end
     @auto_load_done = true
+  end
+
+  def self.trigger_backup
+    ScanBackup.save
+  rescue => e
+    puts "Takeoff: trigger_backup error: #{e.message}"
   end
 
   def self.run_scan(progress_dlg = nil)
@@ -222,6 +239,21 @@ module TakeoffTool
           progress_dlg.execute_script("if(typeof scanComplete==='function')scanComplete('#{safe}')") rescue nil
         end
         save_scan_to_model
+        trigger_backup
+
+        # Run interactive scanner for low-confidence items
+        begin
+          is_summary = InteractiveScanner.analyze(@scan_results, @category_assignments)
+          if is_summary[:low_confidence_groups] > 0
+            Dashboard.scan_log_msg("Interactive scanner: #{is_summary[:low_confidence_groups]} groups need classification")
+          end
+          if is_summary[:flagged] > 0
+            Dashboard.scan_log_msg("#{is_summary[:flagged]} items flagged for review")
+          end
+        rescue => is_err
+          puts "Takeoff: InteractiveScanner error: #{is_err.message}"
+        end
+
         open_dashboard
       end
     rescue => e
@@ -856,6 +888,8 @@ module TakeoffTool
       e.set_attribute(d, 'thickness', (r[:parsed][:thickness] || '').to_s)
       e.set_attribute(d, 'size_nominal', (r[:parsed][:size_nominal] || '').to_s)
       e.set_attribute(d, 'revit_id', (r[:parsed][:revit_id] || '').to_s)
+      e.set_attribute(d, 'confidence', (r[:parsed][:confidence] || '').to_s)
+      e.set_attribute(d, 'cost_code_parsed', (r[:parsed][:cost_code] || '').to_s)
       count += 1
     end
     puts "Takeoff: Saved #{count} scan results to model"
@@ -889,6 +923,15 @@ module TakeoffTool
         vol_ft3 = (inst.get_attribute(d, 'volume_ft3') || 0.0).to_f
         vi3 = vol_ft3 * 1728.0
 
+        conf_str = inst.get_attribute(d, 'confidence')
+        conf_sym = case conf_str
+          when 'high' then :high
+          when 'medium' then :medium
+          when 'low' then :low
+          when 'none' then :none
+          else nil
+        end
+
         parsed = {
           raw: inst.get_attribute(d, 'display_name') || dname,
           element_type: inst.get_attribute(d, 'element_type'),
@@ -900,7 +943,9 @@ module TakeoffTool
           auto_category: auto_cat,
           auto_subcategory: inst.get_attribute(d, 'auto_subcategory') || '',
           measurement_type: inst.get_attribute(d, 'measurement_type'),
-          category_source: inst.get_attribute(d, 'category_source')
+          category_source: inst.get_attribute(d, 'category_source'),
+          confidence: conf_sym,
+          cost_code: inst.get_attribute(d, 'cost_code_parsed')
         }
         parsed.each { |k, v| parsed[k] = nil if v.is_a?(String) && v.empty? && k != :auto_subcategory }
 

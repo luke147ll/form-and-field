@@ -90,6 +90,11 @@ module TakeoffTool
       results = []; reg = {}; seen = {}
       @is_ifc_model = IFCParser.ifc_model?(model)
 
+      # Pre-load cost code map and learned rules
+      CostCodeParser.load_map
+      LearningSystem.load_rules
+      progress.call("Cost code map and learned rules loaded") if progress
+
       # Auto-detection summary
       has_revit = model.definitions.any? { |d| !d.image? && d.name =~ /^Basic Wall|^Basic Roof|^Compound Ceiling/i }
       if @is_ifc_model
@@ -325,6 +330,16 @@ module TakeoffTool
 
       # Strategy 3: Material + bounding box (Cadworks-style models)
       r = try_material_bbox(inst, display, mat)
+      candidates << r if r
+
+      # Strategy 3.5: Cost Code Map parser
+      bb = inst.respond_to?(:bounds) ? inst.bounds : nil
+      cc_dims = bb ? [bb.width.to_f, bb.height.to_f, bb.depth.to_f] : nil
+      r = CostCodeParser.classify(display, tag, mat, ifc_type, cc_dims)
+      candidates << r if r
+
+      # Strategy 3.7: Learned rules
+      r = LearningSystem.apply(display, mat, ifc_type)
       candidates << r if r
 
       # Strategy 4: Existing parser (Revit name patterns + tag fallback)
