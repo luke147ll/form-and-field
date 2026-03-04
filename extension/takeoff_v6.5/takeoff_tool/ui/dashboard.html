@@ -185,6 +185,24 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 /* Dimmed "(no subcategory)" rows */
 .sc-hdr.sc-none td{opacity:0.55}
 .sc-hdr.sc-none .sc-name{color:#6c7086;font-style:italic}
+/* Drag & drop subcategory between categories */
+.sc-hdr.sc-dragging{opacity:0.35;background:rgba(203,166,247,0.05)}
+.sc-hdr[draggable="true"]{cursor:grab}
+.sc-hdr[draggable="true"]:active{cursor:grabbing}
+.cgh.drop-target-available{border-left:2px solid rgba(203,166,247,0.3)}
+.cgh.drop-target-hover{background:rgba(203,166,247,0.1) !important;border-left:3px solid #cba6f7;transition:all .15s ease}
+/* Inline move confirmation bar */
+.move-confirm-bar{display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:rgba(203,166,247,0.08);border-left:3px solid #cba6f7;max-height:0;overflow:hidden;opacity:0;transition:max-height .2s ease,opacity .2s ease,padding .2s ease}
+.move-confirm-bar.visible{max-height:40px;padding:6px 12px;opacity:1}
+.move-confirm-bar.confirmed{background:rgba(166,227,161,0.08);border-left-color:#a6e3a1}
+.mc-text{font-size:11px;color:#cdd6f4}
+.mc-text strong{color:#cba6f7}
+.mc-actions{display:flex;gap:6px;flex-shrink:0}
+.mc-btn{font-size:11px;padding:3px 12px;border-radius:4px;cursor:pointer;transition:all .12s ease;user-select:none}
+.mc-confirm{background:#cba6f7;color:#1e1e2e;font-weight:600}
+.mc-confirm:hover{background:#b4befe}
+.mc-cancel{color:#6c7086;border:1px solid #45475a}
+.mc-cancel:hover{color:#f38ba8;border-color:#f38ba8}
 
 /* ASSEMBLY PANEL */
 .asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center;flex-shrink:0}
@@ -1061,7 +1079,7 @@ function renderGroups(){
     var isoClass=ISO_CATS?(ISO_CATS[gk]?' iso-active':' iso-dimmed'):'';
     h+='<div class="cg'+(isOpen?' open':'')+isoClass+'" id="cg_'+gi+'">';
     // ── HEADER ──
-    h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')">';
+    h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')" data-cat="'+X2(gk)+'" ondragover="onCatDragOver(event,\''+X2(gk)+'\')" ondragleave="onCatDragLeave(event)" ondrop="onCatDrop(event,\''+X2(gk)+'\')">';
     // Eye toggle
     h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togCatVis(\''+X2(gk)+'\')" title="'+(catVis?'Hide':'Show')+'">'+(catVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
     var catCol=(CCOL.categories||{})[gk]||'';
@@ -1142,7 +1160,8 @@ function renderGroups(){
           var sVis=false;for(var svi=0;svi<subArr.length;svi++)if(VIS[subArr[svi].entityId]!==false){sVis=true;break;}
           var scCols=gBy==='category'?9:10;
           var scNone=curSub?'':'sc-none';
-          h+='<tr class="sc-hdr'+(sOpen?'':' closed')+(scNone?' '+scNone:'')+'" oncontextmenu="onSubHdrContext(event,\''+X2(gk)+'\',\''+X2(curSub)+'\')">';
+          var dragAttr=curSub?' draggable="true" ondragstart="onSubDragStart(event,\''+X2(gk)+'\',\''+X2(curSub)+'\')" ondragend="onSubDragEnd(event)"':'';
+          h+='<tr class="sc-hdr'+(sOpen?'':' closed')+(scNone?' '+scNone:'')+'"'+dragAttr+' data-cat="'+X2(gk)+'" data-sub="'+X2(curSub)+'" oncontextmenu="onSubHdrContext(event,\''+X2(gk)+'\',\''+X2(curSub)+'\')">';
           h+='<td class="ck"><input type="checkbox" onclick="event.stopPropagation()" onchange="selSubAll(\''+X2(gk)+'\',\''+X2(curSub)+'\',this.checked)"></td>';
           h+='<td colspan="'+scCols+'" onclick="togSub(\''+X2(sKey)+'\')">';
           h+='<span class="arr">&#9660;</span> ';
@@ -1259,6 +1278,67 @@ function selSubItems(cat,sub){
 function selSubAll(cat,sub,chk){
   for(var i=0;i<F.length;i++){if(F[i].category===cat&&(F[i].subcategory||'')===sub){if(chk)SEL[F[i].entityId]=true;else delete SEL[F[i].entityId];}}
   syncCBs();updateBulkBar();hlSel();
+}
+
+/* ═══ DRAG & DROP SUBCATEGORY BETWEEN CATEGORIES ═══ */
+var dragSourceCat=null,dragSourceSub=null;
+function onSubDragStart(event,cat,sub){
+  dragSourceCat=cat;dragSourceSub=sub;
+  event.dataTransfer.setData('text/plain',JSON.stringify({cat:cat,sub:sub}));
+  event.dataTransfer.effectAllowed='move';
+  event.currentTarget.classList.add('sc-dragging');
+  setTimeout(function(){
+    document.querySelectorAll('.cgh[data-cat]').forEach(function(hdr){
+      if(hdr.dataset.cat!==cat)hdr.classList.add('drop-target-available');
+    });
+  },50);
+}
+function onSubDragEnd(event){
+  event.currentTarget.classList.remove('sc-dragging');
+  dragSourceCat=null;dragSourceSub=null;
+  document.querySelectorAll('.cgh').forEach(function(hdr){
+    hdr.classList.remove('drop-target-available','drop-target-hover');
+  });
+}
+function onCatDragOver(event,targetCat){
+  if(!dragSourceCat||targetCat===dragSourceCat)return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect='move';
+  event.currentTarget.classList.add('drop-target-hover');
+}
+function onCatDragLeave(event){
+  event.currentTarget.classList.remove('drop-target-hover');
+}
+function onCatDrop(event,targetCat){
+  event.preventDefault();
+  event.currentTarget.classList.remove('drop-target-hover','drop-target-available');
+  if(!dragSourceCat||!dragSourceSub||targetCat===dragSourceCat)return;
+  var count=0;
+  for(var i=0;i<D.length;i++){if(D[i].category===dragSourceCat&&(D[i].subcategory||'')===dragSourceSub)count++;}
+  showMoveConfirm(dragSourceCat,dragSourceSub,targetCat,count,event.currentTarget);
+}
+function showMoveConfirm(sCat,sub,tCat,count,headerEl){
+  cancelMove();
+  var bar=document.createElement('div');
+  bar.id='moveConfirmBar';bar.className='move-confirm-bar';
+  var se=function(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');};
+  bar.innerHTML='<span class="mc-text">Move <strong>'+X(sub)+'</strong> ('+count+') to <strong>'+X(tCat)+'</strong>?</span>'
+    +'<span class="mc-actions">'
+    +'<span class="mc-btn mc-confirm" onclick="doConfirmMove(\''+se(sCat)+'\',\''+se(sub)+'\',\''+se(tCat)+'\')">Move</span>'
+    +'<span class="mc-btn mc-cancel" onclick="cancelMove()">Cancel</span>'
+    +'</span>';
+  headerEl.insertAdjacentElement('afterend',bar);
+  requestAnimationFrame(function(){bar.classList.add('visible');});
+  bar._timeout=setTimeout(cancelMove,8000);
+}
+function doConfirmMove(sCat,sub,tCat){
+  var bar=document.getElementById('moveConfirmBar');
+  if(bar){clearTimeout(bar._timeout);bar.classList.add('confirmed');setTimeout(function(){bar.remove();},300);}
+  callJSON('moveSubcategory',{sourceCat:sCat,sub:sub,targetCat:tCat});
+}
+function cancelMove(){
+  var bar=document.getElementById('moveConfirmBar');
+  if(bar){clearTimeout(bar._timeout);bar.classList.remove('visible');setTimeout(function(){bar.remove();},200);}
 }
 
 /* ═══ ADVANCED FILTER TOGGLE ═══ */

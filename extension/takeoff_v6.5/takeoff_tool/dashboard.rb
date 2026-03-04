@@ -404,6 +404,19 @@ module TakeoffTool
         end
       end
 
+      @dialog.add_action_callback('moveSubcategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          source_cat = data['sourceCat'].to_s.strip
+          sub_name = data['sub'].to_s.strip
+          target_cat = data['targetCat'].to_s.strip
+          TakeoffTool.move_subcategory(source_cat, sub_name, target_cat)
+        rescue => e
+          puts "Takeoff moveSubcategory error: #{e.message}"
+        end
+      end
+
       # Bulk set size for multiple entities at once
       @dialog.add_action_callback('bulkSetSize') do |_ctx, json_str|
         begin

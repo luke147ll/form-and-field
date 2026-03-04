@@ -742,6 +742,69 @@ module TakeoffTool
     end
   end
 
+  # Move a subcategory from one category to another.
+  # All entities in that subcategory get their category reassigned.
+  def self.move_subcategory(source_cat, sub_name, target_cat)
+    return false if source_cat.nil? || sub_name.nil? || target_cat.nil?
+    source_cat = source_cat.to_s.strip
+    sub_name = sub_name.to_s.strip
+    target_cat = target_cat.to_s.strip
+    return false if source_cat.empty? || sub_name.empty? || target_cat.empty?
+    return false if source_cat == target_cat
+
+    m = Sketchup.active_model
+    return false unless m
+
+    m.start_operation('Move Subcategory', true)
+    begin
+      moved_count = 0
+
+      # Iterate scan_results — the authoritative data source.
+      # Must use the SAME category/subcategory resolution as send_data:
+      #   category:    @category_assignments[eid] || auto_category
+      #   subcategory: entity attr 'subcategory'  || auto_subcategory
+      (@scan_results || []).each do |r|
+        eid = r[:entity_id]
+        eff_cat = @category_assignments[eid] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless eff_cat == source_cat
+
+        e = find_entity(eid)
+        eff_sub = (e&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''
+        next unless eff_sub == sub_name
+
+        # Update in-memory category assignment
+        @category_assignments[eid] = target_cat
+
+        # Persist to entity attributes
+        if e && e.valid?
+          e.set_attribute('TakeoffAssignments', 'category', target_cat)
+        end
+
+        moved_count += 1
+      end
+
+      # Update master subcategories lists
+      if @master_subcategories[source_cat]
+        @master_subcategories[source_cat].delete(sub_name)
+      end
+      @master_subcategories[target_cat] ||= []
+      unless @master_subcategories[target_cat].include?(sub_name)
+        @master_subcategories[target_cat] << sub_name
+        @master_subcategories[target_cat].sort_by!(&:downcase)
+      end
+
+      save_master_subcategories
+      m.commit_operation
+      broadcast_category_update
+      puts "Takeoff: Moved subcategory '#{sub_name}' (#{moved_count} items) from '#{source_cat}' to '#{target_cat}'"
+      true
+    rescue => e
+      m.abort_operation
+      puts "Takeoff: move_subcategory error: #{e.message}"
+      false
+    end
+  end
+
   # Persist master subcategories to model attribute as JSON
   def self.save_master_subcategories
     m = Sketchup.active_model
