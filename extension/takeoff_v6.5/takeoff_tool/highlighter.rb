@@ -696,8 +696,17 @@ module TakeoffTool
       # Walk model hierarchy to restore any hidden ancestor containers
       show_hierarchy(m.entities)
 
-      # Show all layers
-      m.layers.each { |l| l.visible = true }
+      # Show all layers, but respect multiverse layer visibility
+      mv_view = TakeoffTool.active_mv_view rescue nil
+      m.layers.each do |l|
+        if mv_view == 'a' && (l.name == 'FF_Model_B')
+          l.visible = false
+        elsif mv_view == 'b' && (l.name == 'FF_Model_A')
+          l.visible = false
+        else
+          l.visible = true
+        end
+      end
       m.commit_operation
     end
 
@@ -893,9 +902,19 @@ module TakeoffTool
       end
     end
 
-    # Load the full custom colors map from model attributes
+    # Load the full custom colors map from model attributes.
+    # In multiverse mode, reads the per-view key (custom_colors_model_a/b)
+    # so per-category colors picked in [A] or [B] view are found.
     def self.load_custom_colors
       require 'json'
+      mv_view = TakeoffTool.active_mv_view rescue nil
+      if mv_view && mv_view != 'ab'
+        key = (mv_view == 'a') ? 'custom_colors_model_a' : 'custom_colors_model_b'
+        json = Sketchup.active_model.get_attribute('FormAndField', key, nil)
+        if json
+          return (JSON.parse(json) rescue {})
+        end
+      end
       json = Sketchup.active_model.get_attribute('FormAndField', 'custom_colors', '{}')
       JSON.parse(json) rescue {}
     end

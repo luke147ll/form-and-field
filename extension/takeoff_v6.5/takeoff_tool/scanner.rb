@@ -86,8 +86,12 @@ module TakeoffTool
     # scan_model — Main entry point
     # ═══════════════════════════════════════════════════════════
 
-    def self.scan_model(model, &progress)
-      results = []; reg = {}; seen = {}
+    # model_source_filter: nil = scan all, 'model_a' = only model_a, 'model_b' = only non-model_a
+    # existing_results/existing_reg: when provided, append to these instead of starting fresh
+    def self.scan_model(model, model_source_filter: nil, existing_results: nil, existing_reg: nil, &progress)
+      results = existing_results || []; reg = existing_reg || {}; seen = {}
+      # When appending, mark existing entity IDs as seen so we don't re-process them
+      reg.each_key { |eid| seen[eid] = true } if existing_reg
       @is_ifc_model = IFCParser.ifc_model?(model)
 
       # Pre-load cost code map and learned rules
@@ -105,15 +109,28 @@ module TakeoffTool
         progress.call("Generic model — material + keyword parsers active") if progress
       end
 
+      filter_label = model_source_filter == 'model_b' ? ' (Model B only)' : (model_source_filter == 'model_a' ? ' (Model A only)' : '')
+
       defs = model.definitions.select { |d| !d.image? }
       total_defs = defs.length
-      progress.call("Found #{total_defs} definitions to process") if progress
+      progress.call("Found #{total_defs} definitions to process#{filter_label}") if progress
 
       defs.each_with_index do |defn, idx|
         inst_count = defn.instances.length
         progress.call("Definition #{idx+1}/#{total_defs}: #{defn.name} (#{inst_count} instances)") if progress && inst_count > 0
         defn.instances.each do |inst|
           next if seen[inst.entityID]; seen[inst.entityID] = true
+
+          # Model source filter: skip entities not matching the requested scope
+          if model_source_filter
+            ms = inst.get_attribute('FormAndField', 'model_source') || 'model_a'
+            if model_source_filter == 'model_a'
+              next unless ms == 'model_a'
+            elsif model_source_filter == 'model_b'
+              next if ms == 'model_a'
+            end
+          end
+
           reg[inst.entityID] = inst
           process(inst, defn, results)
         end

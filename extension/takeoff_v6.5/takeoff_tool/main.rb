@@ -205,11 +205,35 @@ module TakeoffTool
     begin
       Dashboard.scan_log_start
 
-      @scan_results, @entity_registry = Scanner.scan_model(m) do |msg|
-        Dashboard.scan_log_msg(msg)
-        if progress_dlg
-          safe = msg.to_s.gsub("\\", "\\\\").gsub("'", "\\\\'")
-          progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('#{safe}')") rescue nil
+      mv_active = active_mv_view
+      if mv_active
+        # Multiverse active: only rescan Model A, preserve Model B results
+        model_b_results = (@scan_results || []).select do |r|
+          e = @entity_registry[r[:entity_id]]
+          ms = (e && e.valid?) ? (e.get_attribute('FormAndField', 'model_source') || 'model_a') : 'model_a'
+          ms != 'model_a'
+        end
+        model_b_reg = {}
+        model_b_results.each { |r| model_b_reg[r[:entity_id]] = @entity_registry[r[:entity_id]] if @entity_registry[r[:entity_id]] }
+
+        a_results, @entity_registry = Scanner.scan_model(m, model_source_filter: 'model_a') do |msg|
+          Dashboard.scan_log_msg(msg)
+          if progress_dlg
+            safe = msg.to_s.gsub("\\", "\\\\").gsub("'", "\\\\'")
+            progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('#{safe}')") rescue nil
+          end
+        end
+        # Merge Model B registry and results back
+        model_b_reg.each { |eid, e| @entity_registry[eid] = e }
+        @scan_results = a_results + model_b_results
+        @scan_results.sort_by! { |r| [r[:tag] || 'zzz', r[:display_name] || ''] }
+      else
+        @scan_results, @entity_registry = Scanner.scan_model(m) do |msg|
+          Dashboard.scan_log_msg(msg)
+          if progress_dlg
+            safe = msg.to_s.gsub("\\", "\\\\").gsub("'", "\\\\'")
+            progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('#{safe}')") rescue nil
+          end
         end
       end
 
@@ -261,7 +285,8 @@ module TakeoffTool
         begin
           is_summary = InteractiveScanner.analyze(@scan_results, @category_assignments)
           if is_summary[:low_confidence_groups] > 0
-            Dashboard.scan_log_msg("Interactive scanner: #{is_summary[:low_confidence_groups]} groups need classification")
+            Dashboard.send_scanner_banner(is_summary)
+            Dashboard.scan_log_msg("Scanner: #{is_summary[:low_confidence_groups]} groups need classification")
           end
           if is_summary[:flagged] > 0
             Dashboard.scan_log_msg("#{is_summary[:flagged]} items flagged for review")

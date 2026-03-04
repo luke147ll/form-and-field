@@ -13,6 +13,34 @@ module TakeoffTool
       Sketchup.active_model.set_attribute('FormAndField', 'custom_colors', JSON.generate(colors))
     end
 
+    # Per-model custom colors: returns the right color set for the active multiverse view
+    def self.load_custom_colors_for_view
+      mv_view = TakeoffTool.active_mv_view
+      return load_custom_colors unless mv_view
+      case mv_view
+      when 'a'
+        key = 'custom_colors_model_a'
+      when 'b'
+        key = 'custom_colors_model_b'
+      else
+        return load_custom_colors
+      end
+      require 'json'
+      json = Sketchup.active_model.get_attribute('FormAndField', key, '{}')
+      JSON.parse(json) rescue {}
+    end
+
+    def self.save_custom_colors_for_view(colors)
+      mv_view = TakeoffTool.active_mv_view
+      unless mv_view && mv_view != 'ab'
+        save_custom_colors(colors)
+        return
+      end
+      key = mv_view == 'a' ? 'custom_colors_model_a' : 'custom_colors_model_b'
+      require 'json'
+      Sketchup.active_model.set_attribute('FormAndField', key, JSON.generate(colors))
+    end
+
     def self.show(sr, ca, cca)
       if @dialog && @dialog.visible?; send_data(sr, ca, cca); return; end
 
@@ -160,13 +188,13 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('highlightAll') do |_ctx|
-        Highlighter.highlight_all(sr, ca)
+        Highlighter.highlight_all(TakeoffTool.filtered_scan_results, ca)
         @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
       @dialog.add_action_callback('highlightCategory') do |_ctx, cat_str|
         Highlighter.clear_all
-        Highlighter.highlight_category(sr, ca, cat_str.to_s)
+        Highlighter.highlight_category(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
         @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
@@ -180,11 +208,11 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('highlightCategoryColor') do |_ctx, cat_str|
-        Highlighter.highlight_category_color(sr, ca, cat_str.to_s)
+        Highlighter.highlight_category_color(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
       end
 
       @dialog.add_action_callback('clearCategoryColor') do |_ctx, cat_str|
-        Highlighter.clear_category_color(sr, ca, cat_str.to_s)
+        Highlighter.clear_category_color(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
       end
 
       @dialog.add_action_callback('clearHighlights') do |_ctx|
@@ -193,7 +221,7 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
-        Highlighter.isolate_category(sr, ca, cat_str.to_s)
+        Highlighter.isolate_category(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
       end
 
       @dialog.add_action_callback('isolateTag') do |_ctx, tag_str|
@@ -202,6 +230,73 @@ module TakeoffTool
 
       @dialog.add_action_callback('showAll') do |_ctx|
         Highlighter.show_all
+      end
+
+      @dialog.add_action_callback('isolateCategoryForModel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          category = data['category'].to_s
+          model_id = data['modelId'].to_s
+          m = Sketchup.active_model
+          next unless m
+
+          prefix = model_id.start_with?('model_b') ? 'model_b' : 'model_a'
+
+          # Collect entities for this model
+          visible = []
+          hide = []
+          TakeoffTool.filtered_scan_results.each do |r|
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid?
+            ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+            next unless ms.start_with?(prefix)
+            cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+            if cat == category
+              visible << e
+            else
+              hide << e
+            end
+          end
+
+          # Build keep-visible set with ancestors
+          keep_ids, keep_layers = Highlighter.build_keep_visible_set(visible)
+
+          m.start_operation('Isolate Model Category', true)
+          hide.each { |e| e.visible = false unless keep_ids[e.entityID] }
+          visible.each { |e| e.visible = true }
+          keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
+          keep_layers.each_key do |ln|
+            l = m.layers[ln]
+            l.visible = true if l && !l.visible?
+          end
+          m.commit_operation
+        rescue => e
+          puts "Dashboard: isolateCategoryForModel error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('showAllForModel') do |_ctx, model_id_str|
+        begin
+          m = Sketchup.active_model
+          next unless m
+          prefix = model_id_str.to_s.start_with?('model_b') ? 'model_b' : 'model_a'
+
+          m.start_operation('Show All Model', true)
+          visible = []
+          TakeoffTool.filtered_scan_results.each do |r|
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid?
+            ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+            next unless ms.start_with?(prefix)
+            e.visible = true
+            visible << e
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+        rescue => e
+          puts "Dashboard: showAllForModel error: #{e.message}"
+        end
       end
 
       @dialog.add_action_callback('hideEntities') do |_ctx, ids_str|
@@ -576,11 +671,15 @@ module TakeoffTool
         send_multiverse_data
       end
 
+      @dialog.add_action_callback('rescanModelB') do |_ctx|
+        TakeoffTool.rescan_model_b
+      end
+
       # Isolate specific entities by ID
       @dialog.add_action_callback('isolateEntities') do |_ctx, ids_str|
         ids = ids_str.to_s.split(',').map(&:to_i)
         puts "Takeoff: isolateEntities #{ids.length} items"
-        Highlighter.isolate_entities(sr, ids)
+        Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, ids)
       end
 
       # ═══ CUSTOM COLORS ═══
@@ -592,12 +691,12 @@ module TakeoffTool
           type = data['type'].to_s
           key = data['key'].to_s
           color = data['color'].to_s
-          colors = load_custom_colors
+          colors = load_custom_colors_for_view
           plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
           section = plural[type] || (type + 's')
           colors[section] ||= {}
           colors[section][key] = color
-          save_custom_colors(colors)
+          save_custom_colors_for_view(colors)
           Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
           send_data(sr, ca, cca)
@@ -612,13 +711,13 @@ module TakeoffTool
           data = JSON.parse(json_str.to_s)
           type = data['type'].to_s
           key = data['key'].to_s
-          colors = load_custom_colors
+          colors = load_custom_colors_for_view
           plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
           section = plural[type] || (type + 's')
           if colors[section]
             colors[section].delete(key)
           end
-          save_custom_colors(colors)
+          save_custom_colors_for_view(colors)
           Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
           send_data(sr, ca, cca)
@@ -743,7 +842,108 @@ module TakeoffTool
         end
       end
 
+      # ── Scanner Mode Callbacks ──
+
+      @dialog.add_action_callback('enterScannerMode') do |_ctx|
+        groups = InteractiveScanner.current_groups
+        if groups && groups.length > 0
+          all_eids = groups.flat_map { |g| g[:entity_ids] }
+          Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, all_eids)
+          send_scanner_groups
+        end
+      end
+
+      @dialog.add_action_callback('exitScannerMode') do |_ctx|
+        Highlighter.show_all
+        Highlighter.clear_all
+        send_data(sr, ca, cca)
+      end
+
+      @dialog.add_action_callback('regroupScanner') do |_ctx, mode_str|
+        InteractiveScanner.regroup(mode_str.to_s)
+        send_scanner_groups
+      end
+
+      @dialog.add_action_callback('highlightScannerGroup') do |_ctx, ids_str|
+        ids = ids_str.to_s.split(',').map(&:to_i)
+        Highlighter.highlight_entities(ids)
+      end
+
+      @dialog.add_action_callback('clearScannerHighlight') do |_ctx|
+        Highlighter.clear_all
+      end
+
+      @dialog.add_action_callback('applyScannerGroup') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          idx = data['groupIdx'].to_i
+          category = data['category'].to_s.strip
+          subcategory = (data['subcategory'] || '').to_s.strip
+          cost_code = (data['costCode'] || '').to_s.strip
+          groups = InteractiveScanner.current_groups
+          next if category.empty? || idx < 0 || idx >= groups.length
+
+          group = groups[idx]
+          InteractiveScanner.apply_to_group(group, category, subcategory, cost_code,
+            InteractiveScanner.current_sr, InteractiveScanner.current_ca)
+          group[:applied] = true
+          (group[:sub_groups] || []).each { |sg| sg[:applied] = true }
+
+          LearningSystem.capture(
+            group[:entity_ids].first, 'Uncategorized', category,
+            new_subcategory: subcategory.empty? ? nil : subcategory,
+            new_cost_code: cost_code.empty? ? nil : cost_code
+          )
+
+          send_scanner_groups
+          TakeoffTool.trigger_backup
+        rescue => e
+          puts "Scanner applyScannerGroup error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('skipScannerGroup') do |_ctx, idx_str|
+        idx = idx_str.to_s.to_i
+        groups = InteractiveScanner.current_groups
+        if idx >= 0 && idx < groups.length
+          groups[idx][:applied] = true
+          groups[idx][:skipped] = true
+          send_scanner_groups
+        end
+      end
+
+      @dialog.add_action_callback('createScannerCategory') do |_ctx, name_str|
+        name = name_str.to_s.strip
+        unless name.empty?
+          TakeoffTool.add_custom_category(name)
+          send_scanner_groups
+        end
+      end
+
       @dialog.show
+    end
+
+    # ── Scanner Mode Send Methods ──
+
+    def self.send_scanner_banner(summary)
+      return unless @dialog
+      require 'json'
+      js = JSON.generate(summary)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("if(typeof receiveScannerBanner==='function')receiveScannerBanner('#{esc}')")
+    end
+
+    def self.send_scanner_groups
+      return unless @dialog
+      require 'json'
+      groups = InteractiveScanner.serialize_groups
+      cats = TakeoffTool.master_categories
+      msub = TakeoffTool.master_subcategories
+      payload = { groups: groups, categories: cats, subcategories: msub }
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("if(typeof receiveScannerGroups==='function')receiveScannerGroups('#{esc}')")
     end
 
     def self.send_assemblies
@@ -752,8 +952,22 @@ module TakeoffTool
       assemblies = TakeoffTool.load_assemblies
 
       # Build entity→category lookup from scan results
-      sr = TakeoffTool.scan_results || []
+      mv_view = TakeoffTool.active_mv_view
+      sr = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_scan_results : (TakeoffTool.scan_results || [])
       ca = TakeoffTool.category_assignments || {}
+
+      # Multiverse: filter assemblies to only those with entities in current view
+      if mv_view && mv_view != 'ab'
+        view_eids = {}
+        sr.each { |r| view_eids[r[:entity_id].to_i] = true }
+        assemblies = assemblies.select do |_name, asm|
+          (asm['entity_ids'] || []).any? { |eid| view_eids[eid.to_i] }
+        end.to_h
+        # Filter each assembly's entity_ids to current-view entities
+        assemblies.each do |_name, asm|
+          asm['entity_ids'] = (asm['entity_ids'] || []).select { |eid| view_eids[eid.to_i] }
+        end
+      end
       eid_cat = {}
       sr.each do |r|
         eid_cat[r[:entity_id].to_i] = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
@@ -786,7 +1000,12 @@ module TakeoffTool
 
     def self.send_data(sr, ca, cca)
       return unless @dialog
-      custom_colors = load_custom_colors
+      # Multiverse: filter to active model's entities
+      mv_view = TakeoffTool.active_mv_view
+      if mv_view && mv_view != 'ab'
+        sr = TakeoffTool.filtered_scan_results
+      end
+      custom_colors = load_custom_colors_for_view
       cc = []; ccm = {}
       begin
         p = File.join(PLUGIN_DIR, 'config', 'cost_codes.json')
@@ -854,7 +1073,7 @@ module TakeoffTool
         }
       end
 
-      cats = TakeoffTool.master_categories
+      cats = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_categories : TakeoffTool.master_categories
 
       # Build per-category measurement type map (for empty categories)
       cat_mt = {}
@@ -867,7 +1086,7 @@ module TakeoffTool
       end
 
       require 'json'
-      msub = TakeoffTool.master_subcategories
+      msub = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_subcategories : TakeoffTool.master_subcategories
       js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt, customColors: custom_colors })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
@@ -985,6 +1204,9 @@ module TakeoffTool
     end
 
     def self.close
+      # Turn off color-by-layer when dashboard closes
+      m = Sketchup.active_model
+      m.rendering_options['DisplayColorByLayer'] = false if m rescue nil
       @dialog.close if @dialog
       @dialog = nil
     end
