@@ -23,6 +23,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'elevation_tool.rb')
   load File.join(PLUGIN_DIR, 'note_tool.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
+  load File.join(PLUGIN_DIR, 'multiverse.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -31,11 +32,12 @@ module TakeoffTool
   @custom_categories = []
   @master_categories = []
   @master_subcategories = {}
+  @multiverse_data = nil
 
   class << self
     attr_accessor :scan_results, :category_assignments, :cost_code_assignments,
                   :entity_registry, :custom_categories, :master_categories,
-                  :master_subcategories
+                  :master_subcategories, :multiverse_data
   end
 
   def self.find_entity(eid)
@@ -78,6 +80,10 @@ module TakeoffTool
     sub.add_item('Show All Elements') { Highlighter.show_all }
     sub.add_item('Hyper Parse') { HyperParser.show_dialog }
     sub.add_item('Learned Rules') { LearningSystem.show_dialog }
+    sub.add_separator
+    mv_sub = sub.add_submenu('Multiverse')
+    mv_sub.add_item('Import Comparison Model') { TakeoffTool.import_comparison_model }
+    mv_sub.add_item('Remove Comparison Model') { TakeoffTool.remove_comparison_model }
     sub.add_separator
     sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
@@ -1062,6 +1068,7 @@ module TakeoffTool
     prune_empty_categories
     load_master_subcategories
     load_manual_measurements
+    load_multiverse_data
 
     # Change detection
     saved_defs = m.get_attribute('FormAndField', 'def_count') || 0

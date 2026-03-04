@@ -558,6 +558,24 @@ module TakeoffTool
         TakeoffTool.activate_elevation_tool
       end
 
+      # ═══ MULTIVERSE ═══
+
+      @dialog.add_action_callback('setMultiverseView') do |_ctx, mode_str|
+        TakeoffTool.set_multiverse_view(mode_str.to_s)
+      end
+
+      @dialog.add_action_callback('importComparisonModel') do |_ctx|
+        TakeoffTool.import_comparison_model
+      end
+
+      @dialog.add_action_callback('removeComparisonModel') do |_ctx|
+        TakeoffTool.remove_comparison_model
+      end
+
+      @dialog.add_action_callback('requestMultiverseData') do |_ctx|
+        send_multiverse_data
+      end
+
       # Isolate specific entities by ID
       @dialog.add_action_callback('isolateEntities') do |_ctx, ids_str|
         ids = ids_str.to_s.split(',').map(&:to_i)
@@ -831,7 +849,8 @@ module TakeoffTool
           categorySource: r[:parsed][:category_source],
           customColor: custom_colors.dig('entities', r[:entity_id].to_s) ||
                         custom_colors.dig('subcategories', "#{cat}|#{(TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''}") ||
-                        custom_colors.dig('categories', cat)
+                        custom_colors.dig('categories', cat),
+          modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
         }
       end
 
@@ -856,6 +875,7 @@ module TakeoffTool
 
       send_measurement_data
       send_assemblies
+      send_multiverse_data
     end
 
     def self.send_measurement_data
@@ -917,6 +937,21 @@ module TakeoffTool
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveMeasurements('#{esc}')")
       send_benchmark_data
+    end
+
+    def self.send_multiverse_data
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      mv = TakeoffTool.multiverse_data
+      if mv && mv['models'] && mv['models'].length > 1
+        summary = TakeoffTool.build_comparison_summary
+        payload = { models: mv['models'], activeView: mv['active_view'] || 'a', comparison: summary }
+      else
+        payload = { models: [], activeView: 'a', comparison: [] }
+      end
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveMultiverseData('#{esc}')")
     end
 
     def self.send_benchmark_data

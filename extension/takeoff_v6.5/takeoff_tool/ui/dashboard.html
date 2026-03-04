@@ -204,6 +204,48 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .mc-cancel{color:#6c7086;border:1px solid #45475a}
 .mc-cancel:hover{color:#f38ba8;border-color:#f38ba8}
 
+/* MULTIVERSE TOGGLE BAR */
+.mv-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
+.mv-toggle{display:inline-flex;background:#313244;border-radius:6px;overflow:hidden}
+.mv-btn{padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;color:#6c7086;transition:all .15s;user-select:none}
+.mv-btn:hover{color:#cdd6f4}
+.mv-btn.active{background:var(--mv-color,#a6e3a1);color:#1e1e2e}
+.mv-label{font-size:11px;color:#a6adc8;margin-left:4px}
+.mv-summary{font-size:11px;color:#89b4fa;font-weight:600;margin-left:auto}
+
+/* MULTIVERSE TAB */
+.mv-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;gap:10px;flex:1}
+.mv-empty-icon{font-size:32px}
+.mv-empty-title{font-size:14px;font-weight:600;color:#cdd6f4}
+.mv-empty-desc{font-size:11px;color:#6c7086;text-align:center;max-width:260px;line-height:1.4}
+.mv-import-btn{padding:8px 16px;border:1px dashed #cba6f7;border-radius:6px;color:#cba6f7;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;margin-top:6px}
+.mv-import-btn:hover{background:rgba(203,166,247,0.08);box-shadow:0 0 12px rgba(203,166,247,0.15)}
+.mv-active{padding:10px 12px;overflow-y:auto;flex:1}
+.mv-models{display:flex;flex-direction:column;gap:6px}
+.mv-model-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:#1a1a2e}
+.mv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.mv-model-label{font-size:10px;color:#6c7086;font-weight:600;text-transform:uppercase}
+.mv-model-name{font-size:11px;color:#cdd6f4;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-model-count{font-size:11px;color:#89b4fa;font-weight:600}
+.mv-divider{height:1px;background:#313244;margin:10px 0}
+.mv-comparison-header{font-size:11px;font-weight:600;color:#a6adc8;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.mv-comparison-list{display:flex;flex-direction:column;gap:3px}
+.mv-comp-row{display:flex;align-items:center;gap:8px;padding:4px 8px;font-size:11px;border-radius:3px}
+.mv-comp-row:hover{background:#1a1a2e}
+.mv-comp-cat{flex:1;color:#cdd6f4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-comp-a{color:#a6e3a1;min-width:40px;text-align:right;font-weight:600}
+.mv-comp-b{color:#89b4fa;min-width:40px;text-align:right;font-weight:600}
+.mv-comp-diff{min-width:50px;text-align:right;font-weight:700}
+.mv-gained{color:#a6e3a1}
+.mv-lost{color:#f38ba8}
+.mv-same{color:#f9e2af}
+.mv-comp-total{font-weight:700;border-top:1px solid #313244;padding-top:6px;margin-top:4px}
+.mv-management{display:flex;gap:8px;align-items:center}
+.mv-mgmt-btn{padding:4px 12px;border:1px solid #45475a;border-radius:4px;color:#a6adc8;cursor:pointer;font-size:11px;transition:all .12s}
+.mv-mgmt-btn:hover{border-color:#89b4fa;color:#cdd6f4;background:#1a1a2e}
+.mv-mgmt-btn.danger{color:#f38ba8;border-color:#f38ba8}
+.mv-mgmt-btn.danger:hover{background:rgba(243,139,168,0.08)}
+
 /* ASSEMBLY PANEL */
 .asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center;flex-shrink:0}
 .asm-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;border-bottom:1px solid #252535;cursor:pointer}
@@ -293,6 +335,47 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 #dbg.show{display:block}
 #dbg div{border-bottom:1px solid #1e1e2e;padding:1px 0}
 #dbg .err{color:#f38ba8}
+
+/* MULTIVERSE LOADING OVERLAY */
+.mv-loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,#1e1e2e 0%,#11111b 70%,#0a0a14 100%);z-index:9999;display:flex;align-items:center;justify-content:center;animation:mvOverlayIn .4s ease}
+@keyframes mvOverlayIn{from{opacity:0}to{opacity:1}}
+.mv-loading-content{display:flex;flex-direction:column;align-items:center;gap:24px}
+/* Portal scene */
+.mv-portal-scene{display:flex;align-items:center;gap:0;width:280px;height:120px;position:relative}
+.mv-portal{width:90px;height:90px;position:relative;display:flex;align-items:center;justify-content:center}
+.mv-portal-a{margin-left:20px}
+.mv-portal-b{margin-right:20px}
+.mv-portal-ring{position:absolute;width:80px;height:80px;border-radius:50%;border:2px solid transparent;animation:mvRingSpin 3s linear infinite}
+.mv-portal-a .mv-portal-ring{border-top-color:#a6e3a1;border-right-color:rgba(166,227,161,0.3);filter:drop-shadow(0 0 8px rgba(166,227,161,0.4))}
+.mv-portal-b .mv-portal-ring{border-top-color:#89b4fa;border-right-color:rgba(137,180,250,0.3);filter:drop-shadow(0 0 8px rgba(137,180,250,0.4));animation-direction:reverse}
+.mv-portal-ring.r2{width:60px;height:60px;animation-duration:2s;animation-direction:reverse}
+.mv-portal-a .mv-portal-ring.r2{animation-direction:reverse}
+.mv-portal-b .mv-portal-ring.r2{animation-direction:normal}
+@keyframes mvRingSpin{to{transform:rotate(360deg)}}
+.mv-portal-core{width:30px;height:30px;border-radius:50%;animation:mvCorePulse 2s ease-in-out infinite}
+.mv-portal-a .mv-portal-core{background:radial-gradient(circle,#a6e3a1 0%,rgba(166,227,161,0.1) 70%);box-shadow:0 0 20px rgba(166,227,161,0.3)}
+.mv-portal-b .mv-portal-core{background:radial-gradient(circle,#89b4fa 0%,rgba(137,180,250,0.1) 70%);box-shadow:0 0 20px rgba(137,180,250,0.3)}
+@keyframes mvCorePulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:1}}
+.mv-portal-label{position:absolute;bottom:-2px;font-size:11px;font-weight:700;letter-spacing:1px}
+.mv-portal-a .mv-portal-label{color:#a6e3a1}
+.mv-portal-b .mv-portal-label{color:#89b4fa}
+/* Beam between portals */
+.mv-beam{flex:1;height:2px;position:relative;background:linear-gradient(90deg,rgba(166,227,161,0.1),rgba(203,166,247,0.2),rgba(137,180,250,0.1))}
+.mv-beam-particle{position:absolute;width:6px;height:6px;border-radius:50%;top:-2px;background:#cba6f7;box-shadow:0 0 6px rgba(203,166,247,0.6);animation:mvParticleFlow 1.5s ease-in-out infinite}
+.mv-beam-particle.p1{animation-delay:0s}
+.mv-beam-particle.p2{animation-delay:.3s}
+.mv-beam-particle.p3{animation-delay:.6s}
+.mv-beam-particle.p4{animation-delay:.9s}
+.mv-beam-particle.p5{animation-delay:1.2s}
+@keyframes mvParticleFlow{0%{left:0%;opacity:0;transform:scale(.5)}20%{opacity:1;transform:scale(1)}80%{opacity:1;transform:scale(1)}100%{left:100%;opacity:0;transform:scale(.5)}}
+/* Loading title */
+.mv-loading-title{font-family:system-ui;font-size:18px;font-weight:300;letter-spacing:6px;text-transform:uppercase;color:#cdd6f4;animation:mvTitlePulse 3s ease-in-out infinite}
+@keyframes mvTitlePulse{0%,100%{opacity:.7}50%{opacity:1}}
+/* Status text */
+.mv-loading-status{font-size:11px;color:#6c7086;letter-spacing:.5px;min-height:16px;transition:opacity .3s ease}
+/* Progress bar */
+.mv-loading-bar{width:200px;height:2px;background:#313244;border-radius:1px;overflow:hidden}
+.mv-loading-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#a6e3a1,#cba6f7,#89b4fa);border-radius:1px;transition:width .5s ease}
 
 /* SCAN DIALOG */
 #scanBackdrop{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99}
@@ -420,6 +503,17 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button class="hb" onclick="clearSel()">Deselect</button>
 </div>
 
+<!-- MULTIVERSE TOGGLE BAR -->
+<div class="mv-bar" id="mvBar" style="display:none">
+  <div class="mv-toggle">
+    <span class="mv-btn active" data-view="a" onclick="setMvView('a')" style="--mv-color:#a6e3a1">A</span>
+    <span class="mv-btn" data-view="ab" onclick="setMvView('ab')" style="--mv-color:#cba6f7">A+B</span>
+    <span class="mv-btn" data-view="b" onclick="setMvView('b')" style="--mv-color:#89b4fa">B</span>
+  </div>
+  <span class="mv-label" id="mvLabel"></span>
+  <span class="mv-summary" id="mvSummary"></span>
+</div>
+
 <!-- FILTER BAR -->
 <div class="fbar">
   <button onclick="call('showAll');resetVis()" title="Reset Visibility (Show All)" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c7086" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -472,6 +566,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <div class="info-tab active" data-tab="measurements" onclick="switchInfoTab('measurements')">Measurements</div>
     <div class="info-tab" data-tab="notes" onclick="switchInfoTab('notes')">Notes</div>
     <div class="info-tab" data-tab="assemblies" onclick="switchInfoTab('assemblies')">Assemblies</div>
+    <div class="info-tab" data-tab="multiverse" onclick="switchInfoTab('multiverse')">Multiverse</div>
     <div class="info-tab-underline" id="tabUnderline"></div>
   </div>
 
@@ -516,6 +611,27 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
       <div class="sec-scroll" id="asmScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
         <div id="asmBody"></div>
         <div class="sec-scroll-fade" id="asmFade"></div>
+      </div>
+    </div>
+
+    <!-- MULTIVERSE TAB -->
+    <div class="info-content" id="tab_multiverse">
+      <div class="mv-empty" id="mvEmpty">
+        <div class="mv-empty-icon">&#127756;</div>
+        <div class="mv-empty-title">Model Comparison</div>
+        <div class="mv-empty-desc">Import a second version of your model to compare quantities and track changes.</div>
+        <div class="mv-import-btn" onclick="call('importComparisonModel')">+ Import Comparison Model</div>
+      </div>
+      <div class="mv-active" id="mvActive" style="display:none">
+        <div class="mv-models" id="mvModels"></div>
+        <div class="mv-divider"></div>
+        <div class="mv-comparison-header">Comparison Summary</div>
+        <div class="mv-comparison-list" id="mvComparisonList"></div>
+        <div class="mv-divider"></div>
+        <div class="mv-management">
+          <span class="mv-mgmt-btn" onclick="call('importComparisonModel')">Import New</span>
+          <span class="mv-mgmt-btn danger" onclick="confirmRemoveMv()">Remove Model B</span>
+        </div>
       </div>
     </div>
   </div>
@@ -644,6 +760,38 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <div class="so-btns" id="scanBtns">
     <button class="hb" onclick="closeScanDialog()">Cancel</button>
     <button class="hb grn" id="scanGoBtn" onclick="doScan()">Scan Model</button>
+  </div>
+</div>
+
+<!-- MULTIVERSE LOADING OVERLAY -->
+<div class="mv-loading-overlay" id="mvLoadingOverlay" style="display:none">
+  <div class="mv-loading-content">
+    <div class="mv-portal-scene">
+      <div class="mv-portal mv-portal-a">
+        <div class="mv-portal-ring"></div>
+        <div class="mv-portal-ring r2"></div>
+        <div class="mv-portal-core"></div>
+        <span class="mv-portal-label">A</span>
+      </div>
+      <div class="mv-beam">
+        <div class="mv-beam-particle p1"></div>
+        <div class="mv-beam-particle p2"></div>
+        <div class="mv-beam-particle p3"></div>
+        <div class="mv-beam-particle p4"></div>
+        <div class="mv-beam-particle p5"></div>
+      </div>
+      <div class="mv-portal mv-portal-b">
+        <div class="mv-portal-ring"></div>
+        <div class="mv-portal-ring r2"></div>
+        <div class="mv-portal-core"></div>
+        <span class="mv-portal-label">B</span>
+      </div>
+    </div>
+    <div class="mv-loading-title">Multiverse</div>
+    <div class="mv-loading-status" id="mvLoadingStatus">Initializing...</div>
+    <div class="mv-loading-bar">
+      <div class="mv-loading-bar-fill" id="mvLoadingBarFill"></div>
+    </div>
   </div>
 </div>
 
@@ -1339,6 +1487,130 @@ function doConfirmMove(sCat,sub,tCat){
 function cancelMove(){
   var bar=document.getElementById('moveConfirmBar');
   if(bar){clearTimeout(bar._timeout);bar.classList.remove('visible');setTimeout(function(){bar.remove();},200);}
+}
+
+/* ═══ MULTIVERSE ═══ */
+var mvModelA='',mvModelB='';
+
+function showMvLoading(status){
+  var o=document.getElementById('mvLoadingOverlay');
+  o.style.display='flex';
+  o.style.opacity='';
+  o.style.transition='';
+  updateMvLoading(status||'Initializing...',0);
+}
+
+function updateMvLoading(status,percent){
+  var s=document.getElementById('mvLoadingStatus');
+  var b=document.getElementById('mvLoadingBarFill');
+  if(s)s.textContent=status;
+  if(b)b.style.width=percent+'%';
+}
+
+function hideMvLoading(){
+  var o=document.getElementById('mvLoadingOverlay');
+  o.style.opacity='0';
+  o.style.transition='opacity 0.4s ease';
+  setTimeout(function(){
+    o.style.display='none';
+    o.style.opacity='';
+    o.style.transition='';
+  },400);
+}
+
+function setMvView(mode){
+  document.querySelectorAll('.mv-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.view===mode);
+  });
+  var lbl=document.getElementById('mvLabel');
+  if(mode==='a') lbl.textContent='Model A: '+mvModelA;
+  else if(mode==='b') lbl.textContent='Model B: '+mvModelB;
+  else lbl.textContent='Comparing A + B';
+  call('setMultiverseView',mode);
+}
+
+function receiveMultiverseData(json){
+  var d=JSON.parse(json);
+  var bar=document.getElementById('mvBar');
+  var empty=document.getElementById('mvEmpty');
+  var active=document.getElementById('mvActive');
+  if(d.models&&d.models.length>1){
+    bar.style.display='flex';
+    empty.style.display='none';
+    active.style.display='block';
+    mvModelA=d.models[0].name;
+    mvModelB=d.models[1].name;
+    document.querySelectorAll('.mv-btn').forEach(function(b){
+      b.classList.toggle('active',b.dataset.view===(d.activeView||'a'));
+    });
+    renderMvModels(d.models);
+    renderMvComparison(d.comparison||[]);
+    var diff=0;(d.comparison||[]).forEach(function(c){diff+=c.diff;});
+    document.getElementById('mvSummary').textContent=(diff>=0?'+':'')+diff+' items';
+    var lbl=document.getElementById('mvLabel');
+    var av=d.activeView||'a';
+    if(av==='a') lbl.textContent='Model A: '+mvModelA;
+    else if(av==='b') lbl.textContent='Model B: '+mvModelB;
+    else lbl.textContent='Comparing A + B';
+  } else {
+    bar.style.display='none';
+    empty.style.display='flex';
+    active.style.display='none';
+  }
+}
+
+function renderMvModels(models){
+  var c=document.getElementById('mvModels');
+  var h='';
+  for(var i=0;i<models.length;i++){
+    var m=models[i];
+    var color=i===0?'#a6e3a1':'#89b4fa';
+    var label=i===0?'A':'B';
+    h+='<div class="mv-model-row">';
+    h+='<div class="mv-dot" style="background:'+color+'"></div>';
+    h+='<span class="mv-model-label">Model '+label+'</span>';
+    h+='<span class="mv-model-name">'+X(m.name||'Unknown')+'</span>';
+    h+='</div>';
+  }
+  c.innerHTML=h;
+}
+
+function renderMvComparison(comparison){
+  var c=document.getElementById('mvComparisonList');
+  if(!comparison||!comparison.length){
+    c.innerHTML='<div style="color:#6c7086;font-size:11px;padding:8px">No comparison data yet.</div>';
+    return;
+  }
+  var h='';
+  var totalA=0,totalB=0,totalDiff=0;
+  for(var i=0;i<comparison.length;i++){
+    var r=comparison[i];
+    totalA+=r.countA;totalB+=r.countB;totalDiff+=r.diff;
+    var cls=r.diff>0?'mv-gained':(r.diff<0?'mv-lost':'mv-same');
+    var sign=r.diff>0?'+':'';
+    h+='<div class="mv-comp-row">';
+    h+='<span class="mv-comp-cat">'+X(r.category)+'</span>';
+    h+='<span class="mv-comp-a">'+r.countA+'</span>';
+    h+='<span class="mv-comp-b">'+r.countB+'</span>';
+    h+='<span class="mv-comp-diff '+cls+'">'+sign+r.diff+'</span>';
+    h+='</div>';
+  }
+  // Total row
+  var tCls=totalDiff>0?'mv-gained':(totalDiff<0?'mv-lost':'mv-same');
+  var tSign=totalDiff>0?'+':'';
+  h+='<div class="mv-comp-row mv-comp-total">';
+  h+='<span class="mv-comp-cat">Total</span>';
+  h+='<span class="mv-comp-a">'+totalA+'</span>';
+  h+='<span class="mv-comp-b">'+totalB+'</span>';
+  h+='<span class="mv-comp-diff '+tCls+'">'+tSign+totalDiff+'</span>';
+  h+='</div>';
+  c.innerHTML=h;
+}
+
+function confirmRemoveMv(){
+  if(confirm('Remove comparison model? All Model B entities will be deleted.')){
+    call('removeComparisonModel');
+  }
 }
 
 /* ═══ ADVANCED FILTER TOGGLE ═══ */
@@ -2524,6 +2796,7 @@ function switchInfoTab(tabName){
   if(tabName==='measurements')call('requestMeasurements');
   else if(tabName==='assemblies')call('loadAssemblies');
   else if(tabName==='notes')renderNotesPanel();
+  else if(tabName==='multiverse')call('requestMultiverseData');
   setTimeout(checkAllScrollFades,50);
 }
 function initTabUnderline(){
