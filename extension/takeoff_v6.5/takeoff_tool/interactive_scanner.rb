@@ -73,17 +73,13 @@ module TakeoffTool
 
       return [] if low_conf.empty?
 
-      # Step 2: Try grouping by definition name
-      groups = build_groups(low_conf) { |r| (r[:definition_name] || '').strip }
+      # Step 2: Group by cleaned display name (instance name preferred, hex IDs stripped)
+      # Uses display_name (instance name > definition name), never raw GUIDs
+      groups = build_groups(low_conf) { |r| clean_display_name(r) }
 
-      # Step 3: If too many groups, re-group by stripped pattern
+      # Step 3: If too many groups, re-group by aggressive pattern stripping
       if groups.length > MAX_GROUPS
-        groups = build_groups(low_conf) { |r| strip_revit_id(r[:display_name] || r[:definition_name] || '') }
-      end
-
-      # Step 4: If STILL too many, group by aggressive pattern stripping
-      if groups.length > MAX_GROUPS
-        groups = build_groups(low_conf) { |r| extract_base_pattern(r[:display_name] || r[:definition_name] || '') }
+        groups = build_groups(low_conf) { |r| extract_base_pattern(clean_display_name(r)) }
       end
 
       # Generate top guesses for each group
@@ -107,9 +103,11 @@ module TakeoffTool
         next if key.empty?
 
         unless groups.key?(key)
+          # Use clean_display_name for user-facing name (never GUIDs)
+          clean = clean_display_name(r)
           groups[key] = {
-            name: key,
-            display_name: r[:display_name] || key,
+            name: clean,
+            display_name: clean,
             material: r[:material],
             ifc_type: r[:ifc_type],
             size: r[:parsed][:size_nominal],
@@ -141,12 +139,52 @@ module TakeoffTool
     # Aggressive pattern extraction: strip ALL trailing identifiers,
     # dimensions, and specifics to find the base component type.
     def self.extract_base_pattern(name)
-      s = strip_revit_id(name)
+      s = strip_revit_id(name.to_s)
       s = s.sub(/,\s*\(?\d+\)?\s*\d+\s*x\s*\d+.*$/i, '').strip
       s = s.sub(/,\s*\d+['"'-].*$/i, '').strip
       s = s.sub(/,\s*\d+\/?\d*\s*["″]?\s*$/, '').strip
-      s = strip_revit_id(name) if s.empty?
+      s = strip_revit_id(name.to_s) if s.empty?
       s
+    end
+
+    # Check if a string looks like a GUID or raw hex identifier
+    # Matches patterns like "cb416e21-3be6-4ff8-9536-ec6d7779a761-0035b8f6"
+    def self.guid?(name)
+      s = name.to_s.strip
+      return true if s =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      # Also match GUID with extra suffix like "-0035b8f6"
+      return true if s =~ /^[0-9a-f]{8}(-[0-9a-f]{4}){3,}/i
+      # Mostly hex with hyphens, no readable words
+      return true if s =~ /^[0-9a-f-]{20,}$/i
+      false
+    end
+
+    # Get the best human-readable name for a scan result.
+    # Prefers instance name (display_name) over definition_name.
+    # Strips Revit hex IDs. Falls back to material/IFC type if name is a GUID.
+    def self.clean_display_name(r)
+      # Prefer display_name (instance name if set, else definition name)
+      raw = (r[:display_name] || r[:definition_name] || '').to_s.strip
+
+      # If the raw name is a GUID, try alternatives
+      if guid?(raw)
+        # Try instance_name explicitly
+        iname = r[:instance_name].to_s.strip
+        raw = iname unless iname.empty? || guid?(iname)
+      end
+
+      # If still a GUID, build a readable name from attributes
+      if guid?(raw)
+        parts = []
+        parts << r[:ifc_type].to_s.sub(/^Ifc/i, '') unless r[:ifc_type].to_s.empty?
+        parts << r[:material].to_s unless r[:material].to_s.empty?
+        tag = r[:tag].to_s
+        parts << tag unless tag.empty? || tag == 'Untagged' || tag == 'Layer0'
+        raw = parts.empty? ? 'Unknown Component' : parts.join(' — ')
+      end
+
+      # Strip trailing Revit hex IDs
+      strip_revit_id(raw)
     end
 
     # ═══════════════════════════════════════════════════════════
@@ -246,7 +284,7 @@ module TakeoffTool
         when 'ifc_name' then 85
         when 'material_bbox' then 65
         when 'material' then 60
-        when 'learned' then 70
+        when 'learned' then 92
         when 'ifc', 'tag' then 40
         when 'keyword' then 30
         when 'material_fallback' then 25
@@ -285,7 +323,7 @@ module TakeoffTool
           category: learned[:auto_category],
           subcategory: learned[:auto_subcategory],
           cost_code: learned[:cost_code],
-          confidence: 60,
+          confidence: 92,
           source: 'Learned Rule'
         }
       end

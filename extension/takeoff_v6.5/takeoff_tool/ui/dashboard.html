@@ -15,6 +15,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .hb{padding:3px 8px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:11px;white-space:nowrap;font-family:inherit}
 .hb:hover{background:#45475a}.hb.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
 .hb.grn{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1}
+.hb.show-all{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1;font-weight:700;font-size:12px;padding:4px 12px}
 .hb.yel{background:#f9e2af;color:#1e1e2e;border-color:#f9e2af}
 .hb:disabled{opacity:0.35;cursor:default;pointer-events:none}
 .hb svg{width:16px;height:16px;vertical-align:middle}
@@ -34,7 +35,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .bulk label{color:#a6adc8}
 
 /* MEASUREMENT PANEL */
-#measPanel{display:none;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;max-height:260px;overflow-y:auto}
+#measPanel{display:none;background:#181825;border-bottom:1px solid #313244}
 #measPanel.show{display:block}
 .mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e}
 .mp-cat{padding:4px 12px 2px 12px;cursor:pointer;user-select:none}
@@ -65,6 +66,30 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .fbar2 label{font-size:11px;color:#a6adc8}
 .clr-btn{background:none;border:1px solid #45475a;border-radius:3px;color:#f38ba8;cursor:pointer;padding:2px 7px;font-size:10px;font-family:inherit}
 .clr-btn:hover{border-color:#f38ba8;background:#f38ba811}
+/* ADVANCED FILTER TOGGLE */
+.fadv-btn{background:none;border:1px solid #45475a;border-radius:3px;color:#a6adc8;cursor:pointer;padding:2px 7px;font-size:10px;font-family:inherit;display:inline-flex;align-items:center;gap:3px;position:relative}
+.fadv-btn:hover{border-color:#89b4fa;color:#cdd6f4}
+.fadv-btn.open{color:#89b4fa;border-color:#89b4fa}
+.fadv-dot{width:6px;height:6px;border-radius:50%;background:#f9e2af;display:none;flex-shrink:0}
+.fadv-dot.on{display:inline-block}
+/* COLLAPSIBLE SECTION HEADERS */
+.sec-hdr{background:#313244;border-bottom:1px solid #45475a;padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;border-left:3px solid transparent}
+.sec-hdr:hover{background:#3a3a4e}
+.sec-hdr .sec-arr{font-size:10px;color:#a6adc8;transition:transform .15s;display:inline-block;width:12px}
+.sec-hdr.open .sec-arr{transform:rotate(90deg)}
+.sec-hdr .sec-title{font-size:13px;font-weight:600}
+.sec-hdr .sec-cnt{font-size:11px;color:#6c7086;margin-left:2px}
+.sec-hdr.meas-hdr{border-left-color:#a6e3a1}
+.sec-hdr.meas-hdr .sec-title{color:#a6e3a1}
+.sec-hdr.asm-hdr{border-left-color:#cba6f7}
+.sec-hdr.asm-hdr .sec-title{color:#cba6f7}
+/* CATEGORY LIST TOOLBAR */
+.cat-bar{background:#181825;border-bottom:1px solid #252535;padding:2px 12px;display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-shrink:0}
+.cat-bar button{background:none;border:1px solid #313244;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;padding:2px 5px;color:#6c7086}
+.cat-bar button:hover{border-color:#45475a;color:#a6adc8}
+/* ADD CATEGORY BUTTON */
+.add-cat-btn{display:block;width:100%;padding:8px 12px;background:transparent;border:1px dashed #45475a;border-radius:0;color:#6c7086;cursor:pointer;font-size:11px;font-family:inherit;text-align:left}
+.add-cat-btn:hover{border-color:#a6adc8;color:#a6adc8;background:#1a1a2e}
 
 /* MAIN SCROLLABLE */
 .tp{flex:1;overflow:auto;padding:0}
@@ -102,7 +127,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .sc-hdr.sc-none .sc-name{color:#6c7086;font-style:italic}
 
 /* ASSEMBLY PANEL */
-#asmPanel{display:none;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;max-height:280px;overflow-y:auto}
+#asmPanel{display:none;background:#181825;border-bottom:1px solid #313244}
 #asmPanel.show{display:block}
 .asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid #313244;background:#1a1a2e;align-items:center}
 .asm-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;border-bottom:1px solid #252535;cursor:pointer}
@@ -116,6 +141,27 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .asm-acts button:hover{color:#cdd6f4}
 .asm-notes{color:#6c7086;font-size:10px;font-style:italic;margin-left:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .asm-empty{padding:12px;color:#6c7086;font-size:11px;text-align:center;font-style:italic}
+/* ASSEMBLY EYE + ISOLATE */
+.asm-item .ey{margin-right:2px;flex-shrink:0}
+.asm-iso{background:none;border:1px solid #45475a;border-radius:3px;cursor:pointer;padding:1px 5px;font-size:9px;color:#a6adc8;font-family:inherit;white-space:nowrap;flex-shrink:0}
+.asm-iso:hover{background:#45475a;color:#cdd6f4;border-color:#89b4fa}
+
+/* CATPPUCCIN MODAL */
+.ff-modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center}
+.ff-modal{background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;min-width:280px;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.ff-modal h2{margin:0 0 14px;font-size:14px;font-weight:600;color:#cdd6f4}
+.ff-modal label{display:block;font-size:11px;color:#a6adc8;margin-bottom:4px}
+.ff-modal input{width:100%;box-sizing:border-box;padding:7px 10px;background:#1e1e2e;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-size:12px;font-family:inherit;outline:none;margin-bottom:10px}
+.ff-modal input:focus{border-color:#cba6f7}
+.ff-modal .ff-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.ff-modal .ff-btn{padding:6px 16px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-family:inherit}
+.ff-modal .ff-ok{background:#cba6f7;color:#1e1e2e;font-weight:600}
+.ff-modal .ff-ok:hover{background:#b48ef0}
+.ff-modal .ff-cancel{background:#45475a;color:#cdd6f4}
+.ff-modal .ff-cancel:hover{background:#585b70}
+.ff-modal .ff-danger{background:#f38ba8;color:#1e1e2e;font-weight:600}
+.ff-modal .ff-danger:hover{background:#e06c88}
+.ff-modal p.ff-msg{color:#cdd6f4;font-size:12px;margin:0 0 14px;line-height:1.4}
 
 /* EYE TOGGLE */
 .ey{background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;display:inline-flex;align-items:center}
@@ -241,51 +287,18 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <!-- HEADER -->
 <div class="header">
   <h1>Form and Field</h1><div class="sep"></div>
+  <button class="hb show-all" onclick="call('showAll');resetVis()">Show All</button>
   <button class="hb pri" onclick="call('highlightAll')">Highlight All</button>
   <button class="hb" onclick="call('clearHighlights')">Clear</button>
-  <button class="hb" onclick="hideMeasurements()" title="Hide all measurement highlights" style="color:#f38ba8">Hide Meas.</button>
-  <button class="hb" onclick="call('showAll');resetVis()">Show All</button>
   <button class="hb" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Undo</button>
-  <button class="hb grn" onclick="toggleMeasPanel()">Measurements</button>
-  <button class="hb" onclick="toggleAsmPanel()" style="color:#f9e2af;border-color:#f9e2af">Assemblies</button>
-  <button class="hb" onclick="promptNewCategory()" title="Add empty category">+ Category</button>
-  <div class="sep"></div>
-  <button class="hb" onclick="call('exportCSV')">CSV</button>
-  <button class="hb pri" onclick="call('exportHTML')">Report</button>
-  <button class="hb" onclick="showScanDialog()">Rescan</button>
-  <div class="sep"></div>
-  <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg></button>
-  <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg></button>
-  <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg></button>
-  <button class="hb pri" onclick="call('openHyperParse')" title="Hyper Parse - Group and re-categorize visible entities" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#cba6f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/><line x1="4.5" y1="5.5" x2="8.5" y2="5.5" stroke-width="1.2"/><line x1="5" y1="7.5" x2="8" y2="7.5" stroke-width="1.2"/></svg>Hyper Parse</button>
-  <div class="sep"></div>
-  <button class="hb" onclick="expandAll()" title="Expand all" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-  <button class="hb" onclick="collapseAll()" title="Collapse all" style="display:inline-flex;align-items:center;padding:3px 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg></button>
-  <button class="hb" onclick="toggleDebug()" title="Debug" style="margin-left:auto;font-size:10px;color:#a6e3a1">dbg</button>
+  <span style="flex:1"></span>
+  <button class="hb" onclick="call('exportCSV')" style="color:#a6adc8;border-color:#45475a">CSV</button>
+  <button class="hb" onclick="call('exportHTML')" style="color:#a6adc8;border-color:#45475a">Report</button>
+  <button class="hb" onclick="toggleDebug()" title="Debug" style="font-size:10px;color:#a6e3a1">dbg</button>
 </div>
 
 <!-- SUMMARY STRIP -->
 <div class="summary" id="sstrip"></div>
-
-<!-- MEASUREMENT PANEL -->
-<div id="measPanel">
-  <div class="mp-toolbar">
-    <button class="hb grn" onclick="showAllMeas()">Show All</button>
-    <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8">Hide All</button>
-    <button class="hb" onclick="toggleMeasPanel()">Close</button>
-  </div>
-  <div id="measBody"></div>
-</div>
-
-<!-- ASSEMBLY PANEL -->
-<div id="asmPanel">
-  <div class="asm-toolbar">
-    <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#f9e2af;border-color:#f9e2af">Save Filtered</button>
-    <button class="hb" onclick="toggleAsmPanel()">Close</button>
-    <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
-  </div>
-  <div id="asmBody"></div>
-</div>
 
 <!-- BENCHMARK INFO BAR -->
 <div id="bmkBar" style="display:none;background:#1a1a2e;border-bottom:1px solid #313244;padding:4px 12px;font-size:11px;flex-shrink:0;align-items:center;gap:6px">
@@ -324,6 +337,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <option value="measurement">Measurements</option>
   </select>
   <button class="clr-btn" onclick="clearAllFilters()" title="Clear all filters">Clear</button>
+  <button class="fadv-btn" id="fadvBtn" onclick="toggleAdvFilters()" title="Advanced filters"><span class="fadv-dot" id="fadvDot"></span>&#9660; More</button>
   <span id="fCnt" style="margin-left:auto;color:#a6adc8;font-size:11px"></span>
 </div>
 <div class="fbar2" id="fbar2">
@@ -334,8 +348,48 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <label id="fFnL">Function:</label><select id="fFn" onchange="filt()"><option value="">All</option></select>
 </div>
 
-<!-- MAIN CONTENT -->
-<div class="tp" id="dp"></div>
+<!-- CATEGORY LIST TOOLBAR -->
+<div class="cat-bar">
+  <button onclick="expandAll()" title="Expand all categories"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+  <button onclick="collapseAll()" title="Collapse all categories"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg></button>
+</div>
+
+<!-- MAIN SCROLLABLE AREA -->
+<div class="tp">
+  <div id="dp"></div>
+
+  <!-- MEASUREMENTS COLLAPSIBLE SECTION -->
+  <div class="sec-hdr meas-hdr" id="measHdr" onclick="toggleMeasSection()">
+    <span class="sec-arr" id="measArr">&#9654;</span>
+    <span class="sec-title">Measurements</span>
+    <span class="sec-cnt" id="measHdrCnt"></span>
+  </div>
+  <div id="measPanel">
+    <div class="mp-toolbar">
+      <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>LF</button>
+      <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
+      <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg>Elev</button>
+      <span style="flex:1"></span>
+      <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
+      <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
+    </div>
+    <div id="measBody"></div>
+  </div>
+
+  <!-- ASSEMBLIES COLLAPSIBLE SECTION -->
+  <div class="sec-hdr asm-hdr" id="asmHdr" onclick="toggleAsmPanel()">
+    <span class="sec-arr" id="asmArr">&#9654;</span>
+    <span class="sec-title">Assemblies</span>
+    <span class="sec-cnt" id="asmHdrCnt"></span>
+  </div>
+  <div id="asmPanel">
+    <div class="asm-toolbar">
+      <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">Create Assembly</button>
+      <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
+    </div>
+    <div id="asmBody"></div>
+  </div>
+</div>
 <div id="dbg"></div>
 
 <!-- SCAN DIALOG -->
@@ -471,6 +525,7 @@ var VIS={};
 var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
+var ASMVIS={};
 var debugOn=false;
 
 /* SVG ICON TEMPLATES */
@@ -659,10 +714,13 @@ function buildDD(){
   buildAttrDD('fTag','fTagL',tags,tagM,2);
   buildAttrDD('fEt','fEtL',ets,etM,1);
   buildAttrDD('fFn','fFnL',fns,fnM,1);
-  // Show second row only if any attribute filters have data
-  var bar2=document.getElementById('fbar2');
-  if(mats.length||sizes.length||tags.length>1||ets.length||fns.length){bar2.classList.add('show');}
-  else{bar2.classList.remove('show');}
+  // Advanced filter row stays collapsed unless user toggled it open
+  // Only show toggle button if there's data for advanced filters
+  var hasAdvData=mats.length||sizes.length||tags.length>1||ets.length||fns.length;
+  var btn=document.getElementById('fadvBtn');
+  if(btn)btn.style.display=hasAdvData?'':'none';
+  // Keep current state: if user opened it, leave it open
+  if(!advOpen){var bar2=document.getElementById('fbar2');bar2.classList.remove('show');}
 }
 function buildAttrDD(selId,lblId,vals,counts,minVals){
   var sel=document.getElementById(selId),lbl=document.getElementById(lblId);
@@ -768,7 +826,7 @@ function filt(){
     F.push(r);
   }
   document.getElementById('fCnt').textContent=F.length+' / '+tot;
-  strip();renderGroups();updateBulkBar();
+  strip();renderGroups();updateBulkBar();updateAdvDot();
   if(FISO)applyFilterIsolation();
   updateFisoBtn();
 }
@@ -1041,6 +1099,7 @@ function renderGroups(){
     }
     h+='</tbody></table></div></div>';
   }
+  if(gBy==='category') h+='<button class="add-cat-btn" onclick="promptNewCategory()">+ Add Category</button>';
   document.getElementById('dp').innerHTML=h||'<div style="padding:20px;color:#6c7086">No items match.</div>';
 }
 
@@ -1074,6 +1133,38 @@ function selSubItems(cat,sub){
 function selSubAll(cat,sub,chk){
   for(var i=0;i<F.length;i++){if(F[i].category===cat&&(F[i].subcategory||'')===sub){if(chk)SEL[F[i].entityId]=true;else delete SEL[F[i].entityId];}}
   syncCBs();updateBulkBar();hlSel();
+}
+
+/* ═══ ADVANCED FILTER TOGGLE ═══ */
+var advOpen=false;
+function toggleAdvFilters(){
+  advOpen=!advOpen;
+  var bar2=document.getElementById('fbar2');
+  var btn=document.getElementById('fadvBtn');
+  if(advOpen){bar2.classList.add('show');btn.classList.add('open');btn.innerHTML='<span class="fadv-dot'+(hasAdvFilter()?' on':'')+'" id="fadvDot"></span>&#9650; Less';}
+  else{bar2.classList.remove('show');btn.classList.remove('open');btn.innerHTML='<span class="fadv-dot'+(hasAdvFilter()?' on':'')+'" id="fadvDot"></span>&#9660; More';}
+}
+function hasAdvFilter(){
+  return document.getElementById('fMat').value||document.getElementById('fSize').value||document.getElementById('fTag').value||document.getElementById('fEt').value||document.getElementById('fFn').value;
+}
+function updateAdvDot(){
+  var dot=document.getElementById('fadvDot');
+  if(dot){if(hasAdvFilter())dot.classList.add('on');else dot.classList.remove('on');}
+}
+
+/* ═══ MEASUREMENTS SECTION ═══ */
+function toggleMeasSection(){
+  var p=document.getElementById('measPanel');
+  var hdr=document.getElementById('measHdr');
+  if(p.classList.contains('show')){
+    p.classList.remove('show');hdr.classList.remove('open');
+  } else {
+    p.classList.add('show');hdr.classList.add('open');call('requestMeasurements');
+  }
+}
+function updateMeasHdrCnt(){
+  var cnt=document.getElementById('measHdrCnt');
+  if(cnt)cnt.textContent=MEAS.length?'('+MEAS.length+')':'';
 }
 
 /* ═══ VISIBILITY ═══ */
@@ -1143,6 +1234,72 @@ function updateFisoBtn(){
   else{btn.classList.remove('active');btn.title='Isolate filtered items in viewport';lbl.textContent='Isolate';}
 }
 
+/* ═══ CATPPUCCIN MODAL ═══ */
+function showFFModal(opts){
+  // opts: {title, fields:[{label,id,value,placeholder}], message, okLabel, cancelLabel, danger, onOk}
+  var bg=document.createElement('div');bg.className='ff-modal-bg';
+  var m=document.createElement('div');m.className='ff-modal';
+  var h='<h2>'+X(opts.title||'')+'</h2>';
+  if(opts.message)h+='<p class="ff-msg">'+X(opts.message)+'</p>';
+  var fields=opts.fields||[];
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i];
+    h+='<label>'+X(f.label||'')+'</label>';
+    h+='<input id="ffm_'+f.id+'" type="text" value="'+X(f.value||'')+'" placeholder="'+(f.placeholder||'')+'">';
+  }
+  h+='<div class="ff-btns">';
+  h+='<button class="ff-btn ff-cancel" id="ffm_cancel">'+(opts.cancelLabel||'Cancel')+'</button>';
+  var okCls=opts.danger?'ff-btn ff-danger':'ff-btn ff-ok';
+  h+='<button class="'+okCls+'" id="ffm_ok">'+(opts.okLabel||'OK')+'</button>';
+  h+='</div>';
+  m.innerHTML=h;bg.appendChild(m);document.body.appendChild(bg);
+  var firstInput=m.querySelector('input');if(firstInput){firstInput.focus();firstInput.select();}
+  function close(){document.body.removeChild(bg);}
+  document.getElementById('ffm_cancel').onclick=close;
+  bg.addEventListener('click',function(e){if(e.target===bg)close();});
+  document.getElementById('ffm_ok').onclick=function(){
+    var vals={};
+    for(var j=0;j<fields.length;j++)vals[fields[j].id]=document.getElementById('ffm_'+fields[j].id).value;
+    close();
+    if(opts.onOk)opts.onOk(vals);
+  };
+  m.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){document.getElementById('ffm_ok').click();}
+    if(e.key==='Escape'){close();}
+  });
+}
+
+/* ═══ ASSEMBLY VISIBILITY ═══ */
+function togAsmVis(name){
+  var a=ASMB[name];if(!a)return;
+  var ids=a.entity_ids||[];if(!ids.length)return;
+  var anyVis=false;
+  for(var i=0;i<ids.length;i++){if(VIS[ids[i]]!==false){anyVis=true;break;}}
+  for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+  if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  ASMVIS[name]=!anyVis;
+  filt();renderAsmPanel();
+}
+function isoAsm(name){
+  var a=ASMB[name];if(!a)return;
+  var aIds={};var ids=a.entity_ids||[];
+  for(var k=0;k<ids.length;k++)aIds[ids[k]]=true;
+  // Set VIS: show assembly entities, hide everything else
+  var toHide=[],toShow=[];
+  for(var i=0;i<D.length;i++){
+    var eid=D[i].entityId,want=!!aIds[eid],cur=VIS[eid]!==false;
+    VIS[eid]=want;
+    if(want&&!cur)toShow.push(eid);
+    else if(!want&&cur)toHide.push(eid);
+  }
+  if(toHide.length)call('hideEntities',toHide.join(','));
+  if(toShow.length)call('showEntities',toShow.join(','));
+  // Set assembly filter dropdown
+  ISO_CATS=null;FISO=false;updateFisoBtn();
+  document.getElementById('fAsm').value=name;
+  filt();renderAsmPanel();
+}
+
 /* ═══ ASSEMBLIES ═══ */
 function receiveAssemblies(json){
   try{ASMB=JSON.parse(json)||{};}catch(e){ASMB={};}
@@ -1151,27 +1308,39 @@ function receiveAssemblies(json){
 }
 function toggleAsmPanel(){
   var p=document.getElementById('asmPanel');
-  if(p.classList.contains('show')){p.classList.remove('show');}
-  else{p.classList.add('show');call('loadAssemblies');}
+  var hdr=document.getElementById('asmHdr');
+  if(p.classList.contains('show')){
+    p.classList.remove('show');hdr.classList.remove('open');
+  } else {
+    p.classList.add('show');hdr.classList.add('open');call('loadAssemblies');
+  }
 }
 function renderAsmPanel(){
   var body=document.getElementById('asmBody');
   var keys=Object.keys(ASMB).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   document.getElementById('asmCount').textContent=keys.length+' assemblies';
-  if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Save Filtered" or right-click in viewport.</div>';return;}
+  // Update collapsed header count
+  var hdrCnt=document.getElementById('asmHdrCnt');
+  if(hdrCnt)hdrCnt.textContent=keys.length?'('+keys.length+')':'';
+  if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Create Assembly" or right-click in viewport.</div>';return;}
   var h='';
   var fasm=document.getElementById('fAsm').value;
   for(var i=0;i<keys.length;i++){
     var name=keys[i],a=ASMB[name],active=fasm===name?' active':'';
-    h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+X(name).replace(/'/g,"\\'")+'\')">'+
+    var aCnt=(a.entity_ids||[]).length;
+    var aVis=ASMVIS[name]!==false;
+    var ne=X(name).replace(/'/g,"\\'");
+    h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+ne+'\')">'+
+      '<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis(\''+ne+'\')" title="'+(aVis?'Hide':'Show')+'">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>'+
+      '<button class="asm-iso" onclick="event.stopPropagation();isoAsm(\''+ne+'\')" title="Isolate — hide everything except this assembly">Isolate</button>'+
       '<span class="asm-name" title="'+X(name)+'">'+X(name)+'</span>'+
       (a.notes?'<span class="asm-notes" title="'+X(a.notes)+'">'+X(a.notes)+'</span>':'')+
-      '<span class="asm-cnt">'+a.count+'</span>'+
+      '<span class="asm-cnt">'+aCnt+'</span>'+
       '<span class="asm-date">'+X(a.created||'')+'</span>'+
       '<span class="asm-acts">'+
-        '<button onclick="event.stopPropagation();renameAssemblyPrompt(\''+X(name).replace(/'/g,"\\'")+'\');" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
-        '<button onclick="event.stopPropagation();editAssemblyNotes(\''+X(name).replace(/'/g,"\\'")+'\');" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'+
-        '<button onclick="event.stopPropagation();deleteAssemblyConfirm(\''+X(name).replace(/'/g,"\\'")+'\');" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
+        '<button onclick="event.stopPropagation();renameAssemblyPrompt(\''+ne+'\');" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
+        '<button onclick="event.stopPropagation();editAssemblyNotes(\''+ne+'\');" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'+
+        '<button onclick="event.stopPropagation();deleteAssemblyConfirm(\''+ne+'\');" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
       '</span></div>';
   }
   body.innerHTML=h;
@@ -1184,7 +1353,7 @@ function buildAsmDD(){
   var prev=sel.value;
   keys.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var h='<option value="">All</option>';
-  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(keys[i])+' ('+a.count+')</option>';}
+  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(keys[i])+' ('+(a.entity_ids||[]).length+')</option>';}
   sel.innerHTML=h;
   if(prev)sel.value=prev;
 }
@@ -1195,28 +1364,49 @@ function filterByAssembly(name){
   renderAsmPanel();
 }
 function saveFilteredAsAssembly(){
-  if(!F.length){alert('No filtered items to save.');return;}
-  var name=prompt('Assembly name:');
-  if(!name||!name.trim())return;
-  var notes=prompt('Notes (optional):','');
-  var ids=[];
-  for(var i=0;i<F.length;i++)ids.push(F[i].entityId);
-  callJSON('createAssembly',{name:name.trim(),entityIds:ids,notes:notes||''});
+  showFFModal({
+    title:'Create Assembly',
+    fields:[
+      {label:'Assembly Name',id:'name',value:'',placeholder:'Enter name...'},
+      {label:'Notes (optional)',id:'notes',value:'',placeholder:''}
+    ],
+    message:'Saves all entities currently visible in the viewport',
+    okLabel:'Create',
+    onOk:function(v){
+      var nm=v.name.trim();if(!nm)return;
+      log('Create Assembly: requesting visible entities from Ruby for "'+nm+'"');
+      callJSON('createAssemblyFromVisible',{name:nm,notes:v.notes||''});
+    }
+  });
 }
 function deleteAssemblyConfirm(name){
-  if(!confirm('Delete assembly "'+name+'"?'))return;
-  call('deleteAssembly',name);
+  showFFModal({
+    title:'Delete Assembly',
+    message:'Delete assembly "'+name+'"? This cannot be undone.',
+    okLabel:'Delete',danger:true,
+    onOk:function(){call('deleteAssembly',name);}
+  });
 }
 function renameAssemblyPrompt(name){
-  var nv=prompt('Rename assembly:',name);
-  if(!nv||!nv.trim()||nv.trim()===name)return;
-  callJSON('renameAssembly',{oldName:name,newName:nv.trim()});
+  showFFModal({
+    title:'Rename Assembly',
+    fields:[{label:'New Name',id:'name',value:name}],
+    okLabel:'Rename',
+    onOk:function(v){
+      var nv=v.name.trim();
+      if(!nv||nv===name)return;
+      callJSON('renameAssembly',{oldName:name,newName:nv});
+    }
+  });
 }
 function editAssemblyNotes(name){
   var a=ASMB[name];if(!a)return;
-  var nv=prompt('Notes for "'+name+'":',a.notes||'');
-  if(nv===null)return;
-  callJSON('updateAssembly',{name:name,notes:nv});
+  showFFModal({
+    title:'Notes for "'+name+'"',
+    fields:[{label:'Notes',id:'notes',value:a.notes||''}],
+    okLabel:'Save',
+    onOk:function(v){callJSON('updateAssembly',{name:name,notes:v.notes});}
+  });
 }
 
 /* ═══ SELECTION ═══ */
@@ -1263,9 +1453,10 @@ function grpKey(r,gBy){
 
 /* ═══ MEASUREMENT PANEL ═══ */
 var MEAS=[],openMeasCats={};
-function toggleMeasPanel(){var p=document.getElementById('measPanel');if(p.classList.contains('show')){p.classList.remove('show');}else{p.classList.add('show');call('requestMeasurements');}}
+function toggleMeasPanel(){toggleMeasSection();}
 function receiveMeasurements(json){
   try{MEAS=JSON.parse(json);}catch(e){MEAS=[];log('MEAS parse err: '+e.message,'err');}
+  updateMeasHdrCnt();
   renderMeasPanel();
 }
 function renderMeasPanel(){
@@ -1315,7 +1506,7 @@ function togMeasVis(eid,show){callJSON('toggleMeasurement',{eid:eid,show:show});
 function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
 function hideMeasurements(){call('hideAllMeasurements');}
-function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});renderMeasPanel();});}
+function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();});}
 
 /* ═══ BENCHMARK INFO ═══ */
 var BMK=null;

@@ -8,8 +8,8 @@ module TakeoffTool
     # Load / Save
     # ═══════════════════════════════════════════════════════════
 
-    def self.load_rules
-      return @rules if @rules
+    def self.load_rules(force: false)
+      return @rules if @rules && !force
       require 'json'
       if File.exist?(@rules_path)
         @rules = JSON.parse(File.read(@rules_path))
@@ -163,7 +163,7 @@ module TakeoffTool
         auto_subcategory: best['to_subcategory'].to_s.empty? ? nil : best['to_subcategory'],
         measurement_type: mt,
         category_source: 'learned',
-        confidence: :medium,
+        confidence: :high,
         cost_code: best['to_cost_code'].to_s.empty? ? nil : best['to_cost_code'],
         learned_keyword: best['keyword'],
         learned_times: best['times_applied']

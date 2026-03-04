@@ -219,5 +219,57 @@
     "times_applied": 1,
     "created": "2026-03-03",
     "last_applied": "2026-03-03"
+  },
+  {
+    "keyword": "Header, H4",
+    "material": "Softwood, Lumber",
+    "ifc_type": "IfcColumn",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Structural Lumber",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-03",
+    "last_applied": "2026-03-03"
+  },
+  {
+    "keyword": "Glulam-Western Species, 6 3/4\"x13 1/2\" GLB",
+    "material": "Softwood, Lumber",
+    "ifc_type": "IfcBeam",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Structural Lumber",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-03",
+    "last_applied": "2026-03-03"
+  },
+  {
+    "keyword": "Timber, 8x8 DF SS",
+    "material": "Softwood, Lumber",
+    "ifc_type": "IfcBeam",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Timbers (Structural)",
+    "to_subcategory": "Beam",
+    "to_cost_code": "3.030",
+    "times_applied": 1,
+    "created": "2026-03-03",
+    "last_applied": "2026-03-03"
+  },
+  {
+    "keyword": "Linked Revit Model : 122325 - EAGLE ROCK - STRUCTURE MODEL (V7).rvt",
+    "material": "",
+    "ifc_type": "IfcBuildingStorey",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Layer0",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-03",
+    "last_applied": "2026-03-03"
   }
 ]

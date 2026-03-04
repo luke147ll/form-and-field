@@ -501,12 +501,46 @@ module TakeoffTool
           name = data['name'].to_s.strip
           ids = data['entityIds'] || []
           notes = data['notes'].to_s
+          puts "Takeoff: createAssembly received #{ids.length} entity IDs from JS (first 5: #{ids.first(5).inspect})"
           next if name.empty? || ids.empty?
           TakeoffTool.create_assembly(name, ids, notes)
           puts "Takeoff: Created assembly '#{name}' with #{ids.length} entities"
           send_assemblies
         rescue => e
           puts "Takeoff createAssembly error: #{e.message}"
+        end
+      end
+
+      # Create assembly from all entities currently VISIBLE in the viewport
+      # This captures every isolation method (eye toggles, category isolate,
+      # filter isolation, search) since they all set entity.visible = false
+      @dialog.add_action_callback('createAssemblyFromVisible') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s.strip
+          notes = data['notes'].to_s
+          next if name.empty?
+
+          visible_ids = []
+          (TakeoffTool.scan_results || []).each do |r|
+            eid = r[:entity_id]
+            e = TakeoffTool.find_entity(eid)
+            next unless e && e.valid? && e.visible?
+            visible_ids << eid
+          end
+
+          if visible_ids.empty?
+            puts "Takeoff: createAssemblyFromVisible — no visible entities found"
+            @dialog.execute_script("alert('No visible entities to save.')")
+            next
+          end
+
+          TakeoffTool.create_assembly(name, visible_ids, notes)
+          puts "Takeoff: Created assembly '#{name}' with #{visible_ids.length} visible entities (of #{(TakeoffTool.scan_results || []).length} total)"
+          send_assemblies
+        rescue => e
+          puts "Takeoff createAssemblyFromVisible error: #{e.message}"
         end
       end
 

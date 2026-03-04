@@ -92,7 +92,7 @@ module TakeoffTool
 
       # Pre-load cost code map and learned rules
       CostCodeParser.load_map
-      LearningSystem.load_rules
+      LearningSystem.load_rules(force: true)
       progress.call("Cost code map and learned rules loaded") if progress
 
       # Auto-detection summary
@@ -338,10 +338,6 @@ module TakeoffTool
       r = CostCodeParser.classify(display, tag, mat, ifc_type, cc_dims)
       candidates << r if r
 
-      # Strategy 3.7: Learned rules
-      r = LearningSystem.apply(display, mat, ifc_type)
-      candidates << r if r
-
       # Strategy 4: Existing parser (Revit name patterns + tag fallback)
       r = Parser.parse_definition(display, tag, material: mat, ifc_type: ifc_type)
       if r && r[:auto_category] != '_IGNORE'
@@ -370,6 +366,16 @@ module TakeoffTool
           best_score = s; best = c
         end
       end
+
+      # Tier 2: Learned rules override — user-verified classifications
+      # Applied AFTER strategy selection so they always win when they match
+      learned = LearningSystem.apply(display, mat, ifc_type)
+      if learned
+        learned[:confidence] = :high
+        learned[:cost_code_score] = 92
+        best = learned
+      end
+
       best
     end
 
