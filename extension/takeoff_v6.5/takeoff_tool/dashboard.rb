@@ -2,6 +2,17 @@ module TakeoffTool
   module Dashboard
     @dialog = nil
 
+    def self.load_custom_colors
+      require 'json'
+      json = Sketchup.active_model.get_attribute('FormAndField', 'custom_colors', '{}')
+      JSON.parse(json) rescue {}
+    end
+
+    def self.save_custom_colors(colors)
+      require 'json'
+      Sketchup.active_model.set_attribute('FormAndField', 'custom_colors', JSON.generate(colors))
+    end
+
     def self.show(sr, ca, cca)
       if @dialog && @dialog.visible?; send_data(sr, ca, cca); return; end
 
@@ -150,11 +161,13 @@ module TakeoffTool
 
       @dialog.add_action_callback('highlightAll') do |_ctx|
         Highlighter.highlight_all(sr, ca)
+        @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
       @dialog.add_action_callback('highlightCategory') do |_ctx, cat_str|
         Highlighter.clear_all
         Highlighter.highlight_category(sr, ca, cat_str.to_s)
+        @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
       @dialog.add_action_callback('highlightSingle') do |_ctx, eid_str|
@@ -166,8 +179,17 @@ module TakeoffTool
         Highlighter.highlight_entities(ids)
       end
 
+      @dialog.add_action_callback('highlightCategoryColor') do |_ctx, cat_str|
+        Highlighter.highlight_category_color(sr, ca, cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('clearCategoryColor') do |_ctx, cat_str|
+        Highlighter.clear_category_color(sr, ca, cat_str.to_s)
+      end
+
       @dialog.add_action_callback('clearHighlights') do |_ctx|
         Highlighter.clear_all
+        @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
       @dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
@@ -469,6 +491,25 @@ module TakeoffTool
         send_measurement_data
       end
 
+      @dialog.add_action_callback('updateElevLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          new_label = data['label'].to_s.strip
+          m = Sketchup.active_model
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'ELEV'
+            m.start_operation('Update Elevation Label', true)
+            grp.set_attribute('TakeoffMeasurement', 'custom_label', new_label)
+            m.commit_operation
+            send_measurement_data
+          end
+        rescue => e
+          puts "Takeoff updateElevLabel error: #{e.message}"
+        end
+      end
+
       @dialog.add_action_callback('requestBenchmark') do |_ctx|
         send_benchmark_data
       end
@@ -486,6 +527,50 @@ module TakeoffTool
         ids = ids_str.to_s.split(',').map(&:to_i)
         puts "Takeoff: isolateEntities #{ids.length} items"
         Highlighter.isolate_entities(sr, ids)
+      end
+
+      # ═══ CUSTOM COLORS ═══
+
+      @dialog.add_action_callback('setCustomColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          type = data['type'].to_s
+          key = data['key'].to_s
+          color = data['color'].to_s
+          colors = load_custom_colors
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities'}
+          section = plural[type] || (type + 's')
+          colors[section] ||= {}
+          colors[section][key] = color
+          save_custom_colors(colors)
+          Highlighter.clear_cached_material(key) if type == 'category'
+          Highlighter.refresh_highlights
+          send_data(sr, ca, cca)
+        rescue => e
+          puts "Takeoff setCustomColor error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('clearCustomColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          type = data['type'].to_s
+          key = data['key'].to_s
+          colors = load_custom_colors
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities'}
+          section = plural[type] || (type + 's')
+          if colors[section]
+            colors[section].delete(key)
+          end
+          save_custom_colors(colors)
+          Highlighter.clear_cached_material(key) if type == 'category'
+          Highlighter.refresh_highlights
+          send_data(sr, ca, cca)
+        rescue => e
+          puts "Takeoff clearCustomColor error: #{e.message}"
+        end
       end
 
       # ═══ ASSEMBLIES ═══
@@ -623,6 +708,7 @@ module TakeoffTool
 
     def self.send_data(sr, ca, cca)
       return unless @dialog
+      custom_colors = load_custom_colors
       cc = []; ccm = {}
       begin
         p = File.join(PLUGIN_DIR, 'config', 'cost_codes.json')
@@ -682,7 +768,10 @@ module TakeoffTool
           warnings: r[:warnings] || [],
           revitId: r[:parsed][:revit_id], ifcType: r[:ifc_type],
           flagged: flagged, confidencePct: conf_pct,
-          categorySource: r[:parsed][:category_source]
+          categorySource: r[:parsed][:category_source],
+          customColor: custom_colors.dig('entities', r[:entity_id].to_s) ||
+                        custom_colors.dig('subcategories', "#{cat}|#{(TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''}") ||
+                        custom_colors.dig('categories', cat)
         }
       end
 
@@ -700,7 +789,7 @@ module TakeoffTool
 
       require 'json'
       msub = TakeoffTool.master_subcategories
-      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt })
+      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt, customColors: custom_colors })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
@@ -745,6 +834,7 @@ module TakeoffTool
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'elevation') || 0
           entry[:unit] = grp.get_attribute('TakeoffMeasurement', 'benchmark_unit') || 'feet'
           entry[:label] = grp.get_attribute('TakeoffMeasurement', 'elevation_label') || ''
+          entry[:custom_label] = grp.get_attribute('TakeoffMeasurement', 'custom_label') || ''
         elsif mtype == 'BENCHMARK'
           next  # Don't show benchmark point in measurement panel
         else

@@ -274,43 +274,85 @@ module TakeoffTool
       view.invalidate
     end
 
+    ELEV_LABEL_SUGGESTIONS = [
+      'T.O.S.', 'T.O.F.', 'T.O.W.', 'F.F.', 'T.O.P.',
+      'B.O.S.', 'T.O.C.', 'Ridge', 'Eave'
+    ]
+
     def onLButtonDown(flags, x, y, view)
       @ip.pick(view, x, y)
       return unless @ip.valid?
       return unless @benchmark
       return unless @hover_face
+      return if @pending_label  # Already waiting for label input
 
-      # Duplicate check — remove existing tag on this face (re-tag replaces)
-      face_pid = (@hover_face.persistent_id rescue nil)
-      TakeoffTool.remove_existing_face_tag(face_pid)
-
-      click_pt = @ip.position
-      slope_angle = TakeoffTool.face_slope_angle(@hover_face, @hover_transform)
+      click_pt = @ip.position.clone
+      face = @hover_face
+      transform = @hover_transform
+      face_pid = (face.persistent_id rescue nil)
+      slope_angle = TakeoffTool.face_slope_angle(face, transform)
 
       if slope_angle >= ELEV_WALL_THRESHOLD
         Sketchup.status_text = "Cannot tag vertical/wall faces."
         return
-      elsif slope_angle > ELEV_HORIZONTAL_THRESHOLD
-        # Sloped face — single slope info label at click point
-        analysis = TakeoffTool.analyze_face_slope(@hover_face, @hover_transform)
-        return unless analysis
-        elev = TakeoffTool.calculate_elevation(click_pt)
-        slope_text = TakeoffTool.format_slope_info(analysis[:rise], analysis[:run])
-        TakeoffTool.create_elev_label(click_pt, slope_text, @hover_face, @hover_transform, @benchmark,
-          color: ELEV_SLOPE_COLOR, dark_text: true, elevation: elev,
-          slope_info: slope_text, slope_angle: slope_angle, view: view)
+      end
+
+      # Store context for after label dialog
+      @pending_label = {
+        click_pt: click_pt, face: face, transform: transform,
+        face_pid: face_pid, slope_angle: slope_angle, view: view
+      }
+
+      # Show label input dialog
+      show_label_dialog(view)
+    end
+
+    def show_label_dialog(view)
+      suggestions = ELEV_LABEL_SUGGESTIONS.join('|')
+      prompts = ['Label (optional):']
+      defaults = ['']
+      list = [suggestions]
+      results = UI.inputbox(prompts, defaults, list, 'Elevation Tag Label')
+
+      if results
+        place_tag_with_label(results[0].to_s.strip)
       else
-        # Horizontal face — single clean elevation label at click point
-        elev = TakeoffTool.calculate_elevation(click_pt)
+        # User cancelled — still place without label
+        place_tag_with_label('')
+      end
+    end
+
+    def place_tag_with_label(custom_label)
+      ctx = @pending_label
+      @pending_label = nil
+      return unless ctx
+
+      face = ctx[:face]
+      return unless face.valid?
+
+      # Duplicate check — remove existing tag on this face
+      TakeoffTool.remove_existing_face_tag(ctx[:face_pid])
+
+      if ctx[:slope_angle] > ELEV_HORIZONTAL_THRESHOLD
+        analysis = TakeoffTool.analyze_face_slope(face, ctx[:transform])
+        return unless analysis
+        elev = TakeoffTool.calculate_elevation(ctx[:click_pt])
+        slope_text = TakeoffTool.format_slope_info(analysis[:rise], analysis[:run])
+        TakeoffTool.create_elev_label(ctx[:click_pt], slope_text, face, ctx[:transform], @benchmark,
+          color: ELEV_SLOPE_COLOR, dark_text: true, elevation: elev,
+          slope_info: slope_text, slope_angle: ctx[:slope_angle], view: ctx[:view],
+          custom_label: custom_label)
+      else
+        elev = TakeoffTool.calculate_elevation(ctx[:click_pt])
         return unless elev
         label = TakeoffTool.format_elevation(elev, @benchmark['unit'])
-        TakeoffTool.create_elev_label(click_pt, label, @hover_face, @hover_transform, @benchmark,
-          elevation: elev, view: view)
+        TakeoffTool.create_elev_label(ctx[:click_pt], label, face, ctx[:transform], @benchmark,
+          elevation: elev, view: ctx[:view], custom_label: custom_label)
       end
 
       @tags_placed += 1
       update_status
-      view.invalidate
+      ctx[:view].invalidate
     end
 
     def draw(view)
@@ -612,14 +654,15 @@ module TakeoffTool
     tag_layer = model.layers[ELEV_TAG] || model.layers.add(ELEV_TAG)
     grp = model.active_entities.add_group
     grp.layer = tag_layer
-    grp.name = "FF_ELEV: #{text}"
+    custom_label = (opts[:custom_label] || '').to_s.strip
+    grp.name = custom_label.empty? ? "FF_ELEV: #{text}" : "FF_ELEV: #{custom_label} #{text}"
     ents = grp.entities
 
     color = opts[:color] || ELEV_MAUVE
     dark_text = opts[:dark_text] || false
 
-    # Build callout label with text + pointer triangle
-    build_rect_label(ents, model, text, color, dark_text)
+    # Build callout label — two lines if custom label provided
+    build_rect_label(ents, model, text, color, dark_text, custom_label)
 
     # Orient label: stand upright facing camera direction (snapped to nearest 90°)
     # Builds a rotation matrix that maps:
@@ -675,6 +718,7 @@ module TakeoffTool
     grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
     grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(color + [230]))
     grp.set_attribute('TakeoffMeasurement', 'note', text)
+    grp.set_attribute('TakeoffMeasurement', 'custom_label', custom_label) unless custom_label.empty?
     face_pid = (face.persistent_id rescue nil)
     grp.set_attribute('TakeoffMeasurement', 'tagged_face_pid', face_pid.to_s) if face_pid
     if opts[:slope_info]
@@ -691,7 +735,7 @@ module TakeoffTool
     grp
   end
 
-  def self.build_rect_label(ents, model, text, bg_color, dark_text = false)
+  def self.build_rect_label(ents, model, text, bg_color, dark_text = false, custom_label = '')
     hex = '%02x%02x%02x' % bg_color[0..2]
     mat_name = "FF_Elev_#{hex}"
     mat = model.materials[mat_name]
@@ -715,8 +759,77 @@ module TakeoffTool
       m
     end
 
+    label_h = ELEV_LABEL_TEXT_HEIGHT * 0.75  # smaller text for custom label
+    has_label = custom_label.to_s.strip.length > 0
+
+    # Add custom label text above the elevation text
+    if has_label
+      ents.add_3d_text(custom_label.to_s.strip, TextAlignCenter, "Arial", true, false,
+                       label_h, 0.0, 0.0, true, 0.15)
+    end
+
+    # Add elevation text
     ents.add_3d_text(text, TextAlignCenter, "Arial", true, false,
                      ELEV_LABEL_TEXT_HEIGHT, 0.0, 0.0, true, 0.2)
+
+    # If two lines, shift custom label up above elevation text
+    if has_label
+      # Measure all text bounding box first
+      all_text = ents.grep(Sketchup::Face) + ents.grep(Sketchup::Edge)
+      elev_bb = Geom::BoundingBox.new
+      all_text.each { |e| elev_bb.add(e.bounds) }
+
+      # The 3d_text calls place text starting at origin, stacking
+      # We need to separate the two: find where each text group starts
+      # SketchUp add_3d_text places at origin each time, so both overlap
+      # We need to shift the first (label) text up by the elevation text height + gap
+      gap = ELEV_LABEL_TEXT_HEIGHT * 0.3  # gap between lines
+
+      # Collect all entities created so far, separate them
+      # The first add_3d_text entities = custom label, second = elevation
+      # Since both are placed at origin, we shift the label text up
+      label_entities = []
+      elev_entities = []
+
+      # Group by creation order — first batch is label, second is elevation
+      faces = ents.grep(Sketchup::Face)
+      edges = ents.grep(Sketchup::Edge)
+
+      # Measure elevation text height (the text itself, not padding)
+      elev_text_h = ELEV_LABEL_TEXT_HEIGHT
+
+      # Shift label text up by elevation text height + gap
+      shift = Geom::Transformation.new(Geom::Vector3d.new(0, elev_text_h + gap, 0))
+      # We can't easily separate the two texts, so instead:
+      # Delete all, re-add with explicit Y offsets
+
+      ents.clear!
+
+      # Add elevation text at y=0
+      ents.add_3d_text(text, TextAlignCenter, "Arial", true, false,
+                       ELEV_LABEL_TEXT_HEIGHT, 0.0, 0.0, true, 0.2)
+
+      # Measure it
+      elev_bb = Geom::BoundingBox.new
+      ents.each { |e| elev_bb.add(e.bounds) }
+      elev_top_y = elev_bb.max.y
+
+      # Now add label text above
+      label_grp = ents.add_group
+      label_grp.entities.add_3d_text(custom_label.to_s.strip, TextAlignCenter, "Arial", true, false,
+                                      label_h, 0.0, 0.0, true, 0.15)
+      label_bb = Geom::BoundingBox.new
+      label_grp.entities.each { |e| label_bb.add(e.bounds) }
+
+      # Center label horizontally relative to elevation text
+      elev_cx = (elev_bb.min.x + elev_bb.max.x) / 2.0
+      label_cx = (label_bb.min.x + label_bb.max.x) / 2.0
+      dx = elev_cx - label_cx
+      dy = elev_top_y + gap - label_bb.min.y
+
+      label_grp.transform!(Geom::Transformation.new(Geom::Vector3d.new(dx, dy, 0)))
+      label_grp.explode
+    end
 
     text_bb = Geom::BoundingBox.new
     ents.each { |e| text_bb.add(e.bounds) }

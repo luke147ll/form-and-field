@@ -300,6 +300,20 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .ctx-item:hover{background:#45475a}
 .ctx-item svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
 .ctx-sep{height:1px;background:#45475a;margin:3px 0}
+/* COLOR DOT — expandable inline picker */
+.color-dot-wrap{display:inline-flex;align-items:center;gap:0;overflow:hidden;border-radius:10px;transition:all .25s cubic-bezier(.16,1,.3,1);cursor:pointer;flex-shrink:0;height:18px;padding:0;vertical-align:middle}
+.color-dot-wrap .cd-main{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,0.08);transition:all .2s ease}
+.color-dot-wrap:hover .cd-main{transform:scale(1.2);border-color:rgba(255,255,255,0.2)}
+.color-dot-wrap .cd-palette{display:flex;align-items:center;gap:4px;max-width:0;opacity:0;overflow:hidden;transition:max-width .3s cubic-bezier(.16,1,.3,1),opacity .2s ease,margin .3s ease;margin-left:0}
+.color-dot-wrap.expanded{background:#313244;padding:3px 6px 3px 4px}
+.color-dot-wrap.expanded .cd-palette{max-width:300px;opacity:1;margin-left:5px}
+.cd-circle{width:14px;height:14px;border-radius:50%;cursor:pointer;border:1.5px solid transparent;transition:all .15s cubic-bezier(.34,1.56,.64,1);flex-shrink:0}
+.cd-circle:hover{transform:scale(1.3);border-color:rgba(255,255,255,0.3)}
+.cd-circle.picked{border-color:#cdd6f4;transform:scale(1.15)}
+.cd-reset{font-size:9px;color:#6c7086;cursor:pointer;padding:0 2px;margin-left:2px;flex-shrink:0;transition:color .15s ease}
+.cd-reset:hover{color:#f38ba8}
+.color-dot-static{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0;vertical-align:middle}
+.color-dot-wrap.viewport-active .cd-main{box-shadow:0 0 6px 2px currentColor;border-color:rgba(255,255,255,0.3)}
 </style>
 </head>
 <body>
@@ -558,6 +572,10 @@ var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
 var ASMVIS={};
+var CCOL={};
+var COLOR_PALETTE=['#cba6f7','#89b4fa','#94e2d5','#a6e3a1','#fab387','#f38ba8','#f9e2af','#f5c2e7','#89dceb','#b4befe','#f2cdcd','#74c7ec'];
+var openColorDotId=null;
+var activeColorCategories={};
 var debugOn=false;
 
 /* SVG ICON TEMPLATES */
@@ -681,7 +699,7 @@ function callJSON(n,o){call(n,JSON.stringify(o));}
 function receiveData(json){
   try{
     var d=JSON.parse(json);
-    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];MSUB=d.masterSubcategories||{};CATMT=d.categoryMT||{};
+    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];MSUB=d.masterSubcategories||{};CATMT=d.categoryMT||{};CCOL=d.customColors||{};
     CA.sort(function(a,b){
       if(a==='_IGNORE')return 1;if(b==='_IGNORE')return -1;
       if(a==='Uncategorized')return 1;if(b==='Uncategorized')return -1;
@@ -817,6 +835,8 @@ function catBadge(c){
 function catNameSpan(c){
   var cls=c.replace(/[\s\/]+/g,'');
   var dbl=' ondblclick="event.stopPropagation();startCatRename(\''+X2(c)+'\',this)"';
+  var cc=(CCOL.categories||{})[c];
+  if(cc) return '<span class="cname" style="background:'+cc+'20;color:'+cc+';border:1px solid '+cc+'30"'+dbl+'>'+X(c)+'</span>';
   if(KNOWN_CATS[cls]) return '<span class="cname c-'+cls+'"'+dbl+'>'+X(c)+'</span>';
   var h=0;for(var i=0;i<c.length;i++)h=c.charCodeAt(i)+((h<<5)-h);
   return '<span class="cname" style="background:hsl('+((h%360+360)%360)+',55%,70%)"'+dbl+'>'+X(c)+'</span>';
@@ -977,6 +997,8 @@ function renderGroups(){
     h+='<div class="cgh'+(isOpen?'':' closed')+'" onclick="togCat('+gi+',\''+X2(gk)+'\')">';
     // Eye toggle
     h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togCatVis(\''+X2(gk)+'\')" title="'+(catVis?'Hide':'Show')+'">'+(catVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    var catCol=(CCOL.categories||{})[gk]||'';
+    if(gBy==='category') h+=buildColorDot('category',gk,catCol);
     h+='<span class="arr">&#9660;</span>';
     // Name badge
     if(gBy==='category') h+=catNameSpan(gk);
@@ -1058,6 +1080,8 @@ function renderGroups(){
           h+='<td colspan="'+scCols+'" onclick="togSub(\''+X2(sKey)+'\')">';
           h+='<span class="arr">&#9660;</span> ';
           h+='<button class="ey'+(sVis?'':' off')+'" onclick="event.stopPropagation();togSubVis(\''+X2(gk)+'\',\''+X2(curSub)+'\')">'+(sVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button> ';
+          var subCol=curSub?((CCOL.subcategories||{})[gk+'|'+curSub]||''):'';
+          if(curSub) h+=buildColorDot('subcategory',gk+'|'+curSub,subCol)+' ';
           if(curSub){
             h+='<span class="sc-name" ondblclick="event.stopPropagation();startSubRename(\''+X2(gk)+'\',\''+X2(curSub)+'\',this)">'+X(curSub)+'</span>';
           } else {
@@ -1088,7 +1112,9 @@ function renderGroups(){
 
       h+='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+(sel?' class="sel"':'')+'>';
       h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
-      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button></td>';
+      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+      h+=' '+buildStaticDot(row.customColor);
+      h+='</td>';
       if(gBy==='category'){
         // Sub first, no Cat column when grouped by category
         h+='<td>'+buildSubSelect(row)+'</td>';
@@ -1414,9 +1440,11 @@ function renderAsmPanel(){
     var aCnt=(a.entity_ids||[]).length;
     var aVis=ASMVIS[name]!==false;
     var ne=X(name).replace(/'/g,"\\'");
+    var asmCol=(CCOL.assemblies||{})[name]||'';
     h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+ne+'\')">'+
       '<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis(\''+ne+'\')" title="'+(aVis?'Hide':'Show')+'">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>'+
       '<button class="asm-iso" onclick="event.stopPropagation();isoAsm(\''+ne+'\')" title="Isolate — hide everything except this assembly">Isolate</button>'+
+      buildColorDot('assembly',name,asmCol)+
       '<span class="asm-name" title="'+X(name)+'">'+X(name)+'</span>'+
       (a.notes?'<span class="asm-notes" title="'+X(a.notes)+'">'+X(a.notes)+'</span>':'')+
       '<span class="asm-cnt">'+aCnt+'</span>'+
@@ -1567,8 +1595,15 @@ function renderMeasPanel(){
       h+='<div class="mp-item">';
       h+='<button class="ey'+(vis?'':' off')+'" onclick="togMeasVis('+it.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
       h+='<span class="mp-swatch" style="'+sw+'"></span>';
-      var desc=it.type==='ELEV'?(it.label||('EL. '+it.value)):(X(it.type)+': '+(it.note?X(it.note):X(cat)));
-      h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
+      if(it.type==='ELEV'){
+        var cl=it.custom_label||'';
+        var elbl=it.label||('EL. '+it.value);
+        var desc=cl?(X(cl)+' '+elbl):elbl;
+        h+='<span class="mp-desc" ondblclick="editElevLabel('+it.eid+',this)" title="Double-click to edit label">'+desc+'</span>';
+      } else {
+        var desc=X(it.type)+': '+(it.note?X(it.note):X(cat));
+        h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
+      }
       h+='<span class="mp-val">'+fmtMeasVal(it.value,it.unit)+'</span>';
       h+='<button class="mp-del" onclick="delMeas('+it.eid+')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
       h+='</div>';
@@ -1593,6 +1628,27 @@ function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
 function hideMeasurements(){call('hideAllMeasurements');}
 function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();});}
+
+function editElevLabel(eid,span){
+  var it=MEAS.find(function(m){return m.eid===eid;});
+  if(!it)return;
+  var cur=it.custom_label||'';
+  var inp=document.createElement('input');
+  inp.type='text';inp.value=cur;
+  inp.style.cssText='background:#313244;color:#cdd6f4;border:1px solid #a6e3a1;border-radius:3px;padding:1px 4px;font-size:11px;width:100%;outline:none;';
+  span.textContent='';span.appendChild(inp);
+  inp.focus();inp.select();
+  var done=false;
+  function finish(){
+    if(done)return;done=true;
+    var val=inp.value.trim();
+    it.custom_label=val;
+    callJSON('updateElevLabel',{eid:eid,label:val});
+    renderMeasPanel();
+  }
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();finish();}if(e.key==='Escape'){done=true;renderMeasPanel();}});
+  inp.addEventListener('blur',finish);
+}
 
 /* ═══ BENCHMARK INFO ═══ */
 var BMK=null;
@@ -1890,6 +1946,172 @@ function scrollToEntity(eid){
 function X(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
 function X2(s){return s?String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"):'';}
 function T(s,n){return s&&s.length>n?s.substr(0,n)+'...':s||'';}
+
+/* ═══ CUSTOM COLORS — expandable dot picker ═══ */
+function getDefaultColor(key){
+  var cls=key.replace(/[\s\/]+/g,'');
+  if(KNOWN_CATS[cls]){var el=document.createElement('span');el.className='c-'+cls;document.body.appendChild(el);var bg=getComputedStyle(el).backgroundColor;document.body.removeChild(el);return bg;}
+  var h=0;for(var i=0;i<key.length;i++)h=key.charCodeAt(i)+((h<<5)-h);
+  return 'hsl('+((h%360+360)%360)+',55%,70%)';
+}
+function safeId(key){return 'cdw_'+key.replace(/[^a-zA-Z0-9]/g,'_');}
+function buildColorDot(type,key,currentColor){
+  var sid=safeId(key);
+  var bg=currentColor||getDefaultColor(key);
+  var hasCustom=!!currentColor;
+  var isActive=(type==='category'&&activeColorCategories[key]);
+  var h='<span class="color-dot-wrap'+(isActive?' viewport-active':'')+'" onclick="handleColorClick(event,\''+type+'\',\''+X2(key)+'\')" ondblclick="handleColorDblClick(event,\''+type+'\',\''+X2(key)+'\')" id="'+sid+'" style="color:'+bg+'">';
+  h+='<span class="cd-main" style="background:'+bg+'"'+(hasCustom?' data-custom-color="'+currentColor+'"':'')+' ></span>';
+  h+='<span class="cd-palette">';
+  for(var i=0;i<COLOR_PALETTE.length;i++){
+    var c=COLOR_PALETTE[i];
+    var picked=(c===currentColor)?' picked':'';
+    h+='<span class="cd-circle'+picked+'" style="background:'+c+'" onclick="pickColor(event,\''+type+'\',\''+X2(key)+'\',\''+c+'\')" ondblclick="event.stopPropagation()"></span>';
+  }
+  h+='<span class="cd-reset" onclick="resetColor(event,\''+type+'\',\''+X2(key)+'\')" ondblclick="event.stopPropagation()">&#10005;</span>';
+  h+='</span></span>';
+  return h;
+}
+function buildStaticDot(color){
+  if(!color)return '';
+  return '<span class="color-dot-static" style="background:'+color+'"></span>';
+}
+var PLURAL_MAP={category:'categories',subcategory:'subcategories',assembly:'assemblies',entity:'entities'};
+var colorClickTimer=null;
+
+function handleColorClick(event,type,key){
+  event.stopPropagation();
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(!wrap)return;
+
+  // If palette is open, just close it
+  if(wrap.classList.contains('expanded')){
+    wrap.classList.remove('expanded');
+    openColorDotId=null;
+    return;
+  }
+
+  // Delay single-click action to distinguish from double-click
+  if(colorClickTimer){clearTimeout(colorClickTimer);colorClickTimer=null;return;}
+  colorClickTimer=setTimeout(function(){
+    colorClickTimer=null;
+    // Single click: toggle highlight on/off (categories only)
+    if(type==='category'){
+      if(activeColorCategories[key]){
+        deactivateCategoryColor(key);
+      } else {
+        // Only toggle ON if a custom color exists
+        var section=PLURAL_MAP[type]||(type+'s');
+        if(CCOL[section]&&CCOL[section][key]){
+          activateCategoryColor(key);
+        }
+      }
+    }
+  },250);
+}
+
+function handleColorDblClick(event,type,key){
+  event.stopPropagation();
+  event.preventDefault();
+  // Cancel pending single click
+  if(colorClickTimer){clearTimeout(colorClickTimer);colorClickTimer=null;}
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(!wrap)return;
+
+  if(wrap.classList.contains('expanded')){
+    wrap.classList.remove('expanded');
+    openColorDotId=null;
+  } else {
+    if(openColorDotId&&openColorDotId!==sid){var prev=document.getElementById(openColorDotId);if(prev)prev.classList.remove('expanded');}
+    wrap.classList.add('expanded');
+    openColorDotId=sid;
+  }
+}
+
+function pickColor(event,type,key,hex){
+  event.stopPropagation();
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(wrap){var dot=wrap.querySelector('.cd-main');dot.style.background=hex;dot.setAttribute('data-custom-color',hex);wrap.classList.remove('expanded');}
+  openColorDotId=null;
+
+  // Save to CCOL optimistically
+  var section=PLURAL_MAP[type]||(type+'s');
+  if(!CCOL[section])CCOL[section]={};
+  CCOL[section][key]=hex;
+
+  // Save to Ruby
+  callJSON('setCustomColor',{type:type,key:key,color:hex});
+
+  // Activate this category's color in viewport
+  if(type==='category'){
+    activeColorCategories[key]=true;
+    call('highlightCategoryColor',key);
+  }
+
+  renderGroups();renderAsmPanel();
+}
+
+function resetColor(event,type,key){
+  event.stopPropagation();
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(wrap){var dot=wrap.querySelector('.cd-main');dot.style.background=getDefaultColor(key);dot.removeAttribute('data-custom-color');wrap.classList.remove('expanded');}
+  openColorDotId=null;
+
+  // Clear from CCOL
+  var section=PLURAL_MAP[type]||(type+'s');
+  if(CCOL[section])delete CCOL[section][key];
+
+  // Clear saved color in Ruby
+  callJSON('clearCustomColor',{type:type,key:key});
+
+  // Deactivate viewport highlight if active
+  if(type==='category'&&activeColorCategories[key]){
+    deactivateCategoryColor(key);
+  }
+
+  renderGroups();renderAsmPanel();
+}
+
+function activateCategoryColor(key){
+  activeColorCategories[key]=true;
+  call('highlightCategoryColor',key);
+  updateDotActiveState(key,true);
+}
+
+function deactivateCategoryColor(key){
+  delete activeColorCategories[key];
+  call('clearCategoryColor',key);
+  updateDotActiveState(key,false);
+}
+
+function updateDotActiveState(key,active){
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(wrap){
+    wrap.classList.toggle('viewport-active',active);
+    // Update currentColor for glow
+    if(active){
+      var main=wrap.querySelector('.cd-main');
+      if(main)wrap.style.color=main.style.background;
+    }
+  }
+}
+
+function clearAllDotStates(){
+  var keys=Object.keys(activeColorCategories);
+  for(var i=0;i<keys.length;i++){
+    updateDotActiveState(keys[i],false);
+  }
+  activeColorCategories={};
+}
+
+document.addEventListener('click',function(){
+  if(openColorDotId){var w=document.getElementById(openColorDotId);if(w)w.classList.remove('expanded');openColorDotId=null;}
+});
 
 /* ═══ INPUT MODAL ═══ */
 var _modalCb=null;

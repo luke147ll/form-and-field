@@ -19,15 +19,26 @@ module TakeoffTool
     @orig_faces = {}      # entityID => array of [face, original_material]
     @mats = {}
     @isolated_categories = nil  # nil = no isolation, Hash = { cat => true }
+    @highlights_active = false
+    @last_highlight_mode = nil  # :all or :category
+    @last_highlight_sr = nil
+    @last_highlight_ca = nil
+    @last_highlight_cat = nil
+    @active_cat_colors = {}  # cat_name => true for per-category inline toggles
     end # unless defined?(COLORS)
 
     def self.highlight_all(sr, ca)
       m = Sketchup.active_model
       return puts("HL: No model") unless m
+      @last_highlight_mode = :all
+      @last_highlight_sr = sr
+      @last_highlight_ca = ca
       clear_all
 
       puts "HL: highlight_all called with #{sr.length} scan results"
       puts "HL: entity_registry has #{TakeoffTool.entity_registry.length} entries"
+
+      @custom_colors = load_custom_colors
 
       m.start_operation('Highlight All', true)
       found = 0; colored = 0; missed = 0
@@ -52,27 +63,39 @@ module TakeoffTool
         cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
         next if cat == '_IGNORE'
 
-        mat = gmat(m, cat)
+        sub = (e.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''
+        mat = gmat_for_entity(m, eid, cat, sub)
         applied = apply_highlight(e, eid, mat)
         colored += 1 if applied
       end
 
       m.commit_operation
+      @custom_colors = nil
+      @highlights_active = true
       puts "HL: Done. found=#{found} colored=#{colored} missed=#{missed}"
     end
 
     def self.highlight_category(sr, ca, tc)
-      m = Sketchup.active_model; return unless m; clear_all
+      m = Sketchup.active_model; return unless m
+      @last_highlight_mode = :category
+      @last_highlight_sr = sr
+      @last_highlight_ca = ca
+      @last_highlight_cat = tc
+      clear_all
+      @custom_colors = load_custom_colors
       m.start_operation('Highlight Cat', true); n=0
       sr.each do |r|
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
         next unless cat == tc
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
-        mat = gmat(m, cat)
+        sub = (e.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''
+        mat = gmat_for_entity(m, r[:entity_id], cat, sub)
         apply_highlight(e, r[:entity_id], mat)
         n += 1
       end
       m.commit_operation
+      @custom_colors = nil
+      @highlights_active = true
       puts "HL: Category '#{tc}' highlighted #{n}"
     end
 
@@ -134,6 +157,113 @@ module TakeoffTool
       @mats.clear
 
       m.commit_operation
+      # Only clear active flag if this is a user-initiated clear (not an internal clear before re-highlight)
+      unless @refreshing
+        @highlights_active = false
+        @last_highlight_mode = nil
+        @active_cat_colors = {}
+      end
+    end
+
+    def self.refresh_highlights
+      return unless @highlights_active && @last_highlight_mode
+      @refreshing = true
+      begin
+        if @last_highlight_mode == :all && @last_highlight_sr && @last_highlight_ca
+          highlight_all(@last_highlight_sr, @last_highlight_ca)
+        elsif @last_highlight_mode == :category && @last_highlight_sr && @last_highlight_ca && @last_highlight_cat
+          highlight_category(@last_highlight_sr, @last_highlight_ca, @last_highlight_cat)
+        end
+      ensure
+        @refreshing = false
+      end
+    end
+
+    # Per-category inline color toggle — highlights one category, can stack
+    def self.highlight_category_color(sr, ca, cat_name)
+      m = Sketchup.active_model; return unless m
+      cc = load_custom_colors
+      hex = cc.dig('categories', cat_name)
+      return unless hex
+
+      m.start_operation('Color ' + cat_name, true)
+
+      # Clear existing highlights for this category first (in case color changed)
+      sr.each do |r|
+        eid = r[:entity_id]
+        cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless cat == cat_name
+        e = TakeoffTool.find_entity(eid); next unless e && e.valid?
+        if @orig_instance.key?(eid)
+          begin; e.material = @orig_instance[eid]; rescue; end
+          @orig_instance.delete(eid)
+        end
+        if @orig_faces.key?(eid)
+          @orig_faces[eid].each { |face, om| begin; face.material = om if face.valid?; rescue; end }
+          @orig_faces.delete(eid)
+        end
+      end
+
+      # Create material for this color
+      c = hex_to_rgb(hex)
+      unless c
+        m.commit_operation
+        return
+      end
+      k = "TO_CC_#{hex.gsub('#','')}"
+      mt = @mats[k]
+      unless mt
+        mt = m.materials.add(k)
+        mt.color = Sketchup::Color.new(*c)
+        mt.alpha = 0.85
+        @mats[k] = mt
+      end
+
+      # Apply to all entities in this category
+      n = 0
+      sr.each do |r|
+        eid = r[:entity_id]
+        cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless cat == cat_name
+        e = TakeoffTool.find_entity(eid); next unless e && e.valid?
+        apply_highlight(e, eid, mt)
+        n += 1
+      end
+
+      @active_cat_colors[cat_name] = true
+      m.commit_operation
+      puts "HL: Color ON '#{cat_name}' (#{n} entities, #{hex})"
+    end
+
+    # Clear per-category inline highlight — restore originals for one category
+    def self.clear_category_color(sr, ca, cat_name)
+      m = Sketchup.active_model; return unless m
+      @active_cat_colors.delete(cat_name)
+
+      m.start_operation('Uncolor ' + cat_name, true)
+      n = 0
+      sr.each do |r|
+        eid = r[:entity_id]
+        cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless cat == cat_name
+        e = TakeoffTool.find_entity(eid); next unless e && e.valid?
+        if @orig_instance.key?(eid)
+          begin; e.material = @orig_instance[eid]; rescue; end
+          @orig_instance.delete(eid)
+          n += 1
+        end
+        if @orig_faces.key?(eid)
+          @orig_faces[eid].each { |face, om| begin; face.material = om if face.valid?; rescue; end }
+          @orig_faces.delete(eid)
+        end
+      end
+
+      m.commit_operation
+      puts "HL: Color OFF '#{cat_name}' (#{n} entities restored)"
+    end
+
+    def self.active_cat_colors
+      @active_cat_colors
     end
 
     def self.clear_measurement_highlights
@@ -639,15 +769,13 @@ module TakeoffTool
     end
 
     # Apply highlight to an entity. Sets instance-level material.
-    # Only paints faces if the definition is used by a single instance,
-    # to avoid corrupting shared component definitions.
+    # Also paints faces (and nested component faces) to override
+    # face-level materials common in IFC imports.
     def self.apply_highlight(entity, eid, mat)
       # Save and set instance-level material
       @orig_instance[eid] = entity.material
       entity.material = mat
 
-      # Only paint faces inside the definition if it's NOT shared
-      # (shared definitions = multiple instances using same geometry)
       defn = nil
       if entity.respond_to?(:definition)
         defn = entity.definition
@@ -656,13 +784,9 @@ module TakeoffTool
       end
 
       if defn && defn.respond_to?(:entities) && defn.respond_to?(:instances)
-        # Only paint faces if this definition has 1 instance
         if defn.instances.length <= 1
           face_list = []
-          defn.entities.grep(Sketchup::Face).each do |face|
-            face_list << [face, face.material]
-            face.material = mat
-          end
+          paint_faces_recursive(defn.entities, mat, face_list)
           @orig_faces[eid] = face_list if face_list.length > 0
         end
       end
@@ -673,17 +797,93 @@ module TakeoffTool
       false
     end
 
+    # Recursively paint faces inside a definition and its nested children.
+    # Saves [face, original_material] pairs into face_list for restore.
+    def self.paint_faces_recursive(ents, mat, face_list)
+      ents.grep(Sketchup::Face).each do |face|
+        face_list << [face, face.material]
+        face.material = mat
+      end
+      # Recurse into nested components/groups
+      ents.each do |child|
+        next unless child.valid?
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        # Only paint if this child definition isn't shared outside this parent
+        next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
+        # Also set instance material on the nested child
+        face_list << [child, child.material] if child.respond_to?(:material)
+        child.material = mat
+        paint_faces_recursive(child_defn.entities, mat, face_list)
+      end
+    end
+
+    # Load the full custom colors map from model attributes
+    def self.load_custom_colors
+      require 'json'
+      json = Sketchup.active_model.get_attribute('FormAndField', 'custom_colors', '{}')
+      JSON.parse(json) rescue {}
+    end
+
+    # Resolve custom hex for an entity: entity > subcategory > category > nil
+    def self.resolve_custom_hex(eid, cat, sub)
+      cc = @custom_colors || load_custom_colors
+      cc.dig('entities', eid.to_s) ||
+        (sub && !sub.empty? && cc.dig('subcategories', "#{cat}|#{sub}")) ||
+        cc.dig('categories', cat)
+    end
+
+    # Parse hex string "#rrggbb" to [r,g,b] array
+    def self.hex_to_rgb(hex)
+      return nil unless hex && hex.length >= 7
+      [hex[1..2].to_i(16), hex[3..4].to_i(16), hex[5..6].to_i(16)]
+    end
+
+    # Get or create a highlight material for a specific entity, checking
+    # entity > subcategory > category custom colors, then default
+    def self.gmat_for_entity(m, eid, cat, sub)
+      custom_hex = resolve_custom_hex(eid, cat, sub)
+      if custom_hex
+        # Use a material key that includes the hex so different colors don't collide
+        k = "TO_CC_#{custom_hex.gsub('#','')}"
+        mt = @mats[k]
+        unless mt
+          c = hex_to_rgb(custom_hex) || COLORS[cat] || COLORS['Uncategorized']
+          mt = m.materials.add(k)
+          mt.color = Sketchup::Color.new(*c)
+          mt.alpha = 0.85
+          @mats[k] = mt
+        end
+        mt
+      else
+        gmat(m, cat)
+      end
+    end
+
+    # Get or create a category-level highlight material (default colors + category custom)
     def self.gmat(m, cat)
       k = "TO_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}"
       mt = @mats[k]
       unless mt
-        c = COLORS[cat] || COLORS['Uncategorized']
+        cc = @custom_colors || load_custom_colors
+        custom_hex = cc.dig('categories', cat)
+        if custom_hex
+          c = hex_to_rgb(custom_hex) || COLORS[cat] || COLORS['Uncategorized']
+        else
+          c = COLORS[cat] || COLORS['Uncategorized']
+        end
         mt = m.materials.add(k)
         mt.color = Sketchup::Color.new(*c)
         mt.alpha = 0.85
         @mats[k] = mt
       end
       mt
+    end
+
+    def self.clear_cached_material(cat)
+      k = "TO_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}"
+      @mats.delete(k)
     end
 
     def self.selmat(m)

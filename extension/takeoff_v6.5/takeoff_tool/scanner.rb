@@ -253,6 +253,16 @@ module TakeoffTool
         area = (dims[1] * dims[2]) / 144.0
       end
 
+      # ─── BB area fallback for all SF categories ───
+      # When volume/thickness didn't produce area, estimate from bounding box.
+      # Two largest dims approximate the surface area (smallest = thickness).
+      if !area
+        mtype = parsed[:measurement_type] || Parser.measurement_for(cat)
+        if %w[sf sf_cy sf_sheets].include?(mtype) && dims[1] > 0 && dims[2] > 0
+          area = (dims[1] * dims[2]) / 144.0
+        end
+      end
+
       results << {
         entity_id: inst.entityID, entity_type: inst.typename, tag: tag,
         definition_name: dname, display_name: display, instance_name: iname,
