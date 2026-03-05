@@ -1051,5 +1051,70 @@
     "times_applied": 1,
     "created": "2026-03-04",
     "last_applied": "2026-03-04"
+  },
+  {
+    "keyword": "8\" x 8\" x 16\" CMU",
+    "material": "8 x 16 CMU",
+    "ifc_type": "IfcWall",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Foundation Walls",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-04",
+    "last_applied": "2026-03-04"
+  },
+  {
+    "keyword": "Generic Models 58, Generic Models 6",
+    "material": "Column - Hewn (Wood Grain)",
+    "ifc_type": "IfcBuildingElementProxy",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Furniture",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-04",
+    "last_applied": "2026-03-04"
+  },
+  {
+    "keyword": "Generic Models 64, Generic Models 64",
+    "material": "Wood - Hewn (Wood Grain)",
+    "ifc_type": "IfcBuildingElementProxy",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Ceilings",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-04",
+    "last_applied": "2026-03-04"
+  },
+  {
+    "keyword": "STUDIO 389",
+    "material": "RoomTransparentBlue",
+    "ifc_type": "IfcSpace",
+    "size_pattern": "96.0\"",
+    "from_category": "Uncategorized",
+    "to_category": "Rooms",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-04",
+    "last_applied": "2026-03-04"
+  },
+  {
+    "keyword": "Column - Hewn Corner (MA), 8\"X10\"",
+    "material": "Column - Hewn (Wood Grain)",
+    "ifc_type": "IfcColumn",
+    "size_pattern": "",
+    "from_category": "Structural Steel",
+    "to_category": "Timbers (Decorative)",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-04",
+    "last_applied": "2026-03-04"
   }
 ]

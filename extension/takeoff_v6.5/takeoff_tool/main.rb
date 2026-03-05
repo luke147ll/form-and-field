@@ -1116,6 +1116,12 @@ module TakeoffTool
         return r == IDYES ? run_scan : nil
       end
     end
+
+    # Ensure multiverse data is loaded (may have been reset by code reload)
+    if !@multiverse_data
+      load_multiverse_data rescue nil
+    end
+
     # Check staleness
     m = Sketchup.active_model
     if m
@@ -1126,6 +1132,8 @@ module TakeoffTool
         return run_scan if r == IDYES
       end
     end
+
+    puts "[FF Dashboard] Opening: #{@scan_results.length} results, mv=#{active_mv_view || 'none'}"
     Dashboard.show(@scan_results, @category_assignments, @cost_code_assignments)
   end
 end

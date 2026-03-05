@@ -245,6 +245,9 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .mv-mgmt-btn:hover{border-color:#89b4fa;color:#cdd6f4;background:#1a1a2e}
 .mv-mgmt-btn.danger{color:#f38ba8;border-color:#f38ba8}
 .mv-mgmt-btn.danger:hover{background:rgba(243,139,168,0.08)}
+.mv-needs-scan{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(249,226,175,0.06);border:1px solid rgba(249,226,175,0.2);border-radius:6px;margin-bottom:8px}
+.mv-scan-b-btn{padding:4px 14px;background:#89b4fa;color:#1e1e2e;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;transition:all .12s}
+.mv-scan-b-btn:hover{filter:brightness(1.1)}
 
 /* SPLIT VERTICAL DASHBOARD */
 .split-container{display:none;flex:1;min-height:0;overflow:hidden}
@@ -557,6 +560,82 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .sc-new-cat-btn:hover{filter:brightness(1.1)}
 .sc-preview-btn{background:none;border:none;color:#cba6f7;cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0}
 .sc-preview-btn:hover{color:#f5c2e7}
+/* COMPARE BAR + RESULTS */
+.compare-bar{display:none;padding:6px 10px;background:rgba(203,166,247,0.08);border-bottom:1px solid rgba(203,166,247,0.2);align-items:center;gap:8px;flex-shrink:0}
+.compare-bar.active{display:flex}
+.cb-label{color:#cba6f7;font-size:11px;font-weight:600}
+.cb-sel{color:#cdd6f4;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb-sel b{color:#a6e3a1}
+.cb-sel .vs{color:#6c7086;margin:0 4px}
+.cb-sel .cat-b{color:#89b4fa}
+.cb-run{padding:3px 10px;background:#cba6f7;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
+.cb-run:hover{filter:brightness(1.1)}
+.cb-clear{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
+.compare-results{display:none;padding:8px 12px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
+.compare-results.active{display:flex;flex-direction:column;gap:6px}
+.cr-header{display:flex;align-items:center;gap:8px}
+.cr-title{color:#cba6f7;font-size:12px;font-weight:600;flex:1}
+.cr-close{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px}
+.cr-stats{display:flex;gap:12px;flex-wrap:wrap}
+.cr-stat{display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.cr-stat:hover{background:rgba(205,214,244,0.05)}
+.cr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cr-dot.matching{background:#a6e3a1}
+.cr-dot.discrepancy{background:#f38ba8}
+.cr-dot.only-a{background:#6c7086}
+.cr-count{font-size:12px;font-weight:600;color:#cdd6f4}
+.cr-label{font-size:11px;color:#a6adc8}
+.cr-note{font-size:9px;color:#585b70;margin-left:auto}
+.cr-actions{display:flex;gap:8px;margin-top:6px}
+.cr-accept-btn{padding:5px 16px;background:#a6e3a1;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
+.cr-accept-btn:hover{filter:brightness(1.1)}
+.cr-cancel-btn{padding:5px 12px;background:none;color:#6c7086;border:1px solid #45475a;border-radius:4px;font-size:11px;cursor:pointer}
+.cr-cancel-btn:hover{color:#f38ba8;border-color:#f38ba8}
+.split-cmp-btn{background:none;border:none;color:#cba6f7;cursor:pointer;font-size:11px;padding:1px 4px;opacity:0.6}
+.split-cmp-btn:hover{opacity:1}
+.split-cmp-btn.selected{opacity:1;color:#f5c2e7}
+.split-commit-btn{background:none;border:none;color:#a6e3a1;cursor:pointer;font-size:12px;padding:1px 4px;opacity:0.6;font-weight:bold}
+.split-commit-btn:hover{opacity:1}
+.cr-commit-btn{padding:5px 16px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
+.cr-commit-btn:hover{filter:brightness(1.1)}
+/* ═══ PORTAL OVERLAY ═══ */
+.portal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,17,27,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;animation:portalFadeIn 0.3s ease}
+@keyframes portalFadeIn{from{opacity:0}to{opacity:1}}
+.portal-content{display:flex;flex-direction:column;align-items:center;gap:16px;z-index:2}
+.portal-animation{width:120px;height:120px;position:relative;display:flex;align-items:center;justify-content:center}
+.portal-ring{position:absolute;border-radius:50%;border:2px solid transparent}
+.portal-ring.outer{width:100px;height:100px;border-color:#cba6f7;box-shadow:0 0 12px rgba(203,166,247,0.3),inset 0 0 12px rgba(203,166,247,0.1);animation:portalSpin 4s linear infinite;border-style:dashed;border-width:3px}
+.portal-ring.inner{width:60px;height:60px;border-color:#89b4fa;box-shadow:0 0 8px rgba(137,180,250,0.3),inset 0 0 8px rgba(137,180,250,0.1);animation:portalSpin 2.5s linear infinite reverse;border-style:dashed;border-width:2px}
+@keyframes portalSpin{to{transform:rotate(360deg)}}
+.portal-core{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,#cba6f7,transparent 70%);animation:portalPulse 2s ease-in-out infinite}
+@keyframes portalPulse{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.5);opacity:1}}
+.portal-pixel{position:absolute;font-size:8px;animation:pixelFly 2s ease-in infinite;opacity:0}
+.p1{top:-10px;left:20px;animation-delay:0s;color:#a6e3a1;--tx:30px;--ty:40px}
+.p2{top:10px;right:-10px;animation-delay:0.3s;color:#89b4fa;--tx:-30px;--ty:20px}
+.p3{bottom:-10px;right:20px;animation-delay:0.6s;color:#f9e2af;--tx:10px;--ty:-40px}
+.p4{bottom:10px;left:-10px;animation-delay:0.9s;color:#cba6f7;--tx:40px;--ty:-10px}
+.p5{top:-5px;right:10px;animation-delay:1.2s;color:#f38ba8;--tx:-20px;--ty:30px}
+.p6{left:10px;top:40px;animation-delay:1.5s;color:#94e2d5;--tx:20px;--ty:-20px}
+@keyframes pixelFly{0%{transform:translate(0,0) scale(1.5);opacity:0}30%{opacity:1}100%{transform:translate(var(--tx,30px),var(--ty,-20px)) scale(0);opacity:0}}
+.portal-title{font-size:16px;font-weight:300;letter-spacing:4px;text-transform:uppercase;color:#cdd6f4}
+.portal-desc{font-size:12px;color:#a6adc8;text-align:center;max-width:280px;line-height:1.5}
+.portal-progress{width:200px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.portal-progress-bar{width:100%;height:3px;background:#313244;border-radius:2px;overflow:hidden}
+.portal-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#a6e3a1,#cba6f7,#89b4fa);transition:width 0.3s ease}
+.portal-progress-text{font-size:10px;color:#585b70;font-family:monospace}
+.portal-actions{display:flex;gap:12px;margin-top:8px}
+.portal-btn{padding:8px 24px;border-radius:6px;font-size:12px;cursor:pointer;transition:all 0.15s ease;user-select:none}
+.portal-confirm{background:#cba6f7;color:#1e1e2e;font-weight:600}
+.portal-confirm:hover{background:#b4befe}
+.portal-cancel{color:#6c7086;border:1px solid #45475a}
+.portal-cancel:hover{color:#f38ba8;border-color:#f38ba8}
+.portal-stars{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;z-index:1}
+.star{position:absolute;width:2px;height:2px;background:#585b70;border-radius:50%;animation:starTwinkle 3s ease-in-out infinite}
+@keyframes starTwinkle{0%,100%{opacity:0.2}50%{opacity:0.8}}
+.s1{top:10%;left:15%;animation-delay:0s}.s2{top:20%;right:20%;animation-delay:0.5s}
+.s3{top:60%;left:10%;animation-delay:1s}.s4{top:80%;right:30%;animation-delay:1.5s}
+.s5{top:30%;left:70%;animation-delay:0.3s}.s6{top:70%;right:15%;animation-delay:0.8s}
+.s7{top:15%;left:45%;animation-delay:1.3s}.s8{top:85%;left:60%;animation-delay:2s}
 </style>
 </head>
 <body>
@@ -693,6 +772,23 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     </div>
   </div>
 
+  <!-- COMPARE BAR -->
+  <div class="compare-bar" id="compareBar">
+    <span class="cb-label">Compare:</span>
+    <span class="cb-sel" id="cbSel">Select categories from each panel</span>
+    <button class="cb-run" id="cbRunBtn" onclick="runCompare()" disabled>Compare</button>
+    <button class="cb-clear" onclick="clearCompare()" title="Clear">&times;</button>
+  </div>
+  <!-- COMPARE RESULTS -->
+  <div class="compare-results" id="compareResults">
+    <div class="cr-header">
+      <span class="cr-title">Comparison Results</span>
+      <button class="cr-close" onclick="clearCompare()" title="Close">&times;</button>
+    </div>
+    <div class="cr-stats" id="crStats"></div>
+    <div class="cr-actions" id="crActions"></div>
+  </div>
+
   <!-- SCANNER MODE OVERLAY -->
   <div class="scanner-overlay" id="scannerOverlay">
     <div class="sc-toolbar">
@@ -779,8 +875,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <div class="mv-comparison-header">Comparison Summary</div>
         <div class="mv-comparison-list" id="mvComparisonList"></div>
         <div class="mv-divider"></div>
+        <div class="mv-needs-scan" id="mvNeedsScan" style="display:none">
+          <span style="color:#f9e2af;font-size:11px">Model B imported — not yet scanned</span>
+          <span class="mv-scan-b-btn" onclick="showPortalLoading('Scanning','Exploding and scanning Model B entities...');call('rescanModelB')">Scan Model B</span>
+        </div>
         <div class="mv-management">
-          <span class="mv-mgmt-btn" onclick="call('rescanModelB')">Rescan B</span>
+          <span class="mv-mgmt-btn" onclick="showPortalLoading('Rescanning','Scanning Model B entities...');call('rescanModelB')">Rescan B</span>
           <span class="mv-mgmt-btn" onclick="call('importComparisonModel')">Import New</span>
           <span class="mv-mgmt-btn danger" onclick="confirmRemoveMv()">Remove Model B</span>
         </div>
@@ -965,6 +1065,8 @@ var splitData={a:{rows:[],filtered:[]},b:{rows:[],filtered:[]}};
 var splitIsolateState={a:null,b:null};
 var splitVis={a:{},b:{}};
 var splitOpenCats={a:{},b:{}};
+var compSelA=null,compSelB=null,compResults=null,compActive=false;
+var pendingVisReapply=false;
 var mvModelA='',mvModelB='';
 var COLOR_PALETTE=['#cba6f7','#89b4fa','#94e2d5','#a6e3a1','#fab387','#f38ba8','#f9e2af','#f5c2e7','#89dceb','#b4befe','#f2cdcd','#74c7ec'];
 var openColorDotId=null;
@@ -1113,12 +1215,36 @@ function receiveData(json){
         if(D[i].modelSource==='model_a')splitData.a.rows.push(D[i]);
         else splitData.b.rows.push(D[i]);
       }
+      /* Sync splitVis from actual entity visibility for entities not already tracked */
+      for(var i=0;i<splitData.a.rows.length;i++){
+        var eid=splitData.a.rows[i].entityId;
+        if(!(eid in splitVis.a) && splitData.a.rows[i].visible===false) splitVis.a[eid]=false;
+      }
+      for(var i=0;i<splitData.b.rows.length;i++){
+        var eid=splitData.b.rows[i].entityId;
+        if(!(eid in splitVis.b) && splitData.b.rows[i].visible===false) splitVis.b[eid]=false;
+      }
+      /* If switching into AB mode, apply saved A/B visibility states */
+      if(pendingVisReapply){
+        pendingVisReapply=false;
+        applySavedVisToSplit();
+      }
       buildSplitCatDD('a');buildSplitCatDD('b');
       renderSplitPanels();
       return;
     }
+    /* Sync VIS from actual entity visibility for entities not already tracked */
+    for(var i=0;i<D.length;i++){
+      var eid=D[i].entityId;
+      if(!(eid in VIS) && D[i].visible===false) VIS[eid]=false;
+    }
     buildDD();buildBulkDDs();
     for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
+    /* Re-apply saved visibility to Ruby after mode switch */
+    if(pendingVisReapply){
+      pendingVisReapply=false;
+      reapplyVisToRuby();
+    }
     syncIsolation();
     filt();
   }catch(e){
@@ -1667,6 +1793,56 @@ function cancelMove(){
   if(bar){clearTimeout(bar._timeout);bar.classList.remove('visible');setTimeout(function(){bar.remove();},200);}
 }
 
+/* ═══ PORTAL CONFIRM/LOADING ═══ */
+function showPortalConfirm(title,desc,onConfirm){
+  document.getElementById('portalTitle').textContent=title;
+  document.getElementById('portalDesc').textContent=desc;
+  document.getElementById('portalProgress').style.display='none';
+  document.getElementById('portalProgressFill').style.width='0%';
+  document.getElementById('portalProgressText').textContent='0%';
+  var acts=document.getElementById('portalActions');
+  acts.style.display='flex';
+  acts.innerHTML='<span class="portal-btn portal-confirm" id="portalConfirmBtn">Confirm</span><span class="portal-btn portal-cancel" onclick="hidePortal()">Cancel</span>';
+  var btn=document.getElementById('portalConfirmBtn');
+  btn.onclick=function(){
+    document.getElementById('portalActions').style.display='none';
+    document.getElementById('portalProgress').style.display='flex';
+    document.getElementById('portalProgressText').textContent='Starting...';
+    onConfirm();
+  };
+  var ov=document.getElementById('portalOverlay');
+  ov.style.display='flex';ov.style.opacity='';ov.style.transition='';
+}
+function showPortalLoading(title,desc){
+  document.getElementById('portalTitle').textContent=title;
+  document.getElementById('portalDesc').textContent=desc||'';
+  document.getElementById('portalProgress').style.display='flex';
+  document.getElementById('portalProgressFill').style.width='0%';
+  document.getElementById('portalProgressText').textContent='Starting...';
+  document.getElementById('portalActions').style.display='none';
+  var ov=document.getElementById('portalOverlay');
+  ov.style.display='flex';ov.style.opacity='';ov.style.transition='';
+}
+function updatePortalProgress(percent,text){
+  document.getElementById('portalProgressFill').style.width=percent+'%';
+  document.getElementById('portalProgressText').textContent=text||(percent+'%');
+}
+function hidePortal(){
+  var ov=document.getElementById('portalOverlay');
+  ov.style.opacity='0';ov.style.transition='opacity 0.3s ease';
+  setTimeout(function(){ov.style.display='none';ov.style.opacity='';ov.style.transition='';},300);
+}
+function showPortalError(title,msg){
+  document.getElementById('portalTitle').textContent=title;
+  document.getElementById('portalDesc').textContent=msg||'An error occurred';
+  document.getElementById('portalProgress').style.display='none';
+  var acts=document.getElementById('portalActions');
+  acts.style.display='flex';
+  acts.innerHTML='<span class="portal-btn portal-cancel" onclick="hidePortal()" style="border-color:#f38ba8;color:#f38ba8">Dismiss</span>';
+  var ov=document.getElementById('portalOverlay');
+  ov.style.display='flex';ov.style.opacity='';ov.style.transition='';
+}
+
 /* ═══ MULTIVERSE ═══ */
 
 function showMvLoading(status){
@@ -1700,6 +1876,12 @@ function setMvView(mode){
   if(currentMvView && currentMvView!=='ab'){
     mvState[currentMvView]={vis:{},isoCats:ISO_CATS?JSON.parse(JSON.stringify(ISO_CATS)):null,fiso:FISO,openCats:JSON.parse(JSON.stringify(openCats)),openSubs:JSON.parse(JSON.stringify(openSubs)),asmvis:JSON.parse(JSON.stringify(ASMVIS))};
     for(var k in VIS)if(VIS.hasOwnProperty(k))mvState[currentMvView].vis[k]=VIS[k];
+  } else if(currentMvView==='ab'){
+    // Save split panel visibility into per-model mvState
+    if(!mvState['a'])mvState['a']={vis:{},isoCats:null,fiso:false,openCats:{},openSubs:{},asmvis:{}};
+    if(!mvState['b'])mvState['b']={vis:{},isoCats:null,fiso:false,openCats:{},openSubs:{},asmvis:{}};
+    for(var k in splitVis.a)if(splitVis.a.hasOwnProperty(k))mvState['a'].vis[k]=splitVis.a[k];
+    for(var k in splitVis.b)if(splitVis.b.hasOwnProperty(k))mvState['b'].vis[k]=splitVis.b[k];
   }
   // Restore target model's state (or initialize fresh)
   if(mode!=='ab' && mvState[mode]){
@@ -1709,6 +1891,7 @@ function setMvView(mode){
     VIS={};ISO_CATS=null;FISO=false;openCats={};openSubs={};ASMVIS={};
   }
   currentMvView=mode;
+  pendingVisReapply=true;
   updateFisoBtn();
   // Toggle split mode
   if(mode==='ab'){enterSplitMode();}else{exitSplitMode();}
@@ -1721,17 +1904,54 @@ function setMvView(mode){
   else lbl.textContent='Comparing A + B';
   call('setMultiverseView',mode);
 }
+/* Update MV button styling + exit split mode without triggering Ruby callback.
+   Called from Ruby after accept_compare switches to view 'a'. */
+function setMvViewUI(mode){
+  currentMvView=mode;
+  document.querySelectorAll('.mv-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.view===mode);
+  });
+  var lbl=document.getElementById('mvLabel');
+  if(mode==='a') lbl.textContent='Model A: '+mvModelA;
+  else if(mode==='b') lbl.textContent='Model B: '+mvModelB;
+  else lbl.textContent='Comparing A + B';
+  if(mode==='ab'){enterSplitMode();}else{exitSplitMode();}
+}
+
+/* Re-apply saved VIS state to Ruby after mode switch (Ruby resets all visible) */
+function reapplyVisToRuby(){
+  var hideIds=[];
+  for(var i=0;i<D.length;i++){
+    if(VIS[D[i].entityId]===false) hideIds.push(D[i].entityId);
+  }
+  if(hideIds.length) call('hideEntities',hideIds.join(','));
+}
+/* Apply saved A/B visibility states into split panels after entering AB mode */
+function applySavedVisToSplit(){
+  var hideIds=[];
+  if(mvState['a']&&mvState['a'].vis){
+    var saved=mvState['a'].vis;
+    for(var k in saved){if(saved.hasOwnProperty(k)&&saved[k]===false){splitVis.a[k]=false;hideIds.push(k);}}
+  }
+  if(mvState['b']&&mvState['b'].vis){
+    var saved=mvState['b'].vis;
+    for(var k in saved){if(saved.hasOwnProperty(k)&&saved[k]===false){splitVis.b[k]=false;hideIds.push(k);}}
+  }
+  if(hideIds.length) call('hideEntities',hideIds.join(','));
+}
 
 function receiveMultiverseData(json){
   var d=JSON.parse(json);
   var bar=document.getElementById('mvBar');
   var empty=document.getElementById('mvEmpty');
   var active=document.getElementById('mvActive');
+  var nsEl=document.getElementById('mvNeedsScan');
   if(d.models&&d.models.length>1){
     currentMvView=d.activeView||'a';
     bar.style.display='flex';
     empty.style.display='none';
     active.style.display='block';
+    if(nsEl) nsEl.style.display=d.needsScan?'flex':'none';
     mvModelA=d.models[0].name;
     mvModelB=d.models[1].name;
     document.querySelectorAll('.mv-btn').forEach(function(b){
@@ -1767,6 +1987,7 @@ function receiveMultiverseData(json){
     bar.style.display='none';
     empty.style.display='flex';
     active.style.display='none';
+    if(nsEl) nsEl.style.display='none';
   }
 }
 
@@ -1819,9 +2040,9 @@ function renderMvComparison(comparison){
 }
 
 function confirmRemoveMv(){
-  if(confirm('Remove comparison model? All Model B entities will be deleted.')){
+  showPortalConfirm('Remove Model B','Remove comparison model? All Model B entities will be deleted.',function(){
     call('removeComparisonModel');
-  }
+  });
 }
 
 /* ═══ SPLIT VERTICAL DASHBOARD ═══ */
@@ -1846,6 +2067,7 @@ function enterSplitMode(){
 function exitSplitMode(){
   if(!splitMode)return;
   splitMode=false;
+  if(compActive||compSelA||compSelB)clearCompare();
   var fbar=document.querySelector('.fbar');
   var catBar=document.querySelector('.cat-bar');
   var dpWrap=document.getElementById('dpWrap');
@@ -1920,6 +2142,8 @@ function renderSplitPanel(panel){
     h+='<button class="ey'+(catVis?'':' off')+'" onclick="event.stopPropagation();togSplitCatVis(\''+panel+'\',\''+X2(gk)+'\')">'+(catVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
     var isIso=(splitIsolateState[panel]===gk);
     h+='<button class="split-iso-btn'+(isIso?' iso-active':'')+'" data-cat="'+X2(gk)+'" onclick="event.stopPropagation();isolateSplitCat(\''+X2(gk)+'\',\''+panel+'\')" title="Isolate">&#8857;</button>';
+    h+='<button class="split-cmp-btn'+((panel==='a'?compSelA:compSelB)===gk?' selected':'')+'" onclick="event.stopPropagation();selectForCompare(\''+panel+'\',\''+X2(gk)+'\')" title="Select for compare">&#8776;</button>';
+    if(panel==='b'){h+='<button class="split-commit-btn" onclick="event.stopPropagation();commitCategory(\''+X2(gk)+'\')" title="Commit to Model A">&#8599;</button>';}
     h+='<span class="arr">&#9660;</span>';
     h+=catNameSpan(gk);
     h+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
@@ -2000,6 +2224,149 @@ function showAllSplitPanel(panel){
   for(var i=0;i<rows.length;i++)vis[rows[i].entityId]=true;
   call('showAllForModel',modelId);
   renderSplitPanel(panel);
+}
+/* ═══ CATEGORY COMPARE FUNCTIONS ═══ */
+function selectForCompare(panel,cat){
+  if(panel==='a'){compSelA=(compSelA===cat)?null:cat;}
+  else{compSelB=(compSelB===cat)?null:cat;}
+  updateCompareBar();
+  renderSplitPanels();
+}
+function updateCompareBar(){
+  var bar=document.getElementById('compareBar');
+  var sel=document.getElementById('cbSel');
+  var btn=document.getElementById('cbRunBtn');
+  if(!compSelA&&!compSelB){bar.classList.remove('active');return;}
+  bar.classList.add('active');
+  var h='';
+  h+=compSelA?'<b>'+X(compSelA)+'</b>':'<i style="color:#6c7086">Pick from A</i>';
+  h+='<span class="vs">vs</span>';
+  h+=compSelB?'<span class="cat-b">'+X(compSelB)+'</span>':'<i style="color:#6c7086">Pick from B</i>';
+  sel.innerHTML=h;
+  btn.disabled=!(compSelA&&compSelB);
+}
+function runCompare(){
+  if(!compSelA||!compSelB)return;
+  showPortalLoading('Comparing','Analyzing "'+compSelA+'" vs "'+compSelB+'"');
+  callJSON('compareCategories',{catA:compSelA,catB:compSelB});
+}
+function receiveCompareResults(s){
+  var d;
+  try{d=JSON.parse(s);}catch(e){console.error('Compare parse error',e);return;}
+  if(d.error){hidePortal();showPortalError('Compare Error',d.error);return;}
+  hidePortal();
+  var mc=d.matchingCount||0, dc=d.discrepancyCount||0, oa=d.onlyACount||0;
+  compResults=d;compActive=true;
+  var stats=document.getElementById('crStats');
+  var h='';
+  h+='<div class="cr-stat" onclick="highlightCompGroup(\'matching\')"><span class="cr-dot matching"></span><span class="cr-count">'+mc+'</span><span class="cr-label">Matching</span><span class="cr-note">will be stashed</span></div>';
+  h+='<div class="cr-stat" onclick="highlightCompGroup(\'discrepancy\')"><span class="cr-dot discrepancy"></span><span class="cr-count">'+dc+'</span><span class="cr-label">Discrepancies</span><span class="cr-note">will be flagged in '+X(d.catA||'')+' &gt; Discrepancy</span></div>';
+  if(oa>0){
+    h+='<div class="cr-stat"><span class="cr-dot only-a"></span><span class="cr-count">'+oa+'</span><span class="cr-label">Only in A</span><span class="cr-note">unchanged</span></div>';
+  }
+  stats.innerHTML=h;
+  var actions=document.getElementById('crActions');
+  var ah='';
+  ah+='<button class="cr-accept-btn" onclick="acceptCompare()">Accept &mdash; Stash '+mc+' + Flag '+dc+'</button>';
+  if(dc>0){ah+='<button class="cr-commit-btn" onclick="commitCompareEntities()">Stash '+mc+' + Commit '+dc+'</button>';}
+  ah+='<button class="cr-cancel-btn" onclick="clearCompare()">Cancel</button>';
+  actions.innerHTML=ah;
+  document.getElementById('compareResults').classList.add('active');
+  document.getElementById('compareBar').classList.remove('active');
+}
+function highlightCompGroup(group){
+  if(!compResults)return;
+  var ids=[];
+  if(group==='matching')ids=compResults.matchingEids;
+  else if(group==='discrepancy')ids=compResults.discrepancyEids;
+  if(ids&&ids.length)call('highlightCompareGroup',ids.join(','));
+}
+function clearCompare(){
+  compSelA=null;compSelB=null;compResults=null;compActive=false;
+  document.getElementById('compareBar').classList.remove('active');
+  document.getElementById('compareResults').classList.remove('active');
+  call('clearCompareHighlights');
+  renderSplitPanels();
+}
+function clearCompareUI(){
+  compSelA=null;compSelB=null;compResults=null;compActive=false;
+  document.getElementById('compareBar').classList.remove('active');
+  document.getElementById('compareResults').classList.remove('active');
+  renderSplitPanels();
+}
+function acceptCompare(){
+  var mc=compResults?compResults.matchingCount||0:0;
+  var dc=compResults?compResults.discrepancyCount||0:0;
+  showPortalConfirm('Accept Comparison','Stash '+mc+' matching + Flag '+dc+' discrepancies',function(){
+    call('acceptCompare');
+  });
+}
+function receiveAcceptResult(s){
+  var d;
+  try{d=JSON.parse(s);}catch(e){console.error('Accept parse error',e);return;}
+  if(d.error){hidePortal();showPortalError('Accept Error',d.error);return;}
+  updatePortalProgress(100,(d.stashed||0)+' stashed, '+(d.flagged||0)+' flagged');
+  setTimeout(function(){hidePortal();clearCompareUI();},800);
+  /* Toast: show result in compare bar briefly */
+  setTimeout(function(){
+    var bar=document.getElementById('compareBar');
+    var sel=document.getElementById('cbSel');
+    if(bar&&sel){
+      sel.innerHTML='<span style="color:#a6e3a1">'+(d.stashed||0)+' stashed, '+(d.flagged||0)+' flagged as discrepancies</span>';
+      bar.classList.add('active');
+      setTimeout(function(){bar.classList.remove('active');},4000);
+    }
+  },900);
+}
+function recallFromVault(){call('recallFromVault');}
+function receiveRecallResult(s){
+  var d=JSON.parse(s);
+  if(d.error){showPortalError('Recall Error',d.error);return;}
+  hidePortal();
+  clearCompareUI();
+}
+function receiveVaultSummary(s){/* future: render vault panel */}
+/* ═══ COMMIT TO MAIN FUNCTIONS ═══ */
+function commitCategory(cat){
+  var count=0;
+  if(splitData&&splitData.b&&splitData.b.rows){
+    for(var i=0;i<splitData.b.rows.length;i++){
+      var rc=splitData.b.rows[i].category||'Uncategorized';
+      if(rc===cat)count++;
+    }
+  }
+  showPortalConfirm('Commit to Main','Move '+(count||'all')+' "'+cat+'" entities from Model B into Model A',function(){
+    call('commitToMain',cat);
+  });
+}
+function commitCompareEntities(){
+  var mc=compResults?compResults.matchingCount||0:0;
+  var dc=compResults?compResults.discrepancyCount||0:0;
+  showPortalConfirm('Stash + Commit','Stash '+mc+' matching + Commit '+dc+' discrepancies to Model A',function(){
+    call('commitCompareEntities');
+  });
+}
+function receiveCommitResult(s){
+  var d;
+  try{d=JSON.parse(s);}catch(e){console.error('Commit parse error',e);return;}
+  if(d.error){hidePortal();showPortalError('Commit Error',d.error);return;}
+  var msg='';
+  if(d.stashed)msg+=d.stashed+' stashed';
+  if(d.committed)msg+=(msg?', ':'')+d.committed+' committed';
+  updatePortalProgress(100,msg||'Complete!');
+  setTimeout(function(){hidePortal();clearCompareUI();},800);
+  setTimeout(function(){
+    var bar=document.getElementById('compareBar');
+    var sel=document.getElementById('cbSel');
+    if(bar&&sel){
+      var tm='';
+      if(d.stashed)tm+=d.stashed+' stashed';
+      if(d.committed)tm+=(tm?', ':'')+d.committed+' committed to '+(d.category||'Model A');
+      sel.innerHTML='<span style="color:#a6e3a1">'+tm+'</span>';
+      bar.classList.add('active');
+      setTimeout(function(){bar.classList.remove('active');},4000);
+    }
+  },900);
 }
 /* Split divider drag */
 (function(){
@@ -3504,5 +3871,37 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');i
   </div>
 </div>
 <div id="ctxMenu" class="ctx-menu"></div>
+<!-- PORTAL OVERLAY -->
+<div class="portal-overlay" id="portalOverlay" style="display:none;">
+  <div class="portal-content">
+    <div class="portal-animation">
+      <div class="portal-ring outer"></div>
+      <div class="portal-ring inner"></div>
+      <div class="portal-core"></div>
+      <div class="portal-pixel p1">&#9642;</div>
+      <div class="portal-pixel p2">&#9642;</div>
+      <div class="portal-pixel p3">&#9642;</div>
+      <div class="portal-pixel p4">&#9642;</div>
+      <div class="portal-pixel p5">&#9642;</div>
+      <div class="portal-pixel p6">&#9642;</div>
+    </div>
+    <div class="portal-title" id="portalTitle">Commit to Main</div>
+    <div class="portal-desc" id="portalDesc"></div>
+    <div class="portal-progress" id="portalProgress" style="display:none;">
+      <div class="portal-progress-bar"><div class="portal-progress-fill" id="portalProgressFill"></div></div>
+      <div class="portal-progress-text" id="portalProgressText">0%</div>
+    </div>
+    <div class="portal-actions" id="portalActions">
+      <span class="portal-btn portal-confirm" id="portalConfirmBtn">Confirm</span>
+      <span class="portal-btn portal-cancel" onclick="hidePortal()">Cancel</span>
+    </div>
+  </div>
+  <div class="portal-stars">
+    <div class="star s1"></div><div class="star s2"></div>
+    <div class="star s3"></div><div class="star s4"></div>
+    <div class="star s5"></div><div class="star s6"></div>
+    <div class="star s7"></div><div class="star s8"></div>
+  </div>
+</div>
 </body>
 </html>

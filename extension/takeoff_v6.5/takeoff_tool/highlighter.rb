@@ -613,10 +613,20 @@ module TakeoffTool
 
       # Phase 1: Determine which entities to show (before touching visibility)
       visible = []
+      found_cats = {}
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+        found_cats[cat] = (found_cats[cat] || 0) + 1
         visible << e if cat == tc
+      end
+
+      puts "HL: isolate_category target='#{tc}' sr=#{sr.length} visible=#{visible.length} cats=#{found_cats.map{|k,v| "#{k}(#{v})"}.first(8).join(', ')}"
+
+      # Safety: if no entities matched, don't hide everything
+      if visible.empty?
+        puts "HL: WARNING — no entities matched category '#{tc}', skipping isolate to avoid hiding all"
+        return
       end
 
       # Phase 2: Collect ancestors BEFORE any hiding
@@ -635,6 +645,7 @@ module TakeoffTool
       end
       m.commit_operation
       @isolated_categories = { tc => true }
+      puts "HL: isolate done — kept #{keep_ids.length} entities, #{keep_layers.length} layers visible"
     end
 
     def self.isolate_entities(sr, ids)
@@ -648,6 +659,14 @@ module TakeoffTool
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
         visible << e if id_set[r[:entity_id]]
+      end
+
+      puts "HL: isolate_entities requested=#{ids.length} matched=#{visible.length} sr=#{sr.length}"
+
+      # Safety: if no entities matched, don't hide everything
+      if visible.empty?
+        puts "HL: WARNING — no entities matched the requested IDs, skipping isolate"
+        return
       end
 
       # Phase 2
@@ -664,7 +683,7 @@ module TakeoffTool
         l = m.layers[ln]; l.visible = true if l && !l.visible?
       end
       m.commit_operation
-      puts "HL: Isolated #{ids.length} entities"
+      puts "HL: isolate_entities done — kept #{keep_ids.length} entities, #{keep_layers.length} layers"
     end
 
     def self.isolate_tag(tn)

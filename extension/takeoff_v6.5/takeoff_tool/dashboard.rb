@@ -1,6 +1,7 @@
 module TakeoffTool
   module Dashboard
     @dialog = nil
+    @data_dirty = false   # Set true when data changes; checked on close
 
     def self.load_custom_colors
       require 'json'
@@ -42,7 +43,7 @@ module TakeoffTool
     end
 
     def self.show(sr, ca, cca)
-      if @dialog && @dialog.visible?; send_data(sr, ca, cca); return; end
+      if @dialog && @dialog.visible?; send_live_data; return; end
 
       @dialog = UI::HtmlDialog.new(dialog_title:"Form and Field \u2014 Takeoff Report", preferences_key:"TakeoffDash",
         width:1280, height:780, left:80, top:80, resizable:true, style:UI::HtmlDialog::STYLE_DIALOG)
@@ -52,7 +53,12 @@ module TakeoffTool
       # This avoids all multi-arg and encoding issues with skp: protocol.
 
       @dialog.add_action_callback('requestData') do |_ctx|
-        send_data(sr, ca, cca)
+        begin
+          puts "[FF Dashboard] requestData: #{TakeoffTool.scan_results.length} results, mv=#{TakeoffTool.active_mv_view || 'none'}"
+          send_live_data
+        rescue => e
+          puts "Dashboard: requestData error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+        end
       end
 
       @dialog.add_action_callback('setCategory') do |_ctx, json_str|
@@ -62,17 +68,18 @@ module TakeoffTool
           eid = data['eid'].to_i
           cat = data['val'].to_s
           puts "Takeoff: setCategory eid=#{eid} cat=#{cat}"
-          old_cat = ca[eid] || sr.find { |r| r[:entity_id] == eid }&.dig(:parsed, :auto_category) || 'Uncategorized'
-          ca[eid] = cat
-          TakeoffTool.category_assignments = ca
+          _ca = TakeoffTool.category_assignments
+          _sr = TakeoffTool.scan_results
+          old_cat = _ca[eid] || _sr.find { |r| r[:entity_id] == eid }&.dig(:parsed, :auto_category) || 'Uncategorized'
+          _ca[eid] = cat
           RecatLog.log_change(eid, cat)
           # Persist to model — clear subcategory on category change
           TakeoffTool.save_assignment(eid, 'category', cat)
           TakeoffTool.save_assignment(eid, 'subcategory', '')
-          sr.each { |r| if r[:entity_id] == eid; r[:parsed][:auto_subcategory] = ''; break; end }
+          _sr.each { |r| if r[:entity_id] == eid; r[:parsed][:auto_subcategory] = ''; break; end }
           # Learning system: capture reclassification
           begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
-          send_data(sr, ca, cca)
+          send_live_data
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff setCategory error: #{e.message}"
@@ -86,8 +93,7 @@ module TakeoffTool
           eid = data['eid'].to_i
           code = data['val'].to_s
           puts "Takeoff: setCostCode eid=#{eid} code=#{code}"
-          cca[eid] = code
-          TakeoffTool.cost_code_assignments = cca
+          TakeoffTool.cost_code_assignments[eid] = code
           # Persist to model
           TakeoffTool.save_assignment(eid, 'cost_code', code)
         rescue => e
@@ -105,7 +111,7 @@ module TakeoffTool
           # Save to entity attribute
           TakeoffTool.save_assignment(eid, 'size', val)
           # Update scan results
-          sr.each do |r|
+          TakeoffTool.scan_results.each do |r|
             if r[:entity_id] == eid
               r[:parsed][:size_nominal] = val
               break
@@ -130,14 +136,15 @@ module TakeoffTool
             m.set_attribute('TakeoffMeasurementTypes', cat, mt)
           end
           # Update all entities in this category in scan results
-          sr.each do |r|
-            ecat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+          _ca = TakeoffTool.category_assignments
+          TakeoffTool.scan_results.each do |r|
+            ecat = _ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
             if ecat == cat
               r[:parsed][:measurement_type] = mt
             end
           end
           # Resend data so dashboard shows updated measurement types
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff setMeasurementType error: #{e.message}"
         end
@@ -166,7 +173,7 @@ module TakeoffTool
           eids.each do |eid|
             TakeoffTool.save_assignment(eid.to_i, 'subcategory', val)
           end
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff bulkSetSubcategory error: #{e.message}"
         end
@@ -188,13 +195,13 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('highlightAll') do |_ctx|
-        Highlighter.highlight_all(TakeoffTool.filtered_scan_results, ca)
+        Highlighter.highlight_all(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments)
         @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
       @dialog.add_action_callback('highlightCategory') do |_ctx, cat_str|
         Highlighter.clear_all
-        Highlighter.highlight_category(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
+        Highlighter.highlight_category(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
         @dialog.execute_script("if(typeof clearAllDotStates==='function')clearAllDotStates();")
       end
 
@@ -208,11 +215,11 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('highlightCategoryColor') do |_ctx, cat_str|
-        Highlighter.highlight_category_color(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
+        Highlighter.highlight_category_color(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
       end
 
       @dialog.add_action_callback('clearCategoryColor') do |_ctx, cat_str|
-        Highlighter.clear_category_color(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
+        Highlighter.clear_category_color(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
       end
 
       @dialog.add_action_callback('clearHighlights') do |_ctx|
@@ -221,7 +228,11 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
-        Highlighter.isolate_category(TakeoffTool.filtered_scan_results, ca, cat_str.to_s)
+        cat = cat_str.to_s
+        fsr = TakeoffTool.filtered_scan_results
+        ca = TakeoffTool.category_assignments
+        puts "Dashboard: isolateCategory cat='#{cat}' fsr=#{fsr.length} ca_keys=#{ca.keys.length} mv_view=#{TakeoffTool.active_mv_view}"
+        Highlighter.isolate_category(fsr, ca, cat)
       end
 
       @dialog.add_action_callback('isolateTag') do |_ctx, tag_str|
@@ -246,17 +257,28 @@ module TakeoffTool
           # Collect entities for this model
           visible = []
           hide = []
-          TakeoffTool.filtered_scan_results.each do |r|
+          found_cats = {}
+          fsr = TakeoffTool.filtered_scan_results
+          fsr.each do |r|
             e = TakeoffTool.find_entity(r[:entity_id])
             next unless e && e.valid?
             ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
             next unless ms.start_with?(prefix)
-            cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+            cat = TakeoffTool.category_assignments[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+            found_cats[cat] = (found_cats[cat] || 0) + 1
             if cat == category
               visible << e
             else
               hide << e
             end
+          end
+
+          puts "Dashboard: isolateForModel prefix=#{prefix} cat='#{category}' fsr=#{fsr.length} visible=#{visible.length} hide=#{hide.length} cats=#{found_cats.map{|k,v| "#{k}(#{v})"}.first(8).join(', ')}"
+
+          # Safety: if no entities matched, don't hide everything
+          if visible.empty?
+            puts "Dashboard: WARNING — no entities matched '#{category}' for #{prefix}, skipping isolate"
+            next
           end
 
           # Build keep-visible set with ancestors
@@ -363,11 +385,11 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('exportCSV') do |_ctx|
-        Exporter.export_csv(sr, ca, cca)
+        Exporter.export_csv(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
       end
 
       @dialog.add_action_callback('exportHTML') do |_ctx|
-        Exporter.export_html(sr, ca, cca)
+        Exporter.export_html(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
       end
 
       @dialog.add_action_callback('rescan') do |_ctx|
@@ -410,23 +432,24 @@ module TakeoffTool
           eids = data['eids'] || []
           cat = data['val'].to_s
           puts "Takeoff: bulkSetCategory #{eids.length} items -> #{cat}"
+          _ca = TakeoffTool.category_assignments
+          _sr = TakeoffTool.scan_results
           first_old_cat = nil
           eids.each do |eid|
             eid_i = eid.to_i
-            old_cat = ca[eid_i] || sr.find { |r| r[:entity_id] == eid_i }&.dig(:parsed, :auto_category) || 'Uncategorized'
+            old_cat = _ca[eid_i] || _sr.find { |r| r[:entity_id] == eid_i }&.dig(:parsed, :auto_category) || 'Uncategorized'
             first_old_cat ||= old_cat
-            ca[eid_i] = cat
+            _ca[eid_i] = cat
             RecatLog.log_change(eid_i, cat)
             TakeoffTool.save_assignment(eid_i, 'category', cat)
             TakeoffTool.save_assignment(eid_i, 'subcategory', '')
-            sr.each { |r| if r[:entity_id] == eid_i; r[:parsed][:auto_subcategory] = ''; break; end }
+            _sr.each { |r| if r[:entity_id] == eid_i; r[:parsed][:auto_subcategory] = ''; break; end }
           end
-          TakeoffTool.category_assignments = ca
           # Learning system: capture from first entity in bulk
           if eids.length > 0 && first_old_cat
             begin; LearningSystem.capture(eids.first.to_i, first_old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           end
-          send_data(sr, ca, cca)
+          send_live_data
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff bulkSetCategory error: #{e.message}"
@@ -457,7 +480,7 @@ module TakeoffTool
         name = name_str.to_s.strip
         unless name.empty?
           TakeoffTool.add_custom_category(name)
-          send_data(sr, ca, cca)
+          send_live_data
           puts "Takeoff: addEmptyCategory '#{name}'"
         end
       end
@@ -523,14 +546,14 @@ module TakeoffTool
           eids.each do |eid|
             eid_i = eid.to_i
             TakeoffTool.save_assignment(eid_i, 'size', val)
-            sr.each do |r|
+            TakeoffTool.scan_results.each do |r|
               if r[:entity_id] == eid_i
                 r[:parsed][:size_nominal] = val
                 break
               end
             end
           end
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff bulkSetSize error: #{e.message}"
         end
@@ -546,11 +569,10 @@ module TakeoffTool
           puts "Takeoff: bulkSetCostCode #{eids.length} items -> #{code}"
           eids.each do |eid|
             eid_i = eid.to_i
-            cca[eid_i] = code
+            TakeoffTool.cost_code_assignments[eid_i] = code
             TakeoffTool.save_assignment(eid_i, 'cost_code', code)
           end
-          TakeoffTool.cost_code_assignments = cca
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff bulkSetCostCode error: #{e.message}"
         end
@@ -588,7 +610,7 @@ module TakeoffTool
         begin
           eid = eid_str.to_s.to_i
           Highlighter.delete_measurement(eid)
-          send_data(sr, ca, cca)
+          send_live_data
           send_measurement_data
         rescue => e
           puts "Takeoff deleteMeasurement error: #{e.message}"
@@ -675,6 +697,113 @@ module TakeoffTool
         TakeoffTool.rescan_model_b
       end
 
+      # ═══ CATEGORY COMPARE ═══
+
+      @dialog.add_action_callback('compareCategories') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat_a = data['catA'].to_s.strip
+          cat_b = data['catB'].to_s.strip
+          next if cat_a.empty? || cat_b.empty?
+          TakeoffTool.compare_categories(cat_a, cat_b)
+          TakeoffTool.apply_compare_highlights
+          send_compare_results
+        rescue => e
+          puts "Dashboard: compareCategories error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          err = { 'error' => e.message }
+          ejs = JSON.generate(err).gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+          @dialog.execute_script("receiveCompareResults('#{ejs}')")
+        end
+      end
+
+      @dialog.add_action_callback('clearCompareHighlights') do |_ctx|
+        begin
+          TakeoffTool.clear_compare_highlights
+        rescue => e
+          puts "Dashboard: clearCompare error: #{e.message}"
+        end
+        @dialog.execute_script("clearCompareUI()")
+      end
+
+      @dialog.add_action_callback('acceptCompare') do |_ctx|
+        begin
+          result = TakeoffTool.accept_compare
+          require 'json'
+          js = JSON.generate(result)
+          esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+          @dialog.execute_script("receiveAcceptResult('#{esc}')")
+          # Switch JS UI to Model A view (accept_compare already set Ruby state)
+          @dialog.execute_script("setMvViewUI('a')")
+          # Refresh dashboard with Model A filtered data
+          send_live_data
+        rescue => e
+          puts "Dashboard: acceptCompare error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          err = { 'error' => e.message }
+          ejs = JSON.generate(err).gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+          @dialog.execute_script("receiveAcceptResult('#{ejs}')")
+        end
+      end
+
+      # ═══ COMMIT TO MAIN ═══
+
+      @dialog.add_action_callback('commitToMain') do |_ctx, cat_str|
+        begin
+          category = cat_str.to_s.strip
+          next if category.empty?
+          result = TakeoffTool.commit_to_main(category)
+          require 'json'
+          js = JSON.generate(result)
+          esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+          @dialog.execute_script("receiveCommitResult('#{esc}')")
+          @dialog.execute_script("setMvViewUI('a')")
+          send_live_data
+        rescue => e
+          puts "Dashboard: commitToMain error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          err = { 'error' => e.message }
+          ejs = JSON.generate(err).gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+          @dialog.execute_script("receiveCommitResult('#{ejs}')")
+        end
+      end
+
+      @dialog.add_action_callback('commitCompareEntities') do |_ctx|
+        begin
+          result = TakeoffTool.commit_compare_entities
+          require 'json'
+          js = JSON.generate(result)
+          esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+          @dialog.execute_script("receiveCommitResult('#{esc}')")
+          @dialog.execute_script("setMvViewUI('a')")
+          send_live_data
+        rescue => e
+          puts "Dashboard: commitCompareEntities error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          err = { 'error' => e.message }
+          ejs = JSON.generate(err).gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+          @dialog.execute_script("receiveCommitResult('#{ejs}')")
+        end
+      end
+
+      @dialog.add_action_callback('recallFromVault') do |_ctx|
+        result = TakeoffTool.recall_from_vault
+        require 'json'
+        js = JSON.generate(result)
+        esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+        @dialog.execute_script("receiveRecallResult('#{esc}')")
+      end
+
+      @dialog.add_action_callback('requestVaultSummary') do |_ctx|
+        require 'json'
+        data = TakeoffTool.vault_summary
+        js = JSON.generate(data)
+        esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+        @dialog.execute_script("receiveVaultSummary('#{esc}')")
+      end
+
+      @dialog.add_action_callback('highlightCompareGroup') do |_ctx, ids_str|
+        ids = ids_str.to_s.split(',').map(&:to_i)
+        Highlighter.highlight_entities(ids) if ids.any?
+      end
+
       # Isolate specific entities by ID
       @dialog.add_action_callback('isolateEntities') do |_ctx, ids_str|
         ids = ids_str.to_s.split(',').map(&:to_i)
@@ -699,7 +828,7 @@ module TakeoffTool
           save_custom_colors_for_view(colors)
           Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff setCustomColor error: #{e.message}"
         end
@@ -720,7 +849,7 @@ module TakeoffTool
           save_custom_colors_for_view(colors)
           Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
-          send_data(sr, ca, cca)
+          send_live_data
         rescue => e
           puts "Takeoff clearCustomColor error: #{e.message}"
         end
@@ -856,7 +985,7 @@ module TakeoffTool
       @dialog.add_action_callback('exitScannerMode') do |_ctx|
         Highlighter.show_all
         Highlighter.clear_all
-        send_data(sr, ca, cca)
+        send_live_data
       end
 
       @dialog.add_action_callback('regroupScanner') do |_ctx, mode_str|
@@ -920,6 +1049,30 @@ module TakeoffTool
           send_scanner_groups
         end
       end
+
+      @dialog.set_on_closed {
+        @dialog = nil
+        # Defer save so the dialog closes immediately — no freeze.
+        # save_scan_to_model is already called after every major operation
+        # (scan, import, accept, commit), so we skip it here.
+        # Only the lightweight saves run as a safety net.
+        if @data_dirty
+          UI.start_timer(0.1, false) {
+            begin
+              puts "[FF Dashboard] Deferred save (dirty=true)..."
+              TakeoffTool.save_master_categories rescue nil
+              TakeoffTool.save_master_subcategories rescue nil
+              TakeoffTool.save_multiverse_data rescue nil
+              puts "[FF Dashboard] Deferred save complete."
+            rescue => e
+              puts "[FF Dashboard] Deferred save error: #{e.message}"
+            end
+            @data_dirty = false
+          }
+        else
+          puts "[FF Dashboard] Dialog closed — no unsaved changes."
+        end
+      }
 
       @dialog.show
     end
@@ -993,13 +1146,52 @@ module TakeoffTool
       @dialog.execute_script("receiveAssemblies('#{esc}')")
     end
 
+    def self.send_compare_results
+      return unless @dialog
+      require 'json'
+      data = TakeoffTool.serialize_compare_results
+      return unless data
+      js = JSON.generate(data)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveCompareResults('#{esc}')")
+    end
+
     def self.scroll_to_entity(eid)
       return unless @dialog && @dialog.visible?
       @dialog.execute_script("scrollToEntity(#{eid})")
     end
 
+    def self.mark_dirty
+      @data_dirty = true
+    end
+
+    def self.portal_complete(text)
+      return unless @dialog
+      esc = text.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("updatePortalProgress(100,'#{esc}');setTimeout(function(){hidePortal()},800)")
+    end
+
+    def self.update_portal_progress(pct, text)
+      return unless @dialog
+      esc = text.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("updatePortalProgress(#{pct},'#{esc}')")
+    end
+
+    def self.portal_error(text)
+      return unless @dialog
+      esc = text.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("hidePortal();showPortalError('Error','#{esc}')")
+    end
+
+    # Helper: always sends data using live module state (no stale closures)
+    def self.send_live_data
+      @data_dirty = true
+      send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
+    end
+
     def self.send_data(sr, ca, cca)
       return unless @dialog
+      begin
       # Multiverse: filter to active model's entities
       mv_view = TakeoffTool.active_mv_view
       if mv_view && mv_view != 'ab'
@@ -1069,7 +1261,8 @@ module TakeoffTool
           customColor: custom_colors.dig('entities', r[:entity_id].to_s) ||
                         custom_colors.dig('subcategories', "#{cat}|#{(TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''}") ||
                         custom_colors.dig('categories', cat),
-          modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
+          modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a',
+          visible: (TakeoffTool.find_entity(r[:entity_id])&.visible? rescue true)
         }
       end
 
@@ -1095,6 +1288,10 @@ module TakeoffTool
       send_measurement_data
       send_assemblies
       send_multiverse_data
+
+      rescue => e
+        puts "[FF Dashboard] send_data error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+      end
     end
 
     def self.send_measurement_data
@@ -1164,9 +1361,14 @@ module TakeoffTool
       mv = TakeoffTool.multiverse_data
       if mv && mv['models'] && mv['models'].length > 1
         summary = TakeoffTool.build_comparison_summary
-        payload = { models: mv['models'], activeView: mv['active_view'] || 'a', comparison: summary }
+        payload = {
+          models: mv['models'],
+          activeView: mv['active_view'] || 'a',
+          comparison: summary,
+          needsScan: !!mv['needs_scan']
+        }
       else
-        payload = { models: [], activeView: 'a', comparison: [] }
+        payload = { models: [], activeView: 'a', comparison: [], needsScan: false }
       end
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
