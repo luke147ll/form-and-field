@@ -127,10 +127,13 @@ module TakeoffTool
           # Model source filter: skip entities not matching the requested scope
           if model_source_filter
             ms = inst.get_attribute('FormAndField', 'model_source') || 'model_a'
+            layer_name = (inst.respond_to?(:layer) && inst.layer) ? inst.layer.name : ''
             if model_source_filter == 'model_a'
               next unless ms == 'model_a'
             elsif model_source_filter == 'model_b'
               next if ms == 'model_a'
+              # Safety: reject entities not on FF_Model_B layer (shared-definition contamination)
+              next unless layer_name == 'FF_Model_B'
             end
           end
 
@@ -154,6 +157,16 @@ module TakeoffTool
       Dashboard.scan_log_status("FINALIZING") rescue nil
       progress.call("Processing warnings...") if progress
       check_warnings(results)
+
+      # Safety: deduplicate by entity_id (should not happen but guards against double-counting)
+      before = results.length
+      results.uniq! { |r| r[:entity_id] }
+      if results.length < before
+        dups = before - results.length
+        puts "[FF Scanner] WARNING: removed #{dups} duplicate entities from scan results"
+        progress.call("Removed #{dups} duplicate entities") if progress
+      end
+
       progress.call("Sorting #{results.length} results") if progress
       [results.sort_by{|r|[r[:tag]||'zzz',r[:display_name]||'']}, reg]
     end
@@ -281,18 +294,11 @@ module TakeoffTool
         end
       end
 
-      # Ensure area_sf for concrete slabs/walls from BB if missing
-      if !area && cat == 'Concrete' && subcat =~ /Slab|Grade|Wall/i && dims[0] > 0
-        area = (dims[1] * dims[2]) / 144.0
-      end
-
-      # ─── BB area fallback for all SF categories ───
-      # When volume/thickness didn't produce area, estimate from bounding box.
-      # Two largest dims approximate the surface area (smallest = thickness).
+      # ─── SF area from actual face geometry only (no BB fallback) ───
       if !area
         mtype = parsed[:measurement_type] || Parser.measurement_for(cat)
-        if %w[sf sf_cy sf_sheets].include?(mtype) && dims[1] > 0 && dims[2] > 0
-          area = (dims[1] * dims[2]) / 144.0
+        if %w[sf sf_cy sf_sheets].include?(mtype)
+          area = face_area_for_entity(defn, cat)
         end
       end
 
@@ -702,6 +708,72 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════
     # Helpers
     # ═══════════════════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════════════════
+    # SF Area — from actual face geometry only. No BB fallback.
+    #
+    # Three paths:
+    #   Sheet goods → sum all faces on the dominant side
+    #   Enclosed 3D → largest single face
+    #   Single-sided → total face area
+    # ═══════════════════════════════════════════════════════════
+
+    SHEET_GOOD_RE = /sheathing|drywall|plywood|osb|roofing|siding|insulation|membrane|soffit|fascia|gypcrete|decking|flooring|tile|stucco|wall\s*finish|ceiling|shingle/i
+
+    def self.face_area_for_entity(defn, category = nil)
+      ents = defn.respond_to?(:entities) ? defn.entities : nil
+      return nil unless ents
+      faces = ents.grep(Sketchup::Face)
+      return nil if faces.empty?
+
+      dname = defn.respond_to?(:name) ? defn.name : ''
+
+      if category && category =~ SHEET_GOOD_RE
+        # Sheet goods: sum all faces on the dominant side (same normal direction)
+        sf = dominant_side_area(faces) / 144.0
+        puts "[FF Measure] '#{dname}': sheet good, dominant side = #{sf.round(1)} SF (#{faces.length} faces)"
+        sf
+      elsif enclosed_3d?(faces)
+        # Enclosed 3D object: largest single face
+        largest = 0.0
+        faces.each { |f| largest = f.area if f.area > largest }
+        sf = largest / 144.0
+        puts "[FF Measure] '#{dname}': enclosed 3D, largest face = #{sf.round(1)} SF (#{faces.length} faces)"
+        sf
+      else
+        # Single-sided surface: total face area
+        total = 0.0
+        faces.each { |f| total += f.area }
+        sf = total / 144.0
+        puts "[FF Measure] '#{dname}': single-sided, total = #{sf.round(1)} SF (#{faces.length} faces)"
+        sf
+      end
+    end
+
+    # Sum faces that share the dominant normal direction.
+    # Groups by rounded normal, picks the group with largest total area.
+    def self.dominant_side_area(faces)
+      groups = {}
+      faces.each do |f|
+        n = f.normal
+        key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+        groups[key] ||= 0.0
+        groups[key] += f.area
+      end
+      # Return the largest group's total area
+      groups.values.max || 0.0
+    end
+
+    # Faces on 3+ distinct normal directions = enclosed 3D object
+    def self.enclosed_3d?(faces)
+      normals = {}
+      faces.first(20).each do |f|
+        n = f.normal
+        key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+        normals[key] = true
+      end
+      normals.length >= 3
+    end
 
     # Convert actual inches to closest nominal lumber size (within 0.5" tolerance)
     def self.to_nominal(actual_in)

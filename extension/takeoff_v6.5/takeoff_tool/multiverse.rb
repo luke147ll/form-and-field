@@ -190,25 +190,25 @@ module TakeoffTool
 
   # Recursively tag entities and their nested children (deep traversal)
   # visited_defs prevents infinite loops on shared/circular definitions
+  # Tag exploded Model B entities. Only tags instances and groups (not raw geometry).
+  # Does NOT recurse into ComponentDefinitions (they may be shared with Model A).
   def self.tag_entities_recursive(entities, model_b_id, layer_b, visited_defs = nil, &counter)
     visited_defs ||= {}
     entities.each do |e|
       next unless e.valid?
-      if e.respond_to?(:set_attribute)
+      # Only tag instances and groups — they are the scannable entities
+      if e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
         e.set_attribute('FormAndField', 'model_source', model_b_id)
-        e.layer = layer_b if e.respond_to?(:layer=)
+        e.layer = layer_b
         counter.call if counter
       end
-      # Recurse into groups and component definitions (deep)
+      # Recurse into groups (their entities are unique to this group)
       if e.is_a?(Sketchup::Group) && e.entities
         tag_entities_recursive(e.entities.to_a, model_b_id, layer_b, visited_defs, &counter)
-      elsif e.is_a?(Sketchup::ComponentInstance) && e.definition
-        defn = e.definition
-        unless visited_defs[defn.object_id]
-          visited_defs[defn.object_id] = true
-          tag_entities_recursive(defn.entities.to_a, model_b_id, layer_b, visited_defs, &counter)
-        end
       end
+      # For ComponentInstances, do NOT recurse into the definition.
+      # The definition is shared — its internal entities belong to ALL instances.
+      # The scanner finds instances via defn.instances and filters by model_source.
     end
   end
 
@@ -221,7 +221,7 @@ module TakeoffTool
     return unless model
     count = 0
 
-    # Pass 1: Tag untagged instances on FF_Model_B layer or in entity_registry
+    # Pass 1: Tag untagged instances on FF_Model_B layer
     (@entity_registry || {}).each do |eid, e|
       next unless e && e.valid?
       existing = e.get_attribute('FormAndField', 'model_source')
@@ -232,36 +232,48 @@ module TakeoffTool
       end
     end
 
-    # Pass 2: Find definitions that contain model_b-tagged instances,
-    # then tag all entities inside those definitions (deep)
-    model_b_defns = {}
+    # Pass 2: Find definitions that are EXCLUSIVELY Model B (no Model A instances).
+    # Skip shared definitions to avoid contaminating Model A entities.
+    model_b_only_defns = {}
     model.definitions.each do |defn|
       next if defn.image?
+      has_b = false; has_a = false
       defn.instances.each do |inst|
         next unless inst.valid?
-        ms = inst.get_attribute('FormAndField', 'model_source')
-        if ms && ms != 'model_a' && !ms.empty?
-          # This definition has a Model B instance — tag all entities inside it
-          model_b_defns[defn.object_id] = defn
+        ms = inst.get_attribute('FormAndField', 'model_source') || 'model_a'
+        if ms == 'model_a'
+          has_a = true
+        else
+          has_b = true
         end
+        break if has_a && has_b  # shared — skip early
+      end
+      # Only tag inside definitions that are exclusively Model B
+      if has_b && !has_a
+        model_b_only_defns[defn.object_id] = defn
+      elsif has_b && has_a
+        puts "[FF Tag] Skipping shared definition '#{defn.name}' (#{defn.instances.length} instances in both A and B)"
       end
     end
 
-    # Recursively tag entities inside Model B definitions
+    # Tag untagged entities inside Model B-only definitions
     visited = {}
-    model_b_defns.each_value do |defn|
+    model_b_only_defns.each_value do |defn|
       tag_untagged_in_definition(defn, model_b_id, visited) { count += 1 }
     end
 
     puts "Multiverse: Tagged #{count} new entities as model_b (#{model_b_id})"
   end
 
-  # Tag all untagged entities inside a definition (and nested definitions) as model_b
+  # Tag untagged entities inside a definition (and nested definitions) as model_b.
+  # Only tags ComponentInstances and Groups — not raw geometry (faces, edges).
   def self.tag_untagged_in_definition(defn, model_b_id, visited, &counter)
     return if visited[defn.object_id]
     visited[defn.object_id] = true
     defn.entities.each do |e|
       next unless e.valid?
+      # Only tag instances and groups — not faces/edges/construction geometry
+      next unless e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
       if e.respond_to?(:get_attribute)
         existing = e.get_attribute('FormAndField', 'model_source')
         if !existing || existing.empty?
@@ -273,8 +285,9 @@ module TakeoffTool
         tag_untagged_in_definition(e.definition, model_b_id, visited, &counter)
       elsif e.is_a?(Sketchup::Group) && e.entities
         e.entities.each do |child|
-          next unless child.valid? && child.respond_to?(:get_attribute)
-          ex = child.get_attribute('FormAndField', 'model_source')
+          next unless child.valid?
+          next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+          ex = child.respond_to?(:get_attribute) ? child.get_attribute('FormAndField', 'model_source') : nil
           if !ex || ex.empty?
             child.set_attribute('FormAndField', 'model_source', model_b_id) if child.respond_to?(:set_attribute)
             counter.call if counter
