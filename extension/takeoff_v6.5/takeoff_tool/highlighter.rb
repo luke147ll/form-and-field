@@ -704,6 +704,12 @@ module TakeoffTool
       m.commit_operation
     end
 
+    # Lightweight reset of isolate tracking — no entity iteration.
+    # Used by set_multiverse_view so layer toggle is instant.
+    def self.clear_isolate_state
+      @isolated_categories = nil
+    end
+
     def self.show_all
       @isolated_categories = nil
       m = Sketchup.active_model; return unless m

@@ -152,6 +152,7 @@ module TakeoffTool
       model_b_id = "model_b_#{Time.now.to_i}"
 
       model.commit_operation
+      invalidate_entity_cache
 
       # Step 5: Save multiverse data (lightweight)
       mv_loading('Saving state...', 90)
@@ -322,6 +323,7 @@ module TakeoffTool
       b_count = 0
       tag_entities_recursive(exploded, model_b_id, layer_b) { b_count += 1 }
       model.commit_operation
+      invalidate_entity_cache
 
       # Second pass for deeply nested entities
       tag_new_as_model_b(model_b_id)
@@ -379,7 +381,6 @@ module TakeoffTool
     if Dashboard.visible?
       Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
       Dashboard.send_multiverse_data
-      Dashboard.portal_complete("#{b_results.length} entities scanned")
     end
   end
 
@@ -402,8 +403,8 @@ module TakeoffTool
 
     mode = mode.to_s.downcase
 
-    # Clear any active Highlighter colors first (own operation)
-    Highlighter.clear_all
+    # Clear any active Highlighter state (isolate tracking, not entity iteration)
+    Highlighter.clear_isolate_state
 
     # Update stored active view BEFORE visibility changes
     # so filtered_scan_results uses the correct view
@@ -415,43 +416,31 @@ module TakeoffTool
     layer_a = model.layers['FF_Model_A']
     layer_b = model.layers['FF_Model_B']
 
-    model.start_operation('Multiverse View', true)
-    begin
-      # Reset ALL entity visibility to true — clears any isolate state
-      # from the previous view. Layers will control which model is shown.
-      @entity_registry.each_value { |e| e.visible = true if e && e.valid? }
-      Highlighter.show_hierarchy(model.entities)
+    # Pure layer switching — no entity iteration needed.
+    # All Model A entities are on FF_Model_A, all Model B on FF_Model_B.
+    case mode
+    when 'a'
+      layer_a.visible = true if layer_a
+      layer_b.visible = false if layer_b
+      model.rendering_options['DisplayColorByLayer'] = false
 
-      case mode
-      when 'a'
-        layer_a.visible = true if layer_a
-        layer_b.visible = false if layer_b
-        model.rendering_options['DisplayColorByLayer'] = false
+    when 'b'
+      layer_a.visible = false if layer_a
+      layer_b.visible = true if layer_b
+      model.rendering_options['DisplayColorByLayer'] = false
 
-      when 'b'
-        layer_a.visible = false if layer_a
-        layer_b.visible = true if layer_b
-        model.rendering_options['DisplayColorByLayer'] = false
+    when 'ab'
+      layer_a.visible = true if layer_a
+      layer_b.visible = true if layer_b
+      model.rendering_options['DisplayColorByLayer'] = true
 
-      when 'ab'
-        layer_a.visible = true if layer_a
-        layer_b.visible = true if layer_b
-        model.rendering_options['DisplayColorByLayer'] = true
+    else
+      puts "Multiverse: Unknown view mode '#{mode}'"
+    end
 
-      else
-        puts "Multiverse: Unknown view mode '#{mode}'"
-      end
-
-      model.commit_operation
-
-      # Refresh dashboard with filtered data for the new view
-      if Dashboard.visible?
-        Dashboard.send_data(filtered_scan_results, @category_assignments, @cost_code_assignments)
-      end
-
-    rescue => e
-      model.abort_operation
-      puts "Multiverse: set_view error: #{e.message}"
+    # Refresh dashboard with filtered data for the new view
+    if Dashboard.visible?
+      Dashboard.send_data(filtered_scan_results, @category_assignments, @cost_code_assignments)
     end
   end
 
@@ -520,6 +509,7 @@ module TakeoffTool
       end
 
       model.commit_operation
+      invalidate_entity_cache
 
       # Clear multiverse data
       @multiverse_data = nil
@@ -1161,6 +1151,7 @@ module TakeoffTool
     model.rendering_options['DisplayColorByLayer'] = false
 
     model.commit_operation
+    invalidate_entity_cache
 
     # ── STEP 3: Update master subcategories ──
     @master_subcategories ||= {}
@@ -1279,6 +1270,7 @@ module TakeoffTool
     end
 
     model.commit_operation
+    invalidate_entity_cache
 
     # Ensure category exists in master list
     @master_categories ||= []
@@ -1448,6 +1440,7 @@ module TakeoffTool
     end
 
     model.commit_operation
+    invalidate_entity_cache
 
     # ── STEP 3: Update master subcategories ──
     @master_subcategories ||= {}
@@ -1519,6 +1512,7 @@ module TakeoffTool
 
     model.set_attribute('FormAndField', 'vault', '[]')
     model.commit_operation
+    invalidate_entity_cache
 
     rescan_model_b if recalled > 0
 

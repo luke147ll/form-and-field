@@ -114,6 +114,9 @@ module TakeoffTool
       defs = model.definitions.select { |d| !d.image? }
       total_defs = defs.length
       progress.call("Found #{total_defs} definitions to process#{filter_label}") if progress
+      Dashboard.scan_log_status("CLASSIFYING ENTITIES") rescue nil
+      entity_count = 0
+      discovered_cats = {}
 
       defs.each_with_index do |defn, idx|
         inst_count = defn.instances.length
@@ -132,10 +135,23 @@ module TakeoffTool
           end
 
           reg[inst.entityID] = inst
+          prev_len = results.length
           process(inst, defn, results)
+          entity_count += 1
+          # Emit newly discovered categories as pills
+          if results.length > prev_len
+            cat = results.last[:parsed][:auto_category] rescue nil
+            if cat && cat != '_IGNORE' && !discovered_cats[cat]
+              discovered_cats[cat] = true
+              Dashboard.scan_log_pill(cat) rescue nil
+            end
+          end
+          Dashboard.scan_log_count(entity_count) if entity_count % 25 == 0
         end
       end
 
+      Dashboard.scan_log_count(entity_count) rescue nil
+      Dashboard.scan_log_status("FINALIZING") rescue nil
       progress.call("Processing warnings...") if progress
       check_warnings(results)
       progress.call("Sorting #{results.length} results") if progress

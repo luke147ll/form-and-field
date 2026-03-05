@@ -1,0 +1,104 @@
+{
+  "containers": [
+    {
+      "name": "Foundation",
+      "color": "#fab387",
+      "order": 0,
+      "categories": [
+        { "name": "Footings and Foundation", "code": "2.200", "unit": "LF" },
+        { "name": "Foundation Walls", "code": "2.210", "unit": "LF" },
+        { "name": "Interior Concrete Slabs", "code": "2.220", "unit": "CY" },
+        { "name": "Exterior Concrete Slabs", "code": "2.230", "unit": "CY" }
+      ]
+    },
+    {
+      "name": "Structure",
+      "color": "#89b4fa",
+      "order": 1,
+      "categories": [
+        { "name": "Structural Steel", "code": "5.100", "unit": "LF" },
+        { "name": "Wall Framing", "code": "6.100", "unit": "LF" },
+        { "name": "Floor Framing", "code": "6.200", "unit": "SF" },
+        { "name": "Roof Framing", "code": "6.300", "unit": "SF" },
+        { "name": "Sheathing", "code": "6.400", "unit": "SF" },
+        { "name": "Trusses", "code": "6.500", "unit": "EA" },
+        { "name": "Columns and Posts", "code": "6.600", "unit": "EA" },
+        { "name": "Beams and Headers", "code": "6.700", "unit": "LF" }
+      ]
+    },
+    {
+      "name": "Full Enclosure",
+      "color": "#94e2d5",
+      "order": 2,
+      "categories": [
+        { "name": "Exterior Wall Finish", "code": "7.100", "unit": "SF" },
+        { "name": "Windows", "code": "8.100", "unit": "EA" },
+        { "name": "Exterior Doors", "code": "8.200", "unit": "EA" },
+        { "name": "Roofing", "code": "7.500", "unit": "SF" },
+        { "name": "Insulation", "code": "7.200", "unit": "SF" },
+        { "name": "Waterproofing", "code": "7.300", "unit": "SF" },
+        { "name": "Gutters and Downspouts", "code": "7.600", "unit": "LF" }
+      ]
+    },
+    {
+      "name": "Finish",
+      "color": "#f5c2e7",
+      "order": 3,
+      "categories": [
+        { "name": "Drywall", "code": "9.100", "unit": "SF" },
+        { "name": "Interior Doors", "code": "8.300", "unit": "EA" },
+        { "name": "Trim and Millwork", "code": "6.800", "unit": "LF" },
+        { "name": "Cabinets", "code": "12.100", "unit": "EA" },
+        { "name": "Countertops", "code": "12.200", "unit": "LF" },
+        { "name": "Flooring", "code": "9.600", "unit": "SF" },
+        { "name": "Ceiling Finish", "code": "9.500", "unit": "SF" },
+        { "name": "Paint", "code": "9.900", "unit": "SF" },
+        { "name": "Tile", "code": "9.300", "unit": "SF" }
+      ]
+    },
+    {
+      "name": "MEP",
+      "color": "#f9e2af",
+      "order": 4,
+      "categories": [
+        { "name": "Plumbing", "code": "22.000", "unit": "EA" },
+        { "name": "HVAC", "code": "23.000", "unit": "EA" },
+        { "name": "Electrical", "code": "26.000", "unit": "EA" },
+        { "name": "Fire Protection", "code": "21.000", "unit": "EA" },
+        { "name": "Low Voltage", "code": "27.000", "unit": "EA" }
+      ]
+    },
+    {
+      "name": "Exterior/Site",
+      "color": "#a6e3a1",
+      "order": 5,
+      "categories": [
+        { "name": "Earthwork", "code": "31.000", "unit": "CY" },
+        { "name": "Paving", "code": "32.100", "unit": "SF" },
+        { "name": "Landscaping", "code": "32.900", "unit": "SF" },
+        { "name": "Fencing", "code": "32.300", "unit": "LF" },
+        { "name": "Retaining Walls", "code": "32.200", "unit": "LF" },
+        { "name": "Site Utilities", "code": "33.000", "unit": "LF" }
+      ]
+    },
+    {
+      "name": "Specialty",
+      "color": "#cba6f7",
+      "order": 6,
+      "categories": [
+        { "name": "Stairs and Railings", "code": "5.500", "unit": "LF" },
+        { "name": "Specialties", "code": "10.000", "unit": "EA" },
+        { "name": "Equipment", "code": "11.000", "unit": "EA" },
+        { "name": "Furnishings", "code": "12.000", "unit": "EA" }
+      ]
+    },
+    {
+      "name": "Other",
+      "color": "#6c7086",
+      "order": 7,
+      "categories": [
+        { "name": "Uncategorized", "code": "", "unit": "" }
+      ]
+    }
+  ]
+}

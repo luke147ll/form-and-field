@@ -485,6 +485,45 @@ module TakeoffTool
         end
       end
 
+      @dialog.add_action_callback('debugHTML') do |_ctx, html|
+        puts "=== RENDERED HTML (first 5000 chars) ==="
+        puts html.to_s
+        puts "=== END ==="
+      end
+
+      @dialog.add_action_callback('debugMsg') do |_ctx, msg|
+        puts "[FF Debug]\n#{msg}"
+      end
+
+      @dialog.add_action_callback('addContainer') do |_ctx, name_str|
+        begin
+          name = name_str.to_s.strip
+          unless name.empty?
+            TakeoffTool.add_container(name)
+            puts "[FF] addContainer '#{name}' — now #{(TakeoffTool.master_containers || []).length} containers"
+            send_live_data
+          end
+        rescue => e
+          puts "[FF] addContainer ERROR: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      @dialog.add_action_callback('addCategoryToContainer') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat_name = data['category'].to_s.strip
+          cont_name = data['container'].to_s.strip
+          unless cat_name.empty? || cont_name.empty?
+            TakeoffTool.add_category_to_container(cat_name, cont_name)
+            send_live_data
+            puts "Takeoff: addCategoryToContainer '#{cat_name}' in '#{cont_name}'"
+          end
+        rescue => e
+          puts "Takeoff addCategoryToContainer error: #{e.message}"
+        end
+      end
+
       @dialog.add_action_callback('addSubcategory') do |_ctx, json_str|
         begin
           require 'json'
@@ -532,6 +571,18 @@ module TakeoffTool
           TakeoffTool.move_subcategory(source_cat, sub_name, target_cat)
         rescue => e
           puts "Takeoff moveSubcategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('moveCategoryToContainer') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat_name = data['category'].to_s.strip
+          target_cont = data['targetContainer'].to_s.strip
+          TakeoffTool.move_category_to_container(cat_name, target_cont)
+        rescue => e
+          puts "Takeoff moveCategoryToContainer error: #{e.message}"
         end
       end
 
@@ -1280,7 +1331,10 @@ module TakeoffTool
 
       require 'json'
       msub = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_subcategories : TakeoffTool.master_subcategories
-      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt, customColors: custom_colors })
+      containers = TakeoffTool.master_containers || []
+      cont_names = containers.map { |c| c['name'] rescue '?' }
+      puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
+      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt, customColors: custom_colors, containers: containers })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
@@ -1397,6 +1451,23 @@ module TakeoffTool
       return unless @dialog && @dialog.visible?
       esc = msg.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
       @dialog.execute_script("scanMsg('#{esc}')")
+    end
+
+    def self.scan_log_count(n)
+      return unless @dialog && @dialog.visible?
+      @dialog.execute_script("scanCount(#{n.to_i})")
+    end
+
+    def self.scan_log_status(text)
+      return unless @dialog && @dialog.visible?
+      esc = text.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("scanStatus('#{esc}')")
+    end
+
+    def self.scan_log_pill(name)
+      return unless @dialog && @dialog.visible?
+      esc = name.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+      @dialog.execute_script("addLoadingPill('#{esc}')")
     end
 
     def self.scan_log_end(summary)
