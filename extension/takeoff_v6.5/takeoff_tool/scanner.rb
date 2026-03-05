@@ -127,13 +127,10 @@ module TakeoffTool
           # Model source filter: skip entities not matching the requested scope
           if model_source_filter
             ms = inst.get_attribute('FormAndField', 'model_source') || 'model_a'
-            layer_name = (inst.respond_to?(:layer) && inst.layer) ? inst.layer.name : ''
             if model_source_filter == 'model_a'
               next unless ms == 'model_a'
             elsif model_source_filter == 'model_b'
               next if ms == 'model_a'
-              # Safety: reject entities not on FF_Model_B layer (shared-definition contamination)
-              next unless layer_name == 'FF_Model_B'
             end
           end
 

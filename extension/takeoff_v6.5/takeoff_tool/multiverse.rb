@@ -188,27 +188,53 @@ module TakeoffTool
     end
   end
 
+  # IFC organizational containers — always recurse into these even if "shared"
+  # because both Model A and B will have IfcProject/IfcSite/etc. wrappers
+  IFC_CONTAINER_RE = /\AIfc(Project|Site|Building(Storey)?|Space)\z/i
+
   # Recursively tag entities and their nested children (deep traversal)
   # visited_defs prevents infinite loops on shared/circular definitions
-  # Tag exploded Model B entities. Only tags instances and groups (not raw geometry).
-  # Does NOT recurse into ComponentDefinitions (they may be shared with Model A).
+  # Tag exploded Model B entities. Two phases:
+  #   Phase 1: Tag ALL instances/groups in the entity list (no recursion)
+  #   Phase 2: Recurse into definitions that are NOT shared with Model A
+  # This avoids the race condition where untagged Model B siblings look like Model A.
   def self.tag_entities_recursive(entities, model_b_id, layer_b, visited_defs = nil, &counter)
     visited_defs ||= {}
+
+    # Phase 1: Tag all direct instances and groups (flat pass)
     entities.each do |e|
       next unless e.valid?
-      # Only tag instances and groups — they are the scannable entities
       if e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
         e.set_attribute('FormAndField', 'model_source', model_b_id)
         e.layer = layer_b
         counter.call if counter
       end
-      # Recurse into groups (their entities are unique to this group)
+    end
+
+    # Phase 2: Recurse — now all siblings are tagged, so shared-def check works
+    entities.each do |e|
+      next unless e.valid?
       if e.is_a?(Sketchup::Group) && e.entities
         tag_entities_recursive(e.entities.to_a, model_b_id, layer_b, visited_defs, &counter)
+      elsif e.is_a?(Sketchup::ComponentInstance) && e.definition
+        defn = e.definition
+        unless visited_defs[defn.object_id]
+          visited_defs[defn.object_id] = true
+          # Check if definition is shared with Model A.
+          # Now safe because all Model B instances at this level are already tagged.
+          shared = defn.instances.any? do |inst|
+            next false unless inst.valid?
+            ms = inst.get_attribute('FormAndField', 'model_source')
+            !ms || ms == 'model_a'
+          end
+          if shared && defn.name !~ IFC_CONTAINER_RE
+            puts "[FF Tag] Shared definition '#{defn.name}' — skipping recursion"
+          else
+            puts "[FF Tag] Force-recursing IFC container '#{defn.name}'" if shared
+            tag_entities_recursive(defn.entities.to_a, model_b_id, layer_b, visited_defs, &counter)
+          end
+        end
       end
-      # For ComponentInstances, do NOT recurse into the definition.
-      # The definition is shared — its internal entities belong to ALL instances.
-      # The scanner finds instances via defn.instances and filters by model_source.
     end
   end
 
@@ -249,7 +275,12 @@ module TakeoffTool
         break if has_a && has_b  # shared — skip early
       end
       # Only tag inside definitions that are exclusively Model B
+      # Exception: IFC containers (IfcProject, IfcSite, etc.) are always "shared"
+      # because both models have them — force-include them for recursion
       if has_b && !has_a
+        model_b_only_defns[defn.object_id] = defn
+      elsif has_b && has_a && defn.name =~ IFC_CONTAINER_RE
+        puts "[FF Tag] Force-including IFC container '#{defn.name}' for Model B tagging"
         model_b_only_defns[defn.object_id] = defn
       elsif has_b && has_a
         puts "[FF Tag] Skipping shared definition '#{defn.name}' (#{defn.instances.length} instances in both A and B)"
