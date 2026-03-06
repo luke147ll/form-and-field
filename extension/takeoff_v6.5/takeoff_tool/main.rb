@@ -23,6 +23,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'elevation_tool.rb')
   load File.join(PLUGIN_DIR, 'note_tool.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
+  load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')
 
   @scan_results = []

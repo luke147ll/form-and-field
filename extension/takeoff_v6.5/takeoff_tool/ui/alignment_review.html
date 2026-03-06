@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Alignment Review</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:12px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:16px;overflow-y:auto}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:#181825}
+::-webkit-scrollbar-thumb{background:#45475a;border-radius:4px}
+
+h1{font-size:17px;font-weight:700;color:#cba6f7;margin-bottom:2px}
+.subtitle{font-size:11px;color:#6c7086;margin-bottom:16px}
+
+/* ── Summary cards ── */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.card{background:#181825;border:1px solid #313244;border-radius:8px;padding:10px;text-align:center}
+.card-value{font-size:22px;font-weight:700;margin-bottom:1px}
+.card-label{font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:#a6adc8}
+.card-auto .card-value{color:#a6e3a1}
+.card-probable .card-value{color:#f9e2af}
+.card-low .card-value{color:#fab387}
+.card-none .card-value{color:#f38ba8}
+
+/* ── Tier sections ── */
+.tier{background:#181825;border:1px solid #313244;border-radius:8px;margin-bottom:10px;overflow:hidden}
+.tier-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none}
+.tier-header:hover{background:#1a1a2e}
+.tier-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.tier-arrow{font-size:10px;transition:transform 0.2s;color:#6c7086}
+.tier-arrow.open{transform:rotate(90deg)}
+.tier-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+
+.tier-auto .tier-title{color:#a6e3a1}
+.tier-auto .tier-badge{background:rgba(166,227,161,0.15);color:#a6e3a1}
+.tier-probable .tier-title{color:#f9e2af}
+.tier-probable .tier-badge{background:rgba(249,226,175,0.15);color:#f9e2af}
+.tier-low .tier-title{color:#fab387}
+.tier-low .tier-badge{background:rgba(250,179,135,0.15);color:#fab387}
+.tier-none .tier-title{color:#f38ba8}
+.tier-none .tier-badge{background:rgba(243,139,168,0.15);color:#f38ba8}
+
+.tier-body{padding:0 14px 10px;display:none}
+.tier-body.open{display:block}
+
+/* ── Accept All button ── */
+.accept-all-btn{display:inline-block;background:rgba(166,227,161,0.15);color:#a6e3a1;border:1px solid rgba(166,227,161,0.3);padding:5px 14px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;margin-bottom:10px}
+.accept-all-btn:hover{background:rgba(166,227,161,0.25)}
+.accept-all-btn.done{opacity:0.4;cursor:default;pointer-events:none}
+
+/* ── Group rows ── */
+.group-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #252536}
+.group-row:last-child{border-bottom:none}
+.group-info{flex:1;display:flex;align-items:center;gap:10px}
+.group-cat{font-weight:600;font-size:11px;color:#cdd6f4;min-width:140px}
+.group-count{font-size:10px;color:#a6adc8}
+.group-pct{font-size:10px;font-weight:600;min-width:36px;text-align:right}
+.group-actions{display:flex;gap:4px;align-items:center}
+
+.btn-sm{padding:3px 10px;border-radius:4px;border:none;font-size:10px;font-weight:600;cursor:pointer}
+.btn-accept{background:rgba(166,227,161,0.15);color:#a6e3a1;border:1px solid rgba(166,227,161,0.25)}
+.btn-accept:hover{background:rgba(166,227,161,0.3)}
+.btn-reject{background:rgba(243,139,168,0.1);color:#f38ba8;border:1px solid rgba(243,139,168,0.2)}
+.btn-reject:hover{background:rgba(243,139,168,0.25)}
+.btn-hl{background:rgba(137,180,250,0.1);color:#89b4fa;border:1px solid rgba(137,180,250,0.2);font-size:9px;padding:3px 6px}
+.btn-hl:hover{background:rgba(137,180,250,0.25)}
+
+.group-row.accepted{opacity:0.45}
+.group-row.accepted .btn-accept{display:none}
+.group-row.rejected{opacity:0.35;text-decoration:line-through}
+.group-row.rejected .btn-reject{display:none}
+
+/* ── No-match info ── */
+.no-match-info{font-size:11px;color:#6c7086;padding:6px 0}
+
+/* ── Footer ── */
+.footer{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid #313244}
+.btn-skip{background:#313244;color:#a6adc8;border:1px solid #45475a;padding:7px 18px;border-radius:5px;font-size:11px;cursor:pointer}
+.btn-skip:hover{background:#45475a}
+.btn-apply{background:rgba(203,166,247,0.2);color:#cba6f7;border:1px solid rgba(203,166,247,0.3);padding:7px 18px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-apply:hover{background:rgba(203,166,247,0.35)}
+
+.loading{text-align:center;padding:40px;color:#6c7086;font-size:14px}
+#content{display:none}
+</style>
+</head>
+<body>
+
+<div id="content">
+  <h1>Alignment Review</h1>
+  <div class="subtitle" id="subtitle"></div>
+
+  <div class="summary">
+    <div class="card card-auto">
+      <div class="card-value" id="countAuto">0</div>
+      <div class="card-label">Auto</div>
+    </div>
+    <div class="card card-probable">
+      <div class="card-value" id="countProbable">0</div>
+      <div class="card-label">Probable</div>
+    </div>
+    <div class="card card-low">
+      <div class="card-value" id="countLow">0</div>
+      <div class="card-label">Low</div>
+    </div>
+    <div class="card card-none">
+      <div class="card-value" id="countNone">0</div>
+      <div class="card-label">No Match</div>
+    </div>
+  </div>
+
+  <div id="tiersContainer"></div>
+
+  <div class="footer">
+    <button class="btn-skip" onclick="doSkip()">Skip</button>
+    <button class="btn-apply" onclick="doApply()">Apply &amp; Compare</button>
+  </div>
+</div>
+
+<div class="loading" id="loadingMsg">Loading alignment data...</div>
+
+<script>
+var DATA=null;
+var ACCEPTED={}, REJECTED={};
+
+/* ═══ Communication ═══ */
+function call(n,a){
+  try{
+    if(window.sketchup&&typeof window.sketchup[n]==='function'){if(a!==undefined)window.sketchup[n](a);else window.sketchup[n]();}
+    else{if(a!==undefined)window.location='skp:'+n+'@'+a;else window.location='skp:'+n;}
+  }catch(e){console.log('call ERR: '+n+' '+e.message);}
+}
+function callJSON(n,o){call(n,JSON.stringify(o));}
+
+/* ═══ Render ═══ */
+function render(data){
+  DATA=data;
+  if(!data)return;
+
+  document.getElementById('subtitle').textContent=
+    data.total_matched+' entities matched using Model A geometry'+(data.skipped_count?' ('+data.skipped_count+' skipped — high confidence)':'');
+
+  document.getElementById('countAuto').textContent=data.auto_count||0;
+  document.getElementById('countProbable').textContent=data.probable_count||0;
+  document.getElementById('countLow').textContent=data.low_count||0;
+  document.getElementById('countNone').textContent=data.no_match_count||0;
+
+  var html='';
+
+  // Auto tier
+  html+=buildTier('auto','Auto-Matched (70%+)','tier-auto',data.tiers.auto||{},true);
+  // Probable
+  html+=buildTier('probable','Probable Match (42-69%)','tier-probable',data.tiers.probable||{},false);
+  // Low
+  html+=buildTier('low','Low Match (17-41%)','tier-low',data.tiers.low||{},false);
+  // No match
+  html+=buildNoMatch(data.tiers.no_match||{}, data.no_match_count||0);
+
+  document.getElementById('tiersContainer').innerHTML=html;
+  document.getElementById('content').style.display='';
+  document.getElementById('loadingMsg').style.display='none';
+}
+
+function buildTier(tierKey, label, cssClass, groups, showAcceptAll){
+  var cats=Object.keys(groups);
+  if(cats.length===0)return'';
+
+  var totalCount=0;
+  cats.forEach(function(c){totalCount+=groups[c].count;});
+
+  var h='<div class="tier '+cssClass+'">';
+  h+='<div class="tier-header" onclick="toggleTier(this)">';
+  h+='<div class="tier-title"><span class="tier-arrow">&#9654;</span>'+esc(label)+'</div>';
+  h+='<span class="tier-badge">'+totalCount+' entities</span>';
+  h+='</div>';
+  h+='<div class="tier-body" id="body-'+tierKey+'">';
+
+  if(showAcceptAll){
+    h+='<button class="accept-all-btn" id="acceptAllAuto" onclick="acceptAllAuto()">&#10003; Accept All Auto-Matched</button>';
+  }
+
+  cats.sort();
+  cats.forEach(function(cat){
+    var g=groups[cat];
+    var rowId=tierKey+'__'+cat.replace(/[^a-zA-Z0-9]/g,'_');
+    h+='<div class="group-row" id="row-'+rowId+'" data-tier="'+tierKey+'" data-cat="'+esc(cat)+'">';
+    h+='<div class="group-info">';
+    h+='<span class="group-cat">'+esc(cat)+'</span>';
+    h+='<span class="group-count">'+g.count+' entities</span>';
+    h+='<span class="group-pct" style="color:'+pctColor(g.pct_avg)+'">'+g.pct_avg+'%</span>';
+    h+='</div>';
+    h+='<div class="group-actions">';
+    if(tierKey!=='no_match'){
+      h+='<button class="btn-sm btn-accept" onclick="acceptGroup(\''+tierKey+'\',\''+escAttr(cat)+'\')">&#10003; Accept</button>';
+      h+='<button class="btn-sm btn-reject" onclick="rejectGroup(\''+tierKey+'\',\''+escAttr(cat)+'\')">&#10007; Reject</button>';
+    }
+    h+='<button class="btn-sm btn-hl" onclick="highlightGroup(\''+tierKey+'\',\''+escAttr(cat)+'\')">HL</button>';
+    h+='</div>';
+    h+='</div>';
+  });
+
+  h+='</div></div>';
+  return h;
+}
+
+function buildNoMatch(groups, count){
+  if(count===0)return'';
+  var cats=Object.keys(groups);
+  var h='<div class="tier tier-none">';
+  h+='<div class="tier-header" onclick="toggleTier(this)">';
+  h+='<div class="tier-title"><span class="tier-arrow">&#9654;</span>No Match (&lt;17%)</div>';
+  h+='<span class="tier-badge">'+count+' entities</span>';
+  h+='</div>';
+  h+='<div class="tier-body">';
+  h+='<div class="no-match-info">'+count+' entities could not be geometry-matched. Use HyperParser to identify them.</div>';
+
+  cats.forEach(function(cat){
+    var g=groups[cat];
+    var rowId='no_match__'+cat.replace(/[^a-zA-Z0-9]/g,'_');
+    h+='<div class="group-row" id="row-'+rowId+'">';
+    h+='<div class="group-info">';
+    h+='<span class="group-cat" style="color:#6c7086">'+esc(cat||'Unknown')+'</span>';
+    h+='<span class="group-count">'+g.count+' entities</span>';
+    h+='<span class="group-pct" style="color:#f38ba8">'+(g.pct_avg||0)+'%</span>';
+    h+='</div>';
+    h+='<div class="group-actions">';
+    h+='<button class="btn-sm btn-hl" onclick="highlightGroup(\'no_match\',\''+escAttr(cat)+'\')">HL</button>';
+    h+='</div>';
+    h+='</div>';
+  });
+
+  h+='</div></div>';
+  return h;
+}
+
+/* ═══ Actions ═══ */
+function toggleTier(header){
+  var arrow=header.querySelector('.tier-arrow');
+  var body=header.nextElementSibling;
+  var open=body.classList.toggle('open');
+  arrow.classList.toggle('open',open);
+}
+
+function acceptAllAuto(){
+  call('acceptAutoMatched');
+}
+
+function acceptGroup(tier,cat){
+  ACCEPTED[tier+'|'+cat]=true;
+  delete REJECTED[tier+'|'+cat];
+  callJSON('acceptGroup',{tier:tier,category:cat});
+}
+
+function rejectGroup(tier,cat){
+  REJECTED[tier+'|'+cat]=true;
+  delete ACCEPTED[tier+'|'+cat];
+  callJSON('rejectGroup',{tier:tier,category:cat});
+}
+
+function highlightGroup(tier,cat){
+  if(!DATA||!DATA.tiers||!DATA.tiers[tier]||!DATA.tiers[tier][cat])return;
+  var eids=DATA.tiers[tier][cat].entity_ids||[];
+  callJSON('highlightGroup',eids);
+}
+
+function doSkip(){
+  call('clearHighlights');
+  call('skipReview');
+}
+
+function doApply(){
+  call('clearHighlights');
+  call('applyAndCompare');
+}
+
+/* ═══ Callbacks from Ruby ═══ */
+function onAutoAccepted(){
+  var btn=document.getElementById('acceptAllAuto');
+  if(btn){btn.classList.add('done');btn.textContent='All auto-matched accepted';}
+  // Mark all auto rows as accepted
+  var body=document.getElementById('body-auto');
+  if(body){
+    var rows=body.querySelectorAll('.group-row');
+    for(var i=0;i<rows.length;i++)rows[i].classList.add('accepted');
+  }
+}
+
+function onGroupAccepted(tier,cat){
+  var rowId='row-'+tier+'__'+cat.replace(/[^a-zA-Z0-9]/g,'_');
+  var el=document.getElementById(rowId);
+  if(el){el.classList.add('accepted');el.classList.remove('rejected');}
+}
+
+function onGroupRejected(tier,cat){
+  var rowId='row-'+tier+'__'+cat.replace(/[^a-zA-Z0-9]/g,'_');
+  var el=document.getElementById(rowId);
+  if(el){el.classList.add('rejected');el.classList.remove('accepted');}
+}
+
+/* ═══ Util ═══ */
+function esc(s){
+  if(!s)return'';
+  var d=document.createElement('div');
+  d.textContent=s;
+  return d.innerHTML;
+}
+
+function escAttr(s){
+  return(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+
+function pctColor(pct){
+  if(pct>=70)return'#a6e3a1';
+  if(pct>=42)return'#f9e2af';
+  if(pct>=17)return'#fab387';
+  return'#f38ba8';
+}
+
+/* ═══ Request data on load + poll as fallback ═══ */
+window.addEventListener('load', function(){
+  call('requestAlignmentData');
+});
+
+var _pollCount=0;
+var _pollTimer=setInterval(function(){
+  _pollCount++;
+  if(window.ALIGNMENT_DATA){
+    clearInterval(_pollTimer);
+    render(window.ALIGNMENT_DATA);
+  }else if(_pollCount===20){
+    // Re-request at 1s in case first request was too early
+    call('requestAlignmentData');
+  }else if(_pollCount>100){
+    clearInterval(_pollTimer);
+    document.getElementById('loadingMsg').textContent='Error: No alignment data received.';
+  }
+},50);
+</script>
+
+</body>
+</html>

@@ -218,7 +218,7 @@ module TakeoffTool
     end
 
     def self.visible_scan_results
-      sr = TakeoffTool.scan_results
+      sr = TakeoffTool.filtered_scan_results
       return [] unless sr
       sr.select do |r|
         e = TakeoffTool.find_entity(r[:entity_id])
@@ -531,6 +531,12 @@ module TakeoffTool
       # Layer
       if entity.respond_to?(:layer) && entity.layer
         props << { key: 'Layer', value: entity.layer.name }
+      end
+
+      # Model source (multiverse)
+      if eid && TakeoffTool.active_mv_view
+        ms_raw = (entity.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
+        props << { key: 'Model Source', value: ms_raw == 'model_a' ? 'Model A' : 'Model B' }
       end
 
       # Entity type

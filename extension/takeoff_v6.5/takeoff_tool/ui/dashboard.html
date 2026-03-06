@@ -577,49 +577,32 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .sc-new-cat-btn:hover{filter:brightness(1.1)}
 .sc-preview-btn{background:none;border:none;color:#cba6f7;cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0}
 .sc-preview-btn:hover{color:#f5c2e7}
-/* COMPARE BAR + RESULTS */
-.compare-bar{display:none;padding:6px 10px;background:rgba(203,166,247,0.08);border-bottom:1px solid rgba(203,166,247,0.2);align-items:center;gap:8px;flex-shrink:0}
-.compare-bar.active{display:flex}
-.cb-label{color:#cba6f7;font-size:11px;font-weight:600}
-.cb-sel{color:#cdd6f4;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cb-sel b{color:#a6e3a1}
-.cb-sel .vs{color:#6c7086;margin:0 4px}
-.cb-sel .cat-b{color:#89b4fa}
-.cb-run{padding:3px 10px;background:#cba6f7;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
-.cb-run:hover{filter:brightness(1.1)}
-.cb-clear{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
-.cb-cluster{color:#a6adc8;font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap}
-.cb-cluster input{margin:0;accent-color:#cba6f7}
-.cb-tol{display:flex;gap:6px;color:#6c7086;font-size:10px;align-items:center}
-.cb-tol label{display:flex;align-items:center;gap:2px;white-space:nowrap}
-.cb-tol-input{width:36px;background:#181825;border:1px solid #313244;border-radius:3px;color:#cdd6f4;font-size:10px;padding:1px 3px;text-align:center}
-.compare-results{display:none;padding:8px 12px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
-.compare-results.active{display:flex;flex-direction:column;gap:6px}
-.cr-header{display:flex;align-items:center;gap:8px}
-.cr-title{color:#cba6f7;font-size:12px;font-weight:600;flex:1}
-.cr-close{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px}
-.cr-stats{display:flex;gap:12px;flex-wrap:wrap}
-.cr-stat{display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:4px}
-.cr-stat:hover{background:rgba(205,214,244,0.05)}
-.cr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.cr-dot.matching{background:#a6e3a1}
-.cr-dot.discrepancy{background:#f38ba8}
-.cr-dot.only-a{background:#6c7086}
-.cr-count{font-size:12px;font-weight:600;color:#cdd6f4}
-.cr-label{font-size:11px;color:#a6adc8}
-.cr-note{font-size:9px;color:#585b70;margin-left:auto}
-.cr-actions{display:flex;gap:8px;margin-top:6px}
-.cr-accept-btn{padding:5px 16px;background:#a6e3a1;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
-.cr-accept-btn:hover{filter:brightness(1.1)}
-.cr-cancel-btn{padding:5px 12px;background:none;color:#6c7086;border:1px solid #45475a;border-radius:4px;font-size:11px;cursor:pointer}
-.cr-cancel-btn:hover{color:#f38ba8;border-color:#f38ba8}
-.split-cmp-btn{background:none;border:none;color:#cba6f7;cursor:pointer;font-size:11px;padding:1px 4px;opacity:0.6}
-.split-cmp-btn:hover{opacity:1}
-.split-cmp-btn.selected{opacity:1;color:#f5c2e7}
+/* COMPARE + DIFF */
+.mv-compare-btn{padding:4px 12px;background:#cba6f7;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px;display:none}
+.mv-compare-btn:hover{filter:brightness(1.1)}
+.mv-diff-toggle{display:none;align-items:center;gap:4px;margin-left:8px;cursor:pointer;padding:3px 10px;border-radius:4px;border:1px solid #45475a;font-size:11px;color:#6c7086;transition:all .15s;white-space:nowrap}
+.mv-diff-toggle.active{border-color:#cba6f7;color:#cba6f7;background:rgba(203,166,247,0.1)}
+.mv-diff-toggle:hover{border-color:#cba6f7}
+.comp-results{display:none;flex-direction:column;gap:6px;padding:8px 12px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;max-height:220px;overflow-y:auto}
+.comp-results.active{display:flex}
+.comp-header{display:flex;align-items:center;justify-content:space-between}
+.comp-title{font-size:12px;font-weight:600;color:#cba6f7}
+.comp-close{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
+.comp-close:hover{color:#f38ba8}
+.comp-table{width:100%;border-collapse:collapse;font-size:10px}
+.comp-table th{text-align:left;padding:3px 6px;color:#a6adc8;border-bottom:1px solid #313244;font-weight:500}
+.comp-table th.r{text-align:right}
+.comp-table td{padding:3px 6px;border-bottom:1px solid rgba(49,50,68,0.5)}
+.comp-table td.r{text-align:right;font-variant-numeric:tabular-nums}
+.comp-table .delta-pos{color:#a6e3a1}
+.comp-table .delta-neg{color:#f38ba8}
+.comp-table .delta-zero{color:#6c7086}
+.comp-table .pct{font-size:9px;opacity:0.7}
+.comp-actions{display:flex;gap:8px;margin-top:4px;align-items:center}
+.comp-report-btn{padding:4px 12px;background:none;border:1px solid #cba6f7;color:#cba6f7;border-radius:4px;font-size:11px;cursor:pointer}
+.comp-report-btn:hover{background:rgba(203,166,247,0.1)}
 .split-commit-btn{background:none;border:none;color:#a6e3a1;cursor:pointer;font-size:12px;padding:1px 4px;opacity:0.6;font-weight:bold}
 .split-commit-btn:hover{opacity:1}
-.cr-commit-btn{padding:5px 16px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
-.cr-commit-btn:hover{filter:brightness(1.1)}
 /* ═══ PORTAL OVERLAY ═══ */
 .portal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(17,17,27,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;animation:portalFadeIn 0.3s ease}
 @keyframes portalFadeIn{from{opacity:0}to{opacity:1}}
@@ -744,6 +727,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <span class="mv-btn" data-view="b" onclick="setMvView('b')" style="--mv-color:#89b4fa">B</span>
   </div>
   <span class="mv-label" id="mvLabel"></span>
+  <button class="mv-compare-btn" id="mvCompareBtn" onclick="runCompare()">Compare</button>
+  <span class="mv-diff-toggle" id="mvDiffToggle" onclick="toggleDiff()">Diff</span>
   <span class="mv-filter-toggle" id="mvMatchedToggle" onclick="toggleMatchedFilter()" style="display:none">Matched Only</span>
   <span class="mv-summary" id="mvSummary"></span>
 </div>
@@ -834,23 +819,19 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     </div>
   </div>
 
-  <!-- COMPARE BAR -->
-  <div class="compare-bar" id="compareBar">
-    <span class="cb-label">Compare:</span>
-    <span class="cb-sel" id="cbSel">Select categories from each panel</span>
-    <label class="cb-cluster" title="Cluster nearby entities before comparing"><input type="checkbox" id="cbCluster" checked onchange="document.getElementById('cbTolGroup').style.display=this.checked?'flex':'none'"> Cluster</label>
-    <span class="cb-tol" id="cbTolGroup"><label title="Gap tolerance (inches)">Gap:<input type="number" id="cbSpatialTol" value="0.5" min="0" max="6" step="0.25" class="cb-tol-input"></label><label title="Volume tolerance %">Vol:<input type="number" id="cbVolTol" value="5" min="1" max="50" step="1" class="cb-tol-input">%</label></span>
-    <button class="cb-run" id="cbRunBtn" onclick="runCompare()" disabled>Compare</button>
-    <button class="cb-clear" onclick="clearCompare()" title="Clear">&times;</button>
-  </div>
-  <!-- COMPARE RESULTS -->
-  <div class="compare-results" id="compareResults">
-    <div class="cr-header">
-      <span class="cr-title">Comparison Results</span>
-      <button class="cr-close" onclick="clearCompare()" title="Close">&times;</button>
+  <!-- COMPARISON RESULTS (quantity delta table) -->
+  <div class="comp-results" id="compResults">
+    <div class="comp-header">
+      <span class="comp-title">Quantity Delta &mdash; A vs B</span>
+      <button class="comp-close" onclick="closeCompResults()" title="Close">&times;</button>
     </div>
-    <div class="cr-stats" id="crStats"></div>
-    <div class="cr-actions" id="crActions"></div>
+    <table class="comp-table" id="compTable">
+      <thead><tr><th>Category</th><th class="r">A</th><th class="r">B</th><th class="r">Delta</th><th class="r">%</th></tr></thead>
+      <tbody id="compTableBody"></tbody>
+    </table>
+    <div class="comp-actions">
+      <button class="comp-report-btn" onclick="call('showChangeReport')">Change Report</button>
+    </div>
   </div>
 
   <!-- SCANNER MODE OVERLAY -->
@@ -1135,7 +1116,7 @@ var containerIsolate=null;
 var splitContainerIsolate={a:null,b:null};
 var splitVis={a:{},b:{}};
 var splitOpenCats={a:{},b:{}};
-var compSelA=null,compSelB=null,compResults=null,compActive=false;
+var comparisonResults=null,diffActive=false,diffComputed=false;
 var matchedFilterActive=false;
 var matchedCats=null;
 var pendingVisReapply=false;
@@ -2495,6 +2476,16 @@ function setMvView(mode){
   if(mode==='a') lbl.textContent='Model A: '+mvModelA;
   else if(mode==='b') lbl.textContent='Model B: '+mvModelB;
   else lbl.textContent='Comparing A + B';
+  // Show Compare button only in A+B mode
+  var cmpBtn=document.getElementById('mvCompareBtn');
+  if(cmpBtn)cmpBtn.style.display=(mode==='ab')?'inline-block':'none';
+  // Clear diff state when leaving A+B
+  if(mode!=='ab'){
+    diffActive=false;diffComputed=false;comparisonResults=null;
+    var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
+    document.getElementById('compResults').classList.remove('active');
+    call('clearCompareHighlights');
+  }
   call('setMultiverseView',mode);
 }
 /* Update MV button styling + exit split mode without triggering Ruby callback.
@@ -2663,7 +2654,7 @@ function enterSplitMode(){
 function exitSplitMode(){
   if(!splitMode)return;
   splitMode=false;
-  if(compActive||compSelA||compSelB)clearCompare();
+  if(comparisonResults)clearCompareUI();
   var fbar=document.querySelector('.fbar');
   var catBar=document.querySelector('.cat-bar');
   var dpWrap=document.getElementById('dpWrap');
@@ -2748,7 +2739,6 @@ function renderSplitPanel(panel){
     catH+='<button class="ey'+(catVis2?'':' off')+'" onclick="event.stopPropagation();togSplitCatVis(\''+panel+'\',\''+X2(gk)+'\')">'+(catVis2?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
     var isIso2=(splitIsolateState[panel]===gk);
     catH+='<button class="split-iso-btn'+(isIso2?' iso-active':'')+'" data-cat="'+X2(gk)+'" onclick="event.stopPropagation();isolateSplitCat(\''+X2(gk)+'\',\''+panel+'\')" title="Isolate">&#8857;</button>';
-    catH+='<button class="split-cmp-btn'+((panel==='a'?compSelA:compSelB)===gk?' selected':'')+'" onclick="event.stopPropagation();selectForCompare(\''+panel+'\',\''+X2(gk)+'\')" title="Select for compare">&#8776;</button>';
     if(panel==='b'){catH+='<button class="split-commit-btn" onclick="event.stopPropagation();commitCategory(\''+X2(gk)+'\')" title="Commit to Model A">&#8599;</button>';}
     catH+='<span class="arr">&#9660;</span>';
     catH+=catNameSpan(gk);
@@ -2964,105 +2954,65 @@ function updateMatchedCount(){
   if(matchedFilterActive) btn.textContent='Matched ('+matched+')';
   else btn.textContent='Matched Only ('+matched+'/'+total+')';
 }
-/* ═══ CATEGORY COMPARE FUNCTIONS ═══ */
-function selectForCompare(panel,cat){
-  if(panel==='a'){compSelA=(compSelA===cat)?null:cat;}
-  else{compSelB=(compSelB===cat)?null:cat;}
-  updateCompareBar();
-  renderSplitPanels();
-}
-function updateCompareBar(){
-  var bar=document.getElementById('compareBar');
-  var sel=document.getElementById('cbSel');
-  var btn=document.getElementById('cbRunBtn');
-  if(!compSelA&&!compSelB){bar.classList.remove('active');return;}
-  bar.classList.add('active');
-  var h='';
-  h+=compSelA?'<b>'+X(compSelA)+'</b>':'<i style="color:#6c7086">Pick from A</i>';
-  h+='<span class="vs">vs</span>';
-  h+=compSelB?'<span class="cat-b">'+X(compSelB)+'</span>':'<i style="color:#6c7086">Pick from B</i>';
-  sel.innerHTML=h;
-  btn.disabled=!(compSelA&&compSelB);
-}
+/* ═══ COMPARE + DIFF FUNCTIONS ═══ */
 function runCompare(){
-  if(!compSelA||!compSelB)return;
-  showPortalLoading('Comparing','Analyzing "'+compSelA+'" vs "'+compSelB+'"');
-  var opts={catA:compSelA,catB:compSelB};
-  var cl=document.getElementById('cbCluster');
-  if(cl) opts.cluster=cl.checked;
-  var st=document.getElementById('cbSpatialTol');
-  if(st&&st.value) opts.spatialTol=parseFloat(st.value);
-  var vt=document.getElementById('cbVolTol');
-  if(vt&&vt.value) opts.volTol=parseFloat(vt.value);
-  callJSON('compareCategories',opts);
+  showPortalLoading('Comparing','Computing quantity deltas...');
+  call('runCompare');
 }
-function receiveCompareResults(s){
+function receiveComparisonResults(s){
   var d;
-  try{d=JSON.parse(s);}catch(e){console.error('Compare parse error',e);return;}
+  try{d=JSON.parse(s);}catch(e){console.error('Comparison parse error',e);return;}
   if(d.error){hidePortal();showPortalError('Compare Error',d.error);return;}
-  hidePortal();
-  var mc=d.matchingCount||0, dc=d.discrepancyCount||0, oa=d.onlyACount||0;
-  compResults=d;compActive=true;
-  var stats=document.getElementById('crStats');
+  comparisonResults=d;
+  var tb=document.getElementById('compTableBody');
   var h='';
-  h+='<div class="cr-stat" onclick="highlightCompGroup(\'matching\')"><span class="cr-dot matching"></span><span class="cr-count">'+mc+'</span><span class="cr-label">Matching</span><span class="cr-note">will be stashed</span></div>';
-  h+='<div class="cr-stat" onclick="highlightCompGroup(\'discrepancy\')"><span class="cr-dot discrepancy"></span><span class="cr-count">'+dc+'</span><span class="cr-label">Discrepancies</span><span class="cr-note">will be flagged in '+X(d.catA||'')+' &gt; Discrepancy</span></div>';
-  if(oa>0){
-    h+='<div class="cr-stat"><span class="cr-dot only-a"></span><span class="cr-count">'+oa+'</span><span class="cr-label">Only in A</span><span class="cr-note">unchanged</span></div>';
+  for(var i=0;i<d.length;i++){
+    var r=d[i];
+    var dc=r.delta>0?'delta-pos':(r.delta<0?'delta-neg':'delta-zero');
+    var pctStr=Math.abs(r.pctChange)>999?'NEW':((r.pctChange>0?'+':'')+r.pctChange+'%');
+    h+='<tr><td>'+X(r.category)+'</td>';
+    h+='<td class="r">'+r.qtyA+' <span class="pct">'+X(r.unit)+'</span></td>';
+    h+='<td class="r">'+r.qtyB+' <span class="pct">'+X(r.unit)+'</span></td>';
+    h+='<td class="r '+dc+'">'+(r.delta>0?'+':'')+r.delta+'</td>';
+    h+='<td class="r '+dc+'">'+pctStr+'</td></tr>';
   }
-  stats.innerHTML=h;
-  var actions=document.getElementById('crActions');
-  var ah='';
-  ah+='<button class="cr-accept-btn" onclick="acceptCompare()">Accept &mdash; Stash '+mc+' + Flag '+dc+'</button>';
-  if(dc>0){ah+='<button class="cr-commit-btn" onclick="commitCompareEntities()">Stash '+mc+' + Commit '+dc+'</button>';}
-  ah+='<button class="cr-cancel-btn" onclick="clearCompare()">Cancel</button>';
-  actions.innerHTML=ah;
-  document.getElementById('compareResults').classList.add('active');
-  document.getElementById('compareBar').classList.remove('active');
+  tb.innerHTML=h;
+  document.getElementById('compResults').classList.add('active');
+  updatePortalProgress(50,'Computing visual diff...');
 }
-function highlightCompGroup(group){
-  if(!compResults)return;
-  var ids=[];
-  if(group==='matching')ids=compResults.matchingEids;
-  else if(group==='discrepancy')ids=compResults.discrepancyEids;
-  if(ids&&ids.length)call('highlightCompareGroup',ids.join(','));
+function receiveDiffResults(s){
+  var d;
+  try{d=JSON.parse(s);}catch(e){console.error('Diff parse error',e);return;}
+  diffComputed=true;
+  diffActive=d.diffActive;
+  updateDiffToggle();
 }
-function clearCompare(){
-  compSelA=null;compSelB=null;compResults=null;compActive=false;
-  document.getElementById('compareBar').classList.remove('active');
-  document.getElementById('compareResults').classList.remove('active');
-  call('clearCompareHighlights');
-  renderSplitPanels();
+function setDiffToggle(isOn){
+  diffActive=isOn;
+  updateDiffToggle();
+}
+function updateDiffToggle(){
+  var el=document.getElementById('mvDiffToggle');
+  if(!el)return;
+  if(diffComputed){
+    el.style.display='inline-flex';
+    el.classList.toggle('active',diffActive);
+    el.textContent=diffActive?'Diff ON':'Diff';
+  } else {
+    el.style.display='none';
+  }
+}
+function toggleDiff(){
+  if(!diffComputed)return;
+  call('toggleDiff');
+}
+function closeCompResults(){
+  document.getElementById('compResults').classList.remove('active');
 }
 function clearCompareUI(){
-  compSelA=null;compSelB=null;compResults=null;compActive=false;
-  document.getElementById('compareBar').classList.remove('active');
-  document.getElementById('compareResults').classList.remove('active');
-  renderSplitPanels();
-}
-function acceptCompare(){
-  var mc=compResults?compResults.matchingCount||0:0;
-  var dc=compResults?compResults.discrepancyCount||0:0;
-  showPortalConfirm('Accept Comparison','Stash '+mc+' matching + Flag '+dc+' discrepancies',function(){
-    call('acceptCompare');
-  });
-}
-function receiveAcceptResult(s){
-  var d;
-  try{d=JSON.parse(s);}catch(e){console.error('Accept parse error',e);return;}
-  if(d.error){hidePortal();showPortalError('Accept Error',d.error);return;}
-  updatePortalProgress(100,(d.stashed||0)+' stashed, '+(d.flagged||0)+' flagged');
-  setTimeout(function(){hidePortal();clearCompareUI();},800);
-  /* Toast: show result in compare bar briefly */
-  setTimeout(function(){
-    var bar=document.getElementById('compareBar');
-    var sel=document.getElementById('cbSel');
-    if(bar&&sel){
-      sel.innerHTML='<span style="color:#a6e3a1">'+(d.stashed||0)+' stashed, '+(d.flagged||0)+' flagged as discrepancies</span>';
-      bar.classList.add('active');
-      setTimeout(function(){bar.classList.remove('active');},4000);
-    }
-  },900);
+  comparisonResults=null;diffActive=false;diffComputed=false;
+  document.getElementById('compResults').classList.remove('active');
+  updateDiffToggle();
 }
 function recallFromVault(){call('recallFromVault');}
 function receiveRecallResult(s){
@@ -3085,13 +3035,6 @@ function commitCategory(cat){
     call('commitToMain',cat);
   });
 }
-function commitCompareEntities(){
-  var mc=compResults?compResults.matchingCount||0:0;
-  var dc=compResults?compResults.discrepancyCount||0:0;
-  showPortalConfirm('Stash + Commit','Stash '+mc+' matching + Commit '+dc+' discrepancies to Model A',function(){
-    call('commitCompareEntities');
-  });
-}
 function receiveCommitResult(s){
   var d;
   try{d=JSON.parse(s);}catch(e){console.error('Commit parse error',e);return;}
@@ -3100,19 +3043,7 @@ function receiveCommitResult(s){
   if(d.stashed)msg+=d.stashed+' stashed';
   if(d.committed)msg+=(msg?', ':'')+d.committed+' committed';
   updatePortalProgress(100,msg||'Complete!');
-  setTimeout(function(){hidePortal();clearCompareUI();},800);
-  setTimeout(function(){
-    var bar=document.getElementById('compareBar');
-    var sel=document.getElementById('cbSel');
-    if(bar&&sel){
-      var tm='';
-      if(d.stashed)tm+=d.stashed+' stashed';
-      if(d.committed)tm+=(tm?', ':'')+d.committed+' committed to '+(d.category||'Model A');
-      sel.innerHTML='<span style="color:#a6e3a1">'+tm+'</span>';
-      bar.classList.add('active');
-      setTimeout(function(){bar.classList.remove('active');},4000);
-    }
-  },900);
+  setTimeout(function(){hidePortal();},800);
 }
 /* Split divider drag */
 (function(){

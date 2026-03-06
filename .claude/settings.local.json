@@ -7,7 +7,10 @@
       "Bash(git push:*)",
       "Bash(python:*)",
       "Bash(python3:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(ruby:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }

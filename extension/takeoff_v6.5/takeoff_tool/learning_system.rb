@@ -171,6 +171,47 @@ module TakeoffTool
     end
 
     # ═══════════════════════════════════════════════════════════
+    # Capture from geometry matching — called per accepted group
+    # ═══════════════════════════════════════════════════════════
+
+    def self.capture_geometry_match(entity_ids, to_category, to_subcategory, scan_results)
+      load_rules unless @rules
+      return if to_category.nil? || to_category.empty?
+
+      entity_data = scan_results.find { |r| entity_ids.include?(r[:entity_id]) }
+      return unless entity_data
+
+      display_name = entity_data[:display_name] || ''
+      definition_name = entity_data[:definition_name] || ''
+      keyword = extract_keyword(display_name, definition_name)
+      return if keyword.nil? || keyword.empty?
+
+      existing = @rules.find { |r| r['keyword'] == keyword && r['to_category'] == to_category }
+      if existing
+        existing['times_applied'] = (existing['times_applied'] || 1) + 1
+        existing['last_applied'] = Time.now.strftime('%Y-%m-%d')
+        puts "LearningSystem: Updated geometry rule '#{keyword}' -> '#{to_category}' (#{existing['times_applied']}x)"
+      else
+        @rules << {
+          'keyword' => keyword,
+          'material' => (entity_data[:material] || '').to_s,
+          'ifc_type' => (entity_data[:ifc_type] || '').to_s,
+          'source' => 'geometry_match',
+          'from_category' => ((entity_data[:parsed] && entity_data[:parsed][:auto_category]) || 'Uncategorized').to_s,
+          'to_category' => to_category.to_s,
+          'to_subcategory' => (to_subcategory || '').to_s,
+          'to_cost_code' => '',
+          'times_applied' => 1,
+          'created' => Time.now.strftime('%Y-%m-%d'),
+          'last_applied' => Time.now.strftime('%Y-%m-%d')
+        }
+        puts "LearningSystem: New geometry rule '#{keyword}' -> '#{to_category}'"
+      end
+
+      save_rules
+    end
+
+    # ═══════════════════════════════════════════════════════════
     # Management API
     # ═══════════════════════════════════════════════════════════
 

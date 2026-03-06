@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Change Report</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:12px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:20px;overflow-y:auto}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:#181825}
+::-webkit-scrollbar-thumb{background:#45475a;border-radius:4px}
+
+h1{font-size:18px;font-weight:700;color:#cba6f7;margin-bottom:4px}
+.subtitle{font-size:12px;color:#6c7086;margin-bottom:20px}
+
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.card{background:#181825;border:1px solid #313244;border-radius:8px;padding:12px;text-align:center}
+.card-value{font-size:24px;font-weight:700;margin-bottom:2px}
+.card-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#a6adc8}
+.card-matched .card-value{color:#a6adc8}
+.card-added .card-value{color:#89b4fa}
+.card-removed .card-value{color:#f38ba8}
+.card-modified .card-value{color:#f9e2af}
+
+.table-wrap{background:#181825;border:1px solid #313244;border-radius:8px;overflow:hidden;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 10px;color:#a6adc8;border-bottom:1px solid #313244;font-size:11px;font-weight:600;background:#11111b}
+th.r{text-align:right}
+td{padding:7px 10px;border-bottom:1px solid #1e1e2e;font-size:11px}
+td.r{text-align:right;font-variant-numeric:tabular-nums}
+tr:hover{background:#1a1a2e}
+
+tr.status-added td.delta-col,tr.status-added td.pct-col{color:#89b4fa}
+tr.status-removed td.delta-col,tr.status-removed td.pct-col{color:#f38ba8}
+tr.status-modified td.delta-col,tr.status-modified td.pct-col{color:#f9e2af}
+tr.status-matched td.delta-col,tr.status-matched td.pct-col{color:#6c7086}
+
+tr.status-added td:first-child{border-left:3px solid #89b4fa}
+tr.status-removed td:first-child{border-left:3px solid #f38ba8}
+tr.status-modified td:first-child{border-left:3px solid #f9e2af}
+tr.status-matched td:first-child{border-left:3px solid transparent}
+
+.footer{padding:12px;background:#181825;border:1px solid #313244;border-radius:8px;font-size:11px;color:#585b70;display:flex;justify-content:space-between}
+.loading{text-align:center;padding:40px;color:#6c7086;font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="content" style="display:none">
+  <h1>Change Report</h1>
+  <div class="subtitle" id="reportSubtitle"></div>
+
+  <div class="summary">
+    <div class="card card-matched">
+      <div class="card-value" id="countMatched">0</div>
+      <div class="card-label">Matched</div>
+    </div>
+    <div class="card card-added">
+      <div class="card-value" id="countAdded">0</div>
+      <div class="card-label">Added</div>
+    </div>
+    <div class="card card-removed">
+      <div class="card-value" id="countRemoved">0</div>
+      <div class="card-label">Removed</div>
+    </div>
+    <div class="card card-modified">
+      <div class="card-value" id="countModified">0</div>
+      <div class="card-label">Modified</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th class="r">A Count</th>
+          <th class="r">A Qty</th>
+          <th class="r">B Count</th>
+          <th class="r">B Qty</th>
+          <th class="r">Delta</th>
+          <th class="r">%</th>
+        </tr>
+      </thead>
+      <tbody id="reportBody"></tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span id="footerModels"></span>
+    <span id="footerTimestamp"></span>
+  </div>
+</div>
+
+<div class="loading" id="loadingMsg">Loading report data...</div>
+
+<script>
+function renderReport(data){
+  if(!data||!data.rows)return;
+
+  var modelA=data.modelA||'Model A';
+  var modelB=data.modelB||'Model B';
+  document.getElementById('reportSubtitle').textContent=modelA+' vs '+modelB;
+
+  var matched=0,added=0,removed=0,modified=0;
+  var rows=data.rows;
+
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i];
+    if(r.countA===0&&r.countB>0){r._status='added';added++;}
+    else if(r.countB===0&&r.countA>0){r._status='removed';removed++;}
+    else if(r.delta!==0){r._status='modified';modified++;}
+    else{r._status='matched';matched++;}
+  }
+
+  document.getElementById('countMatched').textContent=matched;
+  document.getElementById('countAdded').textContent=added;
+  document.getElementById('countRemoved').textContent=removed;
+  document.getElementById('countModified').textContent=modified;
+
+  var html='';
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i];
+    var pctStr=Math.abs(r.pctChange)>999?'NEW':((r.pctChange>0?'+':'')+r.pctChange+'%');
+    var deltaStr=(r.delta>0?'+':'')+r.delta+' '+esc(r.unit);
+
+    html+='<tr class="status-'+r._status+'">';
+    html+='<td>'+esc(r.category)+'</td>';
+    html+='<td class="r">'+r.countA+'</td>';
+    html+='<td class="r">'+r.qtyA+' <span style="opacity:0.6;font-size:10px">'+esc(r.unit)+'</span></td>';
+    html+='<td class="r">'+r.countB+'</td>';
+    html+='<td class="r">'+r.qtyB+' <span style="opacity:0.6;font-size:10px">'+esc(r.unit)+'</span></td>';
+    html+='<td class="r delta-col">'+deltaStr+'</td>';
+    html+='<td class="r pct-col">'+pctStr+'</td>';
+    html+='</tr>';
+  }
+  document.getElementById('reportBody').innerHTML=html;
+
+  document.getElementById('footerModels').textContent=modelA+' vs '+modelB;
+  document.getElementById('footerTimestamp').textContent='Generated '+(data.timestamp||'');
+
+  document.getElementById('content').style.display='';
+  document.getElementById('loadingMsg').style.display='none';
+}
+
+function esc(s){
+  if(!s)return'';
+  var d=document.createElement('div');
+  d.textContent=s;
+  return d.innerHTML;
+}
+
+var _pollCount=0;
+var _pollTimer=setInterval(function(){
+  _pollCount++;
+  if(window.REPORT_DATA){
+    clearInterval(_pollTimer);
+    renderReport(window.REPORT_DATA);
+  }else if(_pollCount>100){
+    clearInterval(_pollTimer);
+    document.getElementById('loadingMsg').textContent='Error: No report data received.';
+  }
+},50);
+</script>
+
+</body>
+</html>

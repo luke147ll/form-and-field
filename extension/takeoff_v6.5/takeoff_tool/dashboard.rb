@@ -748,27 +748,38 @@ module TakeoffTool
         TakeoffTool.rescan_model_b
       end
 
-      # ═══ CATEGORY COMPARE ═══
+      # ═══ MODEL COMPARISON (Quantity Delta + Visual Diff) ═══
 
-      @dialog.add_action_callback('compareCategories') do |_ctx, json_str|
+      @dialog.add_action_callback('runCompare') do |_ctx|
         begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          cat_a = data['catA'].to_s.strip
-          cat_b = data['catB'].to_s.strip
-          next if cat_a.empty? || cat_b.empty?
-          opts = {}
-          opts['cluster'] = data['cluster'] unless data['cluster'].nil?
-          opts['spatialTol'] = data['spatialTol'].to_f if data['spatialTol']
-          opts['volTol'] = data['volTol'].to_f / 100.0 if data['volTol']
-          TakeoffTool.compare_categories(cat_a, cat_b, opts)
-          TakeoffTool.apply_compare_highlights
-          send_compare_results
+          # Part 1: synchronous quantity delta
+          TakeoffTool.compute_quantity_delta
+          send_comparison_results
+          # Part 2: async visual diff (batched via UI.start_timer)
+          TakeoffTool.compute_visual_diff
         rescue => e
-          puts "Dashboard: compareCategories error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          puts "Dashboard: runCompare error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          require 'json'
           err = { 'error' => e.message }
           ejs = JSON.generate(err).gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
-          @dialog.execute_script("receiveCompareResults('#{ejs}')")
+          @dialog.execute_script("receiveComparisonResults('#{ejs}')")
+        end
+      end
+
+      @dialog.add_action_callback('toggleDiff') do |_ctx|
+        begin
+          is_on = TakeoffTool.toggle_diff
+          @dialog.execute_script("setDiffToggle(#{is_on})")
+        rescue => e
+          puts "Dashboard: toggleDiff error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('showChangeReport') do |_ctx|
+        begin
+          TakeoffTool.show_change_report
+        rescue => e
+          puts "Dashboard: showChangeReport error: #{e.message}"
         end
       end
 
@@ -1201,14 +1212,25 @@ module TakeoffTool
       @dialog.execute_script("receiveAssemblies('#{esc}')")
     end
 
-    def self.send_compare_results
+    def self.send_comparison_results
       return unless @dialog
       require 'json'
-      data = TakeoffTool.serialize_compare_results
+      data = TakeoffTool.serialize_comparison_results
       return unless data
       js = JSON.generate(data)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveCompareResults('#{esc}')")
+      @dialog.execute_script("receiveComparisonResults('#{esc}')")
+    end
+
+    def self.send_diff_results
+      return unless @dialog
+      require 'json'
+      diff = TakeoffTool.diff_data
+      total = diff ? diff.length : 0
+      payload = { 'totalEntities' => total, 'diffActive' => TakeoffTool.diff_active? }
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveDiffResults('#{esc}')")
     end
 
     def self.scroll_to_entity(eid)

@@ -1688,5 +1688,57 @@
     "times_applied": 2,
     "created": "2026-03-05",
     "last_applied": "2026-03-05"
+  },
+  {
+    "keyword": "Floor, Concrete - 6\"",
+    "material": "Concrete - Cast-in-Place Concrete",
+    "ifc_type": "IfcCovering",
+    "size_pattern": "6",
+    "from_category": "Hearths/Mantles",
+    "to_category": "Slabs",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-05",
+    "last_applied": "2026-03-05"
+  },
+  {
+    "keyword": "Floor, 12\" CONC SLAB",
+    "material": "Concrete, Cast-in-Place gray",
+    "ifc_type": "IfcSlab",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Footings and Foundation",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-05",
+    "last_applied": "2026-03-05"
+  },
+  {
+    "keyword": "W-Wide Flange-Column, W14X38",
+    "material": "Steel ASTM A992",
+    "ifc_type": "IfcColumn",
+    "size_pattern": "W14X38",
+    "from_category": "Uncategorized",
+    "to_category": "Structural Steel",
+    "to_subcategory": "W",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-05",
+    "last_applied": "2026-03-05"
+  },
+  {
+    "keyword": "Concrete-Rectangular Beam, 8 x 18 LINTEL",
+    "material": "Concrete, Cast-in-Place gray",
+    "ifc_type": "IfcBeam",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "Fireplace",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-05",
+    "last_applied": "2026-03-05"
   }
 ]

@@ -228,6 +228,10 @@ module TakeoffTool
       # Instance count
       inst_count = defn ? defn.instances.length : 1
 
+      # Model source (multiverse)
+      ms_raw = (e.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
+      model_label = ms_raw == 'model_a' ? 'A' : 'B'
+
       {
         name: clean_name(iname || dname),
         definition: dname,
@@ -235,7 +239,8 @@ module TakeoffTool
         tag: tag, ifc: ifc, material: mat,
         w: w, h: h_val, d: d,
         is_solid: is_solid, volume: vol,
-        instance_count: inst_count
+        instance_count: inst_count,
+        model_source: model_label
       }
     end
 
@@ -638,10 +643,17 @@ module TakeoffTool
         defn_line = "<div class=\"def-name-sub\">Definition: #{h(i[:definition])}</div>"
       end
 
+      model_row = ''
+      if TakeoffTool.active_mv_view
+        mc = i[:model_source] == 'A' ? '#a6e3a1' : '#89b4fa'
+        model_row = "<div class=\"row\"><span class=\"label\">Model</span><span class=\"value\" style=\"color:#{mc};font-weight:700\">Model #{i[:model_source]}</span></div>"
+      end
+
       <<~HTML
         <h1>Identify</h1>
         <div class="entity-name">#{h(i[:name])}</div>
         #{defn_line}
+        #{model_row}
         <div class="row"><span class="label">Category</span><span class="value #{cat_class}">#{h(cat_text)}</span></div>
         #{sub_row}
         <div class="row"><span class="label">Layer/Tag</span><span class="value">#{h(i[:tag])}</span></div>
@@ -668,6 +680,20 @@ module TakeoffTool
     def self.build_multi_body(entities)
       count = entities.length
 
+      # Model source summary (multiverse)
+      model_summary = ''
+      if TakeoffTool.active_mv_view
+        a_count = 0; b_count = 0
+        entities.each do |e|
+          ms = (e.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
+          ms == 'model_a' ? a_count += 1 : b_count += 1
+        end
+        parts = []
+        parts << "<span style=\"color:#a6e3a1;font-weight:600\">#{a_count} Model A</span>" if a_count > 0
+        parts << "<span style=\"color:#89b4fa;font-weight:600\">#{b_count} Model B</span>" if b_count > 0
+        model_summary = "<div style=\"font-size:11px;color:#a6adc8;margin-bottom:10px\">#{parts.join(' &bull; ')}</div>"
+      end
+
       # Unique definitions with counts
       def_counts = Hash.new(0)
       entities.each do |e|
@@ -683,6 +709,7 @@ module TakeoffTool
 
       <<~HTML
         <h1>Identify &mdash; #{count} entities selected</h1>
+        #{model_summary}
         <div class="sect-label">Definitions</div>
         <ul class="def-list">
           #{list_items}

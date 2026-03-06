@@ -330,34 +330,7 @@ module TakeoffTool
       Dashboard.scan_log_msg("Rescanning Model B entities...")
     end
 
-    # ── DEBUG: Diagnose what got tagged ──
-    tagged_b = 0
-    untagged = 0
-    model.definitions.each do |defn|
-      defn.instances.each do |inst|
-        ms = inst.get_attribute('FormAndField', 'model_source')
-        if ms && ms != 'model_a'
-          tagged_b += 1
-        else
-          untagged += 1
-        end
-      end
-    end
-    puts "[FF DEBUG] After tagging: #{tagged_b} Model B instances, #{untagged} untagged/Model A"
-    puts "[FF DEBUG] Total definitions: #{model.definitions.length}"
-
-    # Check Revit wrapper contents
-    model.definitions.each do |defn|
-      next unless defn.name =~ /Cole|rvt/i
-      puts "[FF DEBUG] Revit wrapper '#{defn.name}': #{defn.entities.length} entities, #{defn.instances.length} instances"
-      defn.entities.each do |e|
-        if e.is_a?(Sketchup::ComponentInstance)
-          ms = e.get_attribute('FormAndField', 'model_source')
-          puts "[FF DEBUG]   Child: '#{e.definition.name}' model_source=#{ms.inspect} layer=#{e.layer.name}"
-        end
-      end
-    end
-    # ── END DEBUG ──
+    # (debug logging removed — was iterating all definitions)
 
     # ── Step 1: Remove old Model B results ──
     @scan_results.reject! do |r|
@@ -383,6 +356,24 @@ module TakeoffTool
     @scan_results = @scan_results + b_results
     @scan_results.sort_by! { |r| [r[:tag] || 'zzz', r[:display_name] || ''] }
 
+    # ── Geometry matching (Model A reference → Model B reclassification) ──
+    if @category_assignments && @category_assignments.any?
+      Dashboard.scan_log_msg("Matching Model B geometry against Model A reference...")
+      puts "Multiverse: Building geometry reference from #{@category_assignments.keys.length} assignments"
+      GeometryMatcher.build_reference_library(@scan_results, @category_assignments, @entity_registry)
+      @pending_geometry_matches = GeometryMatcher.match_model_b(
+        b_results, @scan_results, @category_assignments, @entity_registry
+      )
+      if @pending_geometry_matches
+        puts "Multiverse: Geometry match results — total=#{@pending_geometry_matches[:total_matched]} auto=#{@pending_geometry_matches[:auto_count]} probable=#{@pending_geometry_matches[:probable_count]} low=#{@pending_geometry_matches[:low_count]} no_match=#{@pending_geometry_matches[:no_match_count]} skipped=#{@pending_geometry_matches[:skipped_count]}"
+        if @pending_geometry_matches[:auto_count] > 0
+          Dashboard.scan_log_msg("Geometry: #{@pending_geometry_matches[:auto_count]} auto, #{@pending_geometry_matches[:probable_count]} probable")
+        end
+      end
+    else
+      puts "Multiverse: Skipping geometry matching — no category assignments"
+    end
+
     # ── Step 3: Load categories + save ──
     load_saved_assignments
     load_master_categories
@@ -400,6 +391,11 @@ module TakeoffTool
     if Dashboard.visible?
       Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
       Dashboard.send_multiverse_data
+    end
+
+    # ── Show alignment review if geometry matches found ──
+    if @pending_geometry_matches && @pending_geometry_matches[:total_matched] > 0
+      GeometryMatcher.show_alignment_review(@pending_geometry_matches)
     end
   end
 
@@ -577,36 +573,7 @@ module TakeoffTool
     end
   end
 
-  # ═══ CATEGORY COMPARE — Bounding Box Intersection ═══
-
-  COMPARE_OVERLAP_THRESHOLD = 0.50   # 50% BB overlap = likely same entity
-  COMPARE_VOLUME_TOLERANCE  = 0.20   # 20% volume difference = same size
-  COMPARE_CLUSTER_SPATIAL_TOL = 0.5  # inches gap tolerance for proximity clustering
-  COMPARE_CLUSTER_VOL_TOL     = 0.05 # 5% volume tolerance for cluster mode
-
-  # Union-Find for connected component grouping (clustering)
-  class UnionFind
-    def initialize(n)
-      @parent = (0...n).to_a
-      @rank = Array.new(n, 0)
-    end
-    def find(x)
-      @parent[x] = @parent[@parent[x]] while @parent[x] != x
-      @parent[x]
-    end
-    def union(a, b)
-      ra, rb = find(a), find(b)
-      return if ra == rb
-      ra, rb = rb, ra if @rank[ra] < @rank[rb]
-      @parent[rb] = ra
-      @rank[ra] += 1 if @rank[ra] == @rank[rb]
-    end
-    def components
-      groups = Hash.new { |h, k| h[k] = [] }
-      @parent.each_index { |i| groups[find(i)] << i }
-      groups.values
-    end
-  end
+  # ═══ MODEL COMPARISON — Quantity Delta + Visual Diff ═══
 
   # Get world-space axis-aligned bounding box for an entity
   def self.get_world_bounds(ent)
@@ -810,326 +777,225 @@ module TakeoffTool
     inter_vol / smaller
   end
 
-  # Are two BBs either overlapping or within tolerance on all 3 axes?
-  def self.bb_adjacent?(a, b, tolerance)
-    3.times.all? do |i|
-      gap = [0, [a[:min][i], b[:min][i]].max - [a[:max][i], b[:max][i]].min].max
-      gap <= tolerance
+  # ═══ PART 1 — QUANTITY DELTA ═══
+
+  # Extract the primary quantity from a scan result based on measurement type.
+  def self.primary_quantity(r, mt)
+    case mt
+    when 'ea', 'ea_bf', 'ea_sf' then 1.0
+    when 'lf'          then (r[:linear_ft] || 0.0).to_f
+    when 'sf', 'sf_cy', 'sf_sheets' then (r[:area_sf] || 0.0).to_f
+    when 'cy'          then (r[:volume_ft3] || 0.0).to_f / 27.0
+    when 'volume'      then (r[:volume_ft3] || 0.0).to_f
+    when 'bf'          then (r[:volume_bf] || 0.0).to_f
+    else 1.0
     end
   end
 
-  # Spatial hash grid for O(N) adjacency queries (N > 100 only)
-  def self.build_spatial_hash(items)
-    return nil if items.length <= 100
-    cell_size = 1.0
-    items.each do |it|
-      b = it[:bounds]
-      3.times { |i| d = b[:max][i] - b[:min][i]; cell_size = d if d > cell_size }
+  # Display label for a measurement type
+  def self.unit_label(mt)
+    case mt
+    when 'ea', 'ea_bf', 'ea_sf' then 'EA'
+    when 'lf'          then 'LF'
+    when 'sf'          then 'SF'
+    when 'sf_cy'       then 'CY'
+    when 'sf_sheets'   then 'SF'
+    when 'cy'          then 'CY'
+    when 'volume'      then 'CF'
+    when 'bf'          then 'BF'
+    else 'EA'
     end
-    cell_size = [cell_size, 1.0].max
-    grid = Hash.new { |h, k| h[k] = [] }
-    items.each_with_index do |it, idx|
-      b = it[:bounds]
-      x0, x1 = (b[:min][0] / cell_size).floor, (b[:max][0] / cell_size).floor
-      y0, y1 = (b[:min][1] / cell_size).floor, (b[:max][1] / cell_size).floor
-      z0, z1 = (b[:min][2] / cell_size).floor, (b[:max][2] / cell_size).floor
-      (x0..x1).each { |cx| (y0..y1).each { |cy| (z0..z1).each { |cz| grid[[cx, cy, cz]] << idx } } }
-    end
-    grid
   end
 
-  # Cluster items by spatial proximity using union-find connected components.
-  # Returns array of cluster hashes: {members, combined_bb, total_real_volume, member_eids}
-  def self.cluster_entities_by_proximity(items, tolerance = COMPARE_CLUSTER_SPATIAL_TOL)
-    return [] if items.empty?
-    n = items.length
-    return [build_cluster(items, [0])] if n == 1
-
-    uf = UnionFind.new(n)
-    grid = build_spatial_hash(items)
-
-    if grid
-      checked = {}
-      grid.each_value do |indices|
-        indices.each do |i|
-          indices.each do |j|
-            next if i >= j
-            key = (i << 20) | j
-            next if checked[key]
-            checked[key] = true
-            uf.union(i, j) if bb_adjacent?(items[i][:bounds], items[j][:bounds], tolerance)
-          end
-        end
-      end
-    else
-      (0...n).each do |i|
-        ((i + 1)...n).each do |j|
-          uf.union(i, j) if bb_adjacent?(items[i][:bounds], items[j][:bounds], tolerance)
-        end
-      end
-    end
-
-    uf.components.map { |indices| build_cluster(items, indices) }
-  end
-
-  # Build a cluster hash from a set of item indices
-  def self.build_cluster(items, indices)
-    members = indices.map { |i| items[i] }
-    c_min = [Float::INFINITY] * 3
-    c_max = [-Float::INFINITY] * 3
-    total_vol = 0.0
-    members.each do |m|
-      b = m[:bounds]
-      3.times do |ax|
-        c_min[ax] = b[:min][ax] if b[:min][ax] < c_min[ax]
-        c_max[ax] = b[:max][ax] if b[:max][ax] > c_max[ax]
-      end
-      total_vol += (m[:r][:volume_ft3] || 0.0)
-    end
-    bb_vol = (c_max[0] - c_min[0]) * (c_max[1] - c_min[1]) * (c_max[2] - c_min[2])
-    {
-      members: members,
-      combined_bb: {
-        min: c_min, max: c_max,
-        center: [(c_min[0] + c_max[0]) / 2.0, (c_min[1] + c_max[1]) / 2.0, (c_min[2] + c_max[2]) / 2.0],
-        volume: [bb_vol, 0.001].max
-      },
-      total_real_volume: total_vol,
-      member_eids: members.map { |m| m[:eid] }
-    }
-  end
-
-  # Compare entities in cat_a (Model A) against cat_b (Model B) by BB intersection.
-  # When opts['cluster'] is true (default), merges touching/overlapping entities into
-  # clusters before comparing — so a group of small footings can match one large footing.
-  # Results: matching, discrepancies (only_b + modified), only_a (unchanged)
-  def self.compare_categories(cat_a, cat_b, opts = {})
+  # Compute quantity deltas for ALL categories across Model A and Model B.
+  # Synchronous — typically <50ms. Stores results in @comparison_results.
+  def self.compute_quantity_delta
     sr = @scan_results || []
     ca = @category_assignments || {}
     reg = @entity_registry || {}
 
-    puts "[FF Compare] Starting: A='#{cat_a}' vs B='#{cat_b}'"
-    puts "[FF Compare] Total scan results: #{sr.length}, registry: #{reg.length}"
+    accum = Hash.new { |h, k| h[k] = { a_qty: 0.0, a_count: 0, b_qty: 0.0, b_count: 0, mt: nil } }
 
-    # Collect entities per model+category with world-space bounding boxes
-    a_items = []; b_items = []
     sr.each do |r|
       e = reg[r[:entity_id]]
       next unless e && e.valid?
       cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+      next if cat == '_IGNORE'
       ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
 
-      bounds = get_world_bounds(e)
-      next unless bounds && bounds[:volume] > 0
+      mt = r[:parsed][:measurement_type] || Parser.measurement_for(cat)
+      mt_ovr = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
+      mt = mt_ovr if mt_ovr && !mt_ovr.empty?
+      accum[cat][:mt] ||= mt
 
-      item = { r: r, e: e, eid: r[:entity_id], bounds: bounds,
-               name: r[:display_name] || r[:definition_name] || '' }
-
-      if ms == 'model_a' && cat == cat_a
-        a_items << item
-      elsif ms != 'model_a' && cat == cat_b
-        b_items << item
+      qty = primary_quantity(r, mt)
+      if ms == 'model_a'
+        accum[cat][:a_qty] += qty; accum[cat][:a_count] += 1
+      else
+        accum[cat][:b_qty] += qty; accum[cat][:b_count] += 1
       end
     end
 
-    puts "[FF Compare] A: #{a_items.length} entities, B: #{b_items.length} entities"
+    @comparison_results = accum.map do |cat, d|
+      delta = d[:b_qty] - d[:a_qty]
+      pct = d[:a_qty] > 0 ? (delta / d[:a_qty] * 100.0) : (d[:b_qty] > 0 ? 999.9 : 0.0)
+      {
+        category: cat, unit: unit_label(d[:mt]),
+        qty_a: d[:a_qty].round(2), qty_b: d[:b_qty].round(2),
+        delta: delta.round(2),
+        pct_change: pct.finite? ? pct.round(1) : (delta > 0 ? 999.9 : -999.9),
+        count_a: d[:a_count], count_b: d[:b_count]
+      }
+    end.sort_by { |r| -r[:pct_change].abs }
 
-    # Debug: print first 3 entities from each side
-    a_items[0..2].each do |it|
-      puts "[FF Compare]   A #{it[:name]}: center=#{it[:bounds][:center].map{|v|v.round(1)}.inspect} vol=#{it[:bounds][:volume].round(1)}"
-    end
-    b_items[0..2].each do |it|
-      puts "[FF Compare]   B #{it[:name]}: center=#{it[:bounds][:center].map{|v|v.round(1)}.inspect} vol=#{it[:bounds][:volume].round(1)}"
-    end
-
-    # Parse comparison options
-    use_cluster = opts.fetch('cluster', true)
-    spatial_tol = opts.fetch('spatialTol', COMPARE_CLUSTER_SPATIAL_TOL).to_f
-    vol_tol = opts.fetch('volTol', use_cluster ? COMPARE_CLUSTER_VOL_TOL : COMPARE_VOLUME_TOLERANCE).to_f
-
-    matched = []
-    only_a  = []
-    only_b  = []
-    b_used  = {}
-
-    if use_cluster && (a_items.length > 1 || b_items.length > 1)
-      # ── Cluster-to-cluster comparison ──
-      puts "[FF Compare] Clustering: spatialTol=#{spatial_tol}\", volTol=#{(vol_tol * 100).round}%"
-      a_clusters = cluster_entities_by_proximity(a_items, spatial_tol)
-      b_clusters = cluster_entities_by_proximity(b_items, spatial_tol)
-      puts "[FF Compare] Clusters: A=#{a_clusters.length} (from #{a_items.length}), B=#{b_clusters.length} (from #{b_items.length})"
-
-      a_clusters.each do |ac|
-        best = nil
-        best_overlap = 0
-
-        b_clusters.each_with_index do |bc, bi|
-          next if b_used[bi]
-          next unless bb_overlap?(ac[:combined_bb], bc[:combined_bb])
-          ratio = bb_overlap_ratio(ac[:combined_bb], bc[:combined_bb])
-          if ratio > COMPARE_OVERLAP_THRESHOLD && ratio > best_overlap
-            best = { bc: bc, idx: bi, overlap: ratio }
-            best_overlap = ratio
-          end
-        end
-
-        if best
-          b_used[best[:idx]] = true
-          bc = best[:bc]
-
-          # Volume comparison using REAL summed volumes (not BB volumes)
-          vol_a = ac[:total_real_volume]
-          vol_b = bc[:total_real_volume]
-          max_vol = [vol_a, vol_b].max
-          vol_diff = max_vol > 0 ? (vol_a - vol_b).abs / max_vol : 0
-
-          status = vol_diff < vol_tol ? 'matching' : 'modified'
-          delta = status == 'modified' ? { vol_diff: vol_diff.round(3), overlap: best[:overlap].round(3),
-                    a_count: ac[:members].length, b_count: bc[:members].length } : {}
-
-          # Expand cluster match → individual eid pairs
-          a_eids = ac[:member_eids]
-          b_eids = bc[:member_eids]
-          [a_eids.length, b_eids.length].max.times do |i|
-            ae = a_eids[i]; be = b_eids[i]
-            if ae && be
-              matched << { a_eid: ae, b_eid: be, status: status, delta: delta }
-            elsif ae
-              only_a << ae
-            elsif be
-              only_b << be
-            end
-          end
-        else
-          only_a.concat(ac[:member_eids])
-        end
-      end
-
-      b_clusters.each_with_index { |bc, idx| only_b.concat(bc[:member_eids]) unless b_used[idx] }
-
-    else
-      # ── Original entity-to-entity comparison ──
-      a_items.each_with_index do |ai, a_idx|
-        best = nil
-        best_overlap = 0
-
-        b_items.each_with_index do |bi, bi_idx|
-          next if b_used[bi_idx]
-          next unless bb_overlap?(ai[:bounds], bi[:bounds])
-
-          ratio = bb_overlap_ratio(ai[:bounds], bi[:bounds])
-          if ratio > COMPARE_OVERLAP_THRESHOLD && ratio > best_overlap
-            best = { bi: bi, idx: bi_idx, overlap: ratio }
-            best_overlap = ratio
-          end
-        end
-
-        if best
-          b_used[best[:idx]] = true
-          bi = best[:bi]
-
-          vol_a = ai[:bounds][:volume]
-          vol_b = bi[:bounds][:volume]
-          max_vol = [vol_a, vol_b].max
-          vol_diff = max_vol > 0 ? (vol_a - vol_b).abs / max_vol : 0
-
-          if vol_diff < vol_tol
-            status = 'matching'
-            delta = {}
-          else
-            status = 'modified'
-            delta = { vol_diff: vol_diff.round(3), overlap: best[:overlap].round(3) }
-          end
-          matched << { a_eid: ai[:eid], b_eid: bi[:eid], status: status, delta: delta }
-        else
-          only_a << ai[:eid]
-        end
-
-        if (a_idx + 1) % 50 == 0
-          puts "[FF Compare] Processed #{a_idx + 1}/#{a_items.length}..."
-        end
-      end
-
-      b_items.each_with_index do |bi, idx|
-        only_b << bi[:eid] unless b_used[idx]
-      end
-    end
-
-    matching_n = matched.count { |m| m[:status] == 'matching' }
-    modified_n = matched.count { |m| m[:status] == 'modified' }
-    puts "[FF Compare] Results: #{matching_n} matching, #{modified_n} modified, #{only_a.length} only-A, #{only_b.length} only-B"
-
-    @compare_results = { catA: cat_a, catB: cat_b, matched: matched, onlyA: only_a, onlyB: only_b }
+    puts "[FF Compare] Quantity delta: #{@comparison_results.length} categories computed"
+    @comparison_results
   end
 
-  # Preview: highlight matching green, discrepancies red in viewport
-  def self.apply_compare_highlights
-    return unless @compare_results
+  # ═══ PART 2 — SEMI-TRANSPARENT OVERLAY DIFF ═══
+
+  DIFF_BATCH_SIZE = 50       # entities per async batch
+  DIFF_COLOR_A    = [166, 227, 161]  # green  #a6e3a1
+  DIFF_COLOR_B    = [137, 180, 250]  # blue   #89b4fa
+  DIFF_ALPHA      = 100              # out of 255 (~39% opacity)
+
+  # Start async overlay diff. Collects entities by model_source, creates
+  # 2 materials, then applies in batches of 50 via UI.start_timer(0.01).
+  def self.compute_visual_diff
+    sr = @scan_results || []
+    ca = @category_assignments || {}
+    reg = @entity_registry || {}
+
+    # Clean up any existing diff state first
+    remove_diff_highlights if @diff_active
+    @diff_orig_mats = nil
+
+    puts "[FF Diff] Starting overlay diff..."
+
+    # Collect entities by model source — no spatial analysis needed
+    work_queue = []
+    sr.each do |r|
+      e = reg[r[:entity_id]]
+      next unless e && e.valid?
+      cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+      next if cat == '_IGNORE'
+      ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+      work_queue << { eid: r[:entity_id], model: (ms == 'model_a') ? :a : :b }
+    end
+
+    puts "[FF Diff] Work queue: #{work_queue.length} entities"
+
+    create_diff_materials
+    @diff_orig_mats ||= {}
+
+    model = Sketchup.active_model
+    model.rendering_options['DisplayColorByLayer'] = false if model
+    model.start_operation('Apply Diff', true) if model
+
+    @diff_state = { queue: work_queue, idx: 0, applied: 0, t_start: Time.now }
+    diff_process_batch
+  end
+
+  # Async batch processor: applies materials to DIFF_BATCH_SIZE entities per tick.
+  def self.diff_process_batch
+    state = @diff_state
+    return unless state
+
+    reg = @entity_registry || {}
+    queue = state[:queue]
+    batch_end = [state[:idx] + DIFF_BATCH_SIZE, queue.length].min
+
+    (state[:idx]...batch_end).each do |i|
+      item = queue[i]
+      e = reg[item[:eid]]
+      next unless e && e.valid?
+      mat = @diff_materials[item[:model]]
+      next unless mat
+      @diff_orig_mats[item[:eid]] = e.material unless @diff_orig_mats.key?(item[:eid])
+      e.material = mat
+      state[:applied] += 1
+    end
+
+    state[:idx] = batch_end
+
+    if state[:idx] >= queue.length
+      finalize_diff(state)
+    else
+      pct = (state[:idx].to_f / queue.length * 100).round(0)
+      Dashboard.update_portal_progress(pct, "Applying diff #{state[:idx]}/#{queue.length}...")
+      UI.start_timer(0.01, false) { diff_process_batch }
+    end
+  end
+
+  # Called when all batches complete.
+  def self.finalize_diff(state)
+    model = Sketchup.active_model
+    model.commit_operation if model
+
+    @diff_data = state[:queue]  # Array of {eid:, model:}
+    @diff_state = nil
+    @diff_active = true
+    elapsed = Time.now - state[:t_start]
+
+    model.active_view.invalidate if model
+    puts "[FF Diff] Complete: #{state[:applied]} entities in #{elapsed.round(2)}s"
+
+    Dashboard.send_diff_results
+    Dashboard.portal_complete("Diff applied — #{state[:applied]} entities")
+  end
+
+  # Create 2 semi-transparent diff materials (green for A, blue for B).
+  def self.create_diff_materials
+    model = Sketchup.active_model
+    return unless model
+    @diff_materials = {}
+    { a: DIFF_COLOR_A, b: DIFF_COLOR_B }.each do |key, rgb|
+      name = "FF_Compare_#{key.to_s.upcase}"
+      mat = model.materials[name] || model.materials.add(name)
+      mat.color = Sketchup::Color.new(rgb[0], rgb[1], rgb[2])
+      mat.alpha = DIFF_ALPHA / 255.0
+      @diff_materials[key] = mat
+    end
+  end
+
+  # Re-apply diff materials from stored state (for toggle ON after OFF).
+  def self.apply_diff_highlights
+    return unless @diff_data && @diff_data.any?
     model = Sketchup.active_model
     return unless model
     reg = @entity_registry || {}
 
+    create_diff_materials unless @diff_materials
     model.rendering_options['DisplayColorByLayer'] = false
+    model.start_operation('Apply Diff', true)
 
-    model.start_operation('Compare Highlights', true)
-
-    # Green = matching (will be stashed)
-    mat_green_name = 'FF_Compare_Matching'
-    mat_green = model.materials[mat_green_name] || model.materials.add(mat_green_name)
-    mat_green.color = Sketchup::Color.new(166, 227, 161)
-    mat_green.alpha = 0.5
-
-    # Red = discrepancy (will be flagged)
-    mat_red_name = 'FF_Compare_Discrepancy'
-    mat_red = model.materials[mat_red_name] || model.materials.add(mat_red_name)
-    mat_red.color = Sketchup::Color.new(243, 139, 168)
-    mat_red.alpha = 0.7
-
-    @compare_orig_mats = {}
-    all_eids = []
-
-    # Matching pairs: paint both A and B copies green
-    @compare_results[:matched].each do |pair|
-      mat = (pair[:status] == 'matching') ? mat_green : mat_red
-      [pair[:a_eid], pair[:b_eid]].each do |eid|
-        e = reg[eid]
-        next unless e && e.valid?
-        @compare_orig_mats[eid] = e.material
-        e.material = mat
-        all_eids << eid
-      end
-    end
-
-    # Only in B: paint red (new in B = discrepancy)
-    @compare_results[:onlyB].each do |eid|
-      e = reg[eid]
+    @diff_orig_mats ||= {}
+    applied = 0
+    @diff_data.each do |item|
+      e = reg[item[:eid]]
       next unless e && e.valid?
-      @compare_orig_mats[eid] = e.material
-      e.material = mat_red
-      all_eids << eid
-    end
-
-    # Only in A: leave as-is but include in isolation set
-    @compare_results[:onlyA].each do |eid|
-      all_eids << eid if reg[eid] && reg[eid].valid?
+      mat = @diff_materials[item[:model]]
+      next unless mat
+      @diff_orig_mats[item[:eid]] = e.material unless @diff_orig_mats.key?(item[:eid])
+      e.material = mat
+      applied += 1
     end
 
     model.commit_operation
-
-    puts "[FF Compare] Highlighted #{all_eids.length} entities (#{@compare_orig_mats.length} tinted)"
-
-    Highlighter.isolate_entities(@scan_results, all_eids) if all_eids.any?
+    @diff_active = true
+    model.active_view.invalidate
+    puts "[FF Diff] Applied materials to #{applied} entities"
   end
 
-  # Restore original materials and show all entities
-  def self.clear_compare_highlights
+  # Remove diff materials, restoring original appearance.
+  def self.remove_diff_highlights
     model = Sketchup.active_model
     return unless model
     reg = @entity_registry || {}
 
-    if @compare_orig_mats && @compare_orig_mats.any?
-      model.start_operation('Clear Compare', true)
-      @compare_orig_mats.each do |eid, orig_mat|
+    if @diff_orig_mats && @diff_orig_mats.any?
+      model.start_operation('Remove Diff', true)
+      @diff_orig_mats.each do |eid, orig_mat|
         e = reg[eid]
         next unless e && e.valid?
         e.material = orig_mat
@@ -1137,36 +1003,104 @@ module TakeoffTool
       model.commit_operation
     end
 
-    @compare_orig_mats = nil
+    @diff_orig_mats = nil
+    @diff_active = false
 
     if active_mv_view == 'ab'
       model.rendering_options['DisplayColorByLayer'] = true
+    end
+    model.active_view.invalidate
+    puts "[FF Diff] Removed diff highlights"
+  end
+
+  # Toggle diff on/off without recomputing. Returns new active state.
+  def self.toggle_diff
+    if @diff_active
+      remove_diff_highlights
+    elsif @diff_data && @diff_data.any?
+      create_diff_materials unless @diff_materials
+      apply_diff_highlights
+    end
+    @diff_active
+  end
+
+  # ═══ CHANGE REPORT ═══
+
+  # Open a standalone HtmlDialog with the change report, injecting data.
+  def self.show_change_report
+    return unless @comparison_results
+
+    models = @multiverse_data && @multiverse_data['models']
+    model_a_name = models && models[0] ? models[0]['name'] : 'Model A'
+    model_b_name = models && models[1] ? models[1]['name'] : 'Model B'
+
+    report_data = {
+      'modelA' => model_a_name, 'modelB' => model_b_name,
+      'timestamp' => Time.now.strftime('%Y-%m-%d %H:%M'),
+      'rows' => serialize_comparison_results
+    }
+
+    require 'json'
+    json_str = JSON.generate(report_data)
+
+    dlg = UI::HtmlDialog.new(
+      dialog_title: "Form and Field — Change Report",
+      preferences_key: "FFChangeReport",
+      width: 800, height: 900, resizable: true
+    )
+    html_path = File.join(PLUGIN_DIR, 'ui', 'multiverse_change_report.html')
+    dlg.set_file(html_path)
+
+    # Inject data after short delay (set_file is async).
+    # The HTML also polls for window.REPORT_DATA as fallback.
+    UI.start_timer(0.3, false) do
+      if dlg.visible?
+        esc = json_str.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+        dlg.execute_script("window.REPORT_DATA = JSON.parse('#{esc}')")
+      end
+    end
+
+    dlg.show
+  end
+
+  # Clear all comparison state: remove diff highlights, reset data
+  def self.clear_compare_highlights
+    remove_diff_highlights if @diff_active
+    @diff_data = nil
+    @diff_materials = nil
+    @diff_state = nil
+    @comparison_results = nil
+    @compare_results = nil
+    @compare_orig_mats = nil
+
+    if active_mv_view == 'ab'
+      model = Sketchup.active_model
+      model.rendering_options['DisplayColorByLayer'] = true if model
     end
 
     Highlighter.show_all
   end
 
-  # Serialize compare results to a plain string-keyed hash for JSON transport
-  def self.serialize_compare_results
-    return nil unless @compare_results
-    r = @compare_results
-    matching     = r[:matched].select { |m| m[:status] == 'matching' }
-    modified     = r[:matched].select { |m| m[:status] == 'modified' }
-    disc_count   = modified.length + r[:onlyB].length
-    # Use string keys so JSON.generate produces exactly what JS expects
-    {
-      'catA' => r[:catA].to_s,
-      'catB' => r[:catB].to_s,
-      'matchingCount' => matching.length,
-      'discrepancyCount' => disc_count,
-      'modifiedCount' => modified.length,
-      'onlyACount' => r[:onlyA].length,
-      'onlyBCount' => r[:onlyB].length,
-      'matchingEids' => matching.flat_map { |m| [m[:a_eid], m[:b_eid]] },
-      'discrepancyEids' => modified.flat_map { |m| [m[:a_eid], m[:b_eid]] } + r[:onlyB],
-      'onlyAEids' => r[:onlyA],
-    }
+  # Serialize quantity delta results for JSON transport to dashboard
+  def self.serialize_comparison_results
+    return nil unless @comparison_results
+    @comparison_results.map do |r|
+      {
+        'category'  => r[:category],
+        'unit'      => r[:unit],
+        'qtyA'      => r[:qty_a],
+        'qtyB'      => r[:qty_b],
+        'delta'     => r[:delta],
+        'pctChange' => r[:pct_change],
+        'countA'    => r[:count_a],
+        'countB'    => r[:count_b]
+      }
+    end
   end
+
+  def self.diff_data;      @diff_data;      end
+  def self.diff_active?;   !!@diff_active;  end
+  def self.diff_computed?;  @diff_data && @diff_data.any?; end
 
   # ═══ ACCEPT COMPARE — Stash matching + Flag discrepancies ═══
 
