@@ -7,6 +7,10 @@ module TakeoffTool
     @preview_active = false
     @hp_observer = nil
     @sampler_active = false
+    @sample_state = nil
+    @hp_selected_eids = []
+
+    SAMPLE_BATCH_SIZE = 50
 
     # ─── Color Sampler Tool ───
     # One-shot pick tool: user clicks an entity, we grab its material color
@@ -114,6 +118,29 @@ module TakeoffTool
         clear_preview
       end
 
+      @dialog.add_action_callback('toggleEntityHighlight') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          add = data['add']
+          if add
+            highlight_single(eid)
+            @hp_selected_eids << eid unless @hp_selected_eids.include?(eid)
+          else
+            unhighlight_single(eid)
+            @hp_selected_eids.delete(eid)
+          end
+        rescue => e
+          puts "HyperParser: toggleEntityHighlight error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('clearHpSelection') do |_ctx|
+        clear_preview
+        @hp_selected_eids = []
+      end
+
       @dialog.add_action_callback('commitParse') do |_ctx, json_str|
         begin
           require 'json'
@@ -140,8 +167,7 @@ module TakeoffTool
         begin
           require 'json'
           filter_props = JSON.parse(json_str.to_s)
-          eids = parse_by_sample(filter_props)
-          send_sample_matches(eids)
+          find_similar_batched(filter_props)
         rescue => e
           puts "HyperParser: findSimilar error: #{e.message}"
         end
@@ -160,6 +186,20 @@ module TakeoffTool
 
       @dialog.add_action_callback('deactivateObjectSampler') do |_ctx|
         deactivate_object_sampler
+      end
+
+      @dialog.add_action_callback('commitSingle') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s.strip
+          subcat = data['subcategory'].to_s.strip
+          commit_parse([eid], cat, subcat)
+        rescue => e
+          puts "HyperParser: commitSingle error: #{e.message}"
+          send_commit_result(false, e.message)
+        end
       end
 
       @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
@@ -183,6 +223,7 @@ module TakeoffTool
 
       @dialog.set_on_closed { cleanup }
       @dialog.show
+      attach_sampler_observer  # Always listen for selection changes while HP is open
     end
 
     def self.close
@@ -363,6 +404,32 @@ module TakeoffTool
       m.commit_operation
     end
 
+    def self.highlight_single(eid)
+      m = Sketchup.active_model
+      return unless m
+      e = TakeoffTool.find_entity(eid)
+      return unless e && e.valid?
+      m.start_operation('HP Add HL', true)
+      @preview_active = true
+      bright = hp_mat(m, 'TO_HP_bright', [203, 166, 247], 0.9)
+      @orig_instance[eid] = e.material unless @orig_instance.key?(eid)
+      e.material = bright
+      m.commit_operation
+    end
+
+    def self.unhighlight_single(eid)
+      m = Sketchup.active_model
+      return unless m
+      e = TakeoffTool.find_entity(eid)
+      return unless e && e.valid?
+      m.start_operation('HP Rem HL', true)
+      if @orig_instance.key?(eid)
+        begin; e.material = @orig_instance.delete(eid); rescue; end
+      end
+      @preview_active = false if @orig_instance.empty? && @orig_faces.empty?
+      m.commit_operation
+    end
+
     # ─── Commit ───
 
     def self.commit_parse(eids, category, subcategory)
@@ -412,7 +479,7 @@ module TakeoffTool
 
       # Refresh dashboard if open
       if Dashboard.visible?
-        Dashboard.send_data(sr, ca, TakeoffTool.cost_code_assignments)
+        Dashboard.send_data(TakeoffTool.filtered_scan_results, ca, TakeoffTool.cost_code_assignments)
       end
 
       send_commit_result(true, "#{count} entities → #{category}")
@@ -435,7 +502,7 @@ module TakeoffTool
     # ─── Object Sampler (Ray Gun + SelectionObserver) ───
 
     def self.activate_object_sampler
-      attach_sampler_observer
+      # Observer is already attached from show() — just handle current selection or activate DrillBit
       sel = Sketchup.active_model&.selection
       if sel && sel.length == 1
         # Already have a selection — send properties immediately
@@ -446,18 +513,18 @@ module TakeoffTool
           send_sampled_properties(eid, props)
         end
       else
-        # No selection — activate DrillBit (Ray Gun) to help user pick
+        # No selection — activate DrillBit to help user pick nested entities
         DrillBit.activate
       end
     end
 
     def self.deactivate_object_sampler
-      detach_sampler_observer
+      # Observer stays attached for the lifetime of the dialog — only deactivate DrillBit
       DrillBit.deactivate if DrillBit.active?
     end
 
     def self.on_selection_changed(sel)
-      return unless @dialog && @dialog.visible? && @sampler_active
+      return unless @dialog && @dialog.visible?
       return unless sel && sel.length == 1
       entity = sel.first
       return unless entity && entity.valid?
@@ -496,7 +563,7 @@ module TakeoffTool
 
       # Scan result parsed metadata
       if eid
-        sr = TakeoffTool.scan_results
+        sr = TakeoffTool.filtered_scan_results
         if sr
           match = sr.find { |r| r[:entity_id] == eid }
           if match
@@ -582,11 +649,71 @@ module TakeoffTool
       matching_eids
     end
 
+    # ─── Batched Find Similar ───
+
+    def self.find_similar_batched(filter_props)
+      results = visible_scan_results
+      @sample_state = {
+        results: results,
+        filter: filter_props,
+        idx: 0,
+        matching_eids: [],
+        total: results.length,
+        cat_counts: {}
+      }
+      send_search_progress(0, results.length, 0, {})
+      process_sample_batch
+    end
+
+    def self.process_sample_batch
+      state = @sample_state
+      return unless state
+
+      batch_end = [state[:idx] + SAMPLE_BATCH_SIZE, state[:results].length].min
+
+      (state[:idx]...batch_end).each do |i|
+        r = state[:results][i]
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid?
+
+        entity_props = extract_entity_properties(e)
+        prop_hash = {}
+        entity_props.each { |pr| prop_hash[pr[:key]] = pr[:value] }
+
+        match = true
+        state[:filter].each do |key, value|
+          if prop_hash[key] != value
+            match = false
+            break
+          end
+        end
+
+        if match
+          state[:matching_eids] << r[:entity_id]
+          cat = TakeoffTool.category_assignments[r[:entity_id]] ||
+                (r[:parsed] && r[:parsed][:auto_category]) || 'Uncategorized'
+          state[:cat_counts][cat] = (state[:cat_counts][cat] || 0) + 1
+        end
+      end
+
+      state[:idx] = batch_end
+
+      if state[:idx] >= state[:results].length
+        send_sample_matches(state[:matching_eids])
+        @sample_state = nil
+      else
+        send_search_progress(state[:idx], state[:total], state[:matching_eids].length, state[:cat_counts])
+        UI.start_timer(0.01, false) { process_sample_batch }
+      end
+    end
+
     # ─── Cleanup ───
 
     def self.cleanup
       clear_preview
       detach_sampler_observer
+      @hp_selected_eids = []
+      @sample_state = nil
       @dialog = nil
     end
 
@@ -642,6 +769,14 @@ module TakeoffTool
     def self.send_similar_count(count)
       return unless @dialog && @dialog.visible?
       @dialog.execute_script("receiveSimilarCount(#{count})")
+    end
+
+    def self.send_search_progress(processed, total, matches, cat_counts)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      payload = { processed: processed, total: total, matches: matches, cat_counts: cat_counts }
+      js = JSON.generate(payload)
+      @dialog.execute_script("updateSearchProgress(#{js})")
     end
 
     def self.hp_mat(m, name, rgb, alpha)

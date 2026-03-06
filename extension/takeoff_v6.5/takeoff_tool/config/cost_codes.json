@@ -842,101 +842,176 @@
     }
   ],
   "category_to_cost_code": {
-    "Wall Framing": [
-      "3.011"
-    ],
-    "Roof Framing": [
-      "3.012"
-    ],
-    "Structural Lumber": [
-      "3.030"
-    ],
-    "Concrete": [
-      "2.200",
-      "2.301",
-      "2.302"
-    ],
-    "Masonry / Veneer": [
-      "4.001"
-    ],
-    "Windows": [
-      "4.020"
-    ],
-    "Doors": [
-      "4.023",
-      "5.031"
-    ],
-    "Metal Roofing": [
-      "4.060"
-    ],
-    "Shingle Roofing": [
-      "4.060"
-    ],
-    "Roofing": [
-      "4.060"
-    ],
-    "Roof Sheathing": [
-      "3.012"
-    ],
-    "Insulation": [
-      "4.070"
-    ],
-    "Siding": [
-      "4.090"
-    ],
-    "Exterior Finish": [
-      "4.090",
-      "4.100"
-    ],
-    "Drywall": [
-      "5.001"
-    ],
-    "Wall Finish": [
-      "5.001",
-      "5.024",
-      "5.025"
-    ],
-    "Wall Structure": [
-      "3.011"
-    ],
-    "Wall Sheathing": [
-      "3.011"
-    ],
-    "Trim": [
-      "5.032"
-    ],
-    "Fascia": [
-      "4.090"
-    ],
-    "Soffit": [
-      "4.090"
-    ],
-    "Casework": [
-      "5.040"
-    ],
-    "Countertops": [
-      "5.040"
-    ],
-    "Flooring": [
-      "5.020",
-      "5.022",
-      "5.023"
-    ],
-    "Plumbing": [
-      "3.060",
-      "5.084"
-    ],
-    "Hardware": [
-      "4.024"
-    ],
-    "Membrane": [
-      "4.070"
-    ],
-    "Ceilings": [
-      "5.001"
-    ],
+    "Excavation": ["2.100"],
+    "Footings and Foundation": ["2.200"],
+    "Foundation": ["2.200"],
+    "Foundation Walls": ["2.200"],
+    "Footings": ["2.200"],
+    "Grade Beam": ["2.200"],
+    "Pier": ["2.200"],
+    "Stem Wall": ["2.200"],
+    "Rebar": ["2.200"],
+    "Reinforcement": ["2.200"],
+    "Foundation Waterproofing": ["2.201"],
+    "CMU": ["2.210"],
+    "CMU Structure": ["2.210"],
+    "CMU Structure/Lug": ["2.210"],
+    "Concrete Block": ["2.210"],
+    "Concrete": ["2.200", "2.301", "2.302"],
+    "Slabs": ["2.301"],
+    "Interior Concrete Slabs": ["2.301"],
+    "Slab on Grade": ["2.301"],
+    "Exterior Concrete": ["2.302"],
+    "Exterior Concrete/Slabs": ["2.302"],
+    "Floor Framing": ["3.010"],
+    "Floor Framing/Trusses": ["3.010"],
+    "Floor Trusses": ["3.010"],
+    "Floor Joists": ["3.010"],
+    "Wall Framing": ["3.011"],
+    "Wall Structure": ["3.011"],
+    "Wall Sheathing": ["3.011"],
+    "Sheathing": ["3.011"],
+    "Studs": ["3.011"],
+    "Roof Framing": ["3.012"],
+    "Roof Sheathing": ["3.012"],
+    "Rafters": ["3.012"],
+    "Roof Trusses": ["3.013"],
+    "Trusses": ["3.013"],
+    "Misc. Framing": ["3.014"],
+    "Misc Framing": ["3.014"],
+    "Blocking": ["3.014"],
+    "Bridging": ["3.014"],
+    "Furring": ["3.014"],
+    "Ceiling Framing": ["3.014"],
+    "Structural Steel": ["3.020"],
+    "Steel": ["3.020"],
+    "Steel Beams": ["3.020"],
+    "Structural Lumber": ["3.030"],
+    "Timbers": ["3.030"],
+    "Timbers (Structural)": ["3.030"],
+    "Timbers (Decorative)": ["4.010"],
+    "Decorative Timber": ["4.010"],
+    "HVAC": ["3.040"],
+    "Ductwork": ["3.040"],
+    "Electrical": ["3.050"],
+    "Electrical Rough In": ["3.050"],
+    "Generator": ["3.051"],
+    "Plumbing": ["3.060", "5.084"],
+    "Plumbing Rough In": ["3.060"],
+    "Radiant": ["3.061"],
+    "Radiant Heat": ["3.061"],
+    "Gas Piping": ["3.062"],
+    "Audio/Video": ["3.070"],
+    "Security": ["3.071"],
+    "Elevator": ["3.080"],
+    "Masonry": ["4.001"],
+    "Masonry / Veneer": ["4.001"],
+    "Brick": ["4.001"],
+    "Stone Veneer": ["4.001"],
+    "Fireplace": ["4.002"],
+    "Fireplace Caps": ["4.003"],
+    "Windows": ["4.020"],
+    "Windows & Exterior Glass Doors": ["4.020"],
+    "Curtain Wall": ["4.020"],
+    "Storefront": ["4.020"],
+    "Doors": ["4.023", "5.031"],
+    "Exterior Doors": ["4.023"],
+    "Entry Doors": ["4.023"],
+    "Door Hardware": ["4.024"],
+    "Interior Doors": ["5.031"],
+    "Garage Doors": ["4.030"],
+    "Overhead Doors": ["4.030"],
+    "Decking": ["4.040"],
+    "Deck": ["4.040"],
+    "Exterior Railing": ["4.050"],
+    "Deck Railing": ["4.050"],
+    "Roofing": ["4.060"],
+    "Metal Roofing": ["4.060"],
+    "Shingle Roofing": ["4.060"],
+    "Snow Guards": ["4.061"],
+    "Insulation": ["4.070"],
+    "Membrane": ["4.070"],
+    "Stucco": ["4.080"],
+    "Siding": ["4.090"],
+    "Siding, Soffit, Fascia": ["4.090"],
+    "Soffit": ["4.090"],
+    "Fascia": ["4.090"],
+    "Exterior Finish": ["4.090", "4.100"],
+    "Exterior Paint": ["4.100"],
+    "Gypcrete": ["4.110"],
+    "Gutters": ["4.120"],
+    "Drywall": ["5.001"],
+    "Gypsum Board": ["5.001"],
+    "Ceilings": ["5.001"],
+    "Plaster": ["5.002"],
+    "Paint": ["5.010"],
+    "Interior Paint": ["5.010"],
+    "Stain": ["5.010"],
+    "Flooring": ["5.020"],
+    "Flooring Wood": ["5.020"],
+    "Hardwood": ["5.020"],
+    "Wood Floor": ["5.020"],
+    "Flooring Carpet": ["5.021"],
+    "Carpet": ["5.021"],
+    "Flooring Stone": ["5.022"],
+    "Stone Floor": ["5.022"],
+    "Flooring Tile": ["5.023"],
+    "Floor Tile": ["5.023"],
+    "Tile": ["5.023", "5.024"],
+    "Tile Walls": ["5.024"],
+    "Wall Tile": ["5.024"],
+    "Backsplash": ["5.024"],
+    "Stone Walls": ["5.025"],
+    "Wall Finish": ["5.001", "5.024", "5.025"],
+    "Wood Walls/Ceilings": ["5.030"],
+    "Wood Ceiling": ["5.030"],
+    "Tongue and Groove": ["5.030"],
+    "Paneling": ["5.030"],
+    "Interior Doors": ["5.031"],
+    "Pocket Doors": ["5.031"],
+    "Trim": ["5.032"],
+    "Interior Trim": ["5.032"],
+    "Base and Case": ["5.032"],
+    "Baseboard": ["5.032"],
+    "Crown Molding": ["5.032"],
+    "Casing": ["5.032"],
+    "Cabinets": ["5.040"],
+    "Cabinets/Vanities": ["5.040"],
+    "Casework": ["5.040"],
+    "Vanities": ["5.040"],
+    "Countertops": ["5.041"],
+    "Solid Surface Countertops": ["5.041"],
+    "Granite": ["5.041"],
+    "Quartz": ["5.041"],
+    "Appliances": ["5.042"],
+    "Closet Interiors": ["5.043"],
+    "Architectural Metal": ["5.050"],
+    "Decorative Metal": ["5.050"],
+    "Window Coverings": ["5.060"],
+    "Bathroom Accessories": ["5.070"],
+    "Shower Doors": ["5.071"],
+    "Custom Stairs": ["5.072"],
+    "Stairs": ["5.072"],
+    "Staircase": ["5.072"],
+    "Interior Railing": ["5.073"],
+    "Handrail": ["5.073"],
+    "Finish Electrical": ["5.080"],
+    "Lighting": ["5.081"],
+    "Lighting Fixtures": ["5.081"],
+    "Finish Plumbing": ["5.084"],
+    "Plumbing Fixtures": ["5.085"],
+    "Faucets": ["5.085"],
+    "Toilets": ["5.085"],
+    "Sinks": ["5.085"],
+    "Finish HVAC": ["5.086"],
+    "Finish Audio/Video": ["5.087"],
+    "Pools": ["6.010"],
+    "Landscaping": ["6.020"],
+    "Sidewalks": ["6.032"],
+    "Retaining Walls": ["6.050"],
+    "Hardware": ["3.014"],
+    "Walls": ["3.011"],
     "Generic Models": [],
-    "Uncategorized": [],
-    "Walls": []
+    "Uncategorized": []
   }
 }

@@ -64,7 +64,7 @@ module TakeoffTool
 
     # Refresh dashboard if open
     if Dashboard.visible?
-      Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
+      Dashboard.send_data(filtered_scan_results, @category_assignments, @cost_code_assignments)
     end
   end
 

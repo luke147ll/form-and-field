@@ -174,6 +174,9 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .cgh .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:9px;width:12px}
 .cgh.closed .arr{transform:rotate(-90deg)}
 .cgh .cname{font-weight:600;font-size:11px;border-radius:3px;padding:1px 7px;color:#1e1e2e;background:#7f849c}
+.cat-cc{font-family:'DM Mono','Fira Code',monospace;font-size:10px;color:#9399b2;background:#313244;border:1px solid #45475a;border-radius:3px;padding:0 4px;cursor:pointer;white-space:nowrap;max-width:72px;width:auto;text-align:center;outline:none;line-height:18px;overflow:hidden;text-overflow:ellipsis}
+.cat-cc.empty{background:transparent;border-color:#313244;color:#45475a;max-width:28px;padding:0 2px}
+.cat-cc:hover,.cat-cc:focus{border-color:#cba6f7;color:#cdd6f4;background:#313244}
 .cgh .cinfo{color:#89b4fa;font-size:12px;font-weight:600;margin-left:auto;white-space:nowrap;min-width:90px;text-align:right}
 /* Active/expanded category highlight */
 .cg.open>.cgh{background:#252540;border-left:3px solid #cba6f7;padding-left:9px}
@@ -651,6 +654,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .cont-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.3px;border:1.5px solid var(--cc);background:color-mix(in srgb,var(--cc) 12%,transparent);color:var(--cc)}
 .cont-hdr .arr{font-size:8px;color:#6c7086;transition:transform .15s;display:inline-block;width:10px;transform:rotate(-90deg)}
 .cont.open>.cont-hdr .arr{transform:rotate(0deg)}
+.cont-div{font-family:'DM Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:#585b70;letter-spacing:0.5px;padding:0 4px;white-space:nowrap}
 .cont-cnt{color:#6c7086;font-size:10px;margin-left:auto;white-space:nowrap}
 .cont-total{color:#585b70;font-size:10px;margin-left:6px;white-space:nowrap}
 .cont-body{display:none;padding-left:6px;border-left:2px solid #313244;margin-left:4px}
@@ -1093,7 +1097,9 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 </div>
 
 <script>
-var D=[],CA=[],CO=[],F=[],MSUB={},CATMT={},sc='definitionName',sd=1;
+var D=[],CA=[],ALL_CA=[],CO=[],CAT_CCM={},F=[],MSUB={},ALL_MSUB={},CATMT={},sc='definitionName',sd=1;
+var CC_DIV_COLORS={'1':'#a6e3a1','2':'#94e2d5','3':'#89b4fa','4':'#cba6f7','5':'#fab387','6':'#f9e2af','7':'#a6adc8','8':'#585b70','9':'#f5c2e7'};
+var CC_DIV_NAMES={'1':'Site Work','2':'Foundation','3':'Rough Shell','4':'Full Enclosure','5':'Finish Trades','6':'Completion','7':'Indirect Costs','8':'Contingency','9':'Design Costs','001':'Site Work & Development'};
 var SEL={},lastCheckIdx=-1;
 var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
@@ -1246,7 +1252,7 @@ function callJSON(n,o){call(n,JSON.stringify(o));}
 function receiveData(json){
   try{
     var d=JSON.parse(json);
-    D=d.rows||[];CA=d.categories||[];CO=d.costCodes||[];MSUB=d.masterSubcategories||{};CATMT=d.categoryMT||{};CCOL=d.customColors||{};
+    D=d.rows||[];CA=d.categories||[];ALL_CA=d.allCategories||CA;CO=d.costCodes||[];CAT_CCM=d.catCostCodeMap||{};MSUB=d.masterSubcategories||{};ALL_MSUB=d.allMasterSubcategories||MSUB;CATMT=d.categoryMT||{};CCOL=d.customColors||{};
     CONTAINERS=d.containers||[];
     console.log('[FF receiveData] '+D.length+' rows, '+CONTAINERS.length+' containers');
     buildCatToContMap();
@@ -1305,9 +1311,9 @@ function buildDD(){
   var ccM={},subM={},ccs=[],subs=[],i,r;
   var matM={},sizeM={},tagM={},etM={},fnM={};
   var mats=[],sizes=[],tags=[],ets=[],fns=[];
-  // Category filter sourced from CA (master list), excluding _IGNORE
+  // Category filter sourced from ALL_CA (full list), excluding _IGNORE
   var cats=[];
-  for(i=0;i<CA.length;i++){if(CA[i]!=='_IGNORE')cats.push(CA[i]);}
+  for(i=0;i<ALL_CA.length;i++){if(ALL_CA[i]!=='_IGNORE')cats.push(ALL_CA[i]);}
   for(i=0;i<D.length;i++){
     r=D[i];if(r.category==='_IGNORE')continue;
     if(r.costCode&&!ccM[r.costCode]){ccM[r.costCode]=0;ccs.push(r.costCode);}
@@ -1325,8 +1331,8 @@ function buildDD(){
     if(r.function&&!fnM[r.function]){fnM[r.function]=0;fns.push(r.function);}
     if(r.function)fnM[r.function]++;
   }
-  // Merge master subcategories into sub filter
-  for(var mk in MSUB){if(MSUB.hasOwnProperty(mk)){var ma=MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!subM[ma[mi]]){subM[ma[mi]]=0;subs.push(ma[mi]);}}}}
+  // Merge master subcategories into sub filter (use full list for dropdown)
+  for(var mk in ALL_MSUB){if(ALL_MSUB.hasOwnProperty(mk)){var ma=ALL_MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!subM[ma[mi]]){subM[ma[mi]]=0;subs.push(ma[mi]);}}}}
   cats.sort();ccs.sort();subs.sort();mats.sort();sizes.sort();tags.sort();ets.sort();fns.sort();
   var prevC=document.getElementById('fC').value;
   var prevCC=document.getElementById('fCC').value;
@@ -1371,15 +1377,15 @@ function buildAttrDD(selId,lblId,vals,counts,minVals){
 }
 function buildBulkDDs(){
   var h='<option value="">--</option>';
-  for(var i=0;i<CA.length;i++)h+='<option value="'+X(CA[i])+'">'+X(CA[i])+'</option>';
+  for(var i=0;i<ALL_CA.length;i++)h+='<option value="'+X(ALL_CA[i])+'">'+X(ALL_CA[i])+'</option>';
   h+='<option value="__custom__">+ Custom...</option>';
   document.getElementById('bulkCat').innerHTML=h;
   h='<option value="">--</option>';
   for(var i=0;i<CO.length;i++)h+='<option value="'+CO[i].code+'">'+X(CO[i].full)+'</option>';
   document.getElementById('bulkCC').innerHTML=h;
-  // Bulk sub dropdown: union of all MSUB values
+  // Bulk sub dropdown: union of all ALL_MSUB values (full list for assignment)
   var allSubs={},asList=[];
-  for(var mk in MSUB){if(MSUB.hasOwnProperty(mk)){var ma=MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!allSubs[ma[mi]]){allSubs[ma[mi]]=1;asList.push(ma[mi]);}}}}
+  for(var mk in ALL_MSUB){if(ALL_MSUB.hasOwnProperty(mk)){var ma=ALL_MSUB[mk];for(var mi=0;mi<ma.length;mi++){if(!allSubs[ma[mi]]){allSubs[ma[mi]]=1;asList.push(ma[mi]);}}}}
   asList.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   h='<option value="">--</option>';
   for(var si=0;si<asList.length;si++)h+='<option value="'+X(asList[si])+'">'+X(asList[si])+'</option>';
@@ -1625,7 +1631,7 @@ function buildCatToContMap(){
   }
   /* 2. Map every known category: explicit first, then keyword fallback */
   var allCats={};
-  for(var i=0;i<CA.length;i++)allCats[CA[i]]=true;
+  for(var i=0;i<ALL_CA.length;i++)allCats[ALL_CA[i]]=true;
   for(var i=0;i<D.length;i++){if(D[i].category)allCats[D[i].category]=true;}
   for(var cat in allCats){
     if(!allCats.hasOwnProperty(cat)||cat==='_IGNORE')continue;
@@ -1642,8 +1648,8 @@ function getContainerCats(contName){
   }
   if(contName==='Other'){
     /* Also include any category NOT in CAT_TO_CONT */
-    for(var i=0;i<CA.length;i++){
-      if(CA[i]!=='_IGNORE'&&!CAT_TO_CONT[CA[i]])set[CA[i]]=true;
+    for(var i=0;i<ALL_CA.length;i++){
+      if(ALL_CA[i]!=='_IGNORE'&&!CAT_TO_CONT[ALL_CA[i]])set[ALL_CA[i]]=true;
     }
   }
   return set;
@@ -1670,6 +1676,107 @@ function contTotal(allItems){
     else parts.push(b.total.toFixed(2)+' <span style="color:#a6adc8;font-size:10px">ft\u00B3</span>');
   }
   return parts.join(' &nbsp; ');
+}
+
+/* ═══ COST CODE HELPERS ═══ */
+function getCatPrimaryCode(cat){
+  /* 1. Check actual items — reflects user overrides (most authoritative) */
+  var codeCounts={},bestCode='',bestN=0;
+  for(var i=0;i<D.length;i++){
+    if(D[i].category===cat&&D[i].costCode){
+      var c=D[i].costCode;
+      codeCounts[c]=(codeCounts[c]||0)+1;
+      if(codeCounts[c]>bestN){bestN=codeCounts[c];bestCode=c;}
+    }
+  }
+  if(bestCode)return bestCode;
+  /* 2. From category_to_cost_code map */
+  var mapped=CAT_CCM[cat];
+  if(mapped&&mapped.length===1)return mapped[0];
+  /* 3. From container category definitions */
+  for(var i=0;i<CONTAINERS.length;i++){
+    var cats=CONTAINERS[i].categories||[];
+    for(var j=0;j<cats.length;j++){if(cats[j].name===cat&&cats[j].code)return cats[j].code;}
+  }
+  /* 4. First of multiple mapped codes */
+  if(mapped&&mapped.length>1)return mapped[0];
+  return '';
+}
+
+function getContDivision(contName){
+  /* Derive division code from container categories' cost codes */
+  var prefixes={};
+  for(var i=0;i<CONTAINERS.length;i++){
+    if(CONTAINERS[i].name!==contName)continue;
+    var cats=CONTAINERS[i].categories||[];
+    for(var j=0;j<cats.length;j++){
+      var code=cats[j].code||'';
+      /* Also check CAT_CCM */
+      var mapped=CAT_CCM[cats[j].name];
+      if(mapped&&mapped.length>0)code=mapped[0];
+      if(code){
+        var p=code.split('.')[0];
+        prefixes[p]=true;
+      }
+    }
+    break;
+  }
+  var keys=Object.keys(prefixes).sort(function(a,b){return parseInt(a)-parseInt(b);});
+  if(keys.length===0)return '';
+  var pad=function(s){var n=String(s);while(n.length<3)n='0'+n;return n;};
+  if(keys.length===1)return pad(keys[0]);
+  return pad(keys[0])+'\u2013'+pad(keys[keys.length-1]);
+}
+
+function buildCCOptions(selectedCode){
+  var h='<option value="">--</option>';
+  var lastDiv='';
+  for(var i=0;i<CO.length;i++){
+    var code=CO[i].code,prefix=code.split('.')[0];
+    if(prefix!==lastDiv){
+      lastDiv=prefix;
+      var divName=CC_DIV_NAMES[prefix]||('Division '+prefix);
+      var divCol=CC_DIV_COLORS[prefix]||'#6c7086';
+      h+='<option disabled style="font-weight:700;color:'+divCol+';background:color-mix(in srgb,'+divCol+' 15%,#1e1e2e)">\u2500\u2500\u2500 '+prefix+' '+divName.toUpperCase()+' \u2500\u2500\u2500</option>';
+    }
+    var col=CC_DIV_COLORS[prefix]||'#cdd6f4';
+    h+='<option value="'+code+'"'+(code===selectedCode?' selected':'')+' style="color:'+col+'">'+X(CO[i].full)+'</option>';
+  }
+  return h;
+}
+
+function buildCatCCSelect(cat,currentCode){
+  var emptyClass=currentCode?'':'empty';
+  var h='<select class="cat-cc '+emptyClass+'" onchange="setCatCC(\''+X2(cat)+'\',this.value);this.classList.toggle(\'empty\',!this.value)" onclick="event.stopPropagation()" title="Cost code for '+X(cat)+'">';
+  h+='<option value="">\u2014</option>';
+  /* Build color-coded options with division headers */
+  var lastDiv='';
+  for(var i=0;i<CO.length;i++){
+    var code=CO[i].code,prefix=code.split('.')[0];
+    if(prefix!==lastDiv){
+      lastDiv=prefix;
+      var divName=CC_DIV_NAMES[prefix]||('Division '+prefix);
+      var divCol=CC_DIV_COLORS[prefix]||'#6c7086';
+      h+='<option disabled style="font-weight:700;color:'+divCol+';background:color-mix(in srgb,'+divCol+' 15%,#1e1e2e)">\u2500\u2500\u2500 '+prefix+' '+divName.toUpperCase()+' \u2500\u2500\u2500</option>';
+    }
+    var col=CC_DIV_COLORS[prefix]||'#cdd6f4';
+    h+='<option value="'+code+'"'+(code===currentCode?' selected':'')+' style="color:'+col+'">'+X(CO[i].full)+'</option>';
+  }
+  h+='</select>';
+  return h;
+}
+
+function setCatCC(cat,code){
+  /* Collect all entity IDs in this category */
+  var ids=[];
+  for(var i=0;i<D.length;i++){
+    if(D[i].category===cat){ids.push(String(D[i].entityId));D[i].costCode=code;}
+  }
+  if(ids.length>0){
+    callJSON('bulkSetCostCode',{eids:ids,val:code});
+  }
+  /* Update local mapping */
+  if(code)CAT_CCM[cat]=[code];
 }
 
 /* ═══ GROUPED RENDER ═══ */
@@ -1731,6 +1838,7 @@ function renderGroups(){
     if(gBy==='category') h+='<button class="cat-iso'+(catIsoA?' iso-active':'')+'" onclick="event.stopPropagation();isoCat(\''+X2(gk)+'\')" title="Isolate category">&#8857;</button>';
     var catCol=(CCOL.categories||{})[gk]||'';
     if(gBy==='category') h+=buildColorDot('category',gk,catCol);
+    if(gBy==='category'){var _cc=getCatPrimaryCode(gk);h+=buildCatCCSelect(gk,_cc);}
     h+='<span class="arr">&#9660;</span>';
     // Name badge
     if(gBy==='category') h+=catNameSpan(gk);
@@ -1837,11 +1945,10 @@ function renderGroups(){
       var wn=row.warnings&&row.warnings.length>0;
       // Cat dropdown
       var co='';
-      for(var j=0;j<CA.length;j++)co+='<option value="'+CA[j]+'"'+(CA[j]===row.category?' selected':'')+'>'+X(CA[j])+'</option>';
+      for(var j=0;j<ALL_CA.length;j++)co+='<option value="'+ALL_CA[j]+'"'+(ALL_CA[j]===row.category?' selected':'')+'>'+X(ALL_CA[j])+'</option>';
       co+='<option value="__custom__">+ Custom...</option>';
       // Cost code dropdown
-      var cco='<option value="">--</option>';
-      for(var j=0;j<CO.length;j++)cco+='<option value="'+CO[j].code+'"'+(row.costCode===CO[j].code?' selected':'')+'>'+X(CO[j].full)+'</option>';
+      var cco=buildCCOptions(row.costCode);
 
       h+='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+(sel?' class="sel"':'')+'>';
       h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
@@ -1957,6 +2064,8 @@ function renderContainerGroups(){
     var cIso=containerIsolate===cm.name;
     h+='<button class="cont-iso'+(cIso?' iso-active':'')+'" onclick="event.stopPropagation();isoContainer(\''+X2(cm.name)+'\')" title="Isolate container">&#8857;</button>';
     h+='<span class="cont-badge" style="--cc:'+cm.color+'" onclick="togCont(\''+X2(cm.name)+'\')">'+X(cm.name)+'</span>';
+    var _cdiv=getContDivision(cm.name);
+    if(_cdiv) h+='<span class="cont-div" onclick="togCont(\''+X2(cm.name)+'\')">'+_cdiv+'</span>';
     h+='<span class="arr" onclick="togCont(\''+X2(cm.name)+'\')">&#9660;</span>';
     h+='<span class="cont-cnt" onclick="togCont(\''+X2(cm.name)+'\')">('+allItems.length+')</span>';
     h+='<span class="cont-total" onclick="togCont(\''+X2(cm.name)+'\')">'+contTotal(allItems)+'</span>';
@@ -1980,6 +2089,7 @@ function renderContainerGroups(){
         h+='<button class="cat-iso'+(catIsoActive?' iso-active':'')+'" onclick="event.stopPropagation();isoCat(\''+X2(gk)+'\')" title="Isolate category">&#8857;</button>';
         var catCol=(CCOL.categories||{})[gk]||'';
         h+=buildColorDot('category',gk,catCol);
+        var _cc2=getCatPrimaryCode(gk);h+=buildCatCCSelect(gk,_cc2);
         h+='<span class="arr">&#9660;</span>';
         h+=catNameSpan(gk);
         h+='<span style="color:#6c7086;font-size:11px">('+items.length+')</span>';
@@ -2067,10 +2177,9 @@ function renderContainerGroups(){
           var sel=!!SEL[row.entityId],rv=VIS[row.entityId]!==false;
           var wn=row.warnings&&row.warnings.length>0;
           var co='';
-          for(var j3=0;j3<CA.length;j3++)co+='<option value="'+CA[j3]+'"'+(CA[j3]===row.category?' selected':'')+'>'+X(CA[j3])+'</option>';
+          for(var j3=0;j3<ALL_CA.length;j3++)co+='<option value="'+ALL_CA[j3]+'"'+(ALL_CA[j3]===row.category?' selected':'')+'>'+X(ALL_CA[j3])+'</option>';
           co+='<option value="__custom__">+ Custom...</option>';
-          var cco='<option value="">--</option>';
-          for(var j4=0;j4<CO.length;j4++)cco+='<option value="'+CO[j4].code+'"'+(row.costCode===CO[j4].code?' selected':'')+'>'+X(CO[j4].full)+'</option>';
+          var cco=buildCCOptions(row.costCode);
           h+='<tr id="r'+row.entityId+'" data-vi="'+vi3+'"'+(sel?' class="sel"':'')+'>';
           h+='<td class="ck"><input type="checkbox" data-vi="'+vi3+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
           h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
@@ -3823,8 +3932,9 @@ function bulkSetCat(){
   if(v==='__custom__'){
     document.getElementById('bulkCat').value='';
     showInputModal('New category name',function(n){
-      // Update CA locally first
+      // Update CA and ALL_CA locally first
       if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
+      if(ALL_CA.indexOf(n)===-1){ALL_CA.push(n);ALL_CA.sort();}
       var ids=getSelIds();if(!ids.length)return;
       recordUndo(ids,'category',n);
       // Assign FIRST (queues bulkSetCategory callback in Ruby)
@@ -3864,13 +3974,15 @@ function bulkSetSub(){
     document.getElementById('bulkSub').value='';
     showInputModal('New subcategory name',function(n){
       var ids=getSelIds();if(!ids.length)return;
-      // Update MSUB locally first for all affected categories
+      // Update MSUB and ALL_MSUB locally first for all affected categories
       var addedCats={};
       for(var i=0;i<D.length;i++){
         if(SEL[D[i].entityId]){
           var c=D[i].category;
           if(!MSUB[c])MSUB[c]=[];
           if(MSUB[c].indexOf(n)===-1){MSUB[c].push(n);MSUB[c].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+          if(!ALL_MSUB[c])ALL_MSUB[c]=[];
+          if(ALL_MSUB[c].indexOf(n)===-1){ALL_MSUB[c].push(n);ALL_MSUB[c].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
           addedCats[c]=1;
         }
       }
@@ -3928,15 +4040,24 @@ function commitCatRename(oldName,newName){
   if(idx!==-1)CA.splice(idx,1);
   if(CA.indexOf(newName)===-1)CA.push(newName);
   CA.sort();
+  var idx2=ALL_CA.indexOf(oldName);
+  if(idx2!==-1)ALL_CA.splice(idx2,1);
+  if(ALL_CA.indexOf(newName)===-1)ALL_CA.push(newName);
+  ALL_CA.sort();
   if(openCats[oldName]){openCats[newName]=true;delete openCats[oldName];}
   var oldPfx=oldName+'|';
   var subKeys=Object.keys(openSubs);
   for(var s=0;s<subKeys.length;s++){if(subKeys[s].indexOf(oldPfx)===0){var tail=subKeys[s].substring(oldPfx.length);openSubs[newName+'|'+tail]=openSubs[subKeys[s]];delete openSubs[subKeys[s]];}}
-  // Cascade MSUB
+  // Cascade MSUB and ALL_MSUB
   if(MSUB[oldName]){
     if(MSUB[newName]){var ex=MSUB[newName],ol=MSUB[oldName];for(var mi=0;mi<ol.length;mi++){if(ex.indexOf(ol[mi])===-1)ex.push(ol[mi]);}ex.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
     else{MSUB[newName]=MSUB[oldName];}
     delete MSUB[oldName];
+  }
+  if(ALL_MSUB[oldName]){
+    if(ALL_MSUB[newName]){var ex2=ALL_MSUB[newName],ol2=ALL_MSUB[oldName];for(var mi2=0;mi2<ol2.length;mi2++){if(ex2.indexOf(ol2[mi2])===-1)ex2.push(ol2[mi2]);}ex2.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+    else{ALL_MSUB[newName]=ALL_MSUB[oldName];}
+    delete ALL_MSUB[oldName];
   }
   buildBulkDDs();buildDD();filt();
   // Persist to Ruby (Ruby handles entity attrs atomically)
@@ -3977,8 +4098,9 @@ function doSetCat(eid,v){
     var row=document.getElementById('r'+eid);
     if(row){var dd=row.querySelector('select.cs');if(dd)dd.value=curCat;}
     showInputModal('New category name',function(n){
-      // Update CA locally first
+      // Update CA and ALL_CA locally first
       if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
+      if(ALL_CA.indexOf(n)===-1){ALL_CA.push(n);ALL_CA.sort();}
       // Assign FIRST (queues setCategory/bulkSetCategory callback in Ruby)
       applySetCat(eid,n);
       // Then persist new category (queues addCustomCategory → broadcast will include assignment)
@@ -4016,7 +4138,7 @@ function doSetCC(eid,v){
 function doSetSize(el){var eid=el.getAttribute('data-eid'),v=el.value.trim();recordUndo([eid],'sizeNominal',v);callJSON('setSize',{eid:eid,val:v});for(var i=0;i<D.length;i++){if(D[i].entityId==eid){D[i].sizeNominal=v;break;}}}
 function buildSubSelect(row){
   var cat=row.category||'Uncategorized',cur=row.subcategory||'';
-  var subs=MSUB[cat]||[],h='<select class="cs" data-eid="'+row.entityId+'" onchange="doSetSub2(this)" oncontextmenu="onSubSelContext(event,this)" style="max-width:90px">';
+  var subs=ALL_MSUB[cat]||[],h='<select class="cs" data-eid="'+row.entityId+'" onchange="doSetSub2(this)" oncontextmenu="onSubSelContext(event,this)" style="max-width:90px">';
   h+='<option value="">--</option>';
   var inList=false;
   for(var i=0;i<subs.length;i++){
@@ -4035,9 +4157,11 @@ function doSetSub2(sel){
     var cat='';
     for(var i=0;i<D.length;i++){if(String(D[i].entityId)===String(eid)){cat=D[i].category;sel.value=D[i].subcategory||'';break;}}
     showInputModal('New subcategory for '+cat,function(n){
-      // Update MSUB locally first
+      // Update MSUB and ALL_MSUB locally first
       if(!MSUB[cat])MSUB[cat]=[];
       if(MSUB[cat].indexOf(n)===-1){MSUB[cat].push(n);MSUB[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+      if(!ALL_MSUB[cat])ALL_MSUB[cat]=[];
+      if(ALL_MSUB[cat].indexOf(n)===-1){ALL_MSUB[cat].push(n);ALL_MSUB[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
       // Assign FIRST (queues setSubcategory/bulkSetSubcategory callback in Ruby)
       applySetSub(eid,n);
       // Then persist new subcategory (queues addSubcategory → broadcast will include assignment)
@@ -4281,6 +4405,7 @@ function cancelModal(){
 }
 function addNewCategory(n){
   if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
+  if(ALL_CA.indexOf(n)===-1){ALL_CA.push(n);ALL_CA.sort();}
   call('addCustomCategory',n);
   buildDD();buildBulkDDs();
 }
@@ -4292,6 +4417,7 @@ function promptNewCategory(){
     console.log('promptNewCategory OK: '+name);
     if(!name)return;
     if(CA.indexOf(name)===-1){CA.push(name);CA.sort();}
+    if(ALL_CA.indexOf(name)===-1){ALL_CA.push(name);ALL_CA.sort();}
     call('addEmptyCategory',name);
     buildDD();buildBulkDDs();filt();
   });
@@ -4340,8 +4466,10 @@ function deleteCat(cat){
     // Optimistic update
     for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].category='Uncategorized';}
     var idx=CA.indexOf(cat);if(idx!==-1)CA.splice(idx,1);
+    var idx2=ALL_CA.indexOf(cat);if(idx2!==-1)ALL_CA.splice(idx2,1);
     delete openCats[cat];
     delete MSUB[cat];
+    delete ALL_MSUB[cat];
     // Clean openSubs
     var pfx=cat+'|';var sks=Object.keys(openSubs);for(var s=0;s<sks.length;s++){if(sks[s].indexOf(pfx)===0)delete openSubs[sks[s]];}
     buildDD();buildBulkDDs();filt();
@@ -4355,6 +4483,8 @@ function promptAddSubcategory(cat){
     if(!name)return;
     if(!MSUB[cat])MSUB[cat]=[];
     if(MSUB[cat].indexOf(name)===-1){MSUB[cat].push(name);MSUB[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+    if(!ALL_MSUB[cat])ALL_MSUB[cat]=[];
+    if(ALL_MSUB[cat].indexOf(name)===-1){ALL_MSUB[cat].push(name);ALL_MSUB[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
     callJSON('addSubcategory',{cat:cat,name:name});
     buildDD();buildBulkDDs();filt();
   });
@@ -4374,6 +4504,13 @@ function commitSubRename(cat,oldSub,newSub){
       else{MSUB[cat].splice(idx,1);}
     }
   }
+  if(ALL_MSUB[cat]){
+    var idx2=ALL_MSUB[cat].indexOf(oldSub);
+    if(idx2!==-1){
+      if(ALL_MSUB[cat].indexOf(newSub)===-1){ALL_MSUB[cat][idx2]=newSub;ALL_MSUB[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+      else{ALL_MSUB[cat].splice(idx2,1);}
+    }
+  }
   // Fix openSubs key
   var oldKey=cat+'|'+oldSub,newKey=cat+'|'+newSub;
   if(openSubs[oldKey]){openSubs[newKey]=true;delete openSubs[oldKey];}
@@ -4386,6 +4523,7 @@ function deleteSubcategory(cat,sub){
   showConfirmModal(msg,function(){
     for(var i=0;i<D.length;i++){if(D[i].category===cat&&D[i].subcategory===sub)D[i].subcategory='';}
     if(MSUB[cat]){var idx=MSUB[cat].indexOf(sub);if(idx!==-1)MSUB[cat].splice(idx,1);}
+    if(ALL_MSUB[cat]){var idx2=ALL_MSUB[cat].indexOf(sub);if(idx2!==-1)ALL_MSUB[cat].splice(idx2,1);}
     delete openSubs[cat+'|'+sub];
     buildDD();buildBulkDDs();filt();
     callJSON('deleteSubcategory',{cat:cat,name:sub});

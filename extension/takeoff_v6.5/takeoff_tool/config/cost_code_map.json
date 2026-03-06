@@ -1,35 +1,61 @@
 {
   "divisions": {
+    "001": {
+      "name": "Site Work & Development",
+      "codes": {}
+    },
     "002": {
       "name": "Excavation & Foundation",
       "codes": {
+        "2.100": {
+          "name": "Excavation",
+          "keywords": ["excavation"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Excavation"]
+        },
         "2.200": {
           "name": "Footings and Foundation",
-          "keywords": ["footing", "foundation", "ftg", "grade beam"],
+          "keywords": ["footing", "foundation", "ftg", "grade beam", "pier", "stem wall", "rebar", "reinforcement", "anchor bolt"],
           "ifc_types": ["IfcFooting"],
           "materials": ["concrete"],
-          "name_patterns": ["Wall Foundation", "Continuous Footing", "Isolated Footing"]
+          "name_patterns": ["Wall Foundation", "Continuous Footing", "Isolated Footing", "Spread Footing", "Grade Beam", "Pier", "Stem Wall"],
+          "exclude_patterns": ["CMU", "concrete block", "block wall", "lug"]
+        },
+        "2.201": {
+          "name": "Foundation Waterproofing/Drain",
+          "keywords": ["waterproofing", "foundation drain", "drain tile"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Waterproofing", "Foundation Drain"]
         },
         "2.210": {
-          "name": "CMU Structure",
-          "keywords": ["cmu", "concrete masonry", "block wall"],
+          "name": "CMU Structure/Lug",
+          "keywords": ["cmu", "concrete masonry", "block wall", "concrete block", "lug"],
           "ifc_types": [],
           "materials": ["cmu", "masonry", "concrete block"],
           "name_patterns": ["CMU"]
         },
+        "2.300": {
+          "name": "SOG Subgrade Prep",
+          "keywords": ["subgrade", "subgrade prep"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Subgrade"]
+        },
         "2.301": {
           "name": "Interior Concrete Slabs",
-          "keywords": ["slab on grade", "sog", "interior slab", "conc slab"],
+          "keywords": ["slab on grade", "sog", "interior slab", "conc slab", "slab"],
           "ifc_types": ["IfcSlab"],
           "materials": ["concrete"],
-          "name_patterns": ["CONC SLAB ON GRADE", "CONC SLAB"]
+          "name_patterns": ["CONC SLAB ON GRADE", "CONC SLAB", "Slab on Grade"]
         },
         "2.302": {
           "name": "Exterior Concrete/Slabs",
-          "keywords": ["exterior slab", "patio slab", "sidewalk"],
-          "ifc_types": ["IfcSlab"],
+          "keywords": ["exterior slab", "patio slab", "exterior concrete"],
+          "ifc_types": [],
           "materials": ["concrete"],
-          "name_patterns": ["Exterior Slab"]
+          "name_patterns": ["Exterior Slab", "Patio Slab"]
         }
       }
     },
@@ -38,62 +64,66 @@
       "codes": {
         "3.010": {
           "name": "Floor Framing/Trusses",
-          "keywords": ["floor truss", "floor joist", "open web joist", "tjl", "tji", "floor framing"],
+          "keywords": ["floor truss", "floor joist", "open web joist", "tjl", "tji", "floor framing", "rim joist"],
           "ifc_types": ["IfcBeam"],
           "materials": ["softwood", "lumber"],
-          "name_patterns": ["Floor Truss", "Open Web Joist", "TJL", "TJI", "Floor Joist"],
+          "name_patterns": ["Floor Truss", "Open Web Joist", "TJL", "TJI", "Floor Joist", "Rim Joist"],
           "size_rules": "standard_lumber"
         },
         "3.011": {
           "name": "Wall Framing",
-          "keywords": ["wall framing", "stud", "stud pack", "furring"],
+          "keywords": ["wall framing", "stud", "stud pack", "plate", "header", "sheathing", "wall sheathing", "top plate", "bottom plate"],
           "ifc_types": ["IfcWall"],
           "materials": ["softwood", "lumber"],
-          "name_patterns": ["2x4 Wall", "2x6 Wall", "2x8 Wall", "Furring", "Dimension Lumber-Column"],
+          "name_patterns": ["2x4 Wall", "2x6 Wall", "2x8 Wall", "Dimension Lumber-Column", "Wall Sheathing", "Wall Shtg"],
           "size_rules": "standard_lumber",
           "subcategories": {
             "2x4": {"name_patterns": ["2x4"]},
             "2x6": {"name_patterns": ["2x6"]},
             "2x8": {"name_patterns": ["2x8"]},
-            "Furring": {"name_patterns": ["Furring"]},
             "Stud Pack": {"name_patterns": ["(2)", "(3)", "(4)", "stud pack"]}
-          }
+          },
+          "exclude_patterns": ["retaining wall"]
         },
         "3.012": {
           "name": "Roof Framing",
-          "keywords": ["roof framing", "rafter", "ridge", "hip rafter", "valley rafter", "jack rafter", "collar tie"],
+          "keywords": ["roof framing", "rafter", "ridge", "hip rafter", "valley rafter", "jack rafter", "collar tie", "purlin"],
           "ifc_types": ["IfcBeam"],
           "materials": ["softwood", "lumber"],
-          "name_patterns": ["Rafter", "Ridge Board", "Hip Rafter", "Valley Rafter", "Jack Rafter"]
+          "name_patterns": ["Rafter", "Ridge Board", "Hip Rafter", "Valley Rafter", "Jack Rafter", "Purlin"],
+          "exclude_patterns": ["roof truss"]
         },
         "3.013": {
           "name": "Roof Trusses",
           "keywords": ["roof truss", "truss"],
           "ifc_types": [],
           "materials": [],
-          "name_patterns": ["Roof Truss", "Truss"]
+          "name_patterns": ["Roof Truss", "Truss"],
+          "exclude_patterns": ["floor truss"]
         },
         "3.014": {
           "name": "Misc. Framing",
-          "keywords": ["blocking", "bridging", "nailer", "ledger", "rim joist", "rim board"],
+          "keywords": ["blocking", "bridging", "nailer", "ledger", "rim board", "furring", "ceiling framing", "hardware", "simpson", "joist hanger", "strap", "hurricane tie"],
           "ifc_types": [],
           "materials": ["softwood", "lumber"],
-          "name_patterns": ["Blocking", "Bridging", "Nailer", "Ledger", "Rim"]
+          "name_patterns": ["Blocking", "Bridging", "Nailer", "Ledger", "Rim Board", "Furring", "Joist Hanger", "Simpson"],
+          "exclude_patterns": ["door hardware"]
         },
         "3.020": {
           "name": "Structural Steel",
-          "keywords": ["steel", "wide flange", "hss", "tube steel", "angle", "channel", "plate"],
+          "keywords": ["structural steel", "steel beam", "steel column", "steel", "wide flange", "hss", "tube steel", "angle iron", "channel"],
           "ifc_types": ["IfcBeam", "IfcColumn", "IfcMember"],
           "materials": ["steel", "metal"],
           "name_patterns": ["W-Wide Flange", "HSS", "TS", "L-Angle", "C-Channel"],
           "size_rules": "steel",
           "match_rules": [
-            {"pattern": "W\\d+x\\d+", "force": true, "note": "W shapes ALWAYS steel regardless of other attributes"}
+            {"pattern": "W\\d+x\\d+", "force": true},
+            {"pattern": "HSS\\d+", "force": true}
           ]
         },
         "3.030": {
           "name": "Timbers (Structural)",
-          "keywords": ["timber", "heavy timber", "post and beam"],
+          "keywords": ["timber", "heavy timber", "post and beam", "structural timber"],
           "ifc_types": ["IfcBeam", "IfcColumn"],
           "materials": ["oak", "douglas fir", "cedar", "timber", "softwood"],
           "name_patterns": ["Dimension Lumber"],
@@ -108,7 +138,83 @@
             "King Post": {"name_patterns": ["King Post"]},
             "Top Chord": {"name_patterns": ["Top Chord"]},
             "Bottom Chord": {"name_patterns": ["Bottom Chord"]}
-          }
+          },
+          "exclude_patterns": ["decorative"]
+        },
+        "3.040": {
+          "name": "HVAC Rough In",
+          "keywords": ["hvac", "duct", "air handler", "ductwork", "diffuser"],
+          "ifc_types": ["IfcDuctSegment", "IfcDuctFitting", "IfcAirTerminal"],
+          "materials": [],
+          "name_patterns": ["HVAC", "Duct", "Air Handler"],
+          "exclude_patterns": ["finish hvac"]
+        },
+        "3.050": {
+          "name": "Electrical Rough In",
+          "keywords": ["electrical", "conduit", "junction box", "panel"],
+          "ifc_types": ["IfcCableSegment", "IfcCableFitting", "IfcElectricDistributionBoard"],
+          "materials": [],
+          "name_patterns": ["Electrical", "Conduit", "Junction Box"],
+          "exclude_patterns": ["finish electrical", "wall panel", "solar panel"]
+        },
+        "3.051": {
+          "name": "Generator",
+          "keywords": ["generator"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Generator"]
+        },
+        "3.060": {
+          "name": "Plumbing Rough In",
+          "keywords": ["plumbing", "pipe", "drain", "fitting"],
+          "ifc_types": ["IfcSanitaryTerminal", "IfcPipeSegment", "IfcPipeFitting"],
+          "materials": [],
+          "name_patterns": ["Plumbing", "Pipe", "Drain"],
+          "exclude_patterns": ["plumbing fixture", "finish plumbing", "gas piping"]
+        },
+        "3.061": {
+          "name": "Radiant Rough In",
+          "keywords": ["radiant", "radiant heat", "radiant floor"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Radiant"]
+        },
+        "3.062": {
+          "name": "Gas Piping",
+          "keywords": ["gas piping", "gas line", "gas pipe"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Gas Piping", "Gas Line"]
+        },
+        "3.070": {
+          "name": "Audio/Video Rough In",
+          "keywords": ["audio", "video", "speaker"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Audio", "Video", "Speaker"],
+          "exclude_patterns": ["finish audio", "finish video"]
+        },
+        "3.071": {
+          "name": "Security Rough In",
+          "keywords": ["security", "alarm", "camera"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Security", "Alarm", "Camera"],
+          "exclude_patterns": ["finish security"]
+        },
+        "3.072": {
+          "name": "Lighting Control/Shades RI",
+          "keywords": ["lighting control", "shade rough"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Lighting Control"]
+        },
+        "3.080": {
+          "name": "Elevator",
+          "keywords": ["elevator", "lift"],
+          "ifc_types": ["IfcTransportElement"],
+          "materials": [],
+          "name_patterns": ["Elevator"]
         }
       }
     },
@@ -127,21 +233,31 @@
           "keywords": ["fireplace", "chimney", "hearth"],
           "ifc_types": [],
           "materials": [],
-          "name_patterns": ["Fireplace", "Chimney", "Hearth"]
+          "name_patterns": ["Fireplace", "Chimney", "Hearth"],
+          "exclude_patterns": ["fireplace cap"]
+        },
+        "4.003": {
+          "name": "Fireplace Caps, Doors, Access.",
+          "keywords": ["fireplace cap", "fireplace door", "fireplace accessory", "chimney cap"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Fireplace Cap", "Chimney Cap"]
         },
         "4.010": {
           "name": "Timbers (Decorative)",
-          "keywords": ["decorative timber", "mantel", "decorative beam"],
+          "keywords": ["decorative timber", "mantel", "decorative beam", "decorative wood"],
           "ifc_types": [],
           "materials": ["oak", "timber", "wood"],
-          "name_patterns": ["Decorative", "Mantel", "Corbel"]
+          "name_patterns": ["Decorative Timber", "Mantel", "Decorative Beam"],
+          "exclude_patterns": ["structural"]
         },
         "4.020": {
           "name": "Windows & Exterior Glass Doors",
           "keywords": ["window", "storefront", "curtain wall", "sliding door", "glass door"],
-          "ifc_types": ["IfcWindow", "IfcDoor"],
+          "ifc_types": ["IfcWindow"],
           "materials": ["glass", "glazing"],
-          "name_patterns": ["Window", "Storefront", "Curtain Wall", "Sliding Door"]
+          "name_patterns": ["Window", "Storefront", "Curtain Wall", "Sliding Door"],
+          "exclude_patterns": ["window covering", "window blind"]
         },
         "4.023": {
           "name": "Exterior Doors",
@@ -149,6 +265,13 @@
           "ifc_types": ["IfcDoor"],
           "materials": [],
           "name_patterns": ["Exterior Door", "Entry Door"]
+        },
+        "4.024": {
+          "name": "Door Hardware",
+          "keywords": ["door hardware", "lockset", "deadbolt", "door handle", "door knob"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Door Hardware", "Lockset", "Deadbolt"]
         },
         "4.030": {
           "name": "Garage Doors",
@@ -159,17 +282,18 @@
         },
         "4.040": {
           "name": "Decking",
-          "keywords": ["deck", "decking"],
+          "keywords": ["decking", "deck board", "deck"],
           "ifc_types": [],
           "materials": ["composite", "cedar", "trex"],
-          "name_patterns": ["Deck", "Decking"]
+          "name_patterns": ["Deck", "Decking"],
+          "exclude_patterns": ["deck railing"]
         },
         "4.050": {
           "name": "Exterior Railing",
           "keywords": ["exterior railing", "deck railing", "balcony railing"],
           "ifc_types": ["IfcRailing"],
           "materials": [],
-          "name_patterns": ["Railing", "Guard Rail"]
+          "name_patterns": ["Exterior Railing", "Deck Railing", "Guard Rail"]
         },
         "4.060": {
           "name": "Roofing Materials",
@@ -177,14 +301,21 @@
           "ifc_types": ["IfcRoof", "IfcCovering"],
           "materials": ["asphalt", "metal roofing"],
           "name_patterns": ["Roofing", "Shingle", "Metal Roof"],
-          "exclude_patterns": ["Shtg", "Sheathing", "Plywood", "OSB"]
+          "exclude_patterns": ["Shtg", "Sheathing", "Plywood", "OSB", "snow guard"]
+        },
+        "4.061": {
+          "name": "Snow Guards",
+          "keywords": ["snow guard", "snow fence", "snow retention"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Snow Guard"]
         },
         "4.070": {
           "name": "Insulation",
-          "keywords": ["insulation", "batt", "spray foam", "rigid foam"],
+          "keywords": ["insulation", "batt", "spray foam", "rigid foam", "blown in"],
           "ifc_types": [],
           "materials": ["insulation", "fiberglass", "foam"],
-          "name_patterns": ["Insulation", "Batt", "Spray Foam"]
+          "name_patterns": ["Insulation", "Batt", "Spray Foam", "Rigid Foam"]
         },
         "4.080": {
           "name": "Stucco",
@@ -199,6 +330,13 @@
           "ifc_types": [],
           "materials": ["siding", "hardie", "cedar"],
           "name_patterns": ["Siding", "Soffit", "Fascia"]
+        },
+        "4.100": {
+          "name": "Exterior Paint and Stain",
+          "keywords": ["exterior paint", "exterior stain"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Exterior Paint", "Exterior Stain"]
         },
         "4.110": {
           "name": "Gypcrete",
@@ -226,33 +364,70 @@
           "materials": ["gypsum", "drywall"],
           "name_patterns": ["Drywall", "Gypsum Board", "GWB"]
         },
+        "5.002": {
+          "name": "Plaster",
+          "keywords": ["plaster"],
+          "ifc_types": [],
+          "materials": ["plaster"],
+          "name_patterns": ["Plaster"]
+        },
+        "5.010": {
+          "name": "Interior Paint and Stain",
+          "keywords": ["interior paint", "interior stain", "paint", "stain"],
+          "ifc_types": [],
+          "materials": ["paint"],
+          "name_patterns": ["Interior Paint", "Paint", "Stain"],
+          "exclude_patterns": ["exterior paint", "exterior stain"]
+        },
         "5.020": {
           "name": "Flooring Wood",
-          "keywords": ["wood floor", "hardwood floor"],
+          "keywords": ["wood floor", "hardwood floor", "flooring wood", "hardwood", "flooring"],
           "ifc_types": [],
           "materials": ["hardwood", "oak flooring", "wood floor"],
-          "name_patterns": ["Wood Floor", "Hardwood"]
+          "name_patterns": ["Wood Floor", "Hardwood"],
+          "exclude_patterns": ["carpet", "tile", "stone", "epoxy"]
+        },
+        "5.021": {
+          "name": "Flooring Carpet",
+          "keywords": ["carpet", "flooring carpet"],
+          "ifc_types": [],
+          "materials": ["carpet"],
+          "name_patterns": ["Carpet"]
+        },
+        "5.022": {
+          "name": "Flooring Stone",
+          "keywords": ["flooring stone", "stone floor"],
+          "ifc_types": [],
+          "materials": ["stone", "slate", "travertine"],
+          "name_patterns": ["Stone Floor", "Flooring Stone"]
         },
         "5.023": {
           "name": "Flooring Tile",
-          "keywords": ["floor tile", "ceramic tile", "porcelain"],
+          "keywords": ["floor tile", "ceramic tile", "porcelain", "flooring tile"],
           "ifc_types": [],
           "materials": ["tile", "ceramic", "porcelain"],
           "name_patterns": ["Floor Tile", "Ceramic", "Porcelain"]
         },
         "5.024": {
           "name": "Tile Walls",
-          "keywords": ["wall tile", "backsplash", "shower tile"],
+          "keywords": ["wall tile", "backsplash", "shower tile", "tile wall"],
           "ifc_types": [],
           "materials": ["tile"],
           "name_patterns": ["Wall Tile", "Backsplash", "Shower Tile"]
         },
+        "5.025": {
+          "name": "Stone Walls",
+          "keywords": ["stone wall", "interior stone"],
+          "ifc_types": [],
+          "materials": ["stone"],
+          "name_patterns": ["Stone Wall"]
+        },
         "5.030": {
           "name": "Wood Walls/Ceilings",
-          "keywords": ["wood wall", "wood ceiling", "tongue and groove", "paneling", "wainscot"],
+          "keywords": ["wood wall", "wood ceiling", "tongue and groove", "paneling", "wainscot", "t&g"],
           "ifc_types": [],
           "materials": ["wood panel", "t&g", "cedar"],
-          "name_patterns": ["Wood Panel", "T&G", "Wainscot", "Paneling"]
+          "name_patterns": ["Wood Panel", "T&G", "Wainscot", "Paneling", "Tongue and Groove"]
         },
         "5.031": {
           "name": "Interior Doors",
@@ -263,10 +438,10 @@
         },
         "5.032": {
           "name": "Interior Trim",
-          "keywords": ["trim", "baseboard", "base", "case", "crown", "casing", "molding"],
+          "keywords": ["trim", "baseboard", "casing", "crown", "molding", "base and case"],
           "ifc_types": [],
           "materials": [],
-          "name_patterns": ["Trim", "Baseboard", "Crown Mold", "Casing", "Base"]
+          "name_patterns": ["Trim", "Baseboard", "Crown Mold", "Casing", "Base and Case"]
         },
         "5.040": {
           "name": "Cabinets/Vanities",
@@ -277,7 +452,7 @@
         },
         "5.041": {
           "name": "Countertops",
-          "keywords": ["countertop", "counter top", "granite", "quartz", "marble"],
+          "keywords": ["countertop", "counter top", "granite", "quartz", "marble", "solid surface"],
           "ifc_types": [],
           "materials": ["granite", "quartz", "marble"],
           "name_patterns": ["Countertop", "Counter"]
@@ -289,12 +464,40 @@
           "materials": [],
           "name_patterns": ["Appliance", "Refrigerator", "Range", "Dishwasher", "Oven"]
         },
+        "5.043": {
+          "name": "Closet Interiors",
+          "keywords": ["closet interior", "closet system", "closet"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Closet"]
+        },
         "5.050": {
           "name": "Architectural Metal",
-          "keywords": ["decorative metal", "ornamental", "architectural metal"],
+          "keywords": ["architectural metal", "decorative metal", "ornamental"],
           "ifc_types": [],
           "materials": ["decorative metal", "ornamental"],
-          "name_patterns": ["Decorative Metal", "Ornamental"]
+          "name_patterns": ["Architectural Metal", "Decorative Metal", "Ornamental"]
+        },
+        "5.060": {
+          "name": "Window Coverings",
+          "keywords": ["window covering", "blind", "shade"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Window Covering", "Blind", "Shade"]
+        },
+        "5.070": {
+          "name": "Bathroom Accessories",
+          "keywords": ["bathroom accessory", "towel bar", "toilet paper holder"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Bathroom Accessory", "Towel Bar"]
+        },
+        "5.071": {
+          "name": "Shower Doors",
+          "keywords": ["shower door", "shower enclosure"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Shower Door"]
         },
         "5.072": {
           "name": "Custom Stairs",
@@ -308,14 +511,104 @@
           "keywords": ["interior railing", "handrail", "baluster", "newel"],
           "ifc_types": ["IfcRailing"],
           "materials": [],
-          "name_patterns": ["Railing", "Handrail", "Baluster", "Newel"]
+          "name_patterns": ["Interior Railing", "Handrail", "Baluster", "Newel"]
+        },
+        "5.080": {
+          "name": "Finish Electrical",
+          "keywords": ["finish electrical", "outlet", "switch", "receptacle"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Finish Electrical", "Outlet", "Switch"]
         },
         "5.081": {
           "name": "Lighting Fixtures",
-          "keywords": ["light", "fixture", "sconce", "chandelier", "pendant"],
+          "keywords": ["lighting", "light fixture", "sconce", "chandelier", "pendant"],
           "ifc_types": ["IfcLightFixture"],
           "materials": [],
-          "name_patterns": ["Light", "Fixture", "Sconce", "Chandelier"]
+          "name_patterns": ["Light Fixture", "Sconce", "Chandelier"],
+          "exclude_patterns": ["lighting control"]
+        },
+        "5.084": {
+          "name": "Finish Plumbing",
+          "keywords": ["finish plumbing"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Finish Plumbing"]
+        },
+        "5.085": {
+          "name": "Plumbing Fixtures",
+          "keywords": ["plumbing fixture", "faucet", "toilet", "sink", "lavatory", "bathtub"],
+          "ifc_types": ["IfcSanitaryTerminal"],
+          "materials": [],
+          "name_patterns": ["Faucet", "Toilet", "Sink", "Lavatory", "Bathtub"]
+        },
+        "5.086": {
+          "name": "Finish HVAC",
+          "keywords": ["finish hvac", "thermostat"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Finish HVAC", "Thermostat"]
+        },
+        "5.087": {
+          "name": "Finish Audio/Video",
+          "keywords": ["finish audio", "finish video"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Finish Audio", "Finish Video"]
+        }
+      }
+    },
+    "006": {
+      "name": "Completion",
+      "codes": {
+        "6.010": {
+          "name": "Pools and Pond",
+          "keywords": ["pool", "pond", "swimming pool", "hot tub", "spa"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Pool", "Pond", "Hot Tub", "Spa"]
+        },
+        "6.020": {
+          "name": "Landscaping",
+          "keywords": ["landscaping", "landscape", "planting"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Landscaping", "Landscape"]
+        },
+        "6.031": {
+          "name": "Driveway Paving/Concrete",
+          "keywords": ["driveway paving", "driveway concrete", "paving"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Driveway Paving", "Paving"]
+        },
+        "6.032": {
+          "name": "Sidewalks",
+          "keywords": ["sidewalk", "walkway"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Sidewalk", "Walkway"]
+        },
+        "6.033": {
+          "name": "Exterior Patio/Deck",
+          "keywords": ["exterior patio", "patio"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Exterior Patio", "Patio"]
+        },
+        "6.040": {
+          "name": "Entry Gate",
+          "keywords": ["entry gate", "gate"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Entry Gate", "Gate"]
+        },
+        "6.050": {
+          "name": "Retaining Walls",
+          "keywords": ["retaining wall"],
+          "ifc_types": [],
+          "materials": [],
+          "name_patterns": ["Retaining Wall"]
         }
       }
     }
@@ -344,14 +637,154 @@
       "pattern": "W\\d+x\\d+",
       "category": "Structural Steel",
       "cost_code": "3.020",
-      "priority": 0
+      "priority": 100
     },
     {
       "description": "HSS shapes are ALWAYS structural steel",
       "pattern": "HSS\\d+",
       "category": "Structural Steel",
       "cost_code": "3.020",
-      "priority": 0
+      "priority": 100
+    },
+    {
+      "description": "CMU is ALWAYS CMU Structure",
+      "pattern": "\\bCMU\\b",
+      "category": "CMU Structure/Lug",
+      "cost_code": "2.210",
+      "priority": 90
+    },
+    {
+      "description": "Concrete block is CMU Structure",
+      "pattern": "concrete block",
+      "category": "CMU Structure/Lug",
+      "cost_code": "2.210",
+      "priority": 90
+    },
+    {
+      "description": "Block wall is CMU Structure",
+      "pattern": "block wall",
+      "category": "CMU Structure/Lug",
+      "cost_code": "2.210",
+      "priority": 90
+    },
+    {
+      "description": "Decorative timber is always 4.010",
+      "pattern": "decorative.*timber|timber.*decorative",
+      "category": "Timbers (Decorative)",
+      "cost_code": "4.010",
+      "priority": 85
+    },
+    {
+      "description": "Structural timber is always 3.030",
+      "pattern": "structural.*timber|timber.*structural",
+      "category": "Timbers (Structural)",
+      "cost_code": "3.030",
+      "priority": 85
+    },
+    {
+      "description": "Roof truss is always 3.013 (not 3.012)",
+      "pattern": "roof truss",
+      "category": "Roof Trusses",
+      "cost_code": "3.013",
+      "priority": 80
+    },
+    {
+      "description": "Floor truss is always 3.010",
+      "pattern": "floor truss",
+      "category": "Floor Framing/Trusses",
+      "cost_code": "3.010",
+      "priority": 80
+    },
+    {
+      "description": "Floor joist is always 3.010",
+      "pattern": "floor joist",
+      "category": "Floor Framing/Trusses",
+      "cost_code": "3.010",
+      "priority": 80
+    },
+    {
+      "description": "Floor framing is always 3.010",
+      "pattern": "floor framing",
+      "category": "Floor Framing/Trusses",
+      "cost_code": "3.010",
+      "priority": 80
+    },
+    {
+      "description": "Rim joist is floor framing 3.010",
+      "pattern": "rim joist",
+      "category": "Floor Framing/Trusses",
+      "cost_code": "3.010",
+      "priority": 80
+    },
+    {
+      "description": "Ceiling framing is misc framing 3.014",
+      "pattern": "ceiling framing",
+      "category": "Misc. Framing",
+      "cost_code": "3.014",
+      "priority": 80
+    },
+    {
+      "description": "Exterior door is always 4.023",
+      "pattern": "exterior door",
+      "category": "Exterior Doors",
+      "cost_code": "4.023",
+      "priority": 80
+    },
+    {
+      "description": "Entry door is always 4.023",
+      "pattern": "entry door",
+      "category": "Exterior Doors",
+      "cost_code": "4.023",
+      "priority": 80
+    },
+    {
+      "description": "Interior door is always 5.031",
+      "pattern": "interior door",
+      "category": "Interior Doors",
+      "cost_code": "5.031",
+      "priority": 80
+    },
+    {
+      "description": "Garage door is always 4.030",
+      "pattern": "garage door",
+      "category": "Garage Doors",
+      "cost_code": "4.030",
+      "priority": 80
+    },
+    {
+      "description": "Overhead door is garage door 4.030",
+      "pattern": "overhead door",
+      "category": "Garage Doors",
+      "cost_code": "4.030",
+      "priority": 80
+    },
+    {
+      "description": "Exterior railing is always 4.050",
+      "pattern": "exterior railing",
+      "category": "Exterior Railing",
+      "cost_code": "4.050",
+      "priority": 80
+    },
+    {
+      "description": "Deck railing is exterior railing 4.050",
+      "pattern": "deck railing",
+      "category": "Exterior Railing",
+      "cost_code": "4.050",
+      "priority": 80
+    },
+    {
+      "description": "Interior railing is always 5.073",
+      "pattern": "interior railing",
+      "category": "Interior Railing",
+      "cost_code": "5.073",
+      "priority": 80
+    },
+    {
+      "description": "Retaining wall is always 6.050",
+      "pattern": "retaining wall",
+      "category": "Retaining Walls",
+      "cost_code": "6.050",
+      "priority": 80
     }
   ],
 
@@ -362,15 +795,6 @@
       "min_height": 5.5,
       "timber_code": "3.030",
       "lumber_code": "3.011"
-    }
-  },
-
-  "plumbing_codes": {
-    "3.060": {
-      "name": "Plumbing",
-      "keywords": ["plumbing", "pipe", "fixture", "faucet", "toilet", "sink", "shower"],
-      "ifc_types": ["IfcSanitaryTerminal", "IfcPipeSegment", "IfcPipeFitting"],
-      "name_patterns": ["Plumbing", "Pipe", "Toilet", "Sink", "Shower", "Faucet"]
     }
   }
 }

@@ -1344,10 +1344,11 @@ module TakeoffTool
       end
 
       cats = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_categories : TakeoffTool.master_categories
+      all_cats = TakeoffTool.master_categories  # Full list for assignment dropdowns
 
-      # Build per-category measurement type map (for empty categories)
+      # Build per-category measurement type map from ALL categories
       cat_mt = {}
-      cats.each do |c|
+      all_cats.each do |c|
         next if c == '_IGNORE'
         def_mt = Parser.measurement_for(c)
         ovr = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', c) rescue nil
@@ -1357,10 +1358,11 @@ module TakeoffTool
 
       require 'json'
       msub = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_subcategories : TakeoffTool.master_subcategories
+      all_msub = TakeoffTool.master_subcategories  # Full for assignment dropdowns
       containers = TakeoffTool.master_containers || []
       cont_names = containers.map { |c| c['name'] rescue '?' }
       puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
-      js = JSON.generate({ rows: rows, categories: cats, costCodes: cc, masterSubcategories: msub, categoryMT: cat_mt, customColors: custom_colors, containers: containers })
+      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, containers: containers })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")

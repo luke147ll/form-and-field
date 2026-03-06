@@ -77,6 +77,20 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .prop-val{font-size:11px;color:#cdd6f4;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prop-swatch{width:14px;height:14px;border-radius:3px;border:1px solid #45475a;display:inline-block;vertical-align:middle;margin-right:4px}
 .match-count{font-size:13px;color:#a6e3a1;font-weight:700;padding:8px 14px;text-align:center}
+/* SAMPLE COMMIT BAR */
+.sample-commit-bar{background:#181825;border-top:1px solid #313244;padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+.sample-commit-bar select{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:3px 6px;font-size:11px;font-family:inherit;max-width:150px;flex:1}
+.sample-commit-bar label{font-size:10px;color:#a6adc8}
+/* SEARCH LOADING */
+.search-loading{background:#181825;border:1px solid #313244;border-radius:6px;margin:8px 14px;padding:12px 14px;font-family:'DM Mono','Fira Code',monospace}
+.sl-title{color:#a6e3a1;font-size:12px;margin-bottom:8px}
+.sl-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sl-bar{font-size:13px;color:#cba6f7;letter-spacing:1px}
+.sl-count{font-size:11px;color:#6c7086}
+.sl-matches{font-size:11px;color:#a6adc8;max-height:100px;overflow-y:auto}
+.sl-matches div{padding:1px 0}
+.sl-matches .cat-name{color:#cdd6f4}
+.sl-matches .cat-count{color:#cba6f7;font-weight:600}
 /* INPUT MODAL */
 .modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200}
 .modal-bg.show{display:block}
@@ -112,9 +126,9 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
       <div class="mc-sub">Group by material color</div>
     </div>
     <div class="method-card" onclick="doParse('sample')" id="mc-sample">
-      <div class="mc-icon"><img src="../icons/drill_bit_24.png" style="width:20px;height:20px;vertical-align:middle"></div>
-      <div class="mc-label">Ray Gun</div>
-      <div class="mc-sub">Pick &amp; match properties</div>
+      <div class="mc-icon" style="font-size:20px">&#9678;</div>
+      <div class="mc-label">Select Object</div>
+      <div class="mc-sub">Click any object to inspect</div>
     </div>
     <div class="method-card disabled">
       <div class="mc-icon">&#9721;</div>
@@ -140,10 +154,26 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
     <span class="info" id="sampleInfo">Select an entity to see its properties</span>
     <span class="spacer"></span>
     <button class="btn sm pri" onclick="findSimilar()" id="btnFindSimilar" disabled>Find Similar</button>
+    <button class="btn sm" onclick="clearHpSelection()" id="btnClear" style="display:none">Clear</button>
     <button class="btn sm" onclick="exitSampler()">Done</button>
   </div>
   <div class="sample-props" id="sampleProps"></div>
+  <div class="search-loading" id="searchLoading" style="display:none">
+    <div class="sl-title">&#9612; Scanning entities...</div>
+    <div class="sl-bar-row">
+      <span class="sl-bar" id="slBar">░░░░░░░░░░░░░░░░░░░░</span>
+      <span class="sl-count" id="slCount">0 / 0</span>
+    </div>
+    <div class="sl-matches" id="slMatches"></div>
+  </div>
   <div class="match-count" id="matchCount" style="display:none"></div>
+  <div class="sample-commit-bar" id="sampleCommitBar" style="display:none">
+    <label>Category</label>
+    <select id="sampleCatSelect"><option value="">-- select --</option></select>
+    <label>Sub</label>
+    <select id="sampleSubSelect"><option value="">--</option></select>
+    <button class="btn grn" id="btnAssign" onclick="doSingleAssign()" disabled>Assign</button>
+  </div>
 </div>
 
 <!-- STEP 2: Results + Commit -->
@@ -179,6 +209,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 <script>
 var GROUPS=[], METHOD='', CATS=[], SUBCATS={}, SELECTED={};
 var SAMPLE_PROPS=[], SAMPLE_EID=0;
+var HP_EIDS={};
 
 /* ═══ Communication ═══ */
 function call(n,a){
@@ -241,7 +272,7 @@ function doParse(method){
   // Deactivate sampler if switching away from sample mode
   if(METHOD==='sample'&&method!=='sample') call('deactivateObjectSampler');
   METHOD=method;
-  SELECTED={};
+  SELECTED={};HP_EIDS={};
   // Highlight active card
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
   var card=document.getElementById('mc-'+method);
@@ -256,9 +287,12 @@ function doParse(method){
     document.getElementById('samplePanel').style.display='flex';
     document.getElementById('sampleInfo').textContent='Select an entity to see its properties';
     document.getElementById('matchCount').style.display='none';
+    document.getElementById('searchLoading').style.display='none';
+    document.getElementById('sampleProps').style.display='';
+    document.getElementById('sampleCommitBar').style.display='none';
     document.getElementById('btnFindSimilar').disabled=true;
     document.getElementById('btnFindSimilar').textContent='Find Similar';
-    document.getElementById('statusText').textContent='Ray Gun: select or click entities to sample';
+    document.getElementById('statusText').textContent='Select Object: click entities to sample properties';
     call('activateObjectSampler');
     return;
   }
@@ -313,24 +347,30 @@ function toggleGroup(idx,e){
   if(e)e.stopPropagation();
   SELECTED[idx]=!SELECTED[idx];
   if(!SELECTED[idx]) delete SELECTED[idx];
+  // Sync HP_EIDS
+  if(GROUPS[idx]){
+    GROUPS[idx].eids.forEach(function(eid){
+      if(SELECTED[idx]) HP_EIDS[eid]=true;
+      else delete HP_EIDS[eid];
+    });
+  }
   renderGroups();
+  updateHpCount();
 }
 
 function selectAll(){
-  GROUPS.forEach(function(_,i){SELECTED[i]=true;});
+  HP_EIDS={};
+  GROUPS.forEach(function(g,i){SELECTED[i]=true;g.eids.forEach(function(eid){HP_EIDS[eid]=true;});});
   renderGroups();
+  updateHpCount();
 }
 function selectNone(){
-  SELECTED={};
+  SELECTED={};HP_EIDS={};
   renderGroups();
+  updateHpCount();
 }
 
-function updateSelCount(){
-  var eids=getSelectedEids();
-  var n=eids.length;
-  document.getElementById('selCount').textContent=n+' selected';
-  document.getElementById('btnCommit').disabled=(n===0||!document.getElementById('catSelect').value);
-}
+function updateSelCount(){ updateHpCount(); }
 
 function getSelectedEids(){
   var eids=[];
@@ -414,7 +454,7 @@ function doCommit(){
   var subSel=document.getElementById('subcatSelect');
   var sub=subSel.value;
   if(sub==='__custom_sub__')sub='';
-  var eids=getSelectedEids();
+  var eids=Object.keys(HP_EIDS).map(Number);
   if(!cat||eids.length===0)return;
   callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
 }
@@ -425,7 +465,7 @@ function receiveCommitResult(json){
     if(d.success){
       showToast(d.message,'ok');
       // Re-parse with same method
-      SELECTED={};
+      HP_EIDS={};SELECTED={};
       if(METHOD==='name') call('parseByName');
       else if(METHOD==='color') call('parseByColor');
       else if(METHOD==='sample'){document.getElementById('resultsArea').classList.remove('show');document.getElementById('samplePanel').style.display='flex';document.getElementById('statusText').textContent='Committed! Select next entity';}
@@ -442,14 +482,17 @@ function backToMethods(){
     // Go back to sampler panel — observer stays active
     document.getElementById('resultsArea').classList.remove('show');
     document.getElementById('samplePanel').style.display='flex';
-    document.getElementById('statusText').textContent='Ray Gun: select or click entities to sample';
+    document.getElementById('searchLoading').style.display='none';
+    document.getElementById('sampleProps').style.display='';
+    if(SAMPLE_EID>0) document.getElementById('sampleCommitBar').style.display='flex';
+    document.getElementById('statusText').textContent='Select Object: click entities to sample properties';
     return;
   }
   if(METHOD==='sample') call('deactivateObjectSampler');
   document.getElementById('resultsArea').classList.remove('show');
   document.getElementById('samplePanel').style.display='none';
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
-  GROUPS=[];SELECTED={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
+  GROUPS=[];SELECTED={};HP_EIDS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
   document.getElementById('statusText').textContent='Pick a parse method to group visible entities';
 }
 
@@ -485,6 +528,23 @@ function cancelModal(){
 function receiveSampledProperties(json){
   try{
     var d=JSON.parse(json);
+    var eid=d.entity_id||0;
+
+    // If results area is showing — toggle only, don't switch panels
+    if(document.getElementById('resultsArea').classList.contains('show')){
+      if(eid>0) toggleHpEntity(eid);
+      return;
+    }
+
+    // Auto-show sample panel if not already in sample mode
+    if(METHOD!=='sample'){
+      METHOD='sample';
+      document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
+      var card=document.getElementById('mc-sample');
+      if(card)card.classList.add('active');
+      document.getElementById('resultsArea').classList.remove('show');
+      document.getElementById('samplePanel').style.display='flex';
+    }
     // Remember which property KEYS were checked before update
     var wasChecked={};
     var oldChecks=document.querySelectorAll('#sampleProps input[type=checkbox]');
@@ -497,8 +557,18 @@ function receiveSampledProperties(json){
     SAMPLE_PROPS=d.properties||[];
     SAMPLE_EID=d.entity_id||0;
     renderSampleProps(wasChecked);
-    document.getElementById('sampleInfo').textContent='Entity #'+SAMPLE_EID+' \u2014 '+SAMPLE_PROPS.length+' properties';
+    // Toggle in HP_EIDS
+    if(eid>0) toggleHpEntity(eid);
+    updateHpCount();
     document.getElementById('matchCount').style.display='none';
+    // Hide loading, show props and assign bar
+    document.getElementById('searchLoading').style.display='none';
+    document.getElementById('sampleProps').style.display='';
+    if(SAMPLE_EID>0){
+      document.getElementById('sampleCommitBar').style.display='flex';
+      populateSampleCatDropdown();
+      document.getElementById('btnAssign').disabled=!document.getElementById('sampleCatSelect').value;
+    }
     // Auto-update count if anything is still checked
     onPropCheck();
   }catch(e){console.log('receiveSampledProperties err: '+e.message);}
@@ -559,7 +629,15 @@ function receiveSimilarCount(n){
 function findSimilar(){
   var props=getCheckedProps();
   if(Object.keys(props).length===0) return;
-  document.getElementById('sampleInfo').textContent='Searching...';
+  document.getElementById('sampleInfo').textContent='Scanning...';
+  // Show loading display, hide props and assign bar
+  document.getElementById('searchLoading').style.display='block';
+  document.getElementById('sampleProps').style.display='none';
+  document.getElementById('sampleCommitBar').style.display='none';
+  document.getElementById('searchLoading').querySelector('.sl-title').textContent='\u2590 Scanning entities...';
+  document.getElementById('slBar').textContent='\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591';
+  document.getElementById('slCount').textContent='0 / 0';
+  document.getElementById('slMatches').innerHTML='';
   callJSON('findSimilar',props);
 }
 
@@ -568,6 +646,9 @@ function receiveSampleMatches(json){
     var d=JSON.parse(json);
     var eids=d.eids||[];
     var count=d.count||0;
+    // Hide loading display, restore props
+    document.getElementById('searchLoading').style.display='none';
+    document.getElementById('sampleProps').style.display='';
     // Show match count on sample panel
     var mc=document.getElementById('matchCount');
     mc.textContent='Found '+count+' matching entit'+(count===1?'y':'ies');
@@ -576,6 +657,8 @@ function receiveSampleMatches(json){
     // Set up results groups
     GROUPS=[{label:'Sample Matches ('+count+')',count:count,eids:eids}];
     SELECTED={0:true};
+    HP_EIDS={};
+    eids.forEach(function(eid){HP_EIDS[eid]=true;});
     document.getElementById('statusText').textContent='Found '+count+' matching entities';
     document.getElementById('resultsInfo').textContent=count+' matches';
     renderGroups();
@@ -593,9 +676,161 @@ function exitSampler(){
   document.getElementById('resultsArea').classList.remove('show');
   document.getElementById('samplePanel').style.display='none';
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
-  GROUPS=[];SELECTED={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
+  GROUPS=[];SELECTED={};HP_EIDS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
   document.getElementById('statusText').textContent='Pick a parse method to group visible entities';
 }
+
+/* ═══ Search Progress ═══ */
+function updateSearchProgress(data){
+  var el=document.getElementById('searchLoading');
+  el.style.display='block';
+  document.getElementById('sampleProps').style.display='none';
+  document.getElementById('sampleCommitBar').style.display='none';
+  // Progress bar
+  var pct=data.total>0? data.processed/data.total : 0;
+  var filled=Math.round(pct*20);
+  var bar='';
+  for(var i=0;i<20;i++) bar+=(i<filled)?'\u2588':'\u2591';
+  document.getElementById('slBar').textContent=bar;
+  document.getElementById('slCount').textContent=data.processed+' / '+data.total;
+  // Title with match count
+  el.querySelector('.sl-title').textContent='\u2590 Scanning entities... ('+data.matches+' matches)';
+  // Category breakdown
+  var cats=data.cat_counts||{};
+  var html='';
+  var sorted=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];});
+  sorted.forEach(function(c){
+    html+='<div>> <span class="cat-name">'+esc(c)+'</span>: <span class="cat-count">'+cats[c]+' matches</span></div>';
+  });
+  document.getElementById('slMatches').innerHTML=html;
+}
+
+/* ═══ HP_EIDS Toggle ═══ */
+function toggleHpEntity(eid){
+  if(HP_EIDS[eid]){
+    delete HP_EIDS[eid];
+    callJSON('toggleEntityHighlight',{eid:eid,add:false});
+  }else{
+    HP_EIDS[eid]=true;
+    callJSON('toggleEntityHighlight',{eid:eid,add:true});
+  }
+  updateHpCount();
+}
+
+function updateHpCount(){
+  var n=Object.keys(HP_EIDS).length;
+  // Sample panel count
+  var info=document.getElementById('sampleInfo');
+  if(info&&METHOD==='sample'&&document.getElementById('samplePanel').style.display!=='none'){
+    if(n>1) info.textContent=n+' entities selected (viewing #'+SAMPLE_EID+')';
+    else if(SAMPLE_EID>0) info.textContent='Entity #'+SAMPLE_EID+' \u2014 '+SAMPLE_PROPS.length+' properties';
+  }
+  // Sample assign button
+  var btn=document.getElementById('btnAssign');
+  if(btn){
+    btn.textContent=n>1?'Assign ('+n+')':'Assign';
+    btn.disabled=n===0||!document.getElementById('sampleCatSelect').value;
+  }
+  // Results area count
+  var sc=document.getElementById('selCount');
+  if(sc) sc.textContent=n+' selected';
+  var bc=document.getElementById('btnCommit');
+  if(bc) bc.disabled=(n===0||!document.getElementById('catSelect').value);
+  // Clear button visibility
+  var clr=document.getElementById('btnClear');
+  if(clr) clr.style.display=n>1?'inline-block':'none';
+}
+
+function clearHpSelection(){
+  HP_EIDS={};
+  call('clearHpSelection');
+  updateHpCount();
+  if(METHOD==='sample'){
+    document.getElementById('sampleInfo').textContent='Selection cleared \u2014 click entities to add';
+  }
+}
+
+/* ═══ Single-Entity Assign ═══ */
+function populateSampleCatDropdown(){
+  var sel=document.getElementById('sampleCatSelect');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">-- select --</option>';
+  CATS.forEach(function(c){
+    var o=document.createElement('option');
+    o.value=c;o.textContent=c;
+    sel.appendChild(o);
+  });
+  var custom=document.createElement('option');
+  custom.value='__custom__';custom.textContent='+ Custom...';
+  sel.appendChild(custom);
+  if(cur)sel.value=cur;
+  updateSampleSubDropdown();
+}
+function updateSampleSubDropdown(){
+  var cat=document.getElementById('sampleCatSelect').value;
+  var sel=document.getElementById('sampleSubSelect');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">--</option>';
+  var subs=(cat&&SUBCATS[cat])||[];
+  for(var i=0;i<subs.length;i++){
+    var o=document.createElement('option');
+    o.value=subs[i];o.textContent=subs[i];
+    if(subs[i]===cur)o.selected=true;
+    sel.appendChild(o);
+  }
+  var custom=document.createElement('option');
+  custom.value='__custom_sub__';custom.textContent='+ Custom...';
+  sel.appendChild(custom);
+}
+function doSingleAssign(){
+  var cat=document.getElementById('sampleCatSelect').value;
+  if(cat==='__custom__'||!cat)return;
+  var subSel=document.getElementById('sampleSubSelect');
+  var sub=subSel.value;
+  if(sub==='__custom_sub__')sub='';
+  var eids=Object.keys(HP_EIDS).map(Number);
+  if(eids.length===0&&SAMPLE_EID>0)eids=[SAMPLE_EID];
+  if(eids.length===0)return;
+  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
+}
+document.addEventListener('change',function(e){
+  if(e.target.id==='sampleCatSelect'){
+    if(e.target.value==='__custom__'){
+      e.target.value='';
+      showInputModal('New category name',function(name){
+        if(SAMPLE_EID>0){
+          var subSel=document.getElementById('sampleSubSelect');
+          var sub=subSel.value;if(sub==='__custom_sub__')sub='';
+          callJSON('commitSingle',{eid:SAMPLE_EID,category:name,subcategory:sub});
+        }
+        call('addCustomCategory',name);
+        // Add to CATS and refresh
+        if(CATS.indexOf(name)===-1)CATS.push(name);
+        populateSampleCatDropdown();
+        document.getElementById('sampleCatSelect').value=name;
+      });
+    } else {
+      updateSampleSubDropdown();
+    }
+    document.getElementById('btnAssign').disabled=!e.target.value||e.target.value==='__custom__';
+  }
+  if(e.target.id==='sampleSubSelect'){
+    if(e.target.value==='__custom_sub__'){
+      var cat=document.getElementById('sampleCatSelect').value;
+      e.target.value='';
+      showInputModal('New subcategory for '+cat,function(name){
+        if(!SUBCATS[cat])SUBCATS[cat]=[];
+        if(SUBCATS[cat].indexOf(name)===-1){SUBCATS[cat].push(name);SUBCATS[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
+        if(SAMPLE_EID>0&&cat){
+          callJSON('commitSingle',{eid:SAMPLE_EID,category:cat,subcategory:name});
+        }
+        callJSON('addSubcategoryForCat',{cat:cat,name:name});
+        updateSampleSubDropdown();
+        document.getElementById('sampleSubSelect').value=name;
+      });
+    }
+  }
+});
 </script>
 <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
   <div class="modal-card">

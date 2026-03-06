@@ -173,13 +173,18 @@ module TakeoffTool
           end
         end
 
-        # Keyword match (good value)
-        cc[:keyword_regexes].each do |re|
+        # Keyword match — longer (multi-word) keywords score higher
+        best_kw_score = 0
+        cc[:keyword_regexes].each_with_index do |re, ki|
           if text =~ re
-            score += 15
-            matched_how << 'keyword'
-            break
+            kw_words = cc[:keywords][ki].to_s.split(/\s+/).length
+            kw_score = 10 + (kw_words * 5)  # 1-word: 15, 2-word: 20, 3-word: 25
+            best_kw_score = kw_score if kw_score > best_kw_score
           end
+        end
+        if best_kw_score > 0
+          score += best_kw_score
+          matched_how << 'keyword'
         end
 
         # IFC type match

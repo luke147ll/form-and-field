@@ -1,3 +1,4 @@
+
 module TakeoffTool
   unless defined?(NOTE_TAG_LAYER)
   NOTE_TAG_LAYER = 'FF_Note_Tags'

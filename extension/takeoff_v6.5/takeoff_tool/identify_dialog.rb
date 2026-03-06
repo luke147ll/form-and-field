@@ -183,14 +183,14 @@ module TakeoffTool
       cat = TakeoffTool.category_assignments[eid]
       cat ||= (e.get_attribute('TakeoffAssignments', 'category') rescue nil)
       unless cat
-        sr = TakeoffTool.scan_results.find { |r| r[:entity_id] == eid }
+        sr = TakeoffTool.filtered_scan_results.find { |r| r[:entity_id] == eid }
         cat = sr[:parsed][:auto_category] if sr
       end
 
       # Subcategory
       sub = (e.get_attribute('TakeoffAssignments', 'subcategory') rescue nil)
       unless sub
-        sr ||= TakeoffTool.scan_results.find { |r| r[:entity_id] == eid }
+        sr ||= TakeoffTool.filtered_scan_results.find { |r| r[:entity_id] == eid }
         sub = sr[:parsed][:auto_subcategory] if sr
       end
 
