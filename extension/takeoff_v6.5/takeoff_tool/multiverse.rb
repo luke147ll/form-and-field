@@ -581,6 +581,32 @@ module TakeoffTool
 
   COMPARE_OVERLAP_THRESHOLD = 0.50   # 50% BB overlap = likely same entity
   COMPARE_VOLUME_TOLERANCE  = 0.20   # 20% volume difference = same size
+  COMPARE_CLUSTER_SPATIAL_TOL = 0.5  # inches gap tolerance for proximity clustering
+  COMPARE_CLUSTER_VOL_TOL     = 0.05 # 5% volume tolerance for cluster mode
+
+  # Union-Find for connected component grouping (clustering)
+  class UnionFind
+    def initialize(n)
+      @parent = (0...n).to_a
+      @rank = Array.new(n, 0)
+    end
+    def find(x)
+      @parent[x] = @parent[@parent[x]] while @parent[x] != x
+      @parent[x]
+    end
+    def union(a, b)
+      ra, rb = find(a), find(b)
+      return if ra == rb
+      ra, rb = rb, ra if @rank[ra] < @rank[rb]
+      @parent[rb] = ra
+      @rank[ra] += 1 if @rank[ra] == @rank[rb]
+    end
+    def components
+      groups = Hash.new { |h, k| h[k] = [] }
+      @parent.each_index { |i| groups[find(i)] << i }
+      groups.values
+    end
+  end
 
   # Get world-space axis-aligned bounding box for an entity
   def self.get_world_bounds(ent)
@@ -784,9 +810,100 @@ module TakeoffTool
     inter_vol / smaller
   end
 
-  # Compare entities in cat_a (Model A) against cat_b (Model B) by BB intersection
+  # Are two BBs either overlapping or within tolerance on all 3 axes?
+  def self.bb_adjacent?(a, b, tolerance)
+    3.times.all? do |i|
+      gap = [0, [a[:min][i], b[:min][i]].max - [a[:max][i], b[:max][i]].min].max
+      gap <= tolerance
+    end
+  end
+
+  # Spatial hash grid for O(N) adjacency queries (N > 100 only)
+  def self.build_spatial_hash(items)
+    return nil if items.length <= 100
+    cell_size = 1.0
+    items.each do |it|
+      b = it[:bounds]
+      3.times { |i| d = b[:max][i] - b[:min][i]; cell_size = d if d > cell_size }
+    end
+    cell_size = [cell_size, 1.0].max
+    grid = Hash.new { |h, k| h[k] = [] }
+    items.each_with_index do |it, idx|
+      b = it[:bounds]
+      x0, x1 = (b[:min][0] / cell_size).floor, (b[:max][0] / cell_size).floor
+      y0, y1 = (b[:min][1] / cell_size).floor, (b[:max][1] / cell_size).floor
+      z0, z1 = (b[:min][2] / cell_size).floor, (b[:max][2] / cell_size).floor
+      (x0..x1).each { |cx| (y0..y1).each { |cy| (z0..z1).each { |cz| grid[[cx, cy, cz]] << idx } } }
+    end
+    grid
+  end
+
+  # Cluster items by spatial proximity using union-find connected components.
+  # Returns array of cluster hashes: {members, combined_bb, total_real_volume, member_eids}
+  def self.cluster_entities_by_proximity(items, tolerance = COMPARE_CLUSTER_SPATIAL_TOL)
+    return [] if items.empty?
+    n = items.length
+    return [build_cluster(items, [0])] if n == 1
+
+    uf = UnionFind.new(n)
+    grid = build_spatial_hash(items)
+
+    if grid
+      checked = {}
+      grid.each_value do |indices|
+        indices.each do |i|
+          indices.each do |j|
+            next if i >= j
+            key = (i << 20) | j
+            next if checked[key]
+            checked[key] = true
+            uf.union(i, j) if bb_adjacent?(items[i][:bounds], items[j][:bounds], tolerance)
+          end
+        end
+      end
+    else
+      (0...n).each do |i|
+        ((i + 1)...n).each do |j|
+          uf.union(i, j) if bb_adjacent?(items[i][:bounds], items[j][:bounds], tolerance)
+        end
+      end
+    end
+
+    uf.components.map { |indices| build_cluster(items, indices) }
+  end
+
+  # Build a cluster hash from a set of item indices
+  def self.build_cluster(items, indices)
+    members = indices.map { |i| items[i] }
+    c_min = [Float::INFINITY] * 3
+    c_max = [-Float::INFINITY] * 3
+    total_vol = 0.0
+    members.each do |m|
+      b = m[:bounds]
+      3.times do |ax|
+        c_min[ax] = b[:min][ax] if b[:min][ax] < c_min[ax]
+        c_max[ax] = b[:max][ax] if b[:max][ax] > c_max[ax]
+      end
+      total_vol += (m[:r][:volume_ft3] || 0.0)
+    end
+    bb_vol = (c_max[0] - c_min[0]) * (c_max[1] - c_min[1]) * (c_max[2] - c_min[2])
+    {
+      members: members,
+      combined_bb: {
+        min: c_min, max: c_max,
+        center: [(c_min[0] + c_max[0]) / 2.0, (c_min[1] + c_max[1]) / 2.0, (c_min[2] + c_max[2]) / 2.0],
+        volume: [bb_vol, 0.001].max
+      },
+      total_real_volume: total_vol,
+      member_eids: members.map { |m| m[:eid] }
+    }
+  end
+
+  # Compare entities in cat_a (Model A) against cat_b (Model B) by BB intersection.
+  # When opts['cluster'] is true (default), merges touching/overlapping entities into
+  # clusters before comparing — so a group of small footings can match one large footing.
   # Results: matching, discrepancies (only_b + modified), only_a (unchanged)
-  def self.compare_categories(cat_a, cat_b)
+  def self.compare_categories(cat_a, cat_b, opts = {})
     sr = @scan_results || []
     ca = @category_assignments || {}
     reg = @entity_registry || {}
@@ -825,57 +942,117 @@ module TakeoffTool
       puts "[FF Compare]   B #{it[:name]}: center=#{it[:bounds][:center].map{|v|v.round(1)}.inspect} vol=#{it[:bounds][:volume].round(1)}"
     end
 
-    # Match by bounding box intersection
+    # Parse comparison options
+    use_cluster = opts.fetch('cluster', true)
+    spatial_tol = opts.fetch('spatialTol', COMPARE_CLUSTER_SPATIAL_TOL).to_f
+    vol_tol = opts.fetch('volTol', use_cluster ? COMPARE_CLUSTER_VOL_TOL : COMPARE_VOLUME_TOLERANCE).to_f
+
     matched = []
     only_a  = []
     only_b  = []
     b_used  = {}
 
-    a_items.each_with_index do |ai, a_idx|
-      best = nil
-      best_overlap = 0
+    if use_cluster && (a_items.length > 1 || b_items.length > 1)
+      # ── Cluster-to-cluster comparison ──
+      puts "[FF Compare] Clustering: spatialTol=#{spatial_tol}\", volTol=#{(vol_tol * 100).round}%"
+      a_clusters = cluster_entities_by_proximity(a_items, spatial_tol)
+      b_clusters = cluster_entities_by_proximity(b_items, spatial_tol)
+      puts "[FF Compare] Clusters: A=#{a_clusters.length} (from #{a_items.length}), B=#{b_clusters.length} (from #{b_items.length})"
 
-      b_items.each_with_index do |bi, bi_idx|
-        next if b_used[bi_idx]
-        next unless bb_overlap?(ai[:bounds], bi[:bounds])
+      a_clusters.each do |ac|
+        best = nil
+        best_overlap = 0
 
-        ratio = bb_overlap_ratio(ai[:bounds], bi[:bounds])
-        if ratio > COMPARE_OVERLAP_THRESHOLD && ratio > best_overlap
-          best = { bi: bi, idx: bi_idx, overlap: ratio }
-          best_overlap = ratio
+        b_clusters.each_with_index do |bc, bi|
+          next if b_used[bi]
+          next unless bb_overlap?(ac[:combined_bb], bc[:combined_bb])
+          ratio = bb_overlap_ratio(ac[:combined_bb], bc[:combined_bb])
+          if ratio > COMPARE_OVERLAP_THRESHOLD && ratio > best_overlap
+            best = { bc: bc, idx: bi, overlap: ratio }
+            best_overlap = ratio
+          end
         end
-      end
 
-      if best
-        b_used[best[:idx]] = true
-        bi = best[:bi]
+        if best
+          b_used[best[:idx]] = true
+          bc = best[:bc]
 
-        # Check volume similarity
-        vol_a = ai[:bounds][:volume]
-        vol_b = bi[:bounds][:volume]
-        max_vol = [vol_a, vol_b].max
-        vol_diff = max_vol > 0 ? (vol_a - vol_b).abs / max_vol : 0
+          # Volume comparison using REAL summed volumes (not BB volumes)
+          vol_a = ac[:total_real_volume]
+          vol_b = bc[:total_real_volume]
+          max_vol = [vol_a, vol_b].max
+          vol_diff = max_vol > 0 ? (vol_a - vol_b).abs / max_vol : 0
 
-        if vol_diff < COMPARE_VOLUME_TOLERANCE
-          status = 'matching'
-          delta = {}
+          status = vol_diff < vol_tol ? 'matching' : 'modified'
+          delta = status == 'modified' ? { vol_diff: vol_diff.round(3), overlap: best[:overlap].round(3),
+                    a_count: ac[:members].length, b_count: bc[:members].length } : {}
+
+          # Expand cluster match → individual eid pairs
+          a_eids = ac[:member_eids]
+          b_eids = bc[:member_eids]
+          [a_eids.length, b_eids.length].max.times do |i|
+            ae = a_eids[i]; be = b_eids[i]
+            if ae && be
+              matched << { a_eid: ae, b_eid: be, status: status, delta: delta }
+            elsif ae
+              only_a << ae
+            elsif be
+              only_b << be
+            end
+          end
         else
-          status = 'modified'
-          delta = { vol_diff: vol_diff.round(3), overlap: best[:overlap].round(3) }
+          only_a.concat(ac[:member_eids])
         end
-        matched << { a_eid: ai[:eid], b_eid: bi[:eid], status: status, delta: delta }
-      else
-        only_a << ai[:eid]
       end
 
-      # Progress logging
-      if (a_idx + 1) % 50 == 0
-        puts "[FF Compare] Processed #{a_idx + 1}/#{a_items.length}..."
-      end
-    end
+      b_clusters.each_with_index { |bc, idx| only_b.concat(bc[:member_eids]) unless b_used[idx] }
 
-    b_items.each_with_index do |bi, idx|
-      only_b << bi[:eid] unless b_used[idx]
+    else
+      # ── Original entity-to-entity comparison ──
+      a_items.each_with_index do |ai, a_idx|
+        best = nil
+        best_overlap = 0
+
+        b_items.each_with_index do |bi, bi_idx|
+          next if b_used[bi_idx]
+          next unless bb_overlap?(ai[:bounds], bi[:bounds])
+
+          ratio = bb_overlap_ratio(ai[:bounds], bi[:bounds])
+          if ratio > COMPARE_OVERLAP_THRESHOLD && ratio > best_overlap
+            best = { bi: bi, idx: bi_idx, overlap: ratio }
+            best_overlap = ratio
+          end
+        end
+
+        if best
+          b_used[best[:idx]] = true
+          bi = best[:bi]
+
+          vol_a = ai[:bounds][:volume]
+          vol_b = bi[:bounds][:volume]
+          max_vol = [vol_a, vol_b].max
+          vol_diff = max_vol > 0 ? (vol_a - vol_b).abs / max_vol : 0
+
+          if vol_diff < vol_tol
+            status = 'matching'
+            delta = {}
+          else
+            status = 'modified'
+            delta = { vol_diff: vol_diff.round(3), overlap: best[:overlap].round(3) }
+          end
+          matched << { a_eid: ai[:eid], b_eid: bi[:eid], status: status, delta: delta }
+        else
+          only_a << ai[:eid]
+        end
+
+        if (a_idx + 1) % 50 == 0
+          puts "[FF Compare] Processed #{a_idx + 1}/#{a_items.length}..."
+        end
+      end
+
+      b_items.each_with_index do |bi, idx|
+        only_b << bi[:eid] unless b_used[idx]
+      end
     end
 
     matching_n = matched.count { |m| m[:status] == 'matching' }

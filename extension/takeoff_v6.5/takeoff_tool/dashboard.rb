@@ -757,7 +757,11 @@ module TakeoffTool
           cat_a = data['catA'].to_s.strip
           cat_b = data['catB'].to_s.strip
           next if cat_a.empty? || cat_b.empty?
-          TakeoffTool.compare_categories(cat_a, cat_b)
+          opts = {}
+          opts['cluster'] = data['cluster'] unless data['cluster'].nil?
+          opts['spatialTol'] = data['spatialTol'].to_f if data['spatialTol']
+          opts['volTol'] = data['volTol'].to_f / 100.0 if data['volTol']
+          TakeoffTool.compare_categories(cat_a, cat_b, opts)
           TakeoffTool.apply_compare_highlights
           send_compare_results
         rescue => e

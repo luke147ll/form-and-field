@@ -588,6 +588,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .cb-run{padding:3px 10px;background:#cba6f7;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
 .cb-run:hover{filter:brightness(1.1)}
 .cb-clear{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
+.cb-cluster{color:#a6adc8;font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap}
+.cb-cluster input{margin:0;accent-color:#cba6f7}
+.cb-tol{display:flex;gap:6px;color:#6c7086;font-size:10px;align-items:center}
+.cb-tol label{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.cb-tol-input{width:36px;background:#181825;border:1px solid #313244;border-radius:3px;color:#cdd6f4;font-size:10px;padding:1px 3px;text-align:center}
 .compare-results{display:none;padding:8px 12px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
 .compare-results.active{display:flex;flex-direction:column;gap:6px}
 .cr-header{display:flex;align-items:center;gap:8px}
@@ -833,6 +838,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <div class="compare-bar" id="compareBar">
     <span class="cb-label">Compare:</span>
     <span class="cb-sel" id="cbSel">Select categories from each panel</span>
+    <label class="cb-cluster" title="Cluster nearby entities before comparing"><input type="checkbox" id="cbCluster" checked onchange="document.getElementById('cbTolGroup').style.display=this.checked?'flex':'none'"> Cluster</label>
+    <span class="cb-tol" id="cbTolGroup"><label title="Gap tolerance (inches)">Gap:<input type="number" id="cbSpatialTol" value="0.5" min="0" max="6" step="0.25" class="cb-tol-input"></label><label title="Volume tolerance %">Vol:<input type="number" id="cbVolTol" value="5" min="1" max="50" step="1" class="cb-tol-input">%</label></span>
     <button class="cb-run" id="cbRunBtn" onclick="runCompare()" disabled>Compare</button>
     <button class="cb-clear" onclick="clearCompare()" title="Clear">&times;</button>
   </div>
@@ -2980,7 +2987,14 @@ function updateCompareBar(){
 function runCompare(){
   if(!compSelA||!compSelB)return;
   showPortalLoading('Comparing','Analyzing "'+compSelA+'" vs "'+compSelB+'"');
-  callJSON('compareCategories',{catA:compSelA,catB:compSelB});
+  var opts={catA:compSelA,catB:compSelB};
+  var cl=document.getElementById('cbCluster');
+  if(cl) opts.cluster=cl.checked;
+  var st=document.getElementById('cbSpatialTol');
+  if(st&&st.value) opts.spatialTol=parseFloat(st.value);
+  var vt=document.getElementById('cbVolTol');
+  if(vt&&vt.value) opts.volTol=parseFloat(vt.value);
+  callJSON('compareCategories',opts);
 }
 function receiveCompareResults(s){
   var d;
