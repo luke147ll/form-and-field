@@ -124,6 +124,14 @@ h1{font-size:17px;font-weight:700;color:#cba6f7;margin-bottom:2px}
 var DATA=null;
 var ACCEPTED={}, REJECTED={};
 
+/* ═══ Error capture — sends JS errors back to Ruby Console ═══ */
+window.onerror=function(msg,src,line,col,err){
+  var detail='[FF Align JS ERROR] '+msg+' at line '+line+':'+col;
+  console.log(detail);
+  try{if(window.sketchup&&window.sketchup.jsError)window.sketchup.jsError(detail);}catch(e){}
+  return false;
+};
+
 /* ═══ Communication ═══ */
 function call(n,a){
   try{
@@ -158,7 +166,7 @@ function render(data){
   html+=buildNoMatch(data.tiers.no_match||{}, data.no_match_count||0);
 
   document.getElementById('tiersContainer').innerHTML=html;
-  document.getElementById('content').style.display='';
+  document.getElementById('content').style.display='block';
   document.getElementById('loadingMsg').style.display='none';
 }
 
@@ -317,23 +325,44 @@ function pctColor(pct){
   return'#f38ba8';
 }
 
-/* ═══ Request data on load + poll as fallback ═══ */
-window.addEventListener('load', function(){
-  call('requestAlignmentData');
-});
+/* ═══ Entry point — called by Ruby via execute_script ═══ */
+function renderAlignmentData(data){
+  try{
+    console.log('[FF Align JS] renderAlignmentData called, type='+(typeof data));
+    console.log('[FF Align JS] data='+(data?'keys:'+Object.keys(data).join(','):'NULL'));
+    if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}
+    render(data);
+    console.log('[FF Align JS] render() completed successfully');
+  }catch(e){
+    console.log('[FF Align JS ERROR] renderAlignmentData: '+e.message);
+    try{if(window.sketchup&&window.sketchup.jsError)window.sketchup.jsError('renderAlignmentData: '+e.message);}catch(e2){}
+    document.getElementById('loadingMsg').textContent='JS Error: '+e.message;
+    document.getElementById('loadingMsg').style.display='';
+  }
+}
 
+/* ═══ Request data on load — 200ms delay for sketchup bridge ═══ */
+window.onload=function(){
+  console.log('[FF Align JS] onload fired');
+  setTimeout(function(){
+    console.log('[FF Align JS] requesting data via call()');
+    call('requestAlignmentData');
+  },200);
+};
+
+/* ═══ Fallback poll — re-request if data hasn't arrived ═══ */
 var _pollCount=0;
 var _pollTimer=setInterval(function(){
   _pollCount++;
-  if(window.ALIGNMENT_DATA){
-    clearInterval(_pollTimer);
-    render(window.ALIGNMENT_DATA);
-  }else if(_pollCount===20){
-    // Re-request at 1s in case first request was too early
+  if(DATA){
+    clearInterval(_pollTimer);_pollTimer=null;
+  }else if(_pollCount===40){
+    // Re-request at 2s as safety net
+    console.log('[FF Align JS] poll re-request at 2s');
     call('requestAlignmentData');
-  }else if(_pollCount>100){
-    clearInterval(_pollTimer);
-    document.getElementById('loadingMsg').textContent='Error: No alignment data received.';
+  }else if(_pollCount>160){
+    clearInterval(_pollTimer);_pollTimer=null;
+    document.getElementById('loadingMsg').textContent='Error: No alignment data received. Check Ruby Console for [FF Align] logs.';
   }
 },50);
 </script>

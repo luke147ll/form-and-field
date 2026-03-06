@@ -285,6 +285,9 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════
 
     def self.show_alignment_review(match_results)
+      puts "[FF Align] Step 0: show_alignment_review called — total=#{match_results[:total_matched]} auto=#{match_results[:auto_count]} probable=#{match_results[:probable_count]} low=#{match_results[:low_count]} no_match=#{match_results[:no_match_count]}"
+      puts "[FF Align] Step 0: grouped_tiers keys=#{match_results[:grouped_tiers]&.keys&.inspect}"
+
       @review_mr = match_results
       @accepted_groups = {}
 
@@ -301,19 +304,37 @@ module TakeoffTool
         style: UI::HtmlDialog::STYLE_DIALOG
       )
 
+      # Register callbacks BEFORE set_file — HTML may load and fire onload
+      # before show() returns, so callbacks must exist first
+      register_review_callbacks(@review_dlg)
+      puts "[FF Align] Step 0: Callbacks registered"
+
       html_path = File.join(PLUGIN_DIR, 'ui', 'alignment_review.html')
+      puts "[FF Align] Step 0: HTML path=#{html_path} exists=#{File.exist?(html_path)}"
       @review_dlg.set_file(html_path)
 
-      register_review_callbacks(@review_dlg)
-
-      puts "GeometryMatcher: Opening alignment review — #{match_results[:total_matched]} matched, #{match_results[:auto_count]} auto, #{match_results[:probable_count]} probable"
-
       @review_dlg.show
-      # Data injection happens via requestAlignmentData callback from JS onload
+      puts "[FF Align] Step 0: Dialog shown"
+
+      # Backup: proactively inject data after 0.8s in case JS→Ruby callback fails
+      UI.start_timer(0.8, false) do
+        if @review_dlg && @review_dlg.visible? && @review_mr
+          puts "[FF Align] Backup timer fired — injecting data proactively"
+          inject_alignment_data
+        else
+          puts "[FF Align] Backup timer fired — dlg=#{!!@review_dlg} visible=#{@review_dlg&.visible?} mr=#{!!@review_mr}"
+        end
+      end
     end
 
     def self.register_review_callbacks(dlg)
+      dlg.add_action_callback('jsError') do |_ctx, msg|
+        puts "[FF Align] JS ERROR: #{msg}"
+      end
+
       dlg.add_action_callback('requestAlignmentData') do |_ctx|
+        puts "[FF Align] Step 1: requestAlignmentData callback triggered"
+        puts "[FF Align] Step 1: @review_mr=#{@review_mr.nil? ? 'NIL' : 'present'} @review_dlg=#{@review_dlg.nil? ? 'NIL' : 'present'}"
         inject_alignment_data
       end
 
@@ -371,18 +392,18 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════
 
     def self.inject_alignment_data
+      puts "[FF Align] Step 2: inject_alignment_data called"
+
       unless @review_dlg
-        puts "GeometryMatcher: inject_alignment_data — no dialog ref"
+        puts "[FF Align] ABORT: no dialog ref (@review_dlg is nil)"
         return
       end
       unless @review_mr
-        puts "GeometryMatcher: inject_alignment_data — no match results"
+        puts "[FF Align] ABORT: no match results (@review_mr is nil)"
         return
       end
-      unless @review_dlg.visible?
-        puts "GeometryMatcher: inject_alignment_data — dialog not visible yet"
-        return
-      end
+
+      puts "[FF Align] Step 2: @review_mr has #{@review_mr[:total_matched]} total, grouped_tiers=#{@review_mr[:grouped_tiers]&.keys&.inspect}"
 
       data = {
         total_matched: @review_mr[:total_matched],
@@ -406,14 +427,21 @@ module TakeoffTool
         data[:tiers][tier_key.to_s] = tier_data
       end
 
+      puts "[FF Align] Step 3: Data built — #{data[:tiers].keys.length} tiers, categories: #{data[:tiers].map { |k, v| "#{k}(#{v.keys.length})" }.join(', ')}"
+
+      require 'json'
       json = JSON.generate(data)
-      esc = json.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
-      script = "window.ALIGNMENT_DATA=JSON.parse('#{esc}');"
-      puts "GeometryMatcher: Injecting alignment data (#{json.length} bytes)"
+      puts "[FF Align] Step 4: JSON generated — #{json.length} chars"
+
+      # Pass JSON directly as JS object literal — no JSON.parse wrapping,
+      # no single-quote escaping. JSON is valid JavaScript.
+      script = "renderAlignmentData(#{json});"
+      puts "[FF Align] Step 5: Sending execute_script (#{script.length} chars)"
       @review_dlg.execute_script(script)
+      puts "[FF Align] Step 6: execute_script completed"
     rescue => e
-      puts "GeometryMatcher: Error injecting data: #{e.message}"
-      puts e.backtrace.first(3).join("\n") if e.backtrace
+      puts "[FF Align] ERROR in inject_alignment_data: #{e.class}: #{e.message}"
+      puts e.backtrace.first(5).join("\n") if e.backtrace
     end
 
     # ═══════════════════════════════════════════════════════════
