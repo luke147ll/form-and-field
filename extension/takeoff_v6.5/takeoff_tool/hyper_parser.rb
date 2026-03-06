@@ -1,9 +1,6 @@
 module TakeoffTool
   module HyperParser
     @dialog = nil
-    @orig_instance = {}   # eid => original material (for preview restore)
-    @orig_faces = {}      # defn_eid => [[face, orig_material], ...]
-    @hp_mats = {}         # name => Sketchup::Material
     @preview_active = false
     @hp_observer = nil
     @sampler_active = false
@@ -329,105 +326,30 @@ module TakeoffTool
     # ─── Highlight / Preview ───
 
     def self.highlight_group(eids)
-      m = Sketchup.active_model
-      return unless m
-
       clear_preview
-
-      m.start_operation('HP Preview', true)
+      ColorController.focus_entities(eids)
       @preview_active = true
-
-      bright = hp_mat(m, 'TO_HP_bright', [203, 166, 247], 0.9)
-
-      eid_set = {}
-      eids.each { |id| eid_set[id] = true }
-
-      painted_defs = {}
-
-      # Paint only matched entities (bright) — skip dimming others
-      visible_scan_results.each do |r|
-        e = TakeoffTool.find_entity(r[:entity_id])
-        next unless e && e.valid?
-        eid = r[:entity_id]
-        next unless eid_set[eid]
-
-        # Save and set instance material
-        @orig_instance[eid] = e.material
-        e.material = bright
-
-        # Paint faces inside definition for full visibility
-        defn = e.respond_to?(:definition) ? e.definition : nil
-        if defn && !painted_defs[defn.entityID]
-          painted_defs[defn.entityID] = true
-          face_list = []
-          defn.entities.grep(Sketchup::Face).each do |face|
-            face_list << [face, face.material]
-            face.material = bright
-          end
-          @orig_faces[defn.entityID] = face_list if face_list.length > 0
-        end
-      end
-
-      m.commit_operation
     end
 
     def self.clear_preview
       return unless @preview_active
-      m = Sketchup.active_model
-      return unless m
-
-      m.start_operation('HP Clear', true)
-
-      # Restore face materials (before instance materials)
-      @orig_faces.each do |_defn_id, face_list|
-        face_list.each do |face, orig_mat|
-          begin; face.material = orig_mat if face.valid?; rescue; end
-        end
-      end
-      @orig_faces.clear
-
-      # Restore instance materials
-      @orig_instance.each do |eid, orig_mat|
-        e = TakeoffTool.find_entity(eid)
-        if e && e.valid?
-          begin; e.material = orig_mat; rescue; end
-        end
-      end
-      @orig_instance.clear
-
-      @hp_mats.each do |_, mt|
-        begin; m.materials.remove(mt) if mt && mt.valid?; rescue; end
-      end
-      @hp_mats.clear
-
+      ColorController.clear_focus
       @preview_active = false
-      m.commit_operation
     end
 
     def self.highlight_single(eid)
-      m = Sketchup.active_model
-      return unless m
-      e = TakeoffTool.find_entity(eid)
-      return unless e && e.valid?
-      m.start_operation('HP Add HL', true)
+      ColorController.focus_entities([eid])
       @preview_active = true
-      bright = hp_mat(m, 'TO_HP_bright', [203, 166, 247], 0.9)
-      @orig_instance[eid] = e.material unless @orig_instance.key?(eid)
-      e.material = bright
-      m.commit_operation
     end
 
     def self.unhighlight_single(eid)
       m = Sketchup.active_model
       return unless m
-      e = TakeoffTool.find_entity(eid)
-      return unless e && e.valid?
       m.start_operation('HP Rem HL', true)
-      if @orig_instance.key?(eid)
-        begin; e.material = @orig_instance.delete(eid); rescue; end
-      end
-      @preview_active = false if @orig_instance.empty? && @orig_faces.empty?
+      ColorController.restore(eid)
       m.commit_operation
+      @hp_selected_eids.delete(eid)
+      @preview_active = @hp_selected_eids.any?
     end
 
     # ─── Commit ───
@@ -779,15 +701,6 @@ module TakeoffTool
       @dialog.execute_script("updateSearchProgress(#{js})")
     end
 
-    def self.hp_mat(m, name, rgb, alpha)
-      mt = @hp_mats[name]
-      unless mt
-        mt = m.materials.add(name)
-        mt.color = Sketchup::Color.new(*rgb)
-        mt.alpha = alpha
-        @hp_mats[name] = mt
-      end
-      mt
-    end
+    # hp_mat removed — delegated to ColorController
   end
 end

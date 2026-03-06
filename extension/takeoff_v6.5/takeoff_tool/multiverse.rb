@@ -418,6 +418,17 @@ module TakeoffTool
 
     mode = mode.to_s.downcase
 
+    # Clean up smart diff if active — restore original materials and visibility
+    if ColorController.active_mode == :smart_diff
+      ColorController.deactivate
+      if @ab_classification
+        @ab_classification.each_key do |eid|
+          e = find_entity(eid)
+          e.visible = true if e && e.valid?
+        end
+      end
+    end
+
     # Clear any active Highlighter state (isolate tracking, not entity iteration)
     Highlighter.clear_isolate_state
 
@@ -777,6 +788,178 @@ module TakeoffTool
     inter_vol / smaller
   end
 
+  # ═══ SMART A+B DIFF — Spatial Classification ═══
+
+  SMART_DIFF_CELL_SIZE = 24.0  # inches
+
+  # Classify all entities into 4 states: matched, changed, new_b, removed_a
+  # Returns Hash: { entity_id => :matched | :changed | :new_b | :removed_a }
+  def self.classify_ab_entities
+    sr = @scan_results || []
+    ca = @category_assignments || {}
+    reg = @entity_registry || {}
+
+    # Step 1: Separate A and B entities with world bounds
+    # Only include currently visible entities — hide categories to exclude from analysis
+    a_items = []
+    b_items = []
+
+    sr.each do |r|
+      e = reg[r[:entity_id]]
+      next unless e && e.valid? && e.visible?
+      ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+      wb = get_world_bounds(e)
+      next unless wb && wb[:volume] && wb[:volume] > 0
+
+      cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+      item = { eid: r[:entity_id], bounds: wb, category: cat }
+
+      if ms == 'model_a'
+        a_items << item
+      else
+        b_items << item
+      end
+    end
+
+    puts "[FF SmartDiff] A=#{a_items.length} B=#{b_items.length}"
+
+    # Step 2: Build spatial hash grid from A entities
+    grid = Hash.new { |h, k| h[k] = [] }
+    a_items.each do |item|
+      cells = cells_for_bounds(item[:bounds])
+      cells.each { |cell| grid[cell] << item }
+    end
+
+    # Step 3: For each B entity, find best A overlap
+    b_best_overlap = {}  # b_eid => { overlap_ratio:, a_eid: }
+    a_has_overlap = {}   # a_eid => true (any B overlaps it)
+
+    b_items.each do |b_item|
+      cells = cells_for_bounds(b_item[:bounds])
+      checked = {}
+      best_ratio = 0.0
+      best_a_eid = nil
+
+      cells.each do |cell|
+        (grid[cell] || []).each do |a_item|
+          next if checked[a_item[:eid]]
+          checked[a_item[:eid]] = true
+
+          # Category gate — wall overlapping steel is not a match
+          next unless a_item[:category] == b_item[:category]
+
+          next unless bb_overlap?(a_item[:bounds], b_item[:bounds])
+          ratio = bb_overlap_ratio(a_item[:bounds], b_item[:bounds])
+
+          if ratio > best_ratio
+            best_ratio = ratio
+            best_a_eid = a_item[:eid]
+          end
+        end
+      end
+
+      if best_ratio > 0.1
+        b_best_overlap[b_item[:eid]] = { overlap_ratio: best_ratio, a_eid: best_a_eid }
+        a_has_overlap[best_a_eid] = true if best_a_eid
+      end
+    end
+
+    # Step 4: Reverse check — which A entities have B overlap
+    b_grid = Hash.new { |h, k| h[k] = [] }
+    b_items.each do |item|
+      cells = cells_for_bounds(item[:bounds])
+      cells.each { |cell| b_grid[cell] << item }
+    end
+
+    a_items.each do |a_item|
+      next if a_has_overlap[a_item[:eid]]
+      cells = cells_for_bounds(a_item[:bounds])
+      cells.each do |cell|
+        (b_grid[cell] || []).each do |b_item|
+          # Category gate — only same-category overlaps count
+          next unless b_item[:category] == a_item[:category]
+          if bb_overlap?(a_item[:bounds], b_item[:bounds])
+            ratio = bb_overlap_ratio(a_item[:bounds], b_item[:bounds])
+            if ratio > 0.1
+              a_has_overlap[a_item[:eid]] = true
+              break
+            end
+          end
+        end
+        break if a_has_overlap[a_item[:eid]]
+      end
+    end
+
+    # Step 5: Classify
+    result = {}
+
+    a_items.each do |item|
+      if a_has_overlap[item[:eid]]
+        best = 0.0
+        b_best_overlap.each_value do |info|
+          best = info[:overlap_ratio] if info[:a_eid] == item[:eid] && info[:overlap_ratio] > best
+        end
+        result[item[:eid]] = best > 0.5 ? :matched : :changed
+      else
+        result[item[:eid]] = :removed_a
+      end
+    end
+
+    b_items.each do |item|
+      info = b_best_overlap[item[:eid]]
+      if info
+        result[item[:eid]] = info[:overlap_ratio] > 0.5 ? :matched : :changed
+      else
+        result[item[:eid]] = :new_b
+      end
+    end
+
+    counts = { matched: 0, changed: 0, new_b: 0, removed_a: 0 }
+    result.each_value { |v| counts[v] += 1 }
+    puts "[FF SmartDiff] matched=#{counts[:matched]} changed=#{counts[:changed]} new_b=#{counts[:new_b]} removed_a=#{counts[:removed_a]}"
+
+    # Store category for each classified entity (for category filtering)
+    @ab_categories = {}
+    (a_items + b_items).each { |item| @ab_categories[item[:eid]] = item[:category] }
+
+    @ab_classification = result
+    @ab_counts = counts
+    result
+  end
+
+  # Grid cell keys for a world bounding box
+  def self.cells_for_bounds(wb)
+    cs = SMART_DIFF_CELL_SIZE
+    cells = []
+    x0 = (wb[:min][0] / cs).floor
+    x1 = (wb[:max][0] / cs).floor
+    y0 = (wb[:min][1] / cs).floor
+    y1 = (wb[:max][1] / cs).floor
+    z0 = (wb[:min][2] / cs).floor
+    z1 = (wb[:max][2] / cs).floor
+
+    (x0..x1).each do |x|
+      (y0..y1).each do |y|
+        (z0..z1).each do |z|
+          cells << "#{x}_#{y}_#{z}"
+        end
+      end
+    end
+    cells
+  end
+
+  def self.ab_classification
+    @ab_classification
+  end
+
+  def self.ab_counts
+    @ab_counts
+  end
+
+  def self.ab_categories
+    @ab_categories
+  end
+
   # ═══ PART 1 — QUANTITY DELTA ═══
 
   # Extract the primary quantity from a scan result based on measurement type.
@@ -868,7 +1051,7 @@ module TakeoffTool
 
     # Clean up any existing diff state first
     remove_diff_highlights if @diff_active
-    @diff_orig_mats = nil
+    ColorController.diff_orig_mats = nil
 
     puts "[FF Diff] Starting overlay diff..."
 
@@ -886,7 +1069,7 @@ module TakeoffTool
     puts "[FF Diff] Work queue: #{work_queue.length} entities"
 
     create_diff_materials
-    @diff_orig_mats ||= {}
+    ColorController.diff_orig_mats ||= {}
 
     model = Sketchup.active_model
     model.rendering_options['DisplayColorByLayer'] = false if model
@@ -911,7 +1094,8 @@ module TakeoffTool
       next unless e && e.valid?
       mat = @diff_materials[item[:model]]
       next unless mat
-      @diff_orig_mats[item[:eid]] = e.material unless @diff_orig_mats.key?(item[:eid])
+      dom = ColorController.diff_orig_mats
+      dom[item[:eid]] = e.material unless dom.key?(item[:eid])
       e.material = mat
       state[:applied] += 1
     end
@@ -932,7 +1116,8 @@ module TakeoffTool
     model = Sketchup.active_model
     model.commit_operation if model
 
-    @diff_data = state[:queue]  # Array of {eid:, model:}
+    ColorController.diff_data = state[:queue]  # Array of {eid:, model:}
+    @diff_data = state[:queue]
     @diff_state = nil
     @diff_active = true
     elapsed = Time.now - state[:t_start]
@@ -944,23 +1129,22 @@ module TakeoffTool
     Dashboard.portal_complete("Diff applied — #{state[:applied]} entities")
   end
 
-  # Create 2 semi-transparent diff materials (green for A, blue for B).
+  # Create 2 semi-transparent diff materials via ColorController.
   def self.create_diff_materials
     model = Sketchup.active_model
     return unless model
     @diff_materials = {}
     { a: DIFF_COLOR_A, b: DIFF_COLOR_B }.each do |key, rgb|
-      name = "FF_Compare_#{key.to_s.upcase}"
-      mat = model.materials[name] || model.materials.add(name)
-      mat.color = Sketchup::Color.new(rgb[0], rgb[1], rgb[2])
-      mat.alpha = DIFF_ALPHA / 255.0
+      name = "FF_DIFF_#{key.to_s.upcase}"
+      mat = ColorController.get_or_create_material(model, name, rgb, DIFF_ALPHA / 255.0)
       @diff_materials[key] = mat
     end
   end
 
   # Re-apply diff materials from stored state (for toggle ON after OFF).
   def self.apply_diff_highlights
-    return unless @diff_data && @diff_data.any?
+    data = @diff_data || ColorController.diff_data
+    return unless data && data.any?
     model = Sketchup.active_model
     return unless model
     reg = @entity_registry || {}
@@ -969,14 +1153,15 @@ module TakeoffTool
     model.rendering_options['DisplayColorByLayer'] = false
     model.start_operation('Apply Diff', true)
 
-    @diff_orig_mats ||= {}
+    dom = ColorController.diff_orig_mats || {}
+    ColorController.diff_orig_mats = dom
     applied = 0
-    @diff_data.each do |item|
+    data.each do |item|
       e = reg[item[:eid]]
       next unless e && e.valid?
       mat = @diff_materials[item[:model]]
       next unless mat
-      @diff_orig_mats[item[:eid]] = e.material unless @diff_orig_mats.key?(item[:eid])
+      dom[item[:eid]] = e.material unless dom.key?(item[:eid])
       e.material = mat
       applied += 1
     end
@@ -993,9 +1178,10 @@ module TakeoffTool
     return unless model
     reg = @entity_registry || {}
 
-    if @diff_orig_mats && @diff_orig_mats.any?
+    dom = ColorController.diff_orig_mats
+    if dom && dom.any?
       model.start_operation('Remove Diff', true)
-      @diff_orig_mats.each do |eid, orig_mat|
+      dom.each do |eid, orig_mat|
         e = reg[eid]
         next unless e && e.valid?
         e.material = orig_mat
@@ -1003,7 +1189,7 @@ module TakeoffTool
       model.commit_operation
     end
 
-    @diff_orig_mats = nil
+    ColorController.diff_orig_mats = nil
     @diff_active = false
 
     if active_mv_view == 'ab'
@@ -1017,7 +1203,7 @@ module TakeoffTool
   def self.toggle_diff
     if @diff_active
       remove_diff_highlights
-    elsif @diff_data && @diff_data.any?
+    elsif (@diff_data || ColorController.diff_data) && (@diff_data || ColorController.diff_data).any?
       create_diff_materials unless @diff_materials
       apply_diff_highlights
     end
@@ -1067,6 +1253,7 @@ module TakeoffTool
   def self.clear_compare_highlights
     remove_diff_highlights if @diff_active
     @diff_data = nil
+    ColorController.diff_data = nil
     @diff_materials = nil
     @diff_state = nil
     @comparison_results = nil

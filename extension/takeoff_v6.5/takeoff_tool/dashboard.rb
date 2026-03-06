@@ -792,6 +792,116 @@ module TakeoffTool
         @dialog.execute_script("clearCompareUI()")
       end
 
+      # ═══ SMART DIFF ═══
+
+      @dialog.add_action_callback('computeSmartDiff') do |_ctx|
+        begin
+          ab = TakeoffTool.classify_ab_entities
+          if ab && ab.any?
+            ColorController.apply_smart_diff(ab)
+            counts = TakeoffTool.ab_counts || {}
+            require 'json'
+            @dialog.execute_script("onSmartDiffComplete(#{JSON.generate(counts)})")
+          end
+        rescue => e
+          puts "SmartDiff error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      @dialog.add_action_callback('setSmartDiffOpacity') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          state = data['state'].to_s
+          value = data['value'].to_f
+          ColorController.set_smart_diff_opacity(state, value)
+        rescue => e
+          puts "setSmartDiffOpacity error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('setSmartDiffVisibility') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          state = data['state'].to_s
+          visible = data['visible'] == true
+          cats = data['categories']  # nil = all, array = filter
+          ColorController.set_smart_diff_visibility(state, visible)
+          ab = TakeoffTool.ab_classification
+          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+        rescue => e
+          puts "setSmartDiffVisibility error: #{e.message}"
+        end
+      end
+
+      # ═══ SMART DIFF — CATEGORY FILTER ═══
+
+      @dialog.add_action_callback('smartDiffFilterCategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cats = data['categories']  # nil = all, array = filter
+          ab = TakeoffTool.ab_classification
+          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+        rescue => e
+          puts "smartDiffFilterCategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('smartDiffIsolateWithCat') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          state_str = data['state'].to_s
+          cats = data['categories']  # nil = all, array = filter
+          states = [:matched, :changed, :new_b, :removed_a]
+          target = state_str.to_sym
+          states.each { |s| ColorController.set_smart_diff_visibility(s, s == target) }
+          ab = TakeoffTool.ab_classification
+          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(ColorController.smart_diff_visibility)})")
+        rescue => e
+          puts "smartDiffIsolateWithCat error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('smartDiffShowAllWithCat') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cats = data['categories']  # nil = all, array = filter
+          [:matched, :changed, :new_b, :removed_a].each { |s| ColorController.set_smart_diff_visibility(s, true) }
+          ab = TakeoffTool.ab_classification
+          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(ColorController.smart_diff_visibility)})")
+        rescue => e
+          puts "smartDiffShowAllWithCat error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('removeSmartDiff') do |_ctx|
+        begin
+          ColorController.deactivate
+          m = Sketchup.active_model
+          if m && TakeoffTool.active_mv_view == 'ab'
+            m.rendering_options['DisplayColorByLayer'] = true
+          end
+          # Make all entities visible again
+          ab = TakeoffTool.ab_classification
+          if ab
+            ab.each_key do |eid|
+              e = TakeoffTool.find_entity(eid)
+              e.visible = true if e && e.valid?
+            end
+          end
+          m.active_view.invalidate if m
+          @dialog.execute_script("onSmartDiffRemoved()")
+        rescue => e
+          puts "removeSmartDiff error: #{e.message}"
+        end
+      end
+
       @dialog.add_action_callback('acceptCompare') do |_ctx|
         begin
           result = TakeoffTool.accept_compare
@@ -877,7 +987,7 @@ module TakeoffTool
         Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, ids)
       end
 
-      # ═══ CUSTOM COLORS ═══
+      # ═══ CUSTOM COLORS (via ColorController) ═══
 
       @dialog.add_action_callback('setCustomColor') do |_ctx, json_str|
         begin
@@ -886,13 +996,15 @@ module TakeoffTool
           type = data['type'].to_s
           key = data['key'].to_s
           color = data['color'].to_s
-          colors = load_custom_colors_for_view
-          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
+          opacity = data['opacity'] ? data['opacity'].to_f : nil
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements','container'=>'containers'}
           section = plural[type] || (type + 's')
+          ColorController.set_color(section, key, color, opacity)
+          # Also update legacy custom_colors for backward compat
+          colors = load_custom_colors_for_view
           colors[section] ||= {}
           colors[section][key] = color
           save_custom_colors_for_view(colors)
-          Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
           send_live_data
         rescue => e
@@ -906,18 +1018,34 @@ module TakeoffTool
           data = JSON.parse(json_str.to_s)
           type = data['type'].to_s
           key = data['key'].to_s
-          colors = load_custom_colors_for_view
-          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements'}
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements','container'=>'containers'}
           section = plural[type] || (type + 's')
+          ColorController.clear_color(section, key)
+          # Also update legacy custom_colors for backward compat
+          colors = load_custom_colors_for_view
           if colors[section]
             colors[section].delete(key)
           end
           save_custom_colors_for_view(colors)
-          Highlighter.clear_cached_material(key) if type == 'category'
           Highlighter.refresh_highlights
           send_live_data
         rescue => e
           puts "Takeoff clearCustomColor error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('setCustomOpacity') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          type = data['type'].to_s
+          key = data['key'].to_s
+          opacity = data['opacity'].to_f
+          plural = {'category'=>'categories','subcategory'=>'subcategories','assembly'=>'assemblies','entity'=>'entities','measurement'=>'measurements','container'=>'containers'}
+          section = plural[type] || (type + 's')
+          ColorController.set_opacity(section, key, opacity)
+        rescue => e
+          puts "Takeoff setCustomOpacity error: #{e.message}"
         end
       end
 
@@ -1362,7 +1490,8 @@ module TakeoffTool
       containers = TakeoffTool.master_containers || []
       cont_names = containers.map { |c| c['name'] rescue '?' }
       puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
-      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, containers: containers })
+      color_settings = ColorController.get_settings rescue {}
+      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")

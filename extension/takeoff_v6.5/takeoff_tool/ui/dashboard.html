@@ -117,7 +117,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .info-tab-underline{position:absolute;bottom:0;height:2px;background:#cba6f7;border-radius:1px 1px 0 0;transition:left .25s cubic-bezier(.16,1,.3,1),width .25s cubic-bezier(.16,1,.3,1)}
 
 /* INFO PANEL */
-.info-panel{flex:0 0 auto;min-height:120px;max-height:40%;overflow:hidden;background:#1e1e2e;display:flex;flex-direction:column}
+.info-panel{flex:0 0 auto;min-height:120px;max-height:75%;overflow:hidden;background:#1e1e2e;display:flex;flex-direction:column}
 .info-content{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .info-content.active{display:flex}
 .info-panel .sec-scroll::-webkit-scrollbar{width:6px}
@@ -526,6 +526,35 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .cd-reset:hover{color:#f38ba8}
 .color-dot-static{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0;vertical-align:middle}
 .color-dot-wrap.viewport-active .cd-main{box-shadow:0 0 6px 2px currentColor;border-color:rgba(255,255,255,0.3)}
+/* ── Color Picker Popup ── */
+.color-popup{position:fixed;z-index:9000;width:224px;background:#1e1e2e;border:1px solid #45475a;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.5);padding:8px;font-size:11px;color:#cdd6f4}
+.cp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding:0 2px}
+.cp-header span{font-weight:600;font-size:11px;color:#bac2de}
+.cp-close{background:none;border:none;color:#6c7086;font-size:16px;cursor:pointer;padding:0 2px;line-height:1}
+.cp-close:hover{color:#f38ba8}
+.cp-swatches{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;justify-content:center}
+.cp-swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s ease;flex-shrink:0}
+.cp-swatch:hover{transform:scale(1.2);border-color:rgba(255,255,255,0.3)}
+.cp-swatch.picked{border-color:#cdd6f4;transform:scale(1.1)}
+.cp-hex-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.cp-preview{width:20px;height:20px;border-radius:4px;border:1px solid #45475a;flex-shrink:0}
+#cpHexInput{flex:1;background:#181825;border:1px solid #45475a;border-radius:4px;color:#cdd6f4;padding:3px 6px;font-size:11px;font-family:monospace}
+#cpHexInput:focus{border-color:#89b4fa;outline:none}
+.cp-native-wrap{position:relative;width:22px;height:22px;cursor:pointer;flex-shrink:0}
+.cp-native-wrap input[type="color"]{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.cp-native-icon{display:flex;align-items:center;justify-content:center;width:22px;height:22px;background:#313244;border-radius:4px;color:#89b4fa;font-size:12px;pointer-events:none}
+.cp-opacity-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.cp-opacity-row label{color:#a6adc8;font-size:10px;min-width:40px}
+.cp-opacity-row input[type="range"]{flex:1;-webkit-appearance:none;height:4px;background:#313244;border-radius:2px;outline:none}
+.cp-opacity-row input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#cba6f7;cursor:pointer;border:none}
+#cpOpacityVal{color:#a6adc8;font-size:10px;min-width:28px;text-align:right}
+.cp-actions{display:flex;gap:6px;justify-content:flex-end}
+.cp-btn{padding:4px 12px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;font-size:10px;cursor:pointer;transition:all .15s ease}
+.cp-btn:hover{background:#45475a}
+.cp-btn.cp-apply{background:#89b4fa;color:#1e1e2e;border-color:#89b4fa;font-weight:600}
+.cp-btn.cp-apply:hover{background:#74c7ec}
+.cp-btn.cp-reset{color:#f38ba8}
+.cp-btn.cp-reset:hover{background:rgba(243,139,168,0.1)}
 /* ── Scanner Banner ── */
 .scanner-banner{display:none;padding:8px 12px;background:rgba(249,226,175,0.08);border-bottom:1px solid rgba(249,226,175,0.2);align-items:center;gap:8px}
 .scanner-banner.active{display:flex}
@@ -920,13 +949,41 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
       </div>
       <div class="mv-active" id="mvActive" style="display:none">
         <div class="mv-models" id="mvModels"></div>
-        <div class="mv-divider"></div>
-        <div class="mv-comparison-header">Comparison Summary</div>
-        <div class="mv-comparison-list" id="mvComparisonList"></div>
-        <div class="mv-divider"></div>
         <div class="mv-needs-scan" id="mvNeedsScan" style="display:none">
           <span style="color:#f9e2af;font-size:11px">Model B imported — not yet scanned</span>
           <span class="mv-scan-b-btn" onclick="showLoading('SCANNING MODEL B');call('rescanModelB')">Scan Model B</span>
+        </div>
+        <!-- Smart Diff Controls Panel (top priority) -->
+        <div id="smartDiffPanel" style="display:none;background:#1e1e2e;border:1px solid #313244;border-radius:8px;padding:10px;margin:6px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:13px;font-weight:600;color:#cdd6f4;">Smart Comparison</span>
+            <div style="display:flex;gap:4px;">
+              <button onclick="showLoading('ANALYZING SPATIAL OVERLAP');call('computeSmartDiff')" title="Analyze spatial overlap" style="font-size:11px;padding:3px 10px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit;">Analyze</button>
+              <button onclick="call('removeSmartDiff')" title="Remove diff" style="font-size:11px;padding:3px 8px;background:none;border:1px solid #f38ba8;color:#f38ba8;border-radius:4px;cursor:pointer;font-family:inherit;">Clear</button>
+            </div>
+          </div>
+          <div id="sdResults" style="display:none;">
+            <div id="sdRows"></div>
+            <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <select id="sdCatFilter" onchange="applySmartDiffCatFilter()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:3px 6px;font-size:10px;font-family:inherit;max-width:160px;">
+                <option value="">All Categories</option>
+              </select>
+              <button onclick="sdIsolateWithCat('new_b')" style="font-size:10px;padding:2px 8px;background:#313244;color:#89b4fa;border:1px solid #89b4fa;border-radius:4px;cursor:pointer;font-family:inherit;">New in B</button>
+              <button onclick="sdIsolateWithCat('removed_a')" style="font-size:10px;padding:2px 8px;background:#313244;color:#f38ba8;border:1px solid #f38ba8;border-radius:4px;cursor:pointer;font-family:inherit;">Removed</button>
+              <button onclick="sdIsolateWithCat('changed')" style="font-size:10px;padding:2px 8px;background:#313244;color:#f9e2af;border:1px solid #f9e2af;border-radius:4px;cursor:pointer;font-family:inherit;">Changes</button>
+              <button onclick="sdShowAllWithCat()" style="font-size:10px;padding:2px 8px;background:#313244;color:#a6e3a1;border:1px solid #a6e3a1;border-radius:4px;cursor:pointer;font-family:inherit;">Show All</button>
+            </div>
+          </div>
+        </div>
+        <!-- Comparison Summary (collapsed by default) -->
+        <div style="margin:4px 0;">
+          <div onclick="var el=document.getElementById('mvCompWrap');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('.mv-chev').textContent=el.style.display==='none'?'\u25B6':'\u25BC'" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0;">
+            <span class="mv-chev" style="font-size:9px;color:#6c7086;">&#9654;</span>
+            <span style="font-size:11px;color:#6c7086;">Quantity Summary</span>
+          </div>
+          <div id="mvCompWrap" style="display:none;">
+            <div class="mv-comparison-list" id="mvComparisonList"></div>
+          </div>
         </div>
         <div class="mv-management">
           <span class="mv-mgmt-btn" onclick="showLoading('RESCANNING MODEL B');call('rescanModelB')">Rescan B</span>
@@ -1111,6 +1168,7 @@ var ASMVIS={};
 var mvState={};
 var currentMvView=null;
 var CCOL={};
+var CSETTINGS={};
 var CONTAINERS=[];
 var CAT_TO_CONT={};
 var openConts={};
@@ -1127,9 +1185,10 @@ var matchedFilterActive=false;
 var matchedCats=null;
 var pendingVisReapply=false;
 var mvModelA='',mvModelB='';
-var COLOR_PALETTE=['#cba6f7','#89b4fa','#94e2d5','#a6e3a1','#fab387','#f38ba8','#f9e2af','#f5c2e7','#89dceb','#b4befe','#f2cdcd','#74c7ec'];
+var COLOR_PALETTE=['#f5e0dc','#f2cdcd','#f5c2e7','#cba6f7','#f38ba8','#eba0ac','#fab387','#f9e2af','#a6e3a1','#94e2d5','#89dceb','#74c7ec','#89b4fa','#b4befe'];
 var openColorDotId=null;
 var activeColorCategories={};
+var cpState={type:'',key:'',hex:'',opacity:85};
 var debugOn=false;
 /* Scanner Mode state */
 var scannerMode=false;
@@ -1252,7 +1311,7 @@ function callJSON(n,o){call(n,JSON.stringify(o));}
 function receiveData(json){
   try{
     var d=JSON.parse(json);
-    D=d.rows||[];CA=d.categories||[];ALL_CA=d.allCategories||CA;CO=d.costCodes||[];CAT_CCM=d.catCostCodeMap||{};MSUB=d.masterSubcategories||{};ALL_MSUB=d.allMasterSubcategories||MSUB;CATMT=d.categoryMT||{};CCOL=d.customColors||{};
+    D=d.rows||[];CA=d.categories||[];ALL_CA=d.allCategories||CA;CO=d.costCodes||[];CAT_CCM=d.catCostCodeMap||{};MSUB=d.masterSubcategories||{};ALL_MSUB=d.allMasterSubcategories||MSUB;CATMT=d.categoryMT||{};CCOL=d.customColors||{};CSETTINGS=d.colorSettings||{};
     CONTAINERS=d.containers||[];
     console.log('[FF receiveData] '+D.length+' rows, '+CONTAINERS.length+' containers');
     buildCatToContMap();
@@ -1653,6 +1712,12 @@ function getContainerCats(contName){
     }
   }
   return set;
+}
+function getCategoriesInContainer(containerName){
+  var set=getContainerCats(containerName);
+  var result=[];
+  for(var cat in set){if(set.hasOwnProperty(cat))result.push(cat);}
+  return result;
 }
 function contTotal(allItems){
   if(!allItems.length)return'';
@@ -2064,6 +2129,8 @@ function renderContainerGroups(){
     var cIso=containerIsolate===cm.name;
     h+='<button class="cont-iso'+(cIso?' iso-active':'')+'" onclick="event.stopPropagation();isoContainer(\''+X2(cm.name)+'\')" title="Isolate container">&#8857;</button>';
     h+='<span class="cont-badge" style="--cc:'+cm.color+'" onclick="togCont(\''+X2(cm.name)+'\')">'+X(cm.name)+'</span>';
+    var contCol=(CCOL.containers||{})[cm.name]||'';
+    h+=buildColorDot('container',cm.name,contCol);
     var _cdiv=getContDivision(cm.name);
     if(_cdiv) h+='<span class="cont-div" onclick="togCont(\''+X2(cm.name)+'\')">'+_cdiv+'</span>';
     h+='<span class="arr" onclick="togCont(\''+X2(cm.name)+'\')">&#9660;</span>';
@@ -2594,6 +2661,9 @@ function setMvView(mode){
     var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
     document.getElementById('compResults').classList.remove('active');
     call('clearCompareHighlights');
+    // Clear smart diff
+    onSmartDiffRemoved();
+    call('removeSmartDiff');
   }
   call('setMultiverseView',mode);
 }
@@ -2639,12 +2709,14 @@ function receiveMultiverseData(json){
   var empty=document.getElementById('mvEmpty');
   var active=document.getElementById('mvActive');
   var nsEl=document.getElementById('mvNeedsScan');
+  var sdPanel=document.getElementById('smartDiffPanel');
   if(d.models&&d.models.length>1){
     currentMvView=d.activeView||'a';
     bar.style.display='flex';
     empty.style.display='none';
     active.style.display='block';
     if(nsEl) nsEl.style.display=d.needsScan?'flex':'none';
+    if(sdPanel) sdPanel.style.display='block';
     mvModelA=d.models[0].name;
     mvModelB=d.models[1].name;
     document.querySelectorAll('.mv-btn').forEach(function(b){
@@ -2681,6 +2753,7 @@ function receiveMultiverseData(json){
     empty.style.display='flex';
     active.style.display='none';
     if(nsEl) nsEl.style.display='none';
+    if(sdPanel) sdPanel.style.display='none';
   }
 }
 
@@ -2736,6 +2809,134 @@ function confirmRemoveMv(){
   showPortalConfirm('Remove Model B','Remove comparison model? All Model B entities will be deleted.',function(){
     call('removeComparisonModel');
   });
+}
+
+/* ═══ SMART DIFF ═══ */
+var SD_COLORS={matched:'#585b70',changed:'#f9e2af',new_b:'#89b4fa',removed_a:'#f38ba8'};
+var SD_LABELS={matched:'Matched',changed:'Changed',new_b:'New in B',removed_a:'Removed from A'};
+var SD_OPACITY={matched:15,changed:50,new_b:90,removed_a:70};
+var SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
+
+function populateSDCatFilter(){
+  var sel=document.getElementById('sdCatFilter');
+  if(!sel)return;
+  var cats={};
+  for(var i=0;i<D.length;i++){
+    var c=D[i].category;
+    if(c&&c!=='_IGNORE'&&c!=='Uncategorized')cats[c]=true;
+  }
+  var sorted=Object.keys(cats).sort();
+  var h='<option value="">All Categories</option>';
+  /* Add containers as optgroups */
+  var contCats={};
+  for(var ci=0;ci<CONTAINERS.length;ci++){
+    contCats[CONTAINERS[ci].name]=[];
+  }
+  for(var si=0;si<sorted.length;si++){
+    var info=CAT_TO_CONT[sorted[si]];
+    var cn=info?info.name:'Other';
+    if(!contCats[cn])contCats[cn]=[];
+    contCats[cn].push(sorted[si]);
+  }
+  for(var cn2 in contCats){
+    if(!contCats.hasOwnProperty(cn2)||contCats[cn2].length===0)continue;
+    h+='<optgroup label="'+X(cn2)+'">';
+    h+='<option value="__cont__'+X2(cn2)+'" style="font-weight:700;color:#cba6f7;">'+X(cn2)+' (all)</option>';
+    for(var k=0;k<contCats[cn2].length;k++){
+      h+='<option value="'+X2(contCats[cn2][k])+'">'+X(contCats[cn2][k])+'</option>';
+    }
+    h+='</optgroup>';
+  }
+  sel.innerHTML=h;
+}
+
+function getSDCatFilter(){
+  var sel=document.getElementById('sdCatFilter');
+  if(!sel||!sel.value)return null;
+  var v=sel.value;
+  if(v.indexOf('__cont__')===0){
+    /* Container selected — return all cats in it */
+    var cn=v.substring(8);
+    var cats=[];
+    for(var c in CAT_TO_CONT){
+      if(CAT_TO_CONT.hasOwnProperty(c)&&CAT_TO_CONT[c].name===cn) cats.push(c);
+    }
+    return cats;
+  }
+  return [v];
+}
+
+function applySmartDiffCatFilter(){
+  var cats=getSDCatFilter();
+  callJSON('smartDiffFilterCategory',{categories:cats});
+}
+
+function sdIsolateWithCat(state){
+  var cats=getSDCatFilter();
+  callJSON('smartDiffIsolateWithCat',{state:state,categories:cats});
+}
+
+function sdShowAllWithCat(){
+  var cats=getSDCatFilter();
+  SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
+  callJSON('smartDiffShowAllWithCat',{categories:cats});
+}
+
+function onSmartDiffComplete(counts){
+  hideLoading();
+  populateSDCatFilter();
+  document.getElementById('sdResults').style.display='block';
+  var h='';
+  var states=['matched','changed','new_b','removed_a'];
+  for(var i=0;i<states.length;i++){
+    var s=states[i];
+    var cnt=counts[s]||0;
+    var vis=SD_VIS[s];
+    var op=SD_OPACITY[s];
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #313244;">';
+    h+='<button class="ey'+(vis?'':' off')+'" onclick="toggleSDVis(\''+s+'\')" style="flex-shrink:0;" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    h+='<span style="width:10px;height:10px;border-radius:50%;background:'+SD_COLORS[s]+';flex-shrink:0;"></span>';
+    h+='<span style="color:'+SD_COLORS[s]+';font-size:12px;font-weight:600;min-width:100px;">'+SD_LABELS[s]+'</span>';
+    h+='<span style="color:#a6adc8;font-size:11px;min-width:40px;">'+cnt+'</span>';
+    h+='<input type="range" min="0" max="100" value="'+op+'" oninput="setSDOpacity(\''+s+'\',this.value)" style="flex:1;accent-color:'+SD_COLORS[s]+';">';
+    h+='<span id="sdOp_'+s+'" style="color:#6c7086;font-size:10px;min-width:30px;">'+op+'%</span>';
+    h+='</div>';
+  }
+  document.getElementById('sdRows').innerHTML=h;
+}
+
+function toggleSDVis(state){
+  SD_VIS[state]=!SD_VIS[state];
+  var cats=getSDCatFilter();
+  callJSON('setSmartDiffVisibility',{state:state,visible:SD_VIS[state],categories:cats});
+}
+
+function setSDOpacity(state,val){
+  val=parseInt(val);
+  SD_OPACITY[state]=val;
+  var el=document.getElementById('sdOp_'+state);
+  if(el) el.textContent=val+'%';
+  var cats=getSDCatFilter();
+  callJSON('setSmartDiffOpacity',{state:state,value:val/100.0,categories:cats});
+}
+
+function onSmartDiffVisUpdate(vis){
+  SD_VIS=vis;
+  var states=['matched','changed','new_b','removed_a'];
+  for(var i=0;i<states.length;i++){
+    var s=states[i];
+    var rows=document.querySelectorAll('#sdRows .ey');
+    if(rows[i]){
+      if(SD_VIS[s]){rows[i].classList.remove('off');rows[i].innerHTML=ICO_EYE_OPEN;}
+      else{rows[i].classList.add('off');rows[i].innerHTML=ICO_EYE_CLOSED;}
+    }
+  }
+}
+
+function onSmartDiffRemoved(){
+  document.getElementById('sdResults').style.display='none';
+  SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
+  SD_OPACITY={matched:15,changed:50,new_b:90,removed_a:70};
 }
 
 /* ═══ SPLIT VERTICAL DASHBOARD ═══ */
@@ -3426,7 +3627,7 @@ function startResize(e,panelId){
 document.addEventListener('mousemove',function(e){
   if(!_resizing)return;
   var dy=_resizeStartY-e.clientY;
-  var maxH=Math.floor(window.innerHeight*0.6);
+  var maxH=Math.floor(window.innerHeight*0.85);
   var h=Math.max(80,Math.min(maxH,_resizeStartH+dy));
   var p=document.getElementById(_resizing);
   p.style.height=h+'px';
@@ -4233,49 +4434,48 @@ function buildColorDot(type,key,currentColor){
   var isActive=(type==='category'&&activeColorCategories[key]);
   var h='<span class="color-dot-wrap'+(isActive?' viewport-active':'')+'" onclick="handleColorClick(event,\''+type+'\',\''+X2(key)+'\')" ondblclick="handleColorDblClick(event,\''+type+'\',\''+X2(key)+'\')" id="'+sid+'" style="color:'+bg+'">';
   h+='<span class="cd-main" style="background:'+bg+'"'+(hasCustom?' data-custom-color="'+currentColor+'"':'')+' ></span>';
-  h+='<span class="cd-palette">';
-  for(var i=0;i<COLOR_PALETTE.length;i++){
-    var c=COLOR_PALETTE[i];
-    var picked=(c===currentColor)?' picked':'';
-    h+='<span class="cd-circle'+picked+'" style="background:'+c+'" onclick="pickColor(event,\''+type+'\',\''+X2(key)+'\',\''+c+'\')" ondblclick="event.stopPropagation()"></span>';
-  }
-  h+='<span class="cd-reset" onclick="resetColor(event,\''+type+'\',\''+X2(key)+'\')" ondblclick="event.stopPropagation()">&#10005;</span>';
-  h+='</span></span>';
+  h+='</span>';
   return h;
 }
 function buildStaticDot(color){
   if(!color)return '';
   return '<span class="color-dot-static" style="background:'+color+'"></span>';
 }
-var PLURAL_MAP={category:'categories',subcategory:'subcategories',assembly:'assemblies',entity:'entities',measurement:'measurements'};
+var PLURAL_MAP={category:'categories',subcategory:'subcategories',assembly:'assemblies',entity:'entities',measurement:'measurements',container:'containers'};
 var colorClickTimer=null;
 
 function handleColorClick(event,type,key){
   event.stopPropagation();
-  var sid=safeId(key);
-  var wrap=document.getElementById(sid);
-  if(!wrap)return;
-
-  // If palette is open, just close it
-  if(wrap.classList.contains('expanded')){
-    wrap.classList.remove('expanded');
-    openColorDotId=null;
-    return;
-  }
-
   // Delay single-click action to distinguish from double-click
   if(colorClickTimer){clearTimeout(colorClickTimer);colorClickTimer=null;return;}
   colorClickTimer=setTimeout(function(){
     colorClickTimer=null;
-    // Single click: toggle highlight on/off (categories only)
+    // Single click: toggle highlight on/off
     if(type==='category'){
       if(activeColorCategories[key]){
         deactivateCategoryColor(key);
       } else {
-        // Only toggle ON if a custom color exists
         var section=PLURAL_MAP[type]||(type+'s');
         if(CCOL[section]&&CCOL[section][key]){
           activateCategoryColor(key);
+        }
+      }
+    } else if(type==='container'){
+      var cats=getCategoriesInContainer(key);
+      var anyActive=false;
+      for(var ci=0;ci<cats.length;ci++){
+        if(activeColorCategories[cats[ci]]){anyActive=true;break;}
+      }
+      if(anyActive){
+        for(var ci=0;ci<cats.length;ci++) deactivateCategoryColor(cats[ci]);
+      } else {
+        var section=PLURAL_MAP[type]||(type+'s');
+        if(CCOL[section]&&CCOL[section][key]){
+          for(var ci=0;ci<cats.length;ci++){
+            activeColorCategories[cats[ci]]=true;
+            call('highlightCategoryColor',cats[ci]);
+            updateDotActiveState(cats[ci],true);
+          }
         }
       }
     }
@@ -4285,65 +4485,205 @@ function handleColorClick(event,type,key){
 function handleColorDblClick(event,type,key){
   event.stopPropagation();
   event.preventDefault();
-  // Cancel pending single click
   if(colorClickTimer){clearTimeout(colorClickTimer);colorClickTimer=null;}
-  var sid=safeId(key);
-  var wrap=document.getElementById(sid);
-  if(!wrap)return;
+  openColorPopup(event,type,key);
+}
 
-  if(wrap.classList.contains('expanded')){
-    wrap.classList.remove('expanded');
-    openColorDotId=null;
-  } else {
-    if(openColorDotId&&openColorDotId!==sid){var prev=document.getElementById(openColorDotId);if(prev)prev.classList.remove('expanded');}
-    wrap.classList.add('expanded');
-    openColorDotId=sid;
+/* ═══ COLOR POPUP ═══ */
+function openColorPopup(event,type,key){
+  var popup=document.getElementById('colorPopup');
+  // Position below clicked dot
+  var rect=event.target.getBoundingClientRect();
+  var top=rect.bottom+4;
+  var left=rect.left;
+  // Keep within viewport
+  if(left+224>window.innerWidth)left=window.innerWidth-228;
+  if(left<4)left=4;
+  if(top+280>window.innerHeight)top=rect.top-284;
+  if(top<4)top=4;
+  popup.style.top=top+'px';
+  popup.style.left=left+'px';
+  popup.style.display='block';
+
+  // Populate state
+  cpState.type=type;
+  cpState.key=key;
+  var section=PLURAL_MAP[type]||(type+'s');
+  var existingHex=(CCOL[section]&&CCOL[section][key])||'';
+  var existingOpacity=85;
+  if(CSETTINGS[section]&&CSETTINGS[section][key]){
+    var s=CSETTINGS[section][key];
+    if(s.color)existingHex=s.color;
+    if(s.opacity!=null)existingOpacity=Math.round(s.opacity*100);
+  }
+  cpState.hex=existingHex||getDefaultColor(key);
+  cpState.opacity=existingOpacity;
+
+  // Title
+  var titleMap={category:'Category',subcategory:'Subcategory',container:'Container',entity:'Entity',assembly:'Assembly',measurement:'Measurement'};
+  document.getElementById('cpTitle').textContent=(titleMap[type]||'Custom')+' Color';
+
+  // Build swatches
+  var sw=document.getElementById('cpSwatches');
+  var sh='';
+  for(var i=0;i<COLOR_PALETTE.length;i++){
+    var c=COLOR_PALETTE[i];
+    var picked=(c===existingHex)?' picked':'';
+    sh+='<span class="cp-swatch'+picked+'" style="background:'+c+'" onclick="cpPickSwatch(\''+c+'\',this)"></span>';
+  }
+  sw.innerHTML=sh;
+
+  // Hex input + preview
+  document.getElementById('cpHexInput').value=existingHex||'';
+  document.getElementById('cpPreview').style.background=cpState.hex;
+  try{document.getElementById('cpNativePicker').value=existingHex||'#cba6f7';}catch(e){}
+
+  // Opacity slider
+  document.getElementById('cpOpacity').value=existingOpacity;
+  document.getElementById('cpOpacityVal').textContent=existingOpacity+'%';
+
+  // Outside click listener (delayed to avoid immediate close)
+  setTimeout(function(){
+    document.addEventListener('click',cpOutsideClick);
+  },10);
+}
+
+function closeColorPopup(){
+  document.getElementById('colorPopup').style.display='none';
+  document.removeEventListener('click',cpOutsideClick);
+}
+
+function cpOutsideClick(e){
+  var popup=document.getElementById('colorPopup');
+  if(!popup.contains(e.target)){
+    closeColorPopup();
   }
 }
 
-function pickColor(event,type,key,hex){
-  event.stopPropagation();
-  var sid=safeId(key);
-  var wrap=document.getElementById(sid);
-  if(wrap){var dot=wrap.querySelector('.cd-main');dot.style.background=hex;dot.setAttribute('data-custom-color',hex);wrap.classList.remove('expanded');}
-  openColorDotId=null;
+function cpPickSwatch(hex,el){
+  cpState.hex=hex;
+  document.getElementById('cpHexInput').value=hex;
+  document.getElementById('cpPreview').style.background=hex;
+  try{document.getElementById('cpNativePicker').value=hex;}catch(e){}
+  // Update picked state
+  var all=document.getElementById('cpSwatches').querySelectorAll('.cp-swatch');
+  for(var i=0;i<all.length;i++)all[i].classList.remove('picked');
+  el.classList.add('picked');
+}
 
-  // Save to CCOL optimistically
+function onCpHexInput(val){
+  val=val.trim();
+  if(val.length>0&&val[0]!=='#')val='#'+val;
+  if(/^#[0-9a-fA-F]{6}$/.test(val)){
+    cpState.hex=val;
+    document.getElementById('cpPreview').style.background=val;
+    try{document.getElementById('cpNativePicker').value=val;}catch(e){}
+    // Update swatch picked state
+    var all=document.getElementById('cpSwatches').querySelectorAll('.cp-swatch');
+    for(var i=0;i<all.length;i++){
+      all[i].classList.toggle('picked',all[i].style.background===val||rgbToHex(all[i].style.background)===val.toLowerCase());
+    }
+  }
+}
+
+function onCpNativePick(val){
+  cpState.hex=val;
+  document.getElementById('cpHexInput').value=val;
+  document.getElementById('cpPreview').style.background=val;
+  var all=document.getElementById('cpSwatches').querySelectorAll('.cp-swatch');
+  for(var i=0;i<all.length;i++)all[i].classList.remove('picked');
+}
+
+function onCpOpacityChange(val){
+  cpState.opacity=parseInt(val);
+  document.getElementById('cpOpacityVal').textContent=val+'%';
+  // Live preview: update opacity in SketchUp immediately
+  callJSON('setCustomOpacity',{type:cpState.type,key:cpState.key,opacity:parseInt(val)/100.0});
+}
+
+function rgbToHex(rgb){
+  if(!rgb||rgb[0]==='#')return rgb;
+  var m=rgb.match(/(\d+)/g);
+  if(!m||m.length<3)return rgb;
+  return '#'+((1<<24)+(parseInt(m[0])<<16)+(parseInt(m[1])<<8)+parseInt(m[2])).toString(16).slice(1);
+}
+
+function cpApply(){
+  var hex=cpState.hex;
+  var opacity=cpState.opacity/100.0;
+  var type=cpState.type;
+  var key=cpState.key;
   var section=PLURAL_MAP[type]||(type+'s');
+
+  // Update CCOL
   if(!CCOL[section])CCOL[section]={};
   CCOL[section][key]=hex;
 
-  // Save to Ruby
-  callJSON('setCustomColor',{type:type,key:key,color:hex});
+  // Update CSETTINGS
+  if(!CSETTINGS[section])CSETTINGS[section]={};
+  CSETTINGS[section][key]={color:hex,opacity:opacity};
 
-  // Activate this category's color in viewport
+  // Update dot
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(wrap){
+    var dot=wrap.querySelector('.cd-main');
+    if(dot){dot.style.background=hex;dot.setAttribute('data-custom-color',hex);}
+    wrap.style.color=hex;
+  }
+
+  // Save to Ruby
+  callJSON('setCustomColor',{type:type,key:key,color:hex,opacity:opacity});
+
+  // Activate color in viewport
   if(type==='category'){
     activeColorCategories[key]=true;
     call('highlightCategoryColor',key);
+    updateDotActiveState(key,true);
+  } else if(type==='container'){
+    var cats=getCategoriesInContainer(key);
+    for(var ci=0;ci<cats.length;ci++){
+      activeColorCategories[cats[ci]]=true;
+      call('highlightCategoryColor',cats[ci]);
+      updateDotActiveState(cats[ci],true);
+    }
   }
 
+  closeColorPopup();
   renderGroups();renderAsmPanel();renderMeasPanel();
 }
 
-function resetColor(event,type,key){
-  event.stopPropagation();
-  var sid=safeId(key);
-  var wrap=document.getElementById(sid);
-  if(wrap){var dot=wrap.querySelector('.cd-main');dot.style.background=getDefaultColor(key);dot.removeAttribute('data-custom-color');wrap.classList.remove('expanded');}
-  openColorDotId=null;
+function cpReset(){
+  var type=cpState.type;
+  var key=cpState.key;
+  var section=PLURAL_MAP[type]||(type+'s');
 
   // Clear from CCOL
-  var section=PLURAL_MAP[type]||(type+'s');
   if(CCOL[section])delete CCOL[section][key];
+  if(CSETTINGS[section])delete CSETTINGS[section][key];
 
-  // Clear saved color in Ruby
+  // Update dot
+  var sid=safeId(key);
+  var wrap=document.getElementById(sid);
+  if(wrap){
+    var dot=wrap.querySelector('.cd-main');
+    if(dot){dot.style.background=getDefaultColor(key);dot.removeAttribute('data-custom-color');}
+  }
+
+  // Clear in Ruby
   callJSON('clearCustomColor',{type:type,key:key});
 
   // Deactivate viewport highlight if active
   if(type==='category'&&activeColorCategories[key]){
     deactivateCategoryColor(key);
+  } else if(type==='container'){
+    var cats=getCategoriesInContainer(key);
+    for(var ci=0;ci<cats.length;ci++){
+      if(activeColorCategories[cats[ci]]) deactivateCategoryColor(cats[ci]);
+    }
   }
 
+  closeColorPopup();
   renderGroups();renderAsmPanel();renderMeasPanel();
 }
 
@@ -4364,7 +4704,6 @@ function updateDotActiveState(key,active){
   var wrap=document.getElementById(sid);
   if(wrap){
     wrap.classList.toggle('viewport-active',active);
-    // Update currentColor for glow
     if(active){
       var main=wrap.querySelector('.cd-main');
       if(main)wrap.style.color=main.style.background;
@@ -4379,10 +4718,6 @@ function clearAllDotStates(){
   }
   activeColorCategories={};
 }
-
-document.addEventListener('click',function(){
-  if(openColorDotId){var w=document.getElementById(openColorDotId);if(w)w.classList.remove('expanded');openColorDotId=null;}
-});
 
 /* ═══ INPUT MODAL ═══ */
 var _modalCb=null;
@@ -4724,6 +5059,25 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');i
   </div>
 </div>
 <div id="ctxMenu" class="ctx-menu"></div>
+<!-- ═══ COLOR PICKER POPUP ═══ -->
+<div id="colorPopup" class="color-popup" style="display:none;">
+  <div class="cp-header"><span id="cpTitle">Color</span><button class="cp-close" onclick="closeColorPopup()">&times;</button></div>
+  <div class="cp-swatches" id="cpSwatches"></div>
+  <div class="cp-hex-row">
+    <span id="cpPreview" class="cp-preview"></span>
+    <input type="text" id="cpHexInput" maxlength="7" oninput="onCpHexInput(this.value)" spellcheck="false">
+    <label class="cp-native-wrap"><input type="color" id="cpNativePicker" oninput="onCpNativePick(this.value)"><span class="cp-native-icon">&#9998;</span></label>
+  </div>
+  <div class="cp-opacity-row">
+    <label>Opacity</label>
+    <input type="range" id="cpOpacity" min="0" max="100" value="85" oninput="onCpOpacityChange(this.value)">
+    <span id="cpOpacityVal">85%</span>
+  </div>
+  <div class="cp-actions">
+    <button class="cp-btn cp-reset" onclick="cpReset()">Reset</button>
+    <button class="cp-btn cp-apply" onclick="cpApply()">Apply</button>
+  </div>
+</div>
 <!-- LOADING SCREEN OVERLAY -->
 <div id="ffLoading" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#0d0d1a;font-family:monospace;color:#cdd6f4;overflow:hidden;">
   <!-- CRT scanlines -->
