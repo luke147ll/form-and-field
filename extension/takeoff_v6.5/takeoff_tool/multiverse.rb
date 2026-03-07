@@ -419,14 +419,10 @@ module TakeoffTool
     mode = mode.to_s.downcase
 
     # Clean up any active analysis mode — restore original materials and visibility
-    unless ColorController.active_mode == :none
+    if SmartDiff.active?
+      SmartDiff.exit
+    elsif ColorController.active_mode != :none
       ColorController.deactivate
-      if @ab_classification
-        @ab_classification.each_key do |eid|
-          e = find_entity(eid)
-          e.visible = true if e && e.valid?
-        end
-      end
     end
 
     # Clear any active Highlighter state (isolate tracking, not entity iteration)

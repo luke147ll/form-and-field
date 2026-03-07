@@ -26,6 +26,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
   load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')
+  load File.join(PLUGIN_DIR, 'smart_diff.rb')
 
   @scan_results = []
   @category_assignments = {}

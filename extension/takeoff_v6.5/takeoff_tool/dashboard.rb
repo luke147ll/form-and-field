@@ -752,6 +752,10 @@ module TakeoffTool
 
       @dialog.add_action_callback('runCompare') do |_ctx|
         begin
+          if SmartDiff.active?
+            puts "Dashboard: runCompare blocked — SmartDiff is active"
+            next
+          end
           # Part 1: synchronous quantity delta
           TakeoffTool.compute_quantity_delta
           send_comparison_results
@@ -768,6 +772,7 @@ module TakeoffTool
 
       @dialog.add_action_callback('toggleDiff') do |_ctx|
         begin
+          next if SmartDiff.active?
           is_on = TakeoffTool.toggle_diff
           @dialog.execute_script("setDiffToggle(#{is_on})")
         rescue => e
@@ -796,13 +801,10 @@ module TakeoffTool
 
       @dialog.add_action_callback('computeSmartDiff') do |_ctx|
         begin
-          ab = TakeoffTool.classify_ab_entities
-          if ab && ab.any?
-            ColorController.apply_smart_diff(ab)
-            counts = TakeoffTool.ab_counts || {}
-            require 'json'
-            @dialog.execute_script("onSmartDiffComplete(#{JSON.generate(counts)})")
-          end
+          SmartDiff.enter
+          counts = SmartDiff.counts || {}
+          require 'json'
+          @dialog.execute_script("onSmartDiffComplete(#{JSON.generate(counts)})")
         rescue => e
           puts "SmartDiff error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
@@ -814,7 +816,7 @@ module TakeoffTool
           data = JSON.parse(json_str.to_s)
           state = data['state'].to_s
           value = data['value'].to_f
-          ColorController.set_smart_diff_opacity(state, value)
+          SmartDiff.set_opacity(state, value)
         rescue => e
           puts "setSmartDiffOpacity error: #{e.message}"
         end
@@ -827,9 +829,8 @@ module TakeoffTool
           state = data['state'].to_s
           visible = data['visible'] == true
           cats = data['categories']  # nil = all, array = filter
-          ColorController.set_smart_diff_visibility(state, visible)
-          ab = TakeoffTool.ab_classification
-          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+          SmartDiff.set_visibility(state, visible)
+          SmartDiff.repaint(category_filter: cats)
         rescue => e
           puts "setSmartDiffVisibility error: #{e.message}"
         end
@@ -842,8 +843,7 @@ module TakeoffTool
           require 'json'
           data = JSON.parse(json_str.to_s)
           cats = data['categories']  # nil = all, array = filter
-          ab = TakeoffTool.ab_classification
-          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
+          SmartDiff.repaint(category_filter: cats)
         rescue => e
           puts "smartDiffFilterCategory error: #{e.message}"
         end
@@ -855,12 +855,8 @@ module TakeoffTool
           data = JSON.parse(json_str.to_s)
           state_str = data['state'].to_s
           cats = data['categories']  # nil = all, array = filter
-          states = [:matched, :changed, :new_b, :removed_a]
-          target = state_str.to_sym
-          states.each { |s| ColorController.set_smart_diff_visibility(s, s == target) }
-          ab = TakeoffTool.ab_classification
-          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
-          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(ColorController.smart_diff_visibility)})")
+          SmartDiff.isolate_state(state_str, categories: cats)
+          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(SmartDiff.visibility_settings)})")
         rescue => e
           puts "smartDiffIsolateWithCat error: #{e.message}"
         end
@@ -871,10 +867,8 @@ module TakeoffTool
           require 'json'
           data = JSON.parse(json_str.to_s)
           cats = data['categories']  # nil = all, array = filter
-          [:matched, :changed, :new_b, :removed_a].each { |s| ColorController.set_smart_diff_visibility(s, true) }
-          ab = TakeoffTool.ab_classification
-          ColorController.apply_smart_diff(ab, category_filter: cats) if ab
-          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(ColorController.smart_diff_visibility)})")
+          SmartDiff.show_all(categories: cats)
+          @dialog.execute_script("onSmartDiffVisUpdate(#{JSON.generate(SmartDiff.visibility_settings)})")
         rescue => e
           puts "smartDiffShowAllWithCat error: #{e.message}"
         end
@@ -882,20 +876,7 @@ module TakeoffTool
 
       @dialog.add_action_callback('removeSmartDiff') do |_ctx|
         begin
-          ColorController.deactivate
-          m = Sketchup.active_model
-          if m && TakeoffTool.active_mv_view == 'ab'
-            m.rendering_options['DisplayColorByLayer'] = true
-          end
-          # Make all entities visible again
-          ab = TakeoffTool.ab_classification
-          if ab
-            ab.each_key do |eid|
-              e = TakeoffTool.find_entity(eid)
-              e.visible = true if e && e.valid?
-            end
-          end
-          m.active_view.invalidate if m
+          SmartDiff.exit
           @dialog.execute_script("onSmartDiffRemoved()")
         rescue => e
           puts "removeSmartDiff error: #{e.message}"
