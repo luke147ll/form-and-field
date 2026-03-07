@@ -418,8 +418,8 @@ module TakeoffTool
 
     mode = mode.to_s.downcase
 
-    # Clean up smart diff if active — restore original materials and visibility
-    if ColorController.active_mode == :smart_diff
+    # Clean up any active analysis mode — restore original materials and visibility
+    unless ColorController.active_mode == :none
       ColorController.deactivate
       if @ab_classification
         @ab_classification.each_key do |eid|

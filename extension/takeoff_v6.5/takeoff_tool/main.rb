@@ -1241,6 +1241,23 @@ module TakeoffTool
       e.set_attribute(d, 'revit_id', (r[:parsed][:revit_id] || '').to_s)
       e.set_attribute(d, 'confidence', (r[:parsed][:confidence] || '').to_s)
       e.set_attribute(d, 'cost_code_parsed', (r[:parsed][:cost_code] || '').to_s)
+
+      # Catalog original materials for reliable restore after analysis
+      inst_mat_name = e.material ? e.material.display_name : ''
+      e.set_attribute(d, 'original_inst_mat', inst_mat_name)
+      defn_obj = e.respond_to?(:definition) ? e.definition : nil
+      if defn_obj
+        fm_tally = {}
+        defn_obj.entities.grep(Sketchup::Face).each do |f|
+          fn = f.material ? f.material.display_name : nil
+          fm_tally[fn] = (fm_tally[fn] || 0) + 1 if fn
+          bn = f.back_material ? f.back_material.display_name : nil
+          fm_tally[bn] = (fm_tally[bn] || 0) + 1 if bn
+        end
+        dominant = fm_tally.max_by { |_, c| c }&.first || ''
+        e.set_attribute(d, 'original_face_mat', dominant)
+      end
+
       count += 1
     end
     puts "Takeoff: Saved #{count} scan results to model"

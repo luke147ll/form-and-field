@@ -42,7 +42,11 @@ module TakeoffTool
 
     def self.backup(eid, entity)
       return if @originals.key?(eid)
-      entry = { instance: entity.material, faces: nil }
+      inst_mat = entity.material
+      if inst_mat && inst_mat.respond_to?(:name) && inst_mat.name.start_with?('FF_')
+        inst_mat = nil
+      end
+      entry = { instance: inst_mat, faces: nil }
 
       defn = nil
       if entity.respond_to?(:definition)
@@ -123,7 +127,11 @@ module TakeoffTool
     # Recursive: saves [face, front_mat, back_mat] triples and [inst, mat] pairs
     def self.collect_face_originals(ents, list)
       ents.grep(Sketchup::Face).each do |face|
-        list << [face, face.material, face.back_material]
+        fm = face.material
+        bm = face.back_material
+        fm = nil if fm && fm.respond_to?(:name) && fm.name.start_with?('FF_')
+        bm = nil if bm && bm.respond_to?(:name) && bm.name.start_with?('FF_')
+        list << [face, fm, bm]
       end
       ents.each do |child|
         next unless child.valid?
@@ -131,7 +139,11 @@ module TakeoffTool
         child_defn = child.respond_to?(:definition) ? child.definition : nil
         next unless child_defn
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
-        list << [child, child.material] if child.respond_to?(:material)
+        if child.respond_to?(:material)
+          cm = child.material
+          cm = nil if cm && cm.respond_to?(:name) && cm.name.start_with?('FF_')
+          list << [child, cm]
+        end
         collect_face_originals(child_defn.entities, list)
       end
     end
@@ -337,13 +349,157 @@ module TakeoffTool
       @active_mode
     end
 
+    # ─── Pre-strip Baked FF_ Materials ───
+
+    def self.strip_baked_ff_materials
+      m = Sketchup.active_model
+      return 0 unless m
+      reg = TakeoffTool.entity_registry || {}
+      return 0 if reg.empty?
+
+      stripped = 0
+      m.start_operation('CC Pre-strip', true)
+      reg.each do |eid, e|
+        next unless e && e.valid?
+
+        # Instance-level
+        mat = e.material
+        if mat && mat.respond_to?(:name) && mat.name.start_with?('FF_')
+          e.material = nil
+          stripped += 1
+        end
+
+        # Face-level (single-instance definitions only)
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        defn ||= (e.is_a?(Sketchup::Group) ? e.entities.parent : nil)
+        next unless defn && defn.respond_to?(:instances)
+        next if defn.instances.length > 1
+
+        defn.entities.grep(Sketchup::Face).each do |face|
+          fm = face.material
+          if fm && fm.respond_to?(:name) && fm.name.start_with?('FF_')
+            face.material = nil
+            stripped += 1
+          end
+          bm = face.back_material
+          if bm && bm.respond_to?(:name) && bm.name.start_with?('FF_')
+            face.back_material = nil
+            stripped += 1
+          end
+        end
+      end
+      m.commit_operation
+      puts "CC: Pre-strip: #{stripped} baked FF_ materials cleared" if stripped > 0
+      stripped
+    end
+
+    # ─── Material Catalog ───
+
+    @materials_cataloged = false
+
+    def self.catalog_original_materials
+      return if @materials_cataloged
+      reg = TakeoffTool.entity_registry || {}
+      return if reg.empty?
+
+      # Check if already cataloged (from a previous scan save)
+      sample = reg.values.find { |e| e && e.valid? }
+      if sample
+        existing = sample.get_attribute('TakeoffScanData', 'original_inst_mat') rescue nil
+        if existing
+          @materials_cataloged = true
+          return
+        end
+      end
+
+      count = 0
+      d = 'TakeoffScanData'
+      reg.each do |eid, e|
+        next unless e && e.valid?
+        mat = e.material
+        next if mat && mat.respond_to?(:name) && mat.name.start_with?('FF_')
+
+        e.set_attribute(d, 'original_inst_mat', mat ? mat.display_name : '')
+
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        defn ||= (e.is_a?(Sketchup::Group) ? e.entities.parent : nil)
+        if defn
+          fm_tally = {}
+          defn.entities.grep(Sketchup::Face).each do |f|
+            fn = f.material
+            next if fn && fn.respond_to?(:name) && fn.name.start_with?('FF_')
+            fm_tally[fn.display_name] = (fm_tally[fn.display_name] || 0) + 1 if fn
+            bn = f.back_material
+            next if bn && bn.respond_to?(:name) && bn.name.start_with?('FF_')
+            fm_tally[bn.display_name] = (fm_tally[bn.display_name] || 0) + 1 if bn
+          end
+          dominant = fm_tally.max_by { |_, c| c }&.first || ''
+          e.set_attribute(d, 'original_face_mat', dominant)
+        end
+        count += 1
+      end
+      @materials_cataloged = true
+      puts "CC: Cataloged original materials for #{count} entities"
+    end
+
+    def self.restore_from_catalog
+      m = Sketchup.active_model
+      return 0 unless m
+      reg = TakeoffTool.entity_registry || {}
+      return 0 if reg.empty?
+
+      materials = m.materials
+      fixed = 0
+      d = 'TakeoffScanData'
+
+      reg.each do |eid, e|
+        next unless e && e.valid?
+
+        # Fix instance material
+        imat = e.material
+        if imat && imat.respond_to?(:name) && imat.name.start_with?('FF_')
+          orig_name = e.get_attribute(d, 'original_inst_mat') rescue nil
+          e.material = (orig_name && !orig_name.empty?) ? materials[orig_name] : nil
+          fixed += 1
+        end
+
+        # Fix face materials in single-instance definitions
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        defn ||= (e.is_a?(Sketchup::Group) ? e.entities.parent : nil)
+        next unless defn && defn.respond_to?(:instances)
+        next if defn.instances.length > 1
+
+        face_mat_name = e.get_attribute(d, 'original_face_mat') rescue nil
+        next unless face_mat_name && !face_mat_name.empty?
+        face_mat = materials[face_mat_name]
+        next unless face_mat
+
+        defn.entities.grep(Sketchup::Face).each do |f|
+          fm = f.material
+          if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
+            f.material = face_mat
+            fixed += 1
+          end
+          bm = f.back_material
+          if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
+            f.back_material = face_mat
+            fixed += 1
+          end
+        end
+      end
+      puts "CC: Catalog restore fixed #{fixed} materials" if fixed > 0
+      fixed
+    end
+
     # ─── Highlight Mode ───
 
     def self.highlight_all(sr, ca)
       m = Sketchup.active_model
       return puts("CC: No model") unless m
       @highlight_state = { mode: :all, sr: sr, ca: ca, cat: nil }
+      catalog_original_materials
       deactivate_internal
+      strip_baked_ff_materials
 
       load_settings
 
@@ -772,8 +928,10 @@ module TakeoffTool
       return unless m
 
       # Clean up any existing mode
+      catalog_original_materials
       deactivate_internal unless @originals.empty?
       remove_diff_if_active
+      strip_baked_ff_materials
 
       @active_mode = :smart_diff
       @smart_diff_settings ||= SMART_DIFF_OPACITY.dup
@@ -865,30 +1023,35 @@ module TakeoffTool
     # Internal deactivate: restore all without clearing mode state
     def self.deactivate_internal
       m = Sketchup.active_model; return unless m
-      return if @originals.empty?
       m.start_operation('CC Clear', true)
 
-      @originals.each do |eid, entry|
-        e = TakeoffTool.find_entity(eid)
-        if e && e.valid?
-          safe_set_material(e, entry[:instance])
-        end
-        next unless entry[:faces]
-        entry[:faces].each do |arr|
-          obj = arr[0]
-          next unless obj.valid?
-          if arr.length == 3
-            safe_set_material(obj, arr[1])
-            safe_set_back_material(obj, arr[2])
-          else
-            safe_set_material(obj, arr[1])
+      unless @originals.empty?
+        @originals.each do |eid, entry|
+          e = TakeoffTool.find_entity(eid)
+          if e && e.valid?
+            safe_set_material(e, entry[:instance])
+          end
+          next unless entry[:faces]
+          entry[:faces].each do |arr|
+            obj = arr[0]
+            next unless obj.valid?
+            if arr.length == 3
+              safe_set_material(obj, arr[1])
+              safe_set_back_material(obj, arr[2])
+            else
+              safe_set_material(obj, arr[1])
+            end
           end
         end
+        @originals.clear
+        @mats.clear
       end
 
-      @originals.clear
-      @mats.clear
+      # Catalog-based safety net: fix anything the @originals restore missed
+      restore_from_catalog
+
       m.commit_operation
+      m.active_view.invalidate
 
       unless @refreshing
         @highlights_active = false
