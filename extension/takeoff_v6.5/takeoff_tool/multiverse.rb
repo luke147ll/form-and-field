@@ -776,16 +776,43 @@ module TakeoffTool
     a[:min][2] < b[:max][2] && a[:max][2] > b[:min][2]
   end
 
-  # How much do two BBs overlap? Returns 0.0–1.0 relative to the smaller volume
+  # Are two entities geometrically similar enough to be the same element?
+  # Checks volume ratio and dimension proportions.
+  def self.geometry_similar?(a, b)
+    av = a[:solid_vol]; bv = b[:solid_vol]
+
+    # Volume ratio: reject if one is more than 3x the other
+    if av > 0 && bv > 0
+      vol_ratio = av > bv ? av / bv : bv / av
+      return false if vol_ratio > 3.0
+    end
+
+    # Dimension similarity: compare sorted BB dimensions
+    # Each dimension must be within 2x of the other (allows for design changes)
+    ad = a[:dims]; bd = b[:dims]
+    if ad && bd && ad.length == 3 && bd.length == 3
+      3.times do |i|
+        next if ad[i] < 1.0 && bd[i] < 1.0  # skip near-zero dims
+        larger = [ad[i], bd[i]].max
+        smaller = [ad[i], bd[i]].min
+        return false if smaller > 0 && larger / smaller > 2.0
+      end
+    end
+
+    true
+  end
+
+  # How much do two BBs overlap? Returns 0.0–1.0 using IoU (Intersection over Union).
+  # Naturally penalizes size mismatches: a small entity inside a large one scores low.
   def self.bb_overlap_ratio(a, b)
     x_inter = [0, [a[:max][0], b[:max][0]].min - [a[:min][0], b[:min][0]].max].max
     y_inter = [0, [a[:max][1], b[:max][1]].min - [a[:min][1], b[:min][1]].max].max
     z_inter = [0, [a[:max][2], b[:max][2]].min - [a[:min][2], b[:min][2]].max].max
 
     inter_vol = x_inter * y_inter * z_inter
-    smaller = [a[:volume], b[:volume]].min
-    return 0.0 if smaller <= 0
-    inter_vol / smaller
+    union_vol = a[:volume] + b[:volume] - inter_vol
+    return 0.0 if union_vol <= 0
+    inter_vol / union_vol
   end
 
   # ═══ SMART A+B DIFF — Spatial Classification ═══
@@ -812,7 +839,12 @@ module TakeoffTool
       next unless wb && wb[:volume] && wb[:volume] > 0
 
       cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
-      item = { eid: r[:entity_id], bounds: wb, category: cat }
+      # Geometry data for matching: actual volume + sorted BB dimensions
+      solid_vol = r[:volume_ft3] || 0.0
+      dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
+      name = r[:parsed][:definition_name] || (e.respond_to?(:definition) ? e.definition.name : e.name) rescue '?'
+      item = { eid: r[:entity_id], bounds: wb, category: cat,
+               solid_vol: solid_vol, dims: dims, name: name }
 
       if ms == 'model_a'
         a_items << item
@@ -822,6 +854,16 @@ module TakeoffTool
     end
 
     puts "[FF SmartDiff] A=#{a_items.length} B=#{b_items.length}"
+
+    # Diagnostic: log transform origin for first 5 A and 5 B entities
+    [[:A, a_items], [:B, b_items]].each do |label, items|
+      items.first(5).each do |item|
+        e = reg[item[:eid]]
+        next unless e && e.valid?
+        wt = get_accumulated_transform(e)
+        puts "[FF SD] #{label} '#{item[:name]}' cat=#{item[:category]} transform origin: #{wt.origin.to_a.map{|v|v.round(1)}} bounds min=#{item[:bounds][:min].map{|v|v.round(1)}} max=#{item[:bounds][:max].map{|v|v.round(1)}}"
+      end
+    end
 
     # Step 2: Build spatial hash grid from A entities
     grid = Hash.new { |h, k| h[k] = [] }
@@ -847,6 +889,9 @@ module TakeoffTool
 
           # Category gate — wall overlapping steel is not a match
           next unless a_item[:category] == b_item[:category]
+
+          # Geometry gate — reject if volumes or dimensions are too different
+          next unless geometry_similar?(a_item, b_item)
 
           next unless bb_overlap?(a_item[:bounds], b_item[:bounds])
           ratio = bb_overlap_ratio(a_item[:bounds], b_item[:bounds])
@@ -878,6 +923,7 @@ module TakeoffTool
         (b_grid[cell] || []).each do |b_item|
           # Category gate — only same-category overlaps count
           next unless b_item[:category] == a_item[:category]
+          next unless geometry_similar?(a_item, b_item)
           if bb_overlap?(a_item[:bounds], b_item[:bounds])
             ratio = bb_overlap_ratio(a_item[:bounds], b_item[:bounds])
             if ratio > 0.1
@@ -899,7 +945,7 @@ module TakeoffTool
         b_best_overlap.each_value do |info|
           best = info[:overlap_ratio] if info[:a_eid] == item[:eid] && info[:overlap_ratio] > best
         end
-        result[item[:eid]] = best > 0.5 ? :matched : :changed
+        result[item[:eid]] = best > 0.3 ? :matched : :changed
       else
         result[item[:eid]] = :removed_a
       end
@@ -908,7 +954,7 @@ module TakeoffTool
     b_items.each do |item|
       info = b_best_overlap[item[:eid]]
       if info
-        result[item[:eid]] = info[:overlap_ratio] > 0.5 ? :matched : :changed
+        result[item[:eid]] = info[:overlap_ratio] > 0.3 ? :matched : :changed
       else
         result[item[:eid]] = :new_b
       end
@@ -917,6 +963,32 @@ module TakeoffTool
     counts = { matched: 0, changed: 0, new_b: 0, removed_a: 0 }
     result.each_value { |v| counts[v] += 1 }
     puts "[FF SmartDiff] matched=#{counts[:matched]} changed=#{counts[:changed]} new_b=#{counts[:new_b]} removed_a=#{counts[:removed_a]}"
+
+    # Diagnostic: log first 20 matched B entities with their A match details
+    item_by_eid = {}
+    (a_items + b_items).each { |it| item_by_eid[it[:eid]] = it }
+    match_log_count = 0
+    b_best_overlap.each do |b_eid, info|
+      break if match_log_count >= 20
+      next unless result[b_eid] == :matched
+      b_it = item_by_eid[b_eid]
+      a_it = item_by_eid[info[:a_eid]]
+      next unless b_it && a_it
+      puts "[FF SD Match] B:'#{b_it[:name]}' cat=#{b_it[:category]} overlaps A:'#{a_it[:name]}' cat=#{a_it[:category]} ratio=#{info[:overlap_ratio].round(3)}"
+      puts "[FF SD Match]   B bounds: min=#{b_it[:bounds][:min].map{|v|v.round(1)}} max=#{b_it[:bounds][:max].map{|v|v.round(1)}}"
+      puts "[FF SD Match]   A bounds: min=#{a_it[:bounds][:min].map{|v|v.round(1)}} max=#{a_it[:bounds][:max].map{|v|v.round(1)}}"
+      match_log_count += 1
+    end
+
+    # Diagnostic: per-category classification breakdown
+    cat_stats = Hash.new { |h, k| h[k] = { matched: 0, changed: 0, new_b: 0, removed_a: 0 } }
+    (a_items + b_items).each do |item|
+      state = result[item[:eid]]
+      cat_stats[item[:category]][state] += 1 if state
+    end
+    cat_stats.sort_by { |cat, _| cat }.each do |cat, st|
+      puts "[FF SD Cat] #{cat}: #{st[:matched]} matched, #{st[:changed]} changed, #{st[:new_b]} new_b, #{st[:removed_a]} removed_a"
+    end
 
     # Store category for each classified entity (for category filtering)
     @ab_categories = {}
