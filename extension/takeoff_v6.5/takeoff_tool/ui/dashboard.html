@@ -1181,6 +1181,8 @@ var SEL={},lastCheckIdx=-1;
 var UNDO=[],UNDO_MAX=50;
 var openCats={},openSubs={};
 var VIS={};
+var HIDDEN_CATS={};
+var HIDDEN_CONTS={};
 var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
@@ -1370,11 +1372,17 @@ function receiveData(json){
       renderSplitPanels();
       return;
     }
-    /* Sync VIS from actual entity visibility for entities not already tracked */
+    /* Sync VIS — hide entities entering hidden categories/containers */
+    var _reHide=[];
     for(var i=0;i<D.length;i++){
-      var eid=D[i].entityId;
+      var eid=D[i].entityId,cat=D[i].category;
       if(!(eid in VIS) && D[i].visible===false) VIS[eid]=false;
+      /* Entity in a hidden category → force hidden regardless of prior VIS */
+      if(cat && HIDDEN_CATS[cat] && VIS[eid]!==false) VIS[eid]=false;
+      /* Collect all hidden entities — Ruby may have shown them (e.g. Highlighter.show_all) */
+      if(VIS[eid]===false && D[i].visible!==false) _reHide.push(eid);
     }
+    if(_reHide.length) call('hideEntities',_reHide.join(','));
     buildDD();buildBulkDDs();
     for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
     /* Re-apply saved visibility to Ruby after mode switch */
@@ -2376,6 +2384,8 @@ function togContVis(contName){
     }
   }
   for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+  if(anyVis){HIDDEN_CONTS[contName]=true;for(var c in catSet)if(catSet.hasOwnProperty(c))HIDDEN_CATS[c]=true;}
+  else{delete HIDDEN_CONTS[contName];for(var c in catSet)if(catSet.hasOwnProperty(c))delete HIDDEN_CATS[c];}
   if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
   renderGroups();
 }
@@ -2383,21 +2393,23 @@ function isoContainer(contName){
   var catSet=getContainerCats(contName);
   if(containerIsolate===contName){
     /* Un-isolate — show all */
-    containerIsolate=null;ISO_CATS=null;
+    containerIsolate=null;ISO_CATS=null;HIDDEN_CATS={};HIDDEN_CONTS={};
     for(var i=0;i<D.length;i++)VIS[D[i].entityId]=true;
     call('showAll');
   }else{
     /* Isolate this container */
-    containerIsolate=contName;
+    containerIsolate=contName;HIDDEN_CATS={};HIDDEN_CONTS={};
     ISO_CATS={};
     for(var c in catSet){if(catSet.hasOwnProperty(c))ISO_CATS[c]=true;}
     var showIds=[],hideIds=[];
     for(var i=0;i<D.length;i++){
       var inCont=!!(D[i].category&&catSet[D[i].category]);
       VIS[D[i].entityId]=inCont;
+      if(!inCont&&D[i].category)HIDDEN_CATS[D[i].category]=true;
       if(inCont)showIds.push(D[i].entityId);
       else hideIds.push(D[i].entityId);
     }
+    for(var c in catSet)if(catSet.hasOwnProperty(c))delete HIDDEN_CATS[c];
     if(hideIds.length)call('hideEntities',hideIds.join(','));
     if(showIds.length)call('showEntities',showIds.join(','));
   }
@@ -3778,6 +3790,7 @@ function togCatVis(gk){
     if(grpKey(D[i],gBy)===gk){ids.push(D[i].entityId);if(VIS[D[i].entityId]!==false)anyVis=true;}
   }
   for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+  if(anyVis)HIDDEN_CATS[gk]=true; else delete HIDDEN_CATS[gk];
   if(ids.length) call(anyVis?'hideEntities':'showEntities',ids.join(','));
   filt();
 }
@@ -3837,16 +3850,17 @@ function toggleCosmeticSel(){
   renderGroups();
 }
 function isoCat(cat){
-  containerIsolate=null;
+  containerIsolate=null;HIDDEN_CATS={};HIDDEN_CONTS={};
   ISO_CATS={};ISO_CATS[cat]=true;
-  for(var i=0;i<D.length;i++) VIS[D[i].entityId]=(D[i].category===cat);
+  for(var i=0;i<D.length;i++){var v=(D[i].category===cat);VIS[D[i].entityId]=v;if(!v&&D[i].category)HIDDEN_CATS[D[i].category]=true;}
+  delete HIDDEN_CATS[cat];
   call('isolateCategory',cat); filt();
 }
 function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
 }
-function resetVis(){ISO_CATS=null;VIS={};FISO=false;containerIsolate=null;updateFisoBtn();filt();}
+function resetVis(){ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};FISO=false;containerIsolate=null;updateFisoBtn();filt();}
 function syncIsolation(){
   if(FISO){applyFilterIsolation();return;}
   if(!ISO_CATS)return;
@@ -4118,6 +4132,20 @@ function selGrpAll(gk,chk){
   syncCBs();updateBulkBar();hlSel();
 }
 function clearSel(){SEL={};lastCheckIdx=-1;syncCBs();updateBulkBar();call('clearHighlights');}
+/* Click-off deselect: click empty space anywhere to clear selection */
+(function(){
+  document.addEventListener('click',function(ev){
+    if(!getSelIds().length)return;
+    var t=ev.target,tag=t.tagName;
+    if(tag==='INPUT'||tag==='SELECT'||tag==='BUTTON'||tag==='A'||tag==='LABEL')return;
+    if(t.closest('button,a,select,input,label,.ib,.hb,.ck'))return;
+    var row=t.closest('tr');
+    if(row&&row.id&&row.id.charAt(0)==='r')return;
+    if(t.closest('.cat-hdr,.sub-hdr,.show-more-row,.cont-hdr,.add-cat-btn,.add-container'))return;
+    if(t.closest('#bulkBar,.bulk,.modal-bg,.modal-card,#scanBackdrop'))return;
+    clearSel();
+  });
+})();
 function getSelIds(){var ids=[];for(var k in SEL)if(SEL.hasOwnProperty(k))ids.push(k);return ids;}
 function updateBulkBar(){var n=getSelIds().length;document.getElementById('bulkBar').className=n>0?'bulk show':'bulk';document.getElementById('bulkCnt').textContent=n+' sel';}
 function hlSel(){var ids=getSelIds();if(ids.length)call('highlightEntities',ids.join(','));else call('clearHighlights');}

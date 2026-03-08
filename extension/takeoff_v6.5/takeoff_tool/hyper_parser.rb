@@ -1,11 +1,12 @@
+require 'set'
+
 module TakeoffTool
   module HyperParser
     @dialog = nil
     @preview_active = false
-    @hp_observer = nil
-    @sampler_active = false
     @sample_state = nil
     @hp_selected_eids = []
+    @hp_pre_hidden = nil  # eids hidden before HP touched visibility
 
     SAMPLE_BATCH_SIZE = 50
 
@@ -55,16 +56,6 @@ module TakeoffTool
       end
     end
 
-    # ─── Selection Observer for Sampler ───
-    class HPSelObserver < Sketchup::SelectionObserver
-      def onSelectionBulkChange(sel)
-        HyperParser.on_selection_changed(sel)
-      end
-      def onSelectionCleared(sel)
-        HyperParser.on_selection_changed(sel)
-      end
-    end
-
     # ─── Show / Close ───
 
     # Primary entry point — all launch points (menu, toolbar, dashboard) call this
@@ -94,6 +85,10 @@ module TakeoffTool
 
       @dialog.add_action_callback('parseByName') do |_ctx|
         parse_by_name
+      end
+
+      @dialog.add_action_callback('searchByName') do |_ctx, query_str|
+        search_by_name(query_str.to_s.strip)
       end
 
       @dialog.add_action_callback('parseByColor') do |_ctx|
@@ -136,6 +131,96 @@ module TakeoffTool
       @dialog.add_action_callback('clearHpSelection') do |_ctx|
         clear_preview
         @hp_selected_eids = []
+      end
+
+      @dialog.add_action_callback('hpHideGroup') do |_ctx, json_str|
+        begin
+          capture_pre_hidden
+          require 'json'
+          eids = (JSON.parse(json_str.to_s)['eids'] || []).map(&:to_i)
+          m = Sketchup.active_model; next unless m
+          m.start_operation('HP Hide', true)
+          eids.each do |eid|
+            e = TakeoffTool.find_entity(eid)
+            e.visible = false if e && e.valid?
+          end
+          m.commit_operation
+        rescue => e
+          puts "HyperParser: hpHideGroup error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('hpShowGroup') do |_ctx, json_str|
+        begin
+          require 'json'
+          eids = (JSON.parse(json_str.to_s)['eids'] || []).map(&:to_i)
+          m = Sketchup.active_model; next unless m
+          m.start_operation('HP Show', true)
+          visible = []
+          eids.each do |eid|
+            e = TakeoffTool.find_entity(eid)
+            if e && e.valid?
+              e.visible = true
+              visible << e
+            end
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+        rescue => e
+          puts "HyperParser: hpShowGroup error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('hpIsolateGroup') do |_ctx, json_str|
+        begin
+          capture_pre_hidden
+          require 'json'
+          iso_eids = (JSON.parse(json_str.to_s)['eids'] || []).map(&:to_i)
+          iso_set = iso_eids.to_set
+          pre = @hp_pre_hidden || Set.new
+          sr = TakeoffTool.filtered_scan_results
+          m = Sketchup.active_model; next unless m
+          m.start_operation('HP Isolate', true)
+          visible = []
+          sr.each do |r|
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid?
+            next if pre.include?(r[:entity_id])  # don't touch pre-hidden
+            if iso_set.include?(r[:entity_id])
+              e.visible = true
+              visible << e
+            else
+              e.visible = false
+            end
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+        rescue => e
+          puts "HyperParser: hpIsolateGroup error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('hpShowAll') do |_ctx|
+        begin
+          pre = @hp_pre_hidden || Set.new
+          sr = TakeoffTool.filtered_scan_results
+          m = Sketchup.active_model; next unless m
+          m.start_operation('HP Show All', true)
+          visible = []
+          sr.each do |r|
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid?
+            next if pre.include?(r[:entity_id])  # leave pre-hidden alone
+            unless e.visible?
+              e.visible = true
+              visible << e
+            end
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+        rescue => e
+          puts "HyperParser: hpShowAll error: #{e.message}"
+        end
       end
 
       @dialog.add_action_callback('commitParse') do |_ctx, json_str|
@@ -220,7 +305,6 @@ module TakeoffTool
 
       @dialog.set_on_closed { cleanup }
       @dialog.show
-      attach_sampler_observer  # Always listen for selection changes while HP is open
     end
 
     def self.close
@@ -267,6 +351,20 @@ module TakeoffTool
       end
     end
 
+    # Snapshot which eids are already hidden before HP starts changing visibility.
+    # Called once on first visibility action; preserved until cleanup.
+    def self.capture_pre_hidden
+      return if @hp_pre_hidden
+      sr = TakeoffTool.filtered_scan_results
+      return unless sr
+      @hp_pre_hidden = Set.new
+      sr.each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid?
+        @hp_pre_hidden.add(r[:entity_id]) unless e.visible?
+      end
+    end
+
     # ─── Parse Methods ───
 
     def self.parse_by_name
@@ -282,6 +380,22 @@ module TakeoffTool
                      .sort_by { |g| -g[:count] }
 
       send_parse_results('name', results.length, sorted)
+    end
+
+    def self.search_by_name(query)
+      return send_parse_results('search', 0, []) if query.empty?
+      results = visible_scan_results
+      q = query.downcase
+      groups = {}
+      results.each do |r|
+        label = r[:display_name] || r[:definition_name] || ''
+        next unless label.downcase.include?(q)
+        groups[label] ||= []
+        groups[label] << r[:entity_id]
+      end
+      sorted = groups.map { |label, eids| { label: label, count: eids.length, eids: eids } }
+                     .sort_by { |g| -g[:count] }
+      send_parse_results('search', results.length, sorted)
     end
 
     def self.parse_by_color
@@ -421,55 +535,25 @@ module TakeoffTool
       Sketchup.active_model.select_tool(ColorSamplerTool.new(callback))
     end
 
-    # ─── Object Sampler (Ray Gun + SelectionObserver) ───
+    # ─── Grab Selected (one-shot, no observer) ───
 
     def self.activate_object_sampler
-      # Observer is already attached from show() — just handle current selection or activate DrillBit
       sel = Sketchup.active_model&.selection
       if sel && sel.length == 1
-        # Already have a selection — send properties immediately
         entity = sel.first
         if entity && entity.valid?
           props = extract_entity_properties(entity)
           eid = entity.respond_to?(:entityID) ? entity.entityID : 0
           send_sampled_properties(eid, props)
+          return
         end
-      else
-        # No selection — activate DrillBit to help user pick nested entities
-        DrillBit.activate
       end
+      # Nothing selected or multiple — tell JS
+      send_no_selection
     end
 
     def self.deactivate_object_sampler
-      # Observer stays attached for the lifetime of the dialog — only deactivate DrillBit
-      DrillBit.deactivate if DrillBit.active?
-    end
-
-    def self.on_selection_changed(sel)
-      return unless @dialog && @dialog.visible?
-      return unless sel && sel.length == 1
-      entity = sel.first
-      return unless entity && entity.valid?
-      props = extract_entity_properties(entity)
-      eid = entity.respond_to?(:entityID) ? entity.entityID : 0
-      send_sampled_properties(eid, props)
-    end
-
-    def self.attach_sampler_observer
-      detach_sampler_observer
-      sel = Sketchup.active_model&.selection
-      return unless sel
-      @hp_observer = HPSelObserver.new
-      sel.add_observer(@hp_observer)
-      @sampler_active = true
-    end
-
-    def self.detach_sampler_observer
-      return unless @hp_observer
-      sel = Sketchup.active_model&.selection
-      sel.remove_observer(@hp_observer) if sel
-      @hp_observer = nil
-      @sampler_active = false
+      # No-op — no observer or tool to deactivate
     end
 
     def self.extract_entity_properties(entity)
@@ -500,10 +584,14 @@ module TakeoffTool
         end
       end
 
-      # Material
+      # Material — use original if entity is currently highlighted by ColorController
       mat = nil
       if entity.respond_to?(:material) && entity.material
         mat = entity.material
+        if mat.respond_to?(:name) && mat.name.start_with?('FF_') && eid
+          orig = ColorController.original_material(eid) rescue nil
+          mat = orig unless orig.nil? && mat.nil?
+        end
       elsif entity.respond_to?(:definition)
         face = entity.definition.entities.grep(Sketchup::Face).first
         mat = face.material if face
@@ -633,7 +721,29 @@ module TakeoffTool
 
     def self.cleanup
       clear_preview
-      detach_sampler_observer
+      # Restore only entities that HP itself hid — leave pre-hidden alone
+      begin
+        pre = @hp_pre_hidden || Set.new
+        sr = TakeoffTool.filtered_scan_results
+        m = Sketchup.active_model
+        if m && sr && sr.any?
+          m.start_operation('HP Cleanup', true)
+          visible = []
+          sr.each do |r|
+            next if pre.include?(r[:entity_id])
+            e = TakeoffTool.find_entity(r[:entity_id])
+            if e && e.valid? && !e.visible?
+              e.visible = true
+              visible << e
+            end
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+        end
+      rescue => e
+        puts "HyperParser cleanup restore error: #{e.message}"
+      end
+      @hp_pre_hidden = nil
       @hp_selected_eids = []
       @sample_state = nil
       @dialog = nil
@@ -677,6 +787,11 @@ module TakeoffTool
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveSampledProperties('#{esc}')")
+    end
+
+    def self.send_no_selection
+      return unless @dialog && @dialog.visible?
+      @dialog.execute_script("receiveNoSelection()")
     end
 
     def self.send_sample_matches(eids)

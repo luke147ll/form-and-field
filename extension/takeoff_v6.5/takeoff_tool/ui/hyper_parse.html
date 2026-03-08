@@ -53,6 +53,12 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .group-label{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-count{font-size:11px;color:#89b4fa;font-weight:600;min-width:30px;text-align:right}
 .group-hl{flex-shrink:0}
+.group-row.hidden-grp{opacity:0.4}
+.group-row.hidden-grp .group-label{text-decoration:line-through}
+.vis-btn{background:none;border:none;cursor:pointer;padding:2px;font-size:13px;color:#a6adc8;flex-shrink:0;line-height:1}
+.vis-btn:hover{color:#cdd6f4}
+.vis-btn.iso{color:#f9e2af}
+.vis-btn.iso:hover{color:#fab387}
 
 /* COMMIT BAR */
 .commit-bar{background:#181825;border-top:1px solid #313244;padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
@@ -111,6 +117,16 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
   <div class="status" id="statusText">Pick a parse method to group visible entities</div>
 </div>
 
+<!-- SEARCH BAR -->
+<div class="step" id="searchStep" style="padding-bottom:4px">
+  <div class="step-title">Search by Name</div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <input type="text" id="nameSearch" placeholder="Type to search names..." style="flex:1;background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter')doNameSearch()" onfocus="this.style.borderColor='#cba6f7'" onblur="this.style.borderColor='#45475a'">
+    <button class="btn pri" onclick="doNameSearch()">Search</button>
+    <button class="btn sm" onclick="clearNameSearch()" title="Clear search">&#10005;</button>
+  </div>
+</div>
+
 <!-- STEP 1: Parse Method -->
 <div class="step" id="step1">
   <div class="step-title">Parse Method</div>
@@ -125,10 +141,10 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
       <div class="mc-label">By Color</div>
       <div class="mc-sub">Group by material color</div>
     </div>
-    <div class="method-card" onclick="doParse('sample')" id="mc-sample">
+    <div class="method-card" onclick="grabSelected()" id="mc-sample">
       <div class="mc-icon" style="font-size:20px">&#9678;</div>
-      <div class="mc-label">Select Object</div>
-      <div class="mc-sub">Click any object to inspect</div>
+      <div class="mc-label">Grab Selected</div>
+      <div class="mc-sub">Inspect current selection</div>
     </div>
     <div class="method-card disabled">
       <div class="mc-icon">&#9721;</div>
@@ -151,11 +167,12 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 <!-- STEP 2b: Sample Properties Panel -->
 <div class="sample-panel" id="samplePanel" style="display:none">
   <div class="results-toolbar">
-    <span class="info" id="sampleInfo">Select an entity to see its properties</span>
+    <span class="info" id="sampleInfo">Select an entity in the viewport, then click Grab</span>
     <span class="spacer"></span>
+    <button class="btn sm" onclick="grabSelected()" title="Read current SketchUp selection">Grab Selected</button>
     <button class="btn sm pri" onclick="findSimilar()" id="btnFindSimilar" disabled>Find Similar</button>
     <button class="btn sm" onclick="clearHpSelection()" id="btnClear" style="display:none">Clear</button>
-    <button class="btn sm" onclick="exitSampler()">Done</button>
+    <button class="btn sm" onclick="exitSampler()">Back</button>
   </div>
   <div class="sample-props" id="sampleProps"></div>
   <div class="search-loading" id="searchLoading" style="display:none">
@@ -185,7 +202,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
     <button class="btn sm" onclick="selectAll()">Select All</button>
     <button class="btn sm" onclick="selectNone()">Select None</button>
     <button class="btn sm" id="btnSampler" onclick="call('activateColorSampler')" style="display:none">Sampler</button>
-    <button class="btn sm" onclick="clearPreview()">Clear Preview</button>
+    <button class="btn sm" onclick="hpShowAll()">Show All</button>
     <button class="btn sm" onclick="backToMethods()">Back</button>
   </div>
 
@@ -209,6 +226,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 <script>
 var GROUPS=[], METHOD='', CATS=[], SUBCATS={}, SELECTED={};
 var SAMPLE_PROPS=[], SAMPLE_EID=0;
+var GRP_VIS={};  /* idx → false if hidden */
 var HP_EIDS={};
 
 /* ═══ Communication ═══ */
@@ -267,38 +285,54 @@ function updateSubcatDropdown(){
   sel.appendChild(custom);
 }
 
+/* ═══ Name Search ═══ */
+function doNameSearch(){
+  var q=document.getElementById('nameSearch').value.trim();
+  if(!q){showToast('Enter a search term','err');return;}
+  METHOD='search';SELECTED={};HP_EIDS={};
+  document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
+  document.getElementById('samplePanel').style.display='none';
+  document.getElementById('statusText').textContent='Searching for "'+q+'"...';
+  call('searchByName',q);
+}
+function clearNameSearch(){
+  document.getElementById('nameSearch').value='';
+  if(METHOD==='search') backToMethods();
+}
+
+/* ═══ Grab Selected ═══ */
+function grabSelected(){
+  METHOD='sample';SELECTED={};HP_EIDS={};
+  document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
+  var card=document.getElementById('mc-sample');
+  if(card)card.classList.add('active');
+  document.getElementById('resultsArea').classList.remove('show');
+  document.getElementById('samplePanel').style.display='flex';
+  document.getElementById('sampleInfo').textContent='Select an entity in the viewport, then click Grab';
+  document.getElementById('matchCount').style.display='none';
+  document.getElementById('searchLoading').style.display='none';
+  document.getElementById('sampleProps').style.display='';
+  document.getElementById('sampleCommitBar').style.display='none';
+  document.getElementById('btnFindSimilar').disabled=true;
+  document.getElementById('btnFindSimilar').textContent='Find Similar';
+  document.getElementById('statusText').textContent='Grab Selected: select an entity then click Grab Selected';
+  call('activateObjectSampler');
+}
+function receiveNoSelection(){
+  document.getElementById('sampleInfo').textContent='No single entity selected — pick one in the viewport and click Grab Selected';
+  showToast('Select a single entity first','err');
+}
+
 /* ═══ Parse ═══ */
 function doParse(method){
-  // Deactivate sampler if switching away from sample mode
-  if(METHOD==='sample'&&method!=='sample') call('deactivateObjectSampler');
   METHOD=method;
   SELECTED={};HP_EIDS={};
-  // Highlight active card
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
   var card=document.getElementById('mc-'+method);
   if(card)card.classList.add('active');
-  // Hide sample panel when switching methods
   document.getElementById('samplePanel').style.display='none';
-  // Show/hide sampler button
   document.getElementById('btnSampler').style.display=(method==='color'?'inline-block':'none');
-  // Sample / Ray Gun mode
-  if(method==='sample'){
-    document.getElementById('resultsArea').classList.remove('show');
-    document.getElementById('samplePanel').style.display='flex';
-    document.getElementById('sampleInfo').textContent='Select an entity to see its properties';
-    document.getElementById('matchCount').style.display='none';
-    document.getElementById('searchLoading').style.display='none';
-    document.getElementById('sampleProps').style.display='';
-    document.getElementById('sampleCommitBar').style.display='none';
-    document.getElementById('btnFindSimilar').disabled=true;
-    document.getElementById('btnFindSimilar').textContent='Find Similar';
-    document.getElementById('statusText').textContent='Select Object: click entities to sample properties';
-    call('activateObjectSampler');
-    return;
-  }
-  // Set status
   document.getElementById('statusText').textContent='Parsing by '+method+'...';
-  // Call ruby
   if(method==='name') call('parseByName');
   else if(method==='color') call('parseByColor');
 }
@@ -307,7 +341,7 @@ function doParse(method){
 function receiveParseResults(json){
   try{
     var d=JSON.parse(json);
-    GROUPS=d.groups||[];
+    GROUPS=d.groups||[];GRP_VIS={};
     METHOD=d.method||METHOD;
     var total=d.total_visible||0;
     document.getElementById('statusText').textContent=total+' visible entities, '+GROUPS.length+' groups (by '+METHOD+')';
@@ -322,16 +356,19 @@ function renderGroups(){
   GROUPS.forEach(function(g,i){
     var checked=SELECTED[i]?'checked':'';
     var selClass=SELECTED[i]?'selected':'';
+    var hidClass=GRP_VIS[i]===false?' hidden-grp':'';
+    var isVis=GRP_VIS[i]!==false;
     var swatch='';
     if(METHOD==='color'&&g.color){
       swatch='<div class="group-swatch" style="background:'+g.color+'"></div>';
     }
-    html+='<div class="group-row '+selClass+'" data-idx="'+i+'" onclick="toggleGroup('+i+',event)">';
+    html+='<div class="group-row '+selClass+hidClass+'" data-idx="'+i+'" onclick="toggleGroup('+i+',event)">';
     html+='<input type="checkbox" '+checked+' onclick="toggleGroup('+i+',event)">';
+    html+='<button class="vis-btn" onclick="hpToggleVis('+i+',event)" title="'+(isVis?'Hide':'Show')+'">'+(isVis?'\u25C9':'\u25CB')+'</button>';
+    html+='<button class="vis-btn iso" onclick="hpIsolate('+i+',event)" title="Isolate">\u2299</button>';
     html+=swatch;
     html+='<span class="group-label" title="'+esc(g.label)+'">'+esc(g.label)+'</span>';
     html+='<span class="group-count">'+g.count+'</span>';
-    html+='<button class="btn sm group-hl" onclick="hlGroup('+i+',event)">Highlight</button>';
     html+='</div>';
   });
   document.getElementById('resultsList').innerHTML=html;
@@ -390,6 +427,40 @@ function hlGroup(idx,e){
 }
 function clearPreview(){
   call('clearPreview');
+}
+
+/* ═══ Visibility ═══ */
+function hpToggleVis(idx,e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  if(!GROUPS[idx])return;
+  var vis=GRP_VIS[idx]!==false;
+  GRP_VIS[idx]=!vis;
+  callJSON(vis?'hpHideGroup':'hpShowGroup',{eids:GROUPS[idx].eids});
+  renderGroups();
+}
+function hpIsolate(idx,e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  if(!GROUPS[idx])return;
+  /* If already isolated (only this visible), toggle back to show all */
+  var onlyThis=true;
+  for(var i=0;i<GROUPS.length;i++){
+    if(i===idx){if(GRP_VIS[i]===false){onlyThis=false;break;}}
+    else{if(GRP_VIS[i]!==false){onlyThis=false;break;}}
+  }
+  if(onlyThis){hpShowAll();return;}
+  GRP_VIS={};
+  for(var i=0;i<GROUPS.length;i++) GRP_VIS[i]=(i===idx);
+  callJSON('hpIsolateGroup',{eids:GROUPS[idx].eids});
+  renderGroups();
+}
+function hpShowAll(){
+  GRP_VIS={};
+  call('hpShowAll');
+  renderGroups();
+}
+function hasHiddenGroups(){
+  for(var k in GRP_VIS)if(GRP_VIS.hasOwnProperty(k)&&GRP_VIS[k]===false)return true;
+  return false;
 }
 
 /* ═══ Color Sampler ═══ */
@@ -468,7 +539,7 @@ function receiveCommitResult(json){
       HP_EIDS={};SELECTED={};
       if(METHOD==='name') call('parseByName');
       else if(METHOD==='color') call('parseByColor');
-      else if(METHOD==='sample'){document.getElementById('resultsArea').classList.remove('show');document.getElementById('samplePanel').style.display='flex';document.getElementById('statusText').textContent='Committed! Select next entity';}
+      else if(METHOD==='sample'){document.getElementById('resultsArea').classList.remove('show');document.getElementById('samplePanel').style.display='flex';document.getElementById('statusText').textContent='Committed! Grab another entity to continue';}
     }else{
       showToast(d.message||'Error','err');
     }
@@ -478,21 +549,21 @@ function receiveCommitResult(json){
 /* ═══ Navigation ═══ */
 function backToMethods(){
   clearPreview();
+  if(hasHiddenGroups()) call('hpShowAll');
   if(METHOD==='sample'&&document.getElementById('resultsArea').classList.contains('show')){
-    // Go back to sampler panel — observer stays active
+    // Go back to sample panel with properties still showing
     document.getElementById('resultsArea').classList.remove('show');
     document.getElementById('samplePanel').style.display='flex';
     document.getElementById('searchLoading').style.display='none';
     document.getElementById('sampleProps').style.display='';
     if(SAMPLE_EID>0) document.getElementById('sampleCommitBar').style.display='flex';
-    document.getElementById('statusText').textContent='Select Object: click entities to sample properties';
+    document.getElementById('statusText').textContent='Grab Selected: select an entity then click Grab Selected';
     return;
   }
-  if(METHOD==='sample') call('deactivateObjectSampler');
   document.getElementById('resultsArea').classList.remove('show');
   document.getElementById('samplePanel').style.display='none';
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
-  GROUPS=[];SELECTED={};HP_EIDS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
+  GROUPS=[];SELECTED={};HP_EIDS={};GRP_VIS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
   document.getElementById('statusText').textContent='Pick a parse method to group visible entities';
 }
 
@@ -524,28 +595,18 @@ function cancelModal(){
   _modalCb=null;
 }
 
-/* ═══ Object Sampler (Ray Gun) ═══ */
+/* ═══ Grab Selected — receive properties (no auto-highlight) ═══ */
 function receiveSampledProperties(json){
   try{
     var d=JSON.parse(json);
-    var eid=d.entity_id||0;
-
-    // If results area is showing — toggle only, don't switch panels
-    if(document.getElementById('resultsArea').classList.contains('show')){
-      if(eid>0) toggleHpEntity(eid);
-      return;
-    }
-
-    // Auto-show sample panel if not already in sample mode
-    if(METHOD!=='sample'){
-      METHOD='sample';
-      document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
-      var card=document.getElementById('mc-sample');
-      if(card)card.classList.add('active');
-      document.getElementById('resultsArea').classList.remove('show');
-      document.getElementById('samplePanel').style.display='flex';
-    }
-    // Remember which property KEYS were checked before update
+    SAMPLE_PROPS=d.properties||[];
+    SAMPLE_EID=d.entity_id||0;
+    // Show sample panel
+    document.getElementById('resultsArea').classList.remove('show');
+    document.getElementById('samplePanel').style.display='flex';
+    document.getElementById('sampleInfo').textContent='Entity #'+SAMPLE_EID+' \u2014 '+SAMPLE_PROPS.length+' properties';
+    document.getElementById('statusText').textContent='Inspecting entity #'+SAMPLE_EID;
+    // Remember checked property keys across grabs
     var wasChecked={};
     var oldChecks=document.querySelectorAll('#sampleProps input[type=checkbox]');
     for(var i=0;i<oldChecks.length;i++){
@@ -554,14 +615,11 @@ function receiveSampledProperties(json){
         if(SAMPLE_PROPS[oi]) wasChecked[SAMPLE_PROPS[oi].key]=true;
       }
     }
-    SAMPLE_PROPS=d.properties||[];
-    SAMPLE_EID=d.entity_id||0;
     renderSampleProps(wasChecked);
-    // Toggle in HP_EIDS
-    if(eid>0) toggleHpEntity(eid);
+    // Track entity for assignment but do NOT highlight
+    HP_EIDS={};HP_EIDS[SAMPLE_EID]=true;
     updateHpCount();
     document.getElementById('matchCount').style.display='none';
-    // Hide loading, show props and assign bar
     document.getElementById('searchLoading').style.display='none';
     document.getElementById('sampleProps').style.display='';
     if(SAMPLE_EID>0){
@@ -569,7 +627,6 @@ function receiveSampledProperties(json){
       populateSampleCatDropdown();
       document.getElementById('btnAssign').disabled=!document.getElementById('sampleCatSelect').value;
     }
-    // Auto-update count if anything is still checked
     onPropCheck();
   }catch(e){console.log('receiveSampledProperties err: '+e.message);}
 }
@@ -645,7 +702,9 @@ function receiveSampleMatches(json){
   try{
     var d=JSON.parse(json);
     var eids=d.eids||[];
-    var count=d.count||0;
+    // Ensure original sampled entity is included
+    if(SAMPLE_EID>0 && eids.indexOf(SAMPLE_EID)===-1) eids.push(SAMPLE_EID);
+    var count=eids.length;
     // Hide loading display, restore props
     document.getElementById('searchLoading').style.display='none';
     document.getElementById('sampleProps').style.display='';
@@ -656,7 +715,7 @@ function receiveSampleMatches(json){
     document.getElementById('sampleInfo').textContent='Entity #'+SAMPLE_EID+' \u2014 '+SAMPLE_PROPS.length+' properties';
     // Set up results groups
     GROUPS=[{label:'Sample Matches ('+count+')',count:count,eids:eids}];
-    SELECTED={0:true};
+    SELECTED={0:true};GRP_VIS={};
     HP_EIDS={};
     eids.forEach(function(eid){HP_EIDS[eid]=true;});
     document.getElementById('statusText').textContent='Found '+count+' matching entities';
@@ -671,12 +730,12 @@ function receiveSampleMatches(json){
 }
 
 function exitSampler(){
-  call('deactivateObjectSampler');
   clearPreview();
+  if(hasHiddenGroups()) call('hpShowAll');
   document.getElementById('resultsArea').classList.remove('show');
   document.getElementById('samplePanel').style.display='none';
   document.querySelectorAll('.method-card').forEach(function(el){el.classList.remove('active');});
-  GROUPS=[];SELECTED={};HP_EIDS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
+  GROUPS=[];SELECTED={};HP_EIDS={};GRP_VIS={};METHOD='';SAMPLE_PROPS=[];SAMPLE_EID=0;
   document.getElementById('statusText').textContent='Pick a parse method to group visible entities';
 }
 

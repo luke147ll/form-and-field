@@ -66,6 +66,11 @@ module TakeoffTool
       @originals[eid] = entry
     end
 
+    def self.original_material(eid)
+      entry = @originals[eid]
+      entry ? entry[:instance] : nil
+    end
+
     def self.restore(eid)
       entry = @originals.delete(eid)
       return unless entry
