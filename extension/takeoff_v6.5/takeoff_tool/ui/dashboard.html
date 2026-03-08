@@ -758,7 +758,6 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <label>Size:</label><input type="text" id="bulkSize" placeholder="1x6" onkeydown="if(event.key==='Enter')bulkSetSize()">
   <label>Sub:</label><select id="bulkSub"></select><button class="hb pri" onclick="bulkSetSub()">Set</button>
   <div class="sep"></div>
-  <button class="hb" onclick="createInstanceFromSel()" style="color:#f9e2af;border-color:#f9e2af">Create Instance</button>
   <button class="hb" onclick="toggleCosmeticSel()" style="color:#94e2d5;border-color:#94e2d5">&#9671; Cosmetic</button>
   <button class="hb" onclick="bulkExclude()" style="color:#f38ba8">Exclude</button>
   <button class="hb" onclick="clearSel()">Deselect</button>
@@ -1873,55 +1872,6 @@ function setCatCC(cat,code){
   if(code)CAT_CCM[cat]=[code];
 }
 
-/* ═══ INSTANCE GROUPING HELPERS ═══ */
-function cleanDefName(n){
-  if(!n)return'';
-  // Strip trailing Revit IDs: hex, decimal, or mixed (any length 4+)
-  // "M_Ceiling Fan:Standard:123456" → "M_Ceiling Fan:Standard"
-  // "Basic Wall, 2x6, 3A4B2C" → "Basic Wall, 2x6"
-  // "Wall-3A4B2C1D" → "Wall"
-  n=n.replace(/\s*\[\d+\]\s*$/,'');           // [123456]
-  n=n.replace(/[,:;\s\-]+[0-9A-Fa-f]{4,}\s*$/,''); // :123456, -3A4B
-  n=n.replace(/\s*#\d+\s*$/,'');              // SketchUp #2
-  return n.replace(/\s+$/,'');
-}
-function buildInstGroups(items){
-  var g={},order=[];
-  for(var i=0;i<items.length;i++){
-    var r=items[i];
-    // Use rawDefName (shared component definition) for grouping, not definitionName (unique instance name)
-    var cn=cleanDefName(r.rawDefName||r.definitionName);
-    var key=(r.subcategory||'')+'::'+cn;
-    if(!g[key]){g[key]={name:cn,sub:r.subcategory||'',items:[],eids:[],mt:r.measurementType||'volume'};order.push(key);}
-    g[key].items.push(r);
-    g[key].eids.push(r.entityId);
-  }
-  g._order=order;
-  return g;
-}
-function instGrpTotal(ig){
-  return grpTotal(ig.items);
-}
-function instGrpPrimary(ig){
-  var m=ig.mt||'volume',tot=0;
-  for(var i=0;i<ig.items.length;i++){
-    var r=ig.items[i];
-    if(m==='ea'||m==='ea_bf'||m==='ea_sf')tot+=1;
-    else if(m==='lf')tot+=(r.linearFt||0);
-    else if(m==='sf'||m==='sf_cy'||m==='sf_sheets')tot+=(r.areaSF||0);
-    else tot+=(r.volumeFt3||0);
-  }
-  return tot;
-}
-function grpSv2(items){
-  if(!items.length)return'';
-  var m=items[0].measurementType||'volume';
-  if(m==='sf_cy'){var cy=0;for(var i=0;i<items.length;i++)cy+=(items[i].volumeFt3||0)/27;return cy>0?cy.toFixed(2)+' <span style="color:#a6adc8;font-size:10px">CY</span>':'';}
-  if(m==='ea_bf'){var bf=0;for(var i=0;i<items.length;i++)bf+=(items[i].volumeBF||0);return bf>0?bf.toFixed(1)+' <span style="color:#a6adc8;font-size:10px">BF</span>':'';}
-  if(m==='ea_sf'){var sf=0;for(var i=0;i<items.length;i++){var w=(items[i].bbWidth||0)/12,h2=(items[i].bbHeight||0)/12;sf+=w*h2;}return sf>0?sf.toFixed(1)+uLabel('sf'):'';}
-  if(m==='sf_sheets'){var sf=0;for(var i=0;i<items.length;i++)sf+=(items[i].areaSF||0);return sf>0?Math.ceil(sf/32)+' <span style="color:#a6adc8;font-size:10px">sht</span>':'';}
-  return'';
-}
 function renderEntityRow(row,gBy,gk,isChild){
   var vi=FIDX.length;
   FIDX.push(row.entityId);
@@ -3873,18 +3823,6 @@ function showToast(msg,type){
   el.textContent=msg;
   document.body.appendChild(el);
   setTimeout(function(){el.style.opacity='0';setTimeout(function(){el.remove();},300);},3000);
-}
-/* ── Create Instance (manual) ── */
-function createInstanceFromSel(){
-  var ids=getSelIds();
-  if(ids.length<2){showToast('Select at least 2 items to instance','warning');return;}
-  var defName='';
-  for(var i=0;i<ROWS.length;i++){
-    if(ids.indexOf(ROWS[i].eid)!==-1){defName=cleanDefName(ROWS[i].definitionName||ROWS[i].name||'');break;}
-  }
-  var name=prompt('Component name:',defName);
-  if(!name)return;
-  callJSON('createInstance',{eids:ids,name:name.trim()});
 }
 function toggleCosmeticSel(){
   var ids=getSelIds();
