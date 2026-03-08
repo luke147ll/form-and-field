@@ -1561,7 +1561,7 @@ function strip(){
 /* ═══ MEASUREMENTS ═══ */
 function pv(r){
   var m=r.measurementType||'volume';
-  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return1+uLabel(m);
+  if(m==='ea'||m==='ea_bf'||m==='ea_sf')return 1+uLabel(m);
   if(m==='lf'){var l=r.linearFt||0;return l>0?l.toFixed(1)+uLabel(m):'--';}
   if(m==='sf'||m==='sf_cy'||m==='sf_sheets'){
     if(r.areaSF)return r.areaSF.toFixed(1)+uLabel(m);
