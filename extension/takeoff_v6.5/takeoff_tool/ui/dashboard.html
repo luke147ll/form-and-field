@@ -754,11 +754,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
 <!-- MULTIVERSE TOGGLE BAR -->
 <div class="mv-bar" id="mvBar" style="display:none">
-  <div class="mv-toggle">
+  <div class="mv-toggle" id="mvToggle">
     <span class="mv-btn active" data-view="a" onclick="setMvView('a')" style="--mv-color:#a6e3a1">A</span>
     <span class="mv-btn" data-view="ab" onclick="setMvView('ab')" style="--mv-color:#cba6f7">A+B</span>
     <span class="mv-btn" data-view="b" onclick="setMvView('b')" style="--mv-color:#89b4fa">B</span>
   </div>
+  <button id="mvExitAnalysis" onclick="exitAnalysisMode()" style="display:none;font-size:11px;padding:4px 14px;background:#f38ba8;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:700;font-family:inherit;">Exit Analysis</button>
   <span class="mv-label" id="mvLabel"></span>
   <button class="mv-compare-btn" id="mvCompareBtn" onclick="runCompare()">Compare</button>
   <span class="mv-diff-toggle" id="mvDiffToggle" onclick="toggleDiff()">Diff</span>
@@ -951,15 +952,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <div class="mv-models" id="mvModels"></div>
         <div class="mv-needs-scan" id="mvNeedsScan" style="display:none">
           <span style="color:#f9e2af;font-size:11px">Model B imported — not yet scanned</span>
-          <span class="mv-scan-b-btn" onclick="showLoading('SCANNING MODEL B');call('rescanModelB')">Scan Model B</span>
+          <span class="mv-scan-b-btn" onclick="showLoading('SCANNING MODEL B','scan');setTimeout(function(){call('rescanModelB');},60)">Scan Model B</span>
         </div>
         <!-- Smart Diff Controls Panel (top priority) -->
         <div id="smartDiffPanel" style="display:none;background:#1e1e2e;border:1px solid #313244;border-radius:8px;padding:10px;margin:6px 0;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span style="font-size:13px;font-weight:600;color:#cdd6f4;">Smart Comparison</span>
-            <div style="display:flex;gap:4px;">
-              <button onclick="showLoading('ANALYZING SPATIAL OVERLAP');call('computeSmartDiff')" title="Analyze spatial overlap" style="font-size:11px;padding:3px 10px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit;">Analyze</button>
-              <button onclick="call('removeSmartDiff')" title="Remove diff" style="font-size:11px;padding:3px 8px;background:none;border:1px solid #f38ba8;color:#f38ba8;border-radius:4px;cursor:pointer;font-family:inherit;">Clear</button>
+            <div style="display:flex;gap:4px;" id="sdButtons">
+              <button onclick="showLoading('ANALYZING SPATIAL OVERLAP','analyze');setTimeout(function(){call('computeSmartDiff');},60)" title="Analyze spatial overlap" style="font-size:11px;padding:3px 10px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit;">Analyze</button>
             </div>
           </div>
           <div id="sdResults" style="display:none;">
@@ -986,7 +986,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
           </div>
         </div>
         <div class="mv-management">
-          <span class="mv-mgmt-btn" onclick="showLoading('RESCANNING MODEL B');call('rescanModelB')">Rescan B</span>
+          <span class="mv-mgmt-btn" onclick="showLoading('RESCANNING MODEL B','scan');setTimeout(function(){call('rescanModelB');},60)">Rescan B</span>
           <span class="mv-mgmt-btn" onclick="call('importComparisonModel')">Import New</span>
           <span class="mv-mgmt-btn danger" onclick="confirmRemoveMv()">Remove Model B</span>
         </div>
@@ -2541,16 +2541,33 @@ function showPortalError(title,msg){
 }
 
 /* ═══ LOADING SCREEN ═══ */
-function showLoading(statusText){
+function showLoading(statusText,iconType){
   var el=document.getElementById('ffLoading');
   el.style.display='block';el.style.opacity='';el.style.transition='';
   document.getElementById('ffLoadCount').textContent='0';
   document.getElementById('ffLoadPct').textContent='0%';
   document.getElementById('ffLoadBar').style.width='0%';
   document.getElementById('ffLoadPills').innerHTML='';
-  document.getElementById('ffTL1').textContent='> scanner ready';
-  document.getElementById('ffTL2').textContent='> systems nominal';
-  document.getElementById('ffTL3').textContent='> awaiting signal...';
+  var ico=document.getElementById('ffLoadIcon');
+  if(iconType==='scan'){
+    ico.style.color='#89b4fa';ico.style.textShadow='0 0 10px #89b4fa';
+    ico.innerHTML='<div style="text-align:center;">&#9604;&#9600;&#9600;&#9604;</div><div style="text-align:center;">&#9608;&#9619;&#9619;&#9608;</div><div style="text-align:center;">&#9600;&#9604;&#9604;&#9600;</div>';
+    document.getElementById('ffTL1').textContent='> geometry parser ready';
+    document.getElementById('ffTL2').textContent='> model B located';
+    document.getElementById('ffTL3').textContent='> awaiting scan...';
+  }else if(iconType==='analyze'){
+    ico.style.color='#a6e3a1';ico.style.textShadow='0 0 10px #a6e3a1';
+    ico.innerHTML='<div style="text-align:center;">&#9617;&#9608;&#9608;&#9617;</div><div style="text-align:center;">&#9608;&#9608;&#9608;&#9608;</div><div style="text-align:center;">&#9617;&#9608;&#9608;&#9617;</div>';
+    document.getElementById('ffTL1').textContent='> collision engine ready';
+    document.getElementById('ffTL2').textContent='> spatial index built';
+    document.getElementById('ffTL3').textContent='> awaiting analysis...';
+  }else{
+    ico.style.color='#cba6f7';ico.style.textShadow='0 0 10px #cba6f7';
+    ico.innerHTML='<div style="text-align:center;">&#9608;&#9600;&#9600;&#9608;</div><div style="text-align:center;">&#9608;&#9618;&#9618;&#9608;</div><div style="text-align:center;">&#9608;&#9604;&#9604;&#9608;</div>';
+    document.getElementById('ffTL1').textContent='> scanner ready';
+    document.getElementById('ffTL2').textContent='> systems nominal';
+    document.getElementById('ffTL3').textContent='> awaiting signal...';
+  }
   updateLoadingStatus(statusText||'INITIALIZING SCANNER');
 }
 function hideLoading(){
@@ -2661,9 +2678,8 @@ function setMvView(mode){
     var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
     document.getElementById('compResults').classList.remove('active');
     call('clearCompareHighlights');
-    // Clear smart diff
+    // Clear smart diff UI (Ruby-side exit handled by setMultiverseView)
     onSmartDiffRemoved();
-    call('removeSmartDiff');
   }
   call('setMultiverseView',mode);
 }
@@ -2886,6 +2902,12 @@ function onSmartDiffComplete(counts){
   hideLoading();
   populateSDCatFilter();
   document.getElementById('sdResults').style.display='block';
+  // Enter analysis mode — swap A/A+B/B for Exit button
+  document.getElementById('mvToggle').style.display='none';
+  document.getElementById('mvExitAnalysis').style.display='inline-block';
+  var cmpBtn=document.getElementById('mvCompareBtn');if(cmpBtn)cmpBtn.style.display='none';
+  var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
+  var lbl=document.getElementById('mvLabel');if(lbl)lbl.textContent='Smart Diff Analysis';
   var h='';
   var states=['matched','changed','new_b','removed_a'];
   for(var i=0;i<states.length;i++){
@@ -2937,6 +2959,16 @@ function onSmartDiffRemoved(){
   document.getElementById('sdResults').style.display='none';
   SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
   SD_OPACITY={matched:15,changed:50,new_b:90,removed_a:70};
+  // Restore normal controls
+  document.getElementById('mvToggle').style.display='';
+  document.getElementById('mvExitAnalysis').style.display='none';
+}
+
+function exitAnalysisMode(){
+  // Clear stale visibility so Model A starts fresh (no SmartDiff leftovers)
+  mvState['a']=null;
+  splitVis={a:{},b:{}};
+  setMvView('a');
 }
 
 /* ═══ SPLIT VERTICAL DASHBOARD ═══ */
@@ -5085,7 +5117,7 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');i
   <!-- Content -->
   <div style="position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">
     <!-- Pixel art portal -->
-    <div style="font-size:24px;line-height:1;letter-spacing:2px;color:#cba6f7;text-shadow:0 0 10px #cba6f7;">
+    <div id="ffLoadIcon" style="font-size:24px;line-height:1;letter-spacing:2px;color:#cba6f7;text-shadow:0 0 10px #cba6f7;">
       <div style="text-align:center;">&#9608;&#9600;&#9600;&#9608;</div>
       <div style="text-align:center;">&#9608;&#9618;&#9618;&#9608;</div>
       <div style="text-align:center;">&#9608;&#9604;&#9604;&#9608;</div>
