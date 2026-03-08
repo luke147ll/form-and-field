@@ -1,3 +1,5 @@
+require 'set'
+
 module TakeoffTool
   module Scanner
     unless defined?(CONFIDENCE_SCORES)
@@ -164,8 +166,24 @@ module TakeoffTool
         progress.call("Removed #{dups} duplicate entities") if progress
       end
 
+      # Post-scan: remove nested children from EA-measured categories
+      # (e.g., a can light's bulb/trim/housing shouldn't count as separate fixtures)
+      progress.call("Filtering nested EA children...") if progress
+      filter_ea_children(results, reg)
+
+      # Post-scan: detect possible overcounts for EA categories
+      @overcount_warnings = detect_overcounts(results, reg)
+      if @overcount_warnings.any?
+        puts "[FF Scanner] Overcount warnings: #{@overcount_warnings.length} categories flagged"
+        @overcount_warnings.each { |w| puts "  #{w[:message]}" }
+      end
+
       progress.call("Sorting #{results.length} results") if progress
       [results.sort_by{|r|[r[:tag]||'zzz',r[:display_name]||'']}, reg]
+    end
+
+    def self.overcount_warnings
+      @overcount_warnings || []
     end
 
     private
@@ -228,12 +246,8 @@ module TakeoffTool
       bb = inst.bounds
       w = bb.width.to_f; h = bb.height.to_f; d = bb.depth.to_f
 
-      # Count same-name instances
-      cnt = 0
-      if iname
-        Sketchup.active_model.definitions.each{|df| df.instances.each{|i| cnt+=1 if i.name==iname}}
-      end
-      cnt = [cnt, 1].max
+      # Each scan result = 1 entity. No multiplication.
+      cnt = 1
 
       vi3 = vol.to_f; vf3 = vi3/1728.0; vbf = vi3/144.0
 
@@ -782,6 +796,128 @@ module TakeoffTool
         end
       end
       best_diff <= 0.5 ? best : nil
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # filter_ea_children — Remove nested sub-components from EA categories
+    #
+    # If a can light has 5 sub-components (bulb, trim, housing, bracket, junction box)
+    # all categorized as "Lighting Fixtures", we only want the top-level can light.
+    # Walk up each EA entity's parent chain; if an ancestor is also in the results
+    # with the same EA category, the entity is a child and gets removed.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.filter_ea_children(results, reg)
+      # Build lookup: entity_id → auto_category (only for EA-measured categories)
+      ea_cats = {}
+      results.each do |r|
+        cat = r[:parsed][:auto_category]
+        mt = r[:parsed][:measurement_type] || Parser.measurement_for(cat)
+        ea_cats[r[:entity_id]] = cat if mt && mt.start_with?('ea')
+      end
+      return if ea_cats.empty?
+
+      children = Set.new
+
+      ea_cats.each do |eid, cat|
+        entity = reg[eid]
+        next unless entity && entity.valid?
+
+        # Walk up the parent chain
+        cursor = entity.parent
+        while cursor
+          break if cursor.is_a?(Sketchup::Model)
+
+          if cursor.is_a?(Sketchup::ComponentDefinition)
+            # Check if any instance of this parent definition is in the same EA category
+            cursor.instances.each do |pinst|
+              next unless pinst.valid?
+              if ea_cats[pinst.entityID] == cat
+                children.add(eid)
+                break
+              end
+            end
+            break if children.include?(eid)
+            # Move up: pick any instance's parent to continue walking
+            pinst = cursor.instances.first
+            cursor = pinst ? pinst.parent : nil
+          else
+            cursor = cursor.respond_to?(:parent) ? cursor.parent : nil
+          end
+        end
+      end
+
+      if children.any?
+        before = results.length
+        results.reject! { |r| children.include?(r[:entity_id]) }
+        puts "[FF Scanner] EA dedup: removed #{children.size} nested children (#{before} → #{results.length})"
+      end
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # detect_overcounts — Post-scan safety net for EA categories
+    #
+    # Even after filter_ea_children, some models may have non-standard nesting.
+    # This pass detects suspicious count ratios and flags them for user review.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.detect_overcounts(results, reg)
+      warnings = []
+
+      # Group by category
+      by_cat = {}
+      results.each do |r|
+        cat = r[:parsed][:auto_category]
+        by_cat[cat] ||= []
+        by_cat[cat] << r
+      end
+
+      by_cat.each do |cat, cat_results|
+        mt = cat_results.first&.dig(:parsed, :measurement_type) || Parser.measurement_for(cat)
+        next unless mt && mt.start_with?('ea')
+
+        # Count entities that HAVE children in the same category in their definition
+        parent_count = 0
+        child_like = 0
+
+        cat_eids = Set.new(cat_results.map { |r| r[:entity_id] })
+
+        cat_results.each do |r|
+          entity = reg[r[:entity_id]]
+          next unless entity && entity.valid?
+
+          # Check if this entity has children in the same category
+          if entity.respond_to?(:definition)
+            has_cat_children = entity.definition.entities.any? do |child|
+              child.respond_to?(:entityID) && cat_eids.include?(child.entityID)
+            end
+            parent_count += 1 if has_cat_children
+          end
+
+          # Check if this entity IS inside a parent (not at model root)
+          p = entity.parent
+          child_like += 1 if p.is_a?(Sketchup::ComponentDefinition)
+        end
+
+        total = cat_results.length
+        # Flag if >30% of entities appear to be nested children
+        if child_like > parent_count && parent_count > 0
+          ratio = child_like.to_f / total
+          if ratio > 0.3
+            probable = total - child_like + parent_count
+            warnings << {
+              category: cat,
+              total_counted: total,
+              probable_real_count: probable,
+              child_count: child_like,
+              overcount_ratio: ratio.round(2),
+              message: "#{cat}: #{total} counted but likely ~#{probable} real items (#{child_like} may be nested children)"
+            }
+          end
+        end
+      end
+
+      warnings
     end
   end
 end

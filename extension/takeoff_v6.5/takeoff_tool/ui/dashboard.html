@@ -199,6 +199,21 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 /* Dimmed "(no subcategory)" rows */
 .sc-hdr.sc-none td{opacity:0.55}
 .sc-hdr.sc-none .sc-name{color:#6c7086;font-style:italic}
+/* Instance group rows */
+.ig-hdr{background:#1a1a30;cursor:pointer;user-select:none}
+.ig-hdr td{padding:5px 8px !important;border-bottom:1px solid #252540;font-size:12px}
+.ig-hdr:hover td{background:#222242 !important}
+.ig-hdr .arr{transition:transform .15s;display:inline-block;color:#89b4fa;margin-right:3px}
+.ig-hdr:not(.ig-open) .arr{transform:rotate(-90deg)}
+.ig-child td{padding-left:24px !important;background:#181828;font-size:11px;border-bottom:1px solid #1e1e30}
+.ig-child:hover td{background:#1e1e38 !important}
+/* Overcount warning banner */
+#overcountBanner{margin:6px 0;display:none}
+.oc-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #313244;font-size:11px}
+.oc-row span{color:#cdd6f4}
+.oc-btn{font-size:10px;padding:2px 8px;border:none;border-radius:3px;cursor:pointer;font-weight:600;font-family:inherit}
+.oc-fix{background:#a6e3a1;color:#1e1e2e}
+.oc-ignore{background:#45475a;color:#cdd6f4}
 /* Drag & drop subcategory between categories */
 .sc-hdr.sc-dragging{opacity:0.35;background:rgba(203,166,247,0.05)}
 .sc-hdr[draggable="true"]{cursor:grab}
@@ -748,6 +763,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <label>Size:</label><input type="text" id="bulkSize" placeholder="1x6" onkeydown="if(event.key==='Enter')bulkSetSize()">
   <label>Sub:</label><select id="bulkSub"></select><button class="hb pri" onclick="bulkSetSub()">Set</button>
   <div class="sep"></div>
+  <button class="hb" onclick="createInstanceFromSel()" style="color:#f9e2af;border-color:#f9e2af">Create Instance</button>
   <button class="hb" onclick="bulkExclude()" style="color:#f38ba8">Exclude</button>
   <button class="hb" onclick="clearSel()">Deselect</button>
 </div>
@@ -814,6 +830,10 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 <div class="tp">
   <!-- CATEGORY LIST (flex:1, scrolls independently) -->
   <div class="dp-wrap" id="dpWrap">
+    <div id="overcountBanner" style="display:none;background:#313244;border:1px solid #f38ba8;border-radius:8px;padding:8px 10px;margin:0 0 6px 0;">
+      <div style="color:#f38ba8;font-weight:600;font-size:12px;margin-bottom:4px">Possible Overcounting Detected</div>
+      <div id="overcountItems"></div>
+    </div>
     <div id="dp"></div>
     <div class="sec-scroll-fade" id="dpFade"></div>
   </div>
@@ -1184,6 +1204,11 @@ var comparisonResults=null,diffActive=false,diffComputed=false;
 var matchedFilterActive=false;
 var matchedCats=null;
 var pendingVisReapply=false;
+var INST_GROUPS={};  // key → {name,items:[rows],entities:[eids]}
+var openInstGroups={};  // key → true if expanded
+var OC_WARNINGS=[];  // overcount warnings from scanner
+var DISPLAY_GROUPS=[];  // Ruby pre-computed display groups [{n,cat,sub,eids}]
+var DG_BY_EID={};  // entityId → index in DISPLAY_GROUPS
 var mvModelA='',mvModelB='';
 var COLOR_PALETTE=['#f5e0dc','#f2cdcd','#f5c2e7','#cba6f7','#f38ba8','#eba0ac','#fab387','#f9e2af','#a6e3a1','#94e2d5','#89dceb','#74c7ec','#89b4fa','#b4befe'];
 var openColorDotId=null;
@@ -1313,7 +1338,13 @@ function receiveData(json){
     var d=JSON.parse(json);
     D=d.rows||[];CA=d.categories||[];ALL_CA=d.allCategories||CA;CO=d.costCodes||[];CAT_CCM=d.catCostCodeMap||{};MSUB=d.masterSubcategories||{};ALL_MSUB=d.allMasterSubcategories||MSUB;CATMT=d.categoryMT||{};CCOL=d.customColors||{};CSETTINGS=d.colorSettings||{};
     CONTAINERS=d.containers||[];
-    console.log('[FF receiveData] '+D.length+' rows, '+CONTAINERS.length+' containers');
+    OC_WARNINGS=d.overcountWarnings||[];
+    DISPLAY_GROUPS=d.displayGroups||[];
+    DG_BY_EID={};
+    for(var i=0;i<DISPLAY_GROUPS.length;i++){
+      for(var j=0;j<DISPLAY_GROUPS[i].eids.length;j++) DG_BY_EID[DISPLAY_GROUPS[i].eids[j]]=i;
+    }
+    console.log('[FF receiveData] '+D.length+' rows, '+DISPLAY_GROUPS.length+' display groups, '+CONTAINERS.length+' containers');
     buildCatToContMap();
     CA.sort(function(a,b){
       if(a==='_IGNORE')return 1;if(b==='_IGNORE')return -1;
@@ -1360,6 +1391,7 @@ function receiveData(json){
     }
     syncIsolation();
     filt();
+    renderOvercountWarnings();
   }catch(e){
     log('PARSE: '+e.message,'err');
     document.getElementById('dp').innerHTML='<div style="padding:20px;color:#f38ba8">'+e.message+'</div>';
@@ -1844,10 +1876,98 @@ function setCatCC(cat,code){
   if(code)CAT_CCM[cat]=[code];
 }
 
+/* ═══ INSTANCE GROUPING HELPERS ═══ */
+function cleanDefName(n){
+  if(!n)return'';
+  // Strip trailing Revit IDs: hex, decimal, or mixed (any length 4+)
+  // "M_Ceiling Fan:Standard:123456" → "M_Ceiling Fan:Standard"
+  // "Basic Wall, 2x6, 3A4B2C" → "Basic Wall, 2x6"
+  // "Wall-3A4B2C1D" → "Wall"
+  n=n.replace(/\s*\[\d+\]\s*$/,'');           // [123456]
+  n=n.replace(/[,:;\s\-]+[0-9A-Fa-f]{4,}\s*$/,''); // :123456, -3A4B
+  n=n.replace(/\s*#\d+\s*$/,'');              // SketchUp #2
+  return n.replace(/\s+$/,'');
+}
+function buildInstGroups(items){
+  var g={},order=[];
+  for(var i=0;i<items.length;i++){
+    var r=items[i];
+    // Use rawDefName (shared component definition) for grouping, not definitionName (unique instance name)
+    var cn=cleanDefName(r.rawDefName||r.definitionName);
+    var key=(r.subcategory||'')+'::'+cn;
+    if(!g[key]){g[key]={name:cn,sub:r.subcategory||'',items:[],eids:[],mt:r.measurementType||'volume'};order.push(key);}
+    g[key].items.push(r);
+    g[key].eids.push(r.entityId);
+  }
+  g._order=order;
+  return g;
+}
+function instGrpTotal(ig){
+  return grpTotal(ig.items);
+}
+function instGrpPrimary(ig){
+  var m=ig.mt||'volume',tot=0;
+  for(var i=0;i<ig.items.length;i++){
+    var r=ig.items[i];
+    if(m==='ea'||m==='ea_bf'||m==='ea_sf')tot+=(r.instanceCount||1);
+    else if(m==='lf')tot+=(r.linearFt||0)*(r.instanceCount||1);
+    else if(m==='sf'||m==='sf_cy'||m==='sf_sheets')tot+=(r.areaSF||0);
+    else tot+=(r.volumeFt3||0);
+  }
+  return tot;
+}
+function grpSv2(items){
+  if(!items.length)return'';
+  var m=items[0].measurementType||'volume';
+  if(m==='sf_cy'){var cy=0;for(var i=0;i<items.length;i++)cy+=(items[i].volumeFt3||0)/27;return cy>0?cy.toFixed(2)+' <span style="color:#a6adc8;font-size:10px">CY</span>':'';}
+  if(m==='ea_bf'){var bf=0;for(var i=0;i<items.length;i++)bf+=(items[i].volumeBF||0);return bf>0?bf.toFixed(1)+' <span style="color:#a6adc8;font-size:10px">BF</span>':'';}
+  if(m==='ea_sf'){var sf=0;for(var i=0;i<items.length;i++){var w=(items[i].bbWidth||0)/12,h2=(items[i].bbHeight||0)/12;sf+=w*h2*(items[i].instanceCount||1);}return sf>0?sf.toFixed(1)+uLabel('sf'):'';}
+  if(m==='sf_sheets'){var sf=0;for(var i=0;i<items.length;i++)sf+=(items[i].areaSF||0);return sf>0?Math.ceil(sf/32)+' <span style="color:#a6adc8;font-size:10px">sht</span>':'';}
+  return'';
+}
+function renderEntityRow(row,gBy,gk,isChild){
+  var vi=FIDX.length;
+  FIDX.push(row.entityId);
+  var sel=!!SEL[row.entityId],rv=VIS[row.entityId]!==false;
+  var wn=row.warnings&&row.warnings.length>0;
+  var co='';
+  for(var j=0;j<ALL_CA.length;j++)co+='<option value="'+ALL_CA[j]+'"'+(ALL_CA[j]===row.category?' selected':'')+'>'+X(ALL_CA[j])+'</option>';
+  co+='<option value="__custom__">+ Custom...</option>';
+  var cco=buildCCOptions(row.costCode);
+  var cls=sel?' class="sel"':'';
+  if(isChild)cls=cls?(cls.replace('"',' ig-child"')):' class="ig-child"';
+  var h='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+cls+'>';
+  h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
+  h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+  h+=' '+buildStaticDot(row.customColor);
+  h+='</td>';
+  if(gBy==='category'){
+    h+='<td>'+buildSubSelect(row)+'</td>';
+    h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
+  }else{
+    h+='<td><select class="cs" onchange="doSetCat('+row.entityId+',this.value)">'+co+'</select></td>';
+    h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
+    h+='<td>'+buildSubSelect(row)+'</td>';
+  }
+  h+='<td title="'+X(row.definitionName)+'">'+X(T(row.definitionName,28));
+  if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
+  h+='</td>';
+  h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
+  h+='<td class="r">'+(row.instanceCount||1)+'</td>';
+  h+='<td class="r">'+pv(row)+'</td>';
+  h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
+  h+='<td style="white-space:nowrap">';
+  h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
+  h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
+  h+='</td></tr>';
+  return h;
+}
+
 /* ═══ GROUPED RENDER ═══ */
 var FIDX=[];
 
 function renderGroups(){
+  INST_GROUPS={};  // Reset instance groups each render
   var gBy=document.getElementById('gBy').value||'container';
   if(gBy==='container'&&CONTAINERS.length>0){renderContainerGroups();return;}
   if(gBy==='container')gBy='category'; // fallback if no containers loaded
@@ -1971,6 +2091,27 @@ function renderGroups(){
       if(hasSubs)items.sort(function(a,b){var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
     }
 
+    /* Build instance groups from Ruby pre-computed display groups */
+    var iGrps={}, iGrpRendered={};
+    var itemByEid={};
+    for(var ii=0;ii<items.length;ii++) itemByEid[items[ii].entityId]=items[ii];
+    var dgSeen={};
+    for(var ii=0;ii<items.length;ii++){
+      var dgIdx=DG_BY_EID[items[ii].entityId];
+      if(dgIdx===undefined||dgSeen[dgIdx])continue;
+      dgSeen[dgIdx]=true;
+      var dg=DISPLAY_GROUPS[dgIdx];
+      if(dg.cat!==gk)continue;
+      var dgItems=[],dgEids=[];
+      for(var dj=0;dj<dg.eids.length;dj++){
+        if(itemByEid[dg.eids[dj]]){dgItems.push(itemByEid[dg.eids[dj]]);dgEids.push(dg.eids[dj]);}
+      }
+      if(dgItems.length>1){
+        var dgKey=(dg.sub||'')+'::'+dg.n;
+        iGrps[dgKey]={name:dg.n,sub:dg.sub,items:dgItems,eids:dgEids,mt:dgItems[0].measurementType||'volume'};
+      }
+    }
+
     for(i=0;i<items.length;i++){
       if(hasSubs){
         var thisSub=items[i].subcategory||'';
@@ -2004,42 +2145,55 @@ function renderGroups(){
         }
         if(!openSubs[gk+'|'+curSub])continue;
       }
-      var row=items[i], vi=FIDX.length;
-      FIDX.push(row.entityId);
-      var sel=!!SEL[row.entityId], rv=VIS[row.entityId]!==false;
-      var wn=row.warnings&&row.warnings.length>0;
-      // Cat dropdown
-      var co='';
-      for(var j=0;j<ALL_CA.length;j++)co+='<option value="'+ALL_CA[j]+'"'+(ALL_CA[j]===row.category?' selected':'')+'>'+X(ALL_CA[j])+'</option>';
-      co+='<option value="__custom__">+ Custom...</option>';
-      // Cost code dropdown
-      var cco=buildCCOptions(row.costCode);
 
-      h+='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+(sel?' class="sel"':'')+'>';
-      h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
-      h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-      h+=' '+buildStaticDot(row.customColor);
-      h+='</td>';
-      if(gBy==='category'){
-        // Sub first, no Cat column when grouped by category
-        h+='<td>'+buildSubSelect(row)+'</td>';
-        h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
-      } else {
-        h+='<td><select class="cs" onchange="doSetCat('+row.entityId+',this.value)">'+co+'</select></td>';
-        h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
-        h+='<td>'+buildSubSelect(row)+'</td>';
+      /* ── Instance grouping: collapse identical definitions into one row ── */
+      var row=items[i];
+      var dgIdx2=DG_BY_EID[row.entityId];
+      var igKey,ig;
+      if(dgIdx2!==undefined){
+        var dg2=DISPLAY_GROUPS[dgIdx2];
+        igKey=(dg2.sub||'')+'::'+dg2.n;
+        ig=iGrps[igKey];
+      } else { igKey=null;ig=null; }
+
+      if(ig&&ig.items.length>1){
+        if(iGrpRendered[igKey])continue; // Already rendered this group
+        iGrpRendered[igKey]=true;
+        var igFullKey=gk+'||'+igKey;
+        INST_GROUPS[igFullKey]=ig;
+        var igOpen=!!openInstGroups[igFullKey];
+        var igVis=false;for(var igv=0;igv<ig.eids.length;igv++)if(VIS[ig.eids[igv]]!==false){igVis=true;break;}
+        // Group summary row
+        h+='<tr class="ig-hdr'+(igOpen?' ig-open':'')+'" onclick="togInstGrp(\''+X2(igFullKey)+'\')">';
+        h+='<td class="ck"><input type="checkbox" onclick="event.stopPropagation()" onchange="selInstGrpAll(\''+X2(igFullKey)+'\',this.checked)"></td>';
+        h+='<td style="width:18px;text-align:center"><button class="ey'+(igVis?'':' off')+'" onclick="event.stopPropagation();togInstGrpVis(\''+X2(igFullKey)+'\')">'+(igVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button></td>';
+        if(gBy==='category'){
+          h+='<td></td>'; // sub placeholder
+          var igCco=buildCCOptions(ig.items[0].costCode);
+          h+='<td><select class="cs" onclick="event.stopPropagation()" onchange="setInstGrpCC(\''+X2(igFullKey)+'\',this.value)" style="max-width:90px">'+igCco+'</select></td>';
+        }else{
+          h+='<td></td><td></td><td></td>'; // cat, code, sub placeholders
+        }
+        h+='<td title="'+X(ig.name)+'"><span class="arr" style="font-size:9px">&#9660;</span> '+X(T(ig.name,26))+' <span style="color:#cba6f7;font-weight:600">&times;'+ig.items.length+'</span></td>';
+        h+='<td>'+X(ig.items[0].sizeNominal||ig.items[0].thickness||'')+'</td>';
+        h+='<td class="r" style="font-weight:600">'+ig.items.length+'</td>';
+        h+='<td class="r" style="font-weight:600">'+grpTotal(ig.items)+'</td>';
+        h+='<td class="r" style="font-size:10px;color:#a6adc8">'+grpSv2(ig.items)+'</td>';
+        h+='<td style="white-space:nowrap">';
+        h+='<button class="ib accent" onclick="event.stopPropagation();isoInstGrp(\''+X2(igFullKey)+'\')" title="Isolate group">'+ICO_ISO+'</button>';
+        h+='<button class="ib accent" onclick="event.stopPropagation();zoomInstGrp(\''+X2(igFullKey)+'\')" title="Zoom to group">'+ICO_ZOOM+'</button>';
+        h+='</td></tr>';
+        // Expanded: render individual child rows
+        if(igOpen){
+          for(var igi=0;igi<ig.items.length;igi++){
+            h+=renderEntityRow(ig.items[igi],gBy,gk,true);
+          }
+        }
+        continue;
       }
-      h+='<td title="'+X(row.definitionName)+'">'+X(T(row.definitionName,28));
-      if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
-      h+='</td>';
-      h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
-      h+='<td class="r">'+(row.instanceCount||1)+'</td>';
-      h+='<td class="r">'+pv(row)+'</td>';
-      h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
-      h+='<td style="white-space:nowrap">';
-      h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
-      h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
-      h+='</td></tr>';
+
+      /* ── Single item — render normally ── */
+      h+=renderEntityRow(row,gBy,gk,false);
     }
     // Render empty subcategories from MSUB that have no items
     if(gBy==='category'&&MSUB[gk]){
@@ -2206,6 +2360,27 @@ function renderContainerGroups(){
         var subKeys2=Object.keys(subSet);hasSubs=subKeys2.length>1||(subKeys2.length===1&&subKeys2[0]!=='');
         if(hasSubs)items.sort(function(a,b){var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
 
+        /* Build instance groups from Ruby pre-computed display groups */
+        var cIGrps={}, cIGrpRendered={};
+        var cItemByEid={};
+        for(var cii=0;cii<items.length;cii++) cItemByEid[items[cii].entityId]=items[cii];
+        var cDgSeen={};
+        for(var cii=0;cii<items.length;cii++){
+          var cDgIdx=DG_BY_EID[items[cii].entityId];
+          if(cDgIdx===undefined||cDgSeen[cDgIdx])continue;
+          cDgSeen[cDgIdx]=true;
+          var cDg=DISPLAY_GROUPS[cDgIdx];
+          if(cDg.cat!==gk)continue;
+          var cDgItems=[],cDgEids=[];
+          for(var cdj=0;cdj<cDg.eids.length;cdj++){
+            if(cItemByEid[cDg.eids[cdj]]){cDgItems.push(cItemByEid[cDg.eids[cdj]]);cDgEids.push(cDg.eids[cdj]);}
+          }
+          if(cDgItems.length>1){
+            var cDgKey=(cDg.sub||'')+'::'+cDg.n;
+            cIGrps[cDgKey]={name:cDg.n,sub:cDg.sub,items:cDgItems,eids:cDgEids,mt:cDgItems[0].measurementType||'volume'};
+          }
+        }
+
         for(var ri=0;ri<items.length;ri++){
           if(hasSubs){
             var thisSub=items[ri].subcategory||'';
@@ -2239,32 +2414,46 @@ function renderContainerGroups(){
             }
             if(!openSubs[gk+'|'+curSub])continue;
           }
-          var row=items[ri],vi3=FIDX.length;
-          FIDX.push(row.entityId);
-          var sel=!!SEL[row.entityId],rv=VIS[row.entityId]!==false;
-          var wn=row.warnings&&row.warnings.length>0;
-          var co='';
-          for(var j3=0;j3<ALL_CA.length;j3++)co+='<option value="'+ALL_CA[j3]+'"'+(ALL_CA[j3]===row.category?' selected':'')+'>'+X(ALL_CA[j3])+'</option>';
-          co+='<option value="__custom__">+ Custom...</option>';
-          var cco=buildCCOptions(row.costCode);
-          h+='<tr id="r'+row.entityId+'" data-vi="'+vi3+'"'+(sel?' class="sel"':'')+'>';
-          h+='<td class="ck"><input type="checkbox" data-vi="'+vi3+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
-          h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-          h+=' '+buildStaticDot(row.customColor);
-          h+='</td>';
-          h+='<td>'+buildSubSelect(row)+'</td>';
-          h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
-          h+='<td title="'+X(row.definitionName)+'">'+X(T(row.definitionName,28));
-          if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
-          h+='</td>';
-          h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
-          h+='<td class="r">'+(row.instanceCount||1)+'</td>';
-          h+='<td class="r">'+pv(row)+'</td>';
-          h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
-          h+='<td style="white-space:nowrap">';
-          h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
-          h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
-          h+='</td></tr>';
+          /* ── Instance grouping in container view ── */
+          var row=items[ri];
+          var cDgIdx2=DG_BY_EID[row.entityId];
+          var cIgKey,cIg;
+          if(cDgIdx2!==undefined){
+            var cDg2=DISPLAY_GROUPS[cDgIdx2];
+            cIgKey=(cDg2.sub||'')+'::'+cDg2.n;
+            cIg=cIGrps[cIgKey];
+          } else { cIgKey=null;cIg=null; }
+
+          if(cIg&&cIg.items.length>1){
+            if(cIGrpRendered[cIgKey])continue;
+            cIGrpRendered[cIgKey]=true;
+            var cIgFullKey=gk+'||'+cIgKey;
+            INST_GROUPS[cIgFullKey]=cIg;
+            var cIgOpen=!!openInstGroups[cIgFullKey];
+            var cIgVis=false;for(var cigv=0;cigv<cIg.eids.length;cigv++)if(VIS[cIg.eids[cigv]]!==false){cIgVis=true;break;}
+            h+='<tr class="ig-hdr'+(cIgOpen?' ig-open':'')+'" onclick="togInstGrp(\''+X2(cIgFullKey)+'\')">';
+            h+='<td class="ck"><input type="checkbox" onclick="event.stopPropagation()" onchange="selInstGrpAll(\''+X2(cIgFullKey)+'\',this.checked)"></td>';
+            h+='<td style="width:18px;text-align:center"><button class="ey'+(cIgVis?'':' off')+'" onclick="event.stopPropagation();togInstGrpVis(\''+X2(cIgFullKey)+'\')">'+(cIgVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button></td>';
+            h+='<td></td>';
+            var cIgCco=buildCCOptions(cIg.items[0].costCode);
+            h+='<td><select class="cs" onclick="event.stopPropagation()" onchange="setInstGrpCC(\''+X2(cIgFullKey)+'\',this.value)" style="max-width:90px">'+cIgCco+'</select></td>';
+            h+='<td title="'+X(cIg.name)+'"><span class="arr" style="font-size:9px">&#9660;</span> '+X(T(cIg.name,26))+' <span style="color:#cba6f7;font-weight:600">&times;'+cIg.items.length+'</span></td>';
+            h+='<td>'+X(cIg.items[0].sizeNominal||cIg.items[0].thickness||'')+'</td>';
+            h+='<td class="r" style="font-weight:600">'+cIg.items.length+'</td>';
+            h+='<td class="r" style="font-weight:600">'+grpTotal(cIg.items)+'</td>';
+            h+='<td class="r" style="font-size:10px;color:#a6adc8">'+grpSv2(cIg.items)+'</td>';
+            h+='<td style="white-space:nowrap">';
+            h+='<button class="ib accent" onclick="event.stopPropagation();isoInstGrp(\''+X2(cIgFullKey)+'\')" title="Isolate group">'+ICO_ISO+'</button>';
+            h+='<button class="ib accent" onclick="event.stopPropagation();zoomInstGrp(\''+X2(cIgFullKey)+'\')" title="Zoom to group">'+ICO_ZOOM+'</button>';
+            h+='</td></tr>';
+            if(cIgOpen){
+              for(var cigi=0;cigi<cIg.items.length;cigi++){
+                h+=renderEntityRow(cIg.items[cigi],'category',gk,true);
+              }
+            }
+            continue;
+          }
+          h+=renderEntityRow(row,'category',gk,false);
         }
         /* Empty subcategories from MSUB */
         if(MSUB[gk]){
@@ -3720,6 +3909,85 @@ function togItemVis(eid){
   var vis=VIS[eid]!==false; VIS[eid]=!vis;
   call(vis?'hideEntities':'showEntities',''+eid);
   filt();
+}
+/* ── Instance group actions ── */
+function togInstGrp(key){openInstGroups[key]=!openInstGroups[key];renderGroups();}
+function togInstGrpVis(key){
+  var ig=INST_GROUPS[key];if(!ig)return;
+  var anyVis=false;
+  for(var i=0;i<ig.eids.length;i++)if(VIS[ig.eids[i]]!==false){anyVis=true;break;}
+  for(var i=0;i<ig.eids.length;i++)VIS[ig.eids[i]]=!anyVis;
+  call(anyVis?'hideEntities':'showEntities',ig.eids.join(','));
+  filt();
+}
+function isoInstGrp(key){
+  var ig=INST_GROUPS[key];if(!ig)return;
+  call('isolateEntities',ig.eids.join(','));
+}
+function zoomInstGrp(key){
+  var ig=INST_GROUPS[key];if(!ig)return;
+  call('zoomToEntities',ig.eids.join(','));
+}
+function selInstGrpAll(key,checked){
+  var ig=INST_GROUPS[key];if(!ig)return;
+  for(var i=0;i<ig.eids.length;i++)SEL[ig.eids[i]]=checked?true:false;
+  if(!checked)for(var i=0;i<ig.eids.length;i++)delete SEL[ig.eids[i]];
+  renderGroups();
+}
+function setInstGrpCC(key,code){
+  var ig=INST_GROUPS[key];if(!ig)return;
+  var ids=ig.eids.map(String);
+  for(var i=0;i<D.length;i++){if(ids.indexOf(String(D[i].entityId))!==-1)D[i].costCode=code;}
+  callJSON('bulkSetCostCode',{eids:ids,val:code});
+}
+/* ── Overcount warning ── */
+function renderOvercountWarnings(){
+  var el=document.getElementById('overcountBanner');
+  if(!OC_WARNINGS||!OC_WARNINGS.length){el.style.display='none';return;}
+  el.style.display='block';
+  var h='';
+  for(var i=0;i<OC_WARNINGS.length;i++){
+    var w=OC_WARNINGS[i];
+    h+='<div class="oc-row">';
+    h+='<span style="flex:1"><strong>'+X(w.category)+':</strong> '+w.total_counted+' counted, likely ~'+w.probable_real_count+' real items</span>';
+    h+='<button class="oc-btn oc-fix" onclick="fixOvercount(\''+X2(w.category)+'\')">Fix Count</button>';
+    h+='<button class="oc-btn oc-ignore" onclick="dismissOvercount('+i+')">Ignore</button>';
+    h+='</div>';
+  }
+  document.getElementById('overcountItems').innerHTML=h;
+}
+function fixOvercount(cat){
+  callJSON('fixOvercount',{category:cat});
+  OC_WARNINGS=OC_WARNINGS.filter(function(w){return w.category!==cat;});
+  renderOvercountWarnings();
+}
+function dismissOvercount(idx){
+  OC_WARNINGS.splice(idx,1);
+  renderOvercountWarnings();
+}
+/* ── Toast notifications ── */
+function showToast(msg,type){
+  var el=document.createElement('div');
+  el.style.cssText='position:fixed;top:12px;right:12px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:500;color:#1e1e2e;max-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:opacity .3s;font-family:inherit';
+  if(type==='success')el.style.background='#a6e3a1';
+  else if(type==='warning')el.style.background='#f9e2af';
+  else if(type==='error')el.style.background='#f38ba8';
+  else el.style.background='#89b4fa';
+  el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(function(){el.style.opacity='0';setTimeout(function(){el.remove();},300);},3000);
+}
+/* ── Create Instance (manual) ── */
+function createInstanceFromSel(){
+  var ids=getSelIds();
+  if(ids.length<2){showToast('Select at least 2 items to instance','warning');return;}
+  var defName='';
+  for(var i=0;i<ROWS.length;i++){
+    if(ids.indexOf(ROWS[i].eid)!==-1){defName=cleanDefName(ROWS[i].definitionName||ROWS[i].name||'');break;}
+  }
+  var name=prompt('Component name:',defName);
+  if(!name)return;
+  callJSON('createInstance',{eids:ids,name:name.trim()});
 }
 function isoCat(cat){
   containerIsolate=null;

@@ -902,6 +902,47 @@ module TakeoffTool
         end
       end
 
+      # ═══ OVERCOUNT FIX ═══
+
+      @dialog.add_action_callback('fixOvercount') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          category = data['category']
+          sr = TakeoffTool.scan_results
+          reg = TakeoffTool.entity_registry
+          next unless sr && reg && category
+
+          removed = 0
+          sr.reject! do |r|
+            next false unless r[:parsed][:auto_category] == category
+            entity = reg[r[:entity_id]]
+            next false unless entity && entity.valid?
+            mt = r[:parsed][:measurement_type] || Parser.measurement_for(category)
+            next false unless mt && mt.start_with?('ea')
+            # Check if this entity is nested inside a parent in the same category
+            p = entity.parent
+            if p.is_a?(Sketchup::ComponentDefinition)
+              cat_eids = sr.select { |r2| r2[:parsed][:auto_category] == category }.map { |r2| r2[:entity_id] }
+              is_child = p.instances.any? { |pinst| pinst.valid? && cat_eids.include?(pinst.entityID) }
+              if is_child
+                removed += 1
+                true
+              else
+                false
+              end
+            else
+              false
+            end
+          end
+
+          puts "[FF] fixOvercount: removed #{removed} children from #{category}"
+          send_live_data
+        rescue => e
+          puts "fixOvercount error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       # ═══ COMMIT TO MAIN ═══
 
       @dialog.add_action_callback('commitToMain') do |_ctx, cat_str|
@@ -1225,6 +1266,120 @@ module TakeoffTool
         end
       end
 
+      # ═══ CREATE INSTANCE (manual only) ═══
+
+      @dialog.add_action_callback('createInstance') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eids = (data['eids'] || []).map(&:to_i)
+          name = data['name'].to_s.strip
+
+          if name.empty?
+            @dialog.execute_script("showToast('Enter a component name','warning')")
+            next
+          end
+          if eids.length < 2
+            @dialog.execute_script("showToast('Select at least 2 items','warning')")
+            next
+          end
+
+          # Resolve entities
+          entities = eids.map { |eid| TakeoffTool.find_entity(eid) }.compact.select(&:valid?)
+          if entities.length < 2
+            @dialog.execute_script("showToast('Could not find enough valid entities','warning')")
+            next
+          end
+
+          model = Sketchup.active_model
+          model.start_operation("Create Instance: #{name}", true)
+
+          begin
+            template = entities.first
+            old_template_id = template.entityID
+
+            # Convert Group to Component if needed
+            if template.is_a?(Sketchup::Group)
+              template = template.to_component
+            end
+
+            defn = template.definition
+            defn.name = name
+
+            # Track old→new entity ID mapping
+            old_to_new = {}
+            if old_template_id != template.entityID
+              old_to_new[old_template_id] = template.entityID
+              TakeoffTool.entity_registry[template.entityID] = template
+            end
+
+            replaced = 0
+            entities[1..-1].each do |e|
+              next unless e.valid?
+              old_eid = e.entityID
+              xform = e.transformation
+              parent = e.parent
+              parent_ents = parent.is_a?(Sketchup::Model) ? model.active_entities : parent.entities
+
+              # Save attributes
+              ff_attrs = {}
+              ta_attrs = {}
+              begin
+                if e.attribute_dictionary('FormAndField')
+                  e.attribute_dictionary('FormAndField').each_pair { |k, v| ff_attrs[k] = v }
+                end
+                if e.attribute_dictionary('TakeoffAssignments')
+                  e.attribute_dictionary('TakeoffAssignments').each_pair { |k, v| ta_attrs[k] = v }
+                end
+              rescue; end
+
+              e.erase!
+
+              new_inst = parent_ents.add_instance(defn, xform)
+              ff_attrs.each { |k, v| new_inst.set_attribute('FormAndField', k, v) }
+              ta_attrs.each { |k, v| new_inst.set_attribute('TakeoffAssignments', k, v) }
+
+              old_to_new[old_eid] = new_inst.entityID
+              TakeoffTool.entity_registry[new_inst.entityID] = new_inst
+              replaced += 1
+            end
+
+            model.commit_operation
+
+            # Update scan_results and assignments with new entity IDs
+            old_to_new.each do |old_id, new_id|
+              next if old_id == new_id
+              TakeoffTool.scan_results.each do |r|
+                if r[:entity_id] == old_id
+                  r[:entity_id] = new_id
+                  break
+                end
+              end
+              ca = TakeoffTool.category_assignments
+              ca[new_id] = ca.delete(old_id) if ca.key?(old_id)
+              cca = TakeoffTool.cost_code_assignments
+              cca[new_id] = cca.delete(old_id) if cca.key?(old_id)
+              TakeoffTool.entity_registry.delete(old_id)
+            end
+            TakeoffTool.instance_variable_set(:@entity_cache, nil)
+
+            count = replaced + 1
+            puts "[FF Instance] Created '#{name}' — #{count} instances"
+            send_live_data
+            esc = "Created #{count} instances of '#{name}'".gsub("'", "\\\\'")
+            @dialog.execute_script("showToast('#{esc}','success')")
+
+          rescue => inner_err
+            model.abort_operation
+            puts "[FF Instance] Error: #{inner_err.message}\n#{inner_err.backtrace.first(3).join("\n")}"
+            esc = inner_err.message.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'")
+            @dialog.execute_script("showToast('Instance failed: #{esc}','error')")
+          end
+        rescue => e
+          puts "Dashboard: createInstance error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       @dialog.set_on_closed {
         @dialog = nil
         # Defer save so the dialog closes immediately — no freeze.
@@ -1369,6 +1524,41 @@ module TakeoffTool
       @dialog.execute_script("hidePortal();showPortalError('Error','#{esc}')")
     end
 
+    # Clean definition name: strip Revit/IFC element IDs and SketchUp auto-numbering
+    def self.clean_def_name(name)
+      return '' unless name && !name.empty?
+      n = name.dup
+      n.sub!(/\s*\[\d+\]\s*$/, '')                    # [123456]
+      n.sub!(/[,:;\s\-]+[0-9A-Fa-f]{4,}\s*$/, '')     # :123456 or , 3A4B2C
+      n.sub!(/\s*#\d+\s*$/, '')                        # SketchUp #2
+      n.strip
+    end
+
+    # Build display groups: identical items grouped by cleaned def name within category+subcategory
+    def self.build_display_groups(rows)
+      groups = {}
+      order = []
+      rows.each do |row|
+        raw = row[:rawDefName] || row[:definitionName] || ''
+        clean = clean_def_name(raw)
+        next if clean.empty?
+        key = "#{row[:category]}|#{row[:subcategory] || ''}|#{clean}"
+        unless groups[key]
+          groups[key] = { n: clean, cat: row[:category], sub: row[:subcategory] || '', eids: [] }
+          order << key
+        end
+        groups[key][:eids] << row[:entityId]
+      end
+      result = []
+      order.each do |key|
+        g = groups[key]
+        next unless g[:eids].length > 1
+        result << g
+      end
+      puts "[FF Dashboard] build_display_groups: #{result.length} groups from #{rows.length} rows"
+      result
+    end
+
     # Helper: always sends data using live module state (no stale closures)
     def self.send_live_data
       @data_dirty = true
@@ -1430,6 +1620,7 @@ module TakeoffTool
         {
           entityId: r[:entity_id], tag: r[:tag], defaultMT: mt_default,
           definitionName: r[:display_name] || r[:definition_name],
+          rawDefName: r[:definition_name],
           elementType: r[:parsed][:element_type], function: r[:parsed][:function],
           material: r[:parsed][:material] || r[:material], thickness: r[:parsed][:thickness],
           sizeNominal: r[:parsed][:size_nominal], isSolid: r[:is_solid],
@@ -1472,7 +1663,9 @@ module TakeoffTool
       cont_names = containers.map { |c| c['name'] rescue '?' }
       puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
       color_settings = ColorController.get_settings rescue {}
-      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers })
+      oc_warnings = Scanner.overcount_warnings rescue []
+      display_groups = build_display_groups(rows)
+      js = JSON.generate({ rows: rows, displayGroups: display_groups, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers, overcountWarnings: oc_warnings })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
