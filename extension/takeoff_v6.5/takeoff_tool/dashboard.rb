@@ -629,6 +629,29 @@ module TakeoffTool
         end
       end
 
+      # ─── Cosmetic flag ───
+      @dialog.add_action_callback('setCosmetic') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eids = data['eids'] || []
+          val = data['val'] == true
+          eids.each do |eid|
+            e = TakeoffTool.find_entity(eid.to_i)
+            next unless e && e.valid?
+            if val
+              e.set_attribute('FormAndField', 'cosmetic', true)
+            else
+              e.delete_attribute('FormAndField', 'cosmetic')
+            end
+          end
+          puts "[FF] setCosmetic #{eids.length} items -> #{val}"
+          send_live_data
+        rescue => e
+          puts "setCosmetic error: #{e.message}"
+        end
+      end
+
       # ─── Measurement visibility callbacks ───
 
       @dialog.add_action_callback('toggleMeasurement') do |_ctx, json_str|
@@ -1614,7 +1637,8 @@ module TakeoffTool
                         custom_colors.dig('subcategories', "#{cat}|#{(TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''}") ||
                         custom_colors.dig('categories', cat),
           modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a',
-          visible: (TakeoffTool.find_entity(r[:entity_id])&.visible? rescue true)
+          visible: (TakeoffTool.find_entity(r[:entity_id])&.visible? rescue true),
+          cosmetic: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'cosmetic') rescue nil) == true
         }
       end
 

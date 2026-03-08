@@ -8,6 +8,9 @@ module TakeoffTool
       sr.each do |r|
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
         next if cat == '_IGNORE'
+        # Skip cosmetic items from export totals
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next if e && e.valid? && e.get_attribute('FormAndField', 'cosmetic') == true
         # Key = category + definition_name (strips the hex Revit ID to group same types)
         defn = r[:definition_name] || r[:display_name] || 'Unknown'
         key = "#{cat}||#{defn}"
@@ -203,6 +206,8 @@ module TakeoffTool
       sr.each do |r|
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
         next if cat == '_IGNORE'
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next if e && e.valid? && e.get_attribute('FormAndField', 'cosmetic') == true
         cc = cca[r[:entity_id]] || ''
         groups[cat] ||= { items: [], cost_code: cc }
         groups[cat][:items] << r
