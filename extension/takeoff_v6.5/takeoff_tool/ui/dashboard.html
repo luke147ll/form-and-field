@@ -801,6 +801,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <option value="subcategory">Subcategory</option>
     <option value="measurement">Measurements</option>
   </select>
+  <label>Sort:</label><select id="catSort" onchange="renderGroups()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:3px;padding:2px 4px;font-size:11px;font-family:inherit">
+    <option value="alpha">A → Z</option>
+    <option value="code">Cost Code</option>
+    <option value="count">Count ↓</option>
+  </select>
   <button class="clr-btn" onclick="clearAllFilters()" title="Clear all filters">Clear</button>
   <button class="fadv-btn" id="fadvBtn" onclick="toggleAdvFilters()" title="Advanced filters"><span class="fadv-dot" id="fadvDot"></span>&#9660; More</button>
   <span id="fCnt" style="margin-left:auto;color:#a6adc8;font-size:11px"></span>
@@ -1948,6 +1953,26 @@ function renderEntityRow(row,gBy,gk,isChild){
   return h;
 }
 
+/* ═══ CATEGORY SORT ═══ */
+function sortCatOrder(order,groups){
+  var mode=document.getElementById('catSort').value||'alpha';
+  if(mode==='code'){
+    order.sort(function(a,b){
+      var ca=getCatPrimaryCode(a)||'\uffff',cb=getCatPrimaryCode(b)||'\uffff';
+      if(ca!==cb)return ca.localeCompare(cb);
+      return a.localeCompare(b);
+    });
+  } else if(mode==='count'){
+    order.sort(function(a,b){
+      var la=(groups[a]||[]).length,lb=(groups[b]||[]).length;
+      if(lb!==la)return lb-la;
+      return a.localeCompare(b);
+    });
+  } else {
+    order.sort();
+  }
+}
+
 /* ═══ GROUPED RENDER ═══ */
 var FIDX=[];
 
@@ -1987,7 +2012,7 @@ function renderGroups(){
       if(wa!==wb)return wa-wb;
       return a.localeCompare(b);
     });
-  } else order.sort();
+  } else sortCatOrder(order,groups);
   FIDX=[];
   var h='';
   for(var gi=0;gi<order.length;gi++){
@@ -2227,6 +2252,8 @@ function renderContainerGroups(){
     h+='<div class="cont-body">';
 
     if(isOpen){
+      /* Sort categories within container */
+      sortCatOrder(cm.cats,groups);
       /* Render each category inside this container */
       for(var ki=0;ki<cm.cats.length;ki++){
         var gk=cm.cats[ki],items=groups[gk]||[];
