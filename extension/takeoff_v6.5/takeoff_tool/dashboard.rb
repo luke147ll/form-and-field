@@ -495,6 +495,47 @@ module TakeoffTool
         puts "[FF Debug]\n#{msg}"
       end
 
+      @dialog.add_action_callback('debugArea') do |_ctx, eid_str|
+        begin
+          eid = eid_str.to_i
+          Scanner.debug_area(eid)
+        rescue => e
+          puts "[FF Debug] debugArea error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('debugAreaCategory') do |_ctx, cat_str|
+        begin
+          Scanner.debug_area_category(cat_str.to_s)
+        rescue => e
+          puts "[FF Debug] debugAreaCategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('debugOcclusion') do |_ctx, cat_str|
+        begin
+          Scanner.debug_occlusion(cat_str.to_s)
+        rescue => e
+          puts "[FF Debug] debugOcclusion error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('debugOccSingle') do |_ctx, eid_str|
+        begin
+          Scanner.debug_occlusion_single(eid_str.to_i)
+        rescue => e
+          puts "[FF Debug] debugOccSingle error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('clearDebug') do |_ctx|
+        begin
+          Scanner.clear_debug
+        rescue => e
+          puts "[FF Debug] clearDebug error: #{e.message}"
+        end
+      end
+
       @dialog.add_action_callback('addContainer') do |_ctx, name_str|
         begin
           name = name_str.to_s.strip

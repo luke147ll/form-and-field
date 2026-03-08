@@ -1604,6 +1604,7 @@ function pn(r){
   return r.volumeFt3||0;
 }
 function grpCount(items){var c=0;for(var i=0;i<items.length;i++)if(!items[i].cosmetic)c++;return c;}
+function hasSfItems(items){for(var i=0;i<items.length;i++)if(items[i].areaSF>0)return true;return false;}
 function grpTotal(items){
   var tot=0,i,m;
   for(i=0;i<items.length;i++){
@@ -1914,6 +1915,10 @@ function renderEntityRow(row,gBy,gk,isChild){
   h+='<td style="white-space:nowrap">';
   h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
   h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
+  if(row.areaSF>0){
+    h+='<button class="ib" onclick="call(\'debugArea\',\''+row.entityId+'\')" title="Debug SF area" style="color:#f9e2af;font-size:10px">SF?</button>';
+    h+='<button class="ib" onclick="call(\'debugOccSingle\',\''+row.entityId+'\')" title="Occlusion debug" style="color:#fab387;font-size:10px">OCC</button>';
+  }
   h+='</td></tr>';
   return h;
 }
@@ -2027,6 +2032,11 @@ function renderGroups(){
       if(!isEmpty){
         h+='<button class="ib accent" onclick="isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
         h+='<button class="ib accent" onclick="zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">'+ICO_ZOOM+'</button>';
+        if(hasSfItems(items)){
+          h+='<button class="ib" onclick="call(\'debugAreaCategory\',\''+X2(gk)+'\')" title="Debug all SF in category" style="color:#f9e2af;font-size:10px">SF?</button>';
+          h+='<button class="ib" onclick="call(\'debugOcclusion\',\''+X2(gk)+'\')" title="Occlusion check: green=open, yellow=partial, red=blocked" style="color:#fab387;font-size:10px">OCC</button>';
+          h+='<button class="ib" onclick="call(\'clearDebug\')" title="Clear debug colors and restore materials" style="color:#a6adc8;font-size:10px">CLR</button>';
+        }
       }
       h+=mtBtn(curMT,gk);
     }
@@ -2258,6 +2268,11 @@ function renderContainerGroups(){
         if(!isEmpty){
           h+='<button class="ib accent" onclick="isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
           h+='<button class="ib accent" onclick="zoomCat(\''+X2(gk)+'\')" title="Zoom to fit">'+ICO_ZOOM+'</button>';
+          if(hasSfItems(items)){
+            h+='<button class="ib" onclick="call(\'debugAreaCategory\',\''+X2(gk)+'\')" title="Debug all SF in category" style="color:#f9e2af;font-size:10px">SF?</button>';
+            h+='<button class="ib" onclick="call(\'debugOcclusion\',\''+X2(gk)+'\')" title="Occlusion check: green=open, yellow=partial, red=blocked" style="color:#fab387;font-size:10px">OCC</button>';
+            h+='<button class="ib" onclick="call(\'clearDebug\')" title="Clear debug colors and restore materials" style="color:#a6adc8;font-size:10px">CLR</button>';
+          }
         }
         h+=mtBtn(curMT,gk);
         h+='<button class="ib accent" onclick="selGrpItems(\''+X2(gk)+'\')" title="Select all">'+ICO_SEL+'</button>';

@@ -84,6 +84,75 @@ module TakeoffTool
     ].freeze
     end # unless defined?(CONFIDENCE_SCORES)
 
+    # Cache for debug restore: face-level and instance-level originals
+    @debug_face_originals = {}
+    @debug_inst_originals = {}
+
+    def self.debug_save_face(face)
+      fid = face.entityID
+      unless @debug_face_originals.key?(fid)
+        @debug_face_originals[fid] = { face: face, front: face.material, back: face.back_material }
+      end
+    end
+
+    def self.debug_paint(face, mat)
+      debug_save_face(face)
+      face.material = mat
+      face.back_material = mat
+    end
+
+    # Recursively paint all faces in an entity (including nested groups/components)
+    def self.debug_paint_entity(entity, mat)
+      defn = entity.respond_to?(:definition) ? entity.definition : nil
+      return unless defn
+      debug_paint_recursive(defn.entities, mat)
+      # Also paint instance material
+      eid = entity.entityID
+      unless @debug_inst_originals.key?(eid)
+        @debug_inst_originals[eid] = { entity: entity, mat: entity.material }
+      end
+      entity.material = mat
+    end
+
+    def self.debug_paint_recursive(ents, mat)
+      ents.grep(Sketchup::Face).each do |f|
+        debug_save_face(f)
+        f.material = mat
+        f.back_material = mat
+      end
+      ents.each do |child|
+        next unless child.valid?
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        debug_paint_recursive(child_defn.entities, mat)
+      end
+    end
+
+    def self.debug_restore_all
+      m = Sketchup.active_model
+      return 0 unless m
+      m.start_operation('Restore Debug', true)
+      restored = 0
+      @debug_face_originals.each_value do |entry|
+        face = entry[:face]
+        next unless face && face.valid?
+        face.material = entry[:front]
+        face.back_material = entry[:back]
+        restored += 1
+      end
+      @debug_inst_originals.each_value do |entry|
+        ent = entry[:entity]
+        next unless ent && ent.valid?
+        ent.material = entry[:mat]
+        restored += 1
+      end
+      m.commit_operation
+      @debug_face_originals = {}
+      @debug_inst_originals = {}
+      restored
+    end
+
     # ═══════════════════════════════════════════════════════════
     # scan_model — Main entry point
     # ═══════════════════════════════════════════════════════════
@@ -309,7 +378,7 @@ module TakeoffTool
       if !area
         mtype = parsed[:measurement_type] || Parser.measurement_for(cat)
         if %w[sf sf_cy sf_sheets].include?(mtype)
-          area = face_area_for_entity(defn, cat)
+          area = face_area_for_entity(defn, cat, inst.transformation)
         end
       end
 
@@ -731,7 +800,7 @@ module TakeoffTool
 
     SHEET_GOOD_RE = /sheathing|drywall|plywood|osb|roofing|siding|insulation|membrane|soffit|fascia|gypcrete|decking|flooring|tile|stucco|wall\s*finish|ceiling|shingle/i
 
-    def self.face_area_for_entity(defn, category = nil)
+    def self.face_area_for_entity(defn, category = nil, xform = nil)
       ents = defn.respond_to?(:entities) ? defn.entities : nil
       return nil unless ents
       faces = ents.grep(Sketchup::Face)
@@ -740,39 +809,1365 @@ module TakeoffTool
       dname = defn.respond_to?(:name) ? defn.name : ''
 
       if category && category =~ SHEET_GOOD_RE
-        # Sheet goods: sum all faces on the dominant side (same normal direction)
-        sf = dominant_side_area(faces) / 144.0
+        sf = dominant_side_area(faces, xform) / 144.0
         puts "[FF Measure] '#{dname}': sheet good, dominant side = #{sf.round(1)} SF (#{faces.length} faces)"
         sf
       elsif enclosed_3d?(faces)
         # Enclosed 3D object: largest single face
         largest = 0.0
-        faces.each { |f| largest = f.area if f.area > largest }
+        faces.each do |f|
+          a = world_face_area(f, xform)
+          largest = a if a > largest
+        end
         sf = largest / 144.0
         puts "[FF Measure] '#{dname}': enclosed 3D, largest face = #{sf.round(1)} SF (#{faces.length} faces)"
         sf
       else
         # Single-sided surface: total face area
         total = 0.0
-        faces.each { |f| total += f.area }
+        faces.each { |f| total += world_face_area(f, xform) }
         sf = total / 144.0
         puts "[FF Measure] '#{dname}': single-sided, total = #{sf.round(1)} SF (#{faces.length} faces)"
         sf
       end
     end
 
+    # Compute face area in world coordinates, accounting for instance transform.
+    # face.area is in the definition's local coordinate space.
+    def self.world_face_area(face, xform = nil)
+      return face.area unless xform
+      begin
+        mesh = face.mesh(0)
+        total = 0.0
+        (1..mesh.count_polygons).each do |pi|
+          tri = mesh.polygon_points_at(pi)
+          next unless tri && tri.length >= 3
+          p0 = xform * tri[0]
+          p1 = xform * tri[1]
+          p2 = xform * tri[2]
+          v1 = p1 - p0
+          v2 = p2 - p0
+          total += v1.cross(v2).length / 2.0
+        end
+        total
+      rescue
+        face.area
+      end
+    end
+
     # Sum faces that share the dominant normal direction.
     # Groups by rounded normal, picks the group with largest total area.
-    def self.dominant_side_area(faces)
+    def self.dominant_side_area(faces, xform = nil)
       groups = {}
       faces.each do |f|
         n = f.normal
         key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
         groups[key] ||= 0.0
-        groups[key] += f.area
+        groups[key] += world_face_area(f, xform)
       end
       # Return the largest group's total area
       groups.values.max || 0.0
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # debug_area — Visual SF measurement debugger
+    #
+    # Paints measured faces green, excluded faces red, logs per-face breakdown.
+    # Call via dashboard callback 'debugArea' with entity ID.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.debug_area(eid)
+      e = TakeoffTool.find_entity(eid)
+      unless e && e.valid?
+        puts "[FF Debug Area] Entity #{eid} not found"
+        return
+      end
+
+      defn = e.respond_to?(:definition) ? e.definition : nil
+      unless defn
+        puts "[FF Debug Area] Entity #{eid} has no definition"
+        return
+      end
+
+      xform = e.transformation
+      faces = defn.entities.grep(Sketchup::Face)
+      if faces.empty?
+        puts "[FF Debug Area] Entity #{eid} '#{defn.name}' has no faces"
+        return
+      end
+
+      # Determine category and measurement path
+      sr = TakeoffTool.filtered_scan_results
+      match = sr&.find { |r| r[:entity_id] == eid }
+      cat = match ? match[:parsed][:auto_category] : nil
+      dname = defn.name
+
+      puts ""
+      puts "═══════════════════════════════════════════════"
+      puts "[FF Debug Area] Entity #{eid}: '#{dname}'"
+      puts "  Category: #{cat || '(unknown)'}"
+      puts "  Transform scale: x=#{Geom::Vector3d.new(xform.xaxis).length.round(4)} y=#{Geom::Vector3d.new(xform.yaxis).length.round(4)} z=#{Geom::Vector3d.new(xform.zaxis).length.round(4)}"
+      puts "  Total faces: #{faces.length}"
+      puts "  Enclosed 3D: #{enclosed_3d?(faces)}"
+      puts "  Sheet good match: #{cat && cat =~ SHEET_GOOD_RE ? 'YES' : 'no'}"
+      puts "───────────────────────────────────────────────"
+
+      m = Sketchup.active_model
+      return unless m
+
+      # Create debug materials
+      mat_measured = m.materials['FF_DEBUG_MEASURED'] || m.materials.add('FF_DEBUG_MEASURED')
+      mat_measured.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_excluded = m.materials['FF_DEBUG_EXCLUDED'] || m.materials.add('FF_DEBUG_EXCLUDED')
+      mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
+
+      # Determine which faces are measured based on the same logic as face_area_for_entity
+      measured_faces = []
+      excluded_faces = []
+
+      if cat && cat =~ SHEET_GOOD_RE
+        # Sheet goods: dominant normal group
+        groups = {}
+        faces.each do |f|
+          n = f.normal
+          key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+          groups[key] ||= { faces: [], area: 0.0 }
+          groups[key][:faces] << f
+          groups[key][:area] += world_face_area(f, xform)
+        end
+        dominant_key = groups.max_by { |_k, v| v[:area] }&.first
+        puts "  Mode: SHEET GOOD (dominant side)"
+        groups.each do |key, v|
+          is_dom = key == dominant_key
+          sf = v[:area] / 144.0
+          puts "    Normal #{key}: #{v[:faces].length} faces, #{sf.round(2)} SF #{is_dom ? '← MEASURED' : '(excluded)'}"
+          v[:faces].each { |f| is_dom ? measured_faces << f : excluded_faces << f }
+        end
+      elsif enclosed_3d?(faces)
+        # Largest single face
+        face_areas = faces.map { |f| [f, world_face_area(f, xform)] }
+        largest_face, largest_area = face_areas.max_by { |_f, a| a }
+        puts "  Mode: ENCLOSED 3D (largest face)"
+        face_areas.sort_by { |_f, a| -a }.first(10).each_with_index do |(f, a), i|
+          sf = a / 144.0
+          is_lg = f == largest_face
+          n = f.normal
+          puts "    Face #{i+1}: #{sf.round(2)} SF, normal=(#{n.x.round(2)},#{n.y.round(2)},#{n.z.round(2)}) #{is_lg ? '← MEASURED' : ''}"
+        end
+        if face_areas.length > 10
+          puts "    ... and #{face_areas.length - 10} more faces"
+        end
+        measured_faces << largest_face
+        excluded_faces = faces.reject { |f| f == largest_face }
+      else
+        # Single-sided: all faces measured
+        puts "  Mode: SINGLE-SIDED (all faces)"
+        measured_faces = faces
+      end
+
+      total_measured_sf = measured_faces.sum { |f| world_face_area(f, xform) } / 144.0
+      total_excluded_sf = excluded_faces.sum { |f| world_face_area(f, xform) } / 144.0
+      local_sf = measured_faces.sum { |f| f.area } / 144.0
+
+      puts "───────────────────────────────────────────────"
+      puts "  Measured: #{measured_faces.length} faces = #{total_measured_sf.round(2)} SF (world)"
+      puts "  Excluded: #{excluded_faces.length} faces = #{total_excluded_sf.round(2)} SF (world)"
+      puts "  Local (no transform): #{local_sf.round(2)} SF"
+      puts "  Stored area_sf: #{match ? match[:area_sf] : 'N/A'}"
+      puts "═══════════════════════════════════════════════"
+      puts ""
+
+      # Paint the faces (save originals first)
+      m.start_operation('Debug Area', true)
+      measured_faces.each { |f| debug_paint(f, mat_measured) }
+      excluded_faces.each { |f| debug_paint(f, mat_excluded) }
+      m.commit_operation
+
+      # Zoom to entity
+      begin
+        bb = Geom::BoundingBox.new
+        bb.add(e.bounds)
+        m.active_view.zoom(bb) unless bb.empty?
+      rescue; end
+
+      puts "[FF Debug Area] Green = measured, Red = excluded. Run Scanner.clear_debug to restore."
+    end
+
+    def self.clear_debug
+      count = debug_restore_all
+      m = Sketchup.active_model
+      if m
+        m.start_operation('Clear Debug Mats', true)
+        %w[FF_DEBUG_MEASURED FF_DEBUG_EXCLUDED FF_DEBUG_OPEN FF_DEBUG_PARTIAL FF_DEBUG_BLOCKED].each do |name|
+          m.materials.remove(m.materials[name]) if m.materials[name]
+        end
+        m.commit_operation
+      end
+      puts "[FF Debug] Restored #{count} faces, debug materials cleared"
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # debug_area_category — Debug all SF entities in a category
+    #
+    # Paints all measured faces green, excluded red across every
+    # entity in the category. Logs per-entity and summary totals.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.debug_area_category(category)
+      sr = TakeoffTool.filtered_scan_results
+      ca = TakeoffTool.category_assignments
+      return unless sr
+
+      # Find all entities in this category with SF area
+      entries = sr.select do |r|
+        assigned = ca[r[:entity_id]]
+        cat = assigned || r[:parsed][:auto_category]
+        cat == category && r[:area_sf] && r[:area_sf] > 0
+      end
+
+      if entries.empty?
+        all_cats = sr.map { |r| ca[r[:entity_id]] || r[:parsed][:auto_category] }.compact.uniq.sort
+        cat_count = sr.count { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category]) == category }
+        puts "[FF Debug Area] No SF entities found in '#{category}'"
+        puts "  Entities in this category: #{cat_count}"
+        if cat_count == 0
+          close = all_cats.select { |c| c.downcase.include?(category.downcase) }
+          puts "  Similar categories: #{close.any? ? close.join(', ') : 'none'}"
+          puts "  All categories: #{all_cats.join(', ')}"
+        else
+          with_sf = sr.count { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category]) == category && r[:area_sf] }
+          puts "  With area_sf set: #{with_sf}"
+        end
+        return
+      end
+
+      m = Sketchup.active_model
+      return unless m
+
+      # Create debug materials
+      mat_measured = m.materials['FF_DEBUG_MEASURED'] || m.materials.add('FF_DEBUG_MEASURED')
+      mat_measured.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_excluded = m.materials['FF_DEBUG_EXCLUDED'] || m.materials.add('FF_DEBUG_EXCLUDED')
+      mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
+
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "[FF Debug Area] Category: '#{category}' — #{entries.length} entities with SF"
+      puts "═══════════════════════════════════════════════════════════"
+
+      grand_measured = 0.0
+      grand_excluded = 0.0
+      grand_stored = 0.0
+      all_measured_faces = []
+      all_excluded_faces = []
+      by_defn = {}  # group by definition name for summary
+
+      m.start_operation('Debug Area Category', true)
+
+      entries.each do |r|
+        eid = r[:entity_id]
+        e = TakeoffTool.find_entity(eid)
+        next unless e && e.valid?
+
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        next unless defn
+
+        xform = e.transformation
+        faces = defn.entities.grep(Sketchup::Face)
+        next if faces.empty?
+
+        cat = category
+        dname = r[:display_name] || defn.name
+        measured_faces = []
+        excluded_faces = []
+
+        if cat =~ SHEET_GOOD_RE
+          # Sheet goods: dominant normal
+          groups = {}
+          faces.each do |f|
+            n = f.normal
+            key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+            groups[key] ||= { faces: [], area: 0.0 }
+            groups[key][:faces] << f
+            groups[key][:area] += world_face_area(f, xform)
+          end
+          dominant_key = groups.max_by { |_k, v| v[:area] }&.first
+          groups.each do |key, v|
+            v[:faces].each { |f| key == dominant_key ? measured_faces << f : excluded_faces << f }
+          end
+        elsif enclosed_3d?(faces)
+          face_areas = faces.map { |f| [f, world_face_area(f, xform)] }
+          largest_face = face_areas.max_by { |_f, a| a }&.first
+          measured_faces << largest_face if largest_face
+          excluded_faces = faces.reject { |f| f == largest_face }
+        else
+          measured_faces = faces
+        end
+
+        entity_sf = measured_faces.sum { |f| world_face_area(f, xform) } / 144.0
+        excl_sf = excluded_faces.sum { |f| world_face_area(f, xform) } / 144.0
+        stored_sf = r[:area_sf] || 0
+
+        grand_measured += entity_sf
+        grand_excluded += excl_sf
+        grand_stored += stored_sf
+
+        # Group by definition name
+        by_defn[dname] ||= { count: 0, sf: 0.0, stored: 0.0 }
+        by_defn[dname][:count] += 1
+        by_defn[dname][:sf] += entity_sf
+        by_defn[dname][:stored] += stored_sf
+
+        # Paint faces (save originals first)
+        measured_faces.each { |f| debug_paint(f, mat_measured) }
+        excluded_faces.each { |f| debug_paint(f, mat_excluded) }
+
+        all_measured_faces.concat(measured_faces)
+        all_excluded_faces.concat(excluded_faces)
+      end
+
+      m.commit_operation
+
+      # Per-definition summary (sorted by total SF descending)
+      puts ""
+      puts "  %-60s %5s %10s %10s" % ['Definition', 'Count', 'Measured', 'Stored']
+      puts "  " + "─" * 87
+      by_defn.sort_by { |_k, v| -v[:sf] }.each do |dname, v|
+        label = dname.length > 58 ? dname[0..55] + '...' : dname
+        puts "  %-60s %5d %9.1f %9.1f" % [label, v[:count], v[:sf], v[:stored]]
+      end
+
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "  TOTAL MEASURED:  #{grand_measured.round(1)} SF (#{all_measured_faces.length} faces)"
+      puts "  TOTAL EXCLUDED:  #{grand_excluded.round(1)} SF (#{all_excluded_faces.length} faces)"
+      puts "  TOTAL STORED:    #{grand_stored.round(1)} SF"
+      puts "  Entity count:    #{entries.length}"
+      puts "═══════════════════════════════════════════════════════════"
+      puts ""
+      puts "[FF Debug Area] Green = measured, Red = excluded. Run Scanner.clear_debug to restore."
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # debug_occlusion — Raycast occlusion analysis for SF category
+    #
+    # For each measured face, raycasts outward from sample points to
+    # detect blocking objects (cabinets, other finishes, framing).
+    # Green = exposed, Yellow = partially blocked, Red = fully blocked.
+    # ═══════════════════════════════════════════════════════════
+
+    DEBUG_OCC_SAMPLES = 6     # ray sample points per face
+    DEBUG_OCC_OFFSET  = 0.5   # inches offset from surface to avoid self-hit
+    DEBUG_OCC_MIN     = 2.0   # inches min distance (ignore very close self-geometry)
+
+    # Categories/tags to ignore as blockers (rooms, volumes, levels)
+    OCC_IGNORE_RE = /room|volume|level|datum|space|zone|story|storey/i
+
+    # Wall assembly / structural categories to ignore as blockers.
+    # These are expected behind drywall, not true occlusion.
+    OCC_ASSEMBLY_RE = /wall\s*framing|ceiling\s*framing|roof\s*framing|floor\s*framing|
+      truss|sheathing|siding|soffit|fascia|drywall|gyp|
+      window|door|opening|curtain\s*wall|
+      footing|foundation|slab|masonry|veneer|
+      framing|stud|joist|rafter|beam|header|
+      insulation|vapor\s*barrier|membrane|flashing/ix
+
+    def self.debug_occlusion(category, threshold_in = 18.0)
+      sr = TakeoffTool.filtered_scan_results
+      ca = TakeoffTool.category_assignments
+      return unless sr
+
+      entries = sr.select do |r|
+        assigned = ca[r[:entity_id]]
+        cat = assigned || r[:parsed][:auto_category]
+        cat == category && r[:area_sf] && r[:area_sf] > 0
+      end
+
+      if entries.empty?
+        # Diagnostic: check if category exists at all
+        all_cats = sr.map { |r| ca[r[:entity_id]] || r[:parsed][:auto_category] }.compact.uniq.sort
+        cat_count = sr.count { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category]) == category }
+        puts "[FF Occlusion] No SF entities found in '#{category}'"
+        puts "  Entities in this category: #{cat_count}"
+        if cat_count == 0
+          close = all_cats.select { |c| c.downcase.include?(category.downcase) }
+          puts "  Similar categories: #{close.any? ? close.join(', ') : 'none'}"
+          puts "  All categories: #{all_cats.join(', ')}"
+        else
+          with_sf = sr.count { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category]) == category && r[:area_sf] }
+          puts "  With area_sf set: #{with_sf}"
+        end
+        return
+      end
+
+      m = Sketchup.active_model
+      return unless m
+
+      occ_results = []
+
+      # Build blocker lookup: entityID → "Category: DisplayName"
+      blocker_lookup = {}
+      sr.each do |r|
+        bcat = ca[r[:entity_id]] || r[:parsed][:auto_category] || '?'
+        bdn = r[:display_name] || r[:definition_name] || ''
+        # Shorten long Revit GUIDs to something readable
+        if bdn.length > 36 && bdn.include?('-')
+          bdn = r[:parsed][:element_type] || r[:parsed][:function] || bdn[0..20] + '...'
+        end
+        blocker_lookup[r[:entity_id]] = "#{bcat}: #{bdn}"
+      end
+
+      # Debug materials
+      mat_open = m.materials['FF_DEBUG_OPEN'] || m.materials.add('FF_DEBUG_OPEN')
+      mat_open.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_partial = m.materials['FF_DEBUG_PARTIAL'] || m.materials.add('FF_DEBUG_PARTIAL')
+      mat_partial.color = Sketchup::Color.new(240, 200, 0, 180)
+      mat_blocked = m.materials['FF_DEBUG_BLOCKED'] || m.materials.add('FF_DEBUG_BLOCKED')
+      mat_blocked.color = Sketchup::Color.new(200, 0, 0, 180)
+
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "[FF Occlusion] Category: '#{category}' — #{entries.length} entities"
+      puts "  Threshold: #{threshold_in}\" (#{(threshold_in / 12.0).round(1)} ft)"
+      puts "═══════════════════════════════════════════════════════════"
+
+      open_sf = 0.0; partial_sf = 0.0; blocked_sf = 0.0
+      open_count = 0; partial_count = 0; blocked_count = 0
+      blocker_tally = {}
+
+      m.start_operation('Debug Occlusion', true)
+
+      entries.each_with_index do |r, ei|
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid?
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        next unless defn
+
+        xform = e.transformation
+        faces = defn.entities.grep(Sketchup::Face)
+        next if faces.empty?
+
+        # Find the measured face(s) — same logic as face_area_for_entity
+        measured = []
+        if category =~ SHEET_GOOD_RE
+          groups = {}
+          faces.each do |f|
+            n = f.normal
+            key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+            groups[key] ||= { faces: [], area: 0.0 }
+            groups[key][:faces] << f
+            groups[key][:area] += world_face_area(f, xform)
+          end
+          dom_key = groups.max_by { |_k, v| v[:area] }&.first
+          measured = dom_key ? groups[dom_key][:faces] : []
+        elsif enclosed_3d?(faces)
+          largest = faces.max_by { |f| world_face_area(f, xform) }
+          measured = [largest] if largest
+        else
+          measured = faces
+        end
+        next if measured.empty?
+
+        # For each measured face, raycast to check occlusion
+        face_hits = 0
+        face_total = 0
+
+        measured.each do |face|
+          # Get the face normal in world space
+          normal_world = xform * face.normal
+          # Normalize in case of scaling
+          normal_world = normal_world.normalize rescue face.normal
+
+          # Sample points on the face via mesh triangles
+          samples = face_sample_points(face, xform, DEBUG_OCC_SAMPLES)
+          next if samples.empty?
+
+          # Determine room-side direction:
+          # Raycast both ways from first sample. The direction that either
+          # hits nothing or hits farther away is the "room side."
+          test_pt = samples.first
+          room_dir = normal_world
+
+          pt_fwd = Geom::Point3d.new(
+            test_pt.x + normal_world.x * DEBUG_OCC_OFFSET,
+            test_pt.y + normal_world.y * DEBUG_OCC_OFFSET,
+            test_pt.z + normal_world.z * DEBUG_OCC_OFFSET
+          )
+          rev = Geom::Vector3d.new(-normal_world.x, -normal_world.y, -normal_world.z)
+          pt_rev = Geom::Point3d.new(
+            test_pt.x + rev.x * DEBUG_OCC_OFFSET,
+            test_pt.y + rev.y * DEBUG_OCC_OFFSET,
+            test_pt.z + rev.z * DEBUG_OCC_OFFSET
+          )
+
+          hit_fwd = m.raytest([pt_fwd, normal_world])
+          hit_rev = m.raytest([pt_rev, rev])
+          dist_fwd = hit_fwd ? pt_fwd.distance(hit_fwd[0]) : 99999
+          dist_rev = hit_rev ? pt_rev.distance(hit_rev[0]) : 99999
+
+          # Closer hit = wall cavity side. Farther hit (or none) = room side.
+          if dist_rev < dist_fwd && dist_rev < 6.0
+            room_dir = normal_world
+          elsif dist_fwd < dist_rev && dist_fwd < 6.0
+            room_dir = rev
+          end
+          # If neither is very close, keep normal_world as room direction
+
+          # Raycast from each sample along room direction
+          samples.each do |pt|
+            ray_origin = Geom::Point3d.new(
+              pt.x + room_dir.x * DEBUG_OCC_OFFSET,
+              pt.y + room_dir.y * DEBUG_OCC_OFFSET,
+              pt.z + room_dir.z * DEBUG_OCC_OFFSET
+            )
+
+            result = m.raytest([ray_origin, room_dir])
+            face_total += 1
+
+            if result
+              hit_pt = result[0]
+              dist = ray_origin.distance(hit_pt)
+              if dist > DEBUG_OCC_MIN && dist <= threshold_in
+                hit_path = result[1]
+                # Walk path to find the containing ComponentInstance/Group
+                # hit_path is [CI, CI, ..., Face] — we want the deepest CI/Group
+                hit_inst = nil
+                if hit_path.is_a?(Array)
+                  hit_path.reverse_each do |pe|
+                    if pe.is_a?(Sketchup::ComponentInstance) || pe.is_a?(Sketchup::Group)
+                      hit_inst = pe
+                      break
+                    end
+                  end
+                end
+
+                # Self-hit: same entity or same definition
+                is_self = false
+                if hit_inst
+                  is_self = (hit_inst == e) ||
+                            (hit_inst.respond_to?(:definition) && hit_inst.definition == defn)
+                else
+                  # Hit loose geometry — check if it's inside our own definition
+                  is_self = true  # loose faces near our entity are likely self
+                end
+
+                # Filter: rooms/volumes + wall assembly/structural
+                is_skip = false
+                if hit_inst
+                  hit_eid = hit_inst.respond_to?(:entityID) ? hit_inst.entityID : 0
+                  hit_cat = blocker_lookup[hit_eid]&.split(':')&.first&.strip || ''
+                  hit_tag = hit_inst.respond_to?(:layer) ? hit_inst.layer.name : ''
+                  hit_def = hit_inst.respond_to?(:definition) ? hit_inst.definition.name : ''
+                  is_skip = (hit_cat =~ OCC_IGNORE_RE) ||
+                            (hit_cat =~ OCC_ASSEMBLY_RE) ||
+                            (hit_tag =~ OCC_IGNORE_RE) ||
+                            (hit_tag =~ OCC_ASSEMBLY_RE) ||
+                            (hit_def =~ OCC_IGNORE_RE)
+                end
+
+                unless is_self || is_skip
+                  face_hits += 1
+                  # Identify the blocker by category + display name
+                  hit_eid = hit_inst.respond_to?(:entityID) ? hit_inst.entityID : 0
+                  bname = blocker_lookup[hit_eid]
+                  unless bname
+                    # Not in scan results — use tag + definition name
+                    btag = hit_inst.respond_to?(:layer) ? hit_inst.layer.name : '?'
+                    bdef = hit_inst.respond_to?(:definition) ? hit_inst.definition.name : '?'
+                    bdef = bdef[0..20] + '...' if bdef.length > 24
+                    bname = "#{btag}: #{bdef}"
+                  end
+                  blocker_tally[bname] = (blocker_tally[bname] || 0) + 1
+                end
+              end
+            end
+          end
+        end
+
+        # Classify this entity
+        ratio = face_total > 0 ? face_hits.to_f / face_total : 0
+        sf = measured.sum { |f| world_face_area(f, xform) } / 144.0
+        dname = r[:display_name] || defn.name
+        dname = dname[0..35] + '...' if dname.length > 38
+
+        status = ratio >= 0.6 ? 'blocked' : ratio >= 0.2 ? 'partial' : 'open'
+        occ_results << { eid: r[:entity_id], name: dname, sf: sf.round(1), status: status, included: (status != 'blocked') }
+
+        if status == 'blocked'
+          debug_paint_entity(e, mat_blocked)
+          blocked_sf += sf; blocked_count += 1
+        elsif status == 'partial'
+          debug_paint_entity(e, mat_partial)
+          partial_sf += sf; partial_count += 1
+        else
+          debug_paint_entity(e, mat_open)
+          open_sf += sf; open_count += 1
+        end
+
+        # Progress every 50 entities
+        if (ei + 1) % 50 == 0
+          puts "  ... processed #{ei + 1}/#{entries.length} entities"
+        end
+      end
+
+      m.commit_operation
+
+      total_sf = open_sf + partial_sf + blocked_sf
+      puts ""
+      puts "───────────────────────────────────────────────"
+      puts "  GREEN  (open):    #{open_count} entities, #{open_sf.round(1)} SF"
+      puts "  YELLOW (partial): #{partial_count} entities, #{partial_sf.round(1)} SF"
+      puts "  RED    (blocked): #{blocked_count} entities, #{blocked_sf.round(1)} SF"
+      puts "  TOTAL:            #{entries.length} entities, #{total_sf.round(1)} SF"
+      puts "───────────────────────────────────────────────"
+
+      if blocker_tally.any?
+        # Group by category (part before the colon)
+        cat_hits = {}
+        blocker_tally.each do |bname, count|
+          bcat = bname.split(':').first.strip
+          cat_hits[bcat] = (cat_hits[bcat] || 0) + count
+        end
+
+        puts ""
+        puts "  Blocking categories:"
+        cat_hits.sort_by { |_k, v| -v }.each do |bcat, count|
+          puts "    %-40s %d hits" % [bcat, count]
+        end
+
+        puts ""
+        puts "  Top individual blockers:"
+        blocker_tally.sort_by { |_k, v| -v }.first(15).each do |bname, count|
+          label = bname.length > 55 ? bname[0..52] + '...' : bname
+          puts "    %-58s %d hits" % [label, count]
+        end
+      end
+
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "[FF Occlusion] Green=open, Yellow=partial, Red=blocked"
+      puts "═══════════════════════════════════════════════════════════"
+
+      # Store results and open review dialog
+      @occ_results = occ_results
+      @occ_category = category
+      show_occ_review
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # OCC Review Dialog
+    # ═══════════════════════════════════════════════════════════
+
+    @occ_dialog = nil
+    @occ_results = []
+    @occ_category = ''
+    @occ_pick_active = false
+    @occ_original_sf = {}  # eid => original area_sf, for undo
+
+    # ── OCC Pick Tool ──────────────────────────────────────────
+    # Activated from OCC Review dialog. Click an entity in the
+    # viewport to highlight its row in the dialog and toggle it.
+    class OccPickTool
+      def activate
+        Sketchup.status_text = "OCC PICK | Click entity to select in review dialog | ESC to exit"
+        @hover_eid = nil
+      end
+
+      def deactivate(view)
+        Scanner.instance_variable_set(:@occ_pick_active, false)
+        dlg = Scanner.instance_variable_get(:@occ_dialog)
+        dlg.execute_script("setPickMode(false)") if dlg && dlg.visible?
+        view.invalidate
+      end
+
+      def onMouseMove(_flags, x, y, view)
+        ph = view.pick_helper
+        ph.do_pick(x, y)
+        best = ph.best_picked
+        eid = nil
+        if best.is_a?(Sketchup::ComponentInstance) || best.is_a?(Sketchup::Group)
+          eid = best.entityID
+        elsif ph.path_at(0)
+          ph.path_at(0).reverse_each do |pe|
+            if pe.is_a?(Sketchup::ComponentInstance) || pe.is_a?(Sketchup::Group)
+              eid = pe.entityID
+              break
+            end
+          end
+        end
+        if eid != @hover_eid
+          @hover_eid = eid
+          Sketchup.status_text = if eid
+            item = Scanner.occ_item_by_eid(eid)
+            item ? "OCC PICK | #{item[:name]} (#{item[:sf]} SF) — click to toggle" : "OCC PICK | Not in OCC results"
+          else
+            "OCC PICK | Click entity to select in review dialog | ESC to exit"
+          end
+        end
+        true
+      end
+
+      def onLButtonDown(_flags, x, y, view)
+        ph = view.pick_helper
+        ph.do_pick(x, y)
+        eid = nil
+        best = ph.best_picked
+        if best.is_a?(Sketchup::ComponentInstance) || best.is_a?(Sketchup::Group)
+          eid = best.entityID
+        elsif ph.path_at(0)
+          ph.path_at(0).reverse_each do |pe|
+            if pe.is_a?(Sketchup::ComponentInstance) || pe.is_a?(Sketchup::Group)
+              eid = pe.entityID
+              break
+            end
+          end
+        end
+        return true unless eid
+        Scanner.occ_pick_entity(eid)
+        true
+      end
+
+      def onKeyDown(key, _repeat, _flags, _view)
+        if key == 0x1B # ESC
+          Sketchup.active_model.select_tool(nil)
+          return true
+        end
+        false
+      end
+
+      def getMenu(menu)
+        menu.add_item("Exit Pick Mode") { Sketchup.active_model.select_tool(nil) }
+      end
+    end
+
+    def self.occ_item_by_eid(eid)
+      @occ_results&.find { |r| r[:eid] == eid }
+    end
+
+    def self.occ_pick_entity(eid)
+      item = occ_item_by_eid(eid)
+      unless item
+        puts "[FF OCC Pick] Entity #{eid} not in OCC results"
+        return
+      end
+
+      # Toggle included
+      item[:included] = !item[:included]
+
+      # Repaint
+      m = Sketchup.active_model
+      if m
+        e = TakeoffTool.find_entity(eid)
+        if e && e.valid?
+          mat_name = item[:included] ? 'FF_DEBUG_OPEN' : 'FF_DEBUG_BLOCKED'
+          mat = m.materials[mat_name]
+          if mat
+            m.start_operation('OCC Pick Toggle', true)
+            debug_paint_entity(e, mat)
+            m.commit_operation
+          end
+        end
+      end
+
+      # Update dialog — send data + highlight the row
+      send_occ_data
+      if @occ_dialog && @occ_dialog.visible?
+        @occ_dialog.execute_script("highlightRow(#{eid})")
+      end
+    end
+
+    def self.show_occ_review
+      return unless @occ_results && @occ_results.any?
+
+      if @occ_dialog && @occ_dialog.visible?
+        send_occ_data
+        @occ_dialog.bring_to_front
+        return
+      end
+
+      @occ_dialog = UI::HtmlDialog.new(
+        dialog_title: "OCC Review — #{@occ_category}",
+        preferences_key: "OCCReview",
+        width: 480, height: 580,
+        left: 200, top: 150,
+        resizable: true,
+        style: UI::HtmlDialog::STYLE_DIALOG
+      )
+
+      require 'json'
+      data_json = JSON.generate({ category: @occ_category, items: @occ_results })
+      @occ_dialog.set_html(occ_review_html(data_json))
+
+      @occ_dialog.add_action_callback('occToggle') do |_ctx, eid_str|
+        eid = eid_str.to_i
+        item = @occ_results.find { |r| r[:eid] == eid }
+        if item
+          item[:included] = !item[:included]
+          # Repaint entity
+          m = Sketchup.active_model
+          if m
+            e = TakeoffTool.find_entity(eid)
+            if e && e.valid?
+              mat_name = item[:included] ? 'FF_DEBUG_OPEN' : 'FF_DEBUG_BLOCKED'
+              mat = m.materials[mat_name]
+              if mat
+                m.start_operation('OCC Toggle', true)
+                debug_paint_entity(e, mat)
+                m.commit_operation
+              end
+            end
+          end
+          send_occ_data
+        end
+      end
+
+      @occ_dialog.add_action_callback('occZoom') do |_ctx, eid_str|
+        eid = eid_str.to_i
+        e = TakeoffTool.find_entity(eid)
+        if e && e.valid?
+          m = Sketchup.active_model
+          bb = Geom::BoundingBox.new
+          bb.add(e.bounds)
+          m.active_view.zoom(bb) unless bb.empty?
+        end
+      end
+
+      @occ_dialog.add_action_callback('occPick') do |_ctx|
+        if @occ_pick_active
+          @occ_pick_active = false
+          Sketchup.active_model.select_tool(nil)
+          @occ_dialog.execute_script("setPickMode(false)") if @occ_dialog&.visible?
+        else
+          @occ_pick_active = true
+          Sketchup.active_model.select_tool(OccPickTool.new)
+          @occ_dialog.execute_script("setPickMode(true)") if @occ_dialog&.visible?
+        end
+      end
+
+      @occ_dialog.add_action_callback('occHide') do |_ctx, status|
+        m = Sketchup.active_model
+        next unless m
+        m.start_operation('OCC Hide', true)
+        @occ_results.each do |r|
+          next unless r[:status] == status
+          e = TakeoffTool.find_entity(r[:eid])
+          next unless e && e.valid?
+          e.hidden = true
+        end
+        m.commit_operation
+      end
+
+      @occ_dialog.add_action_callback('occShow') do |_ctx, status|
+        m = Sketchup.active_model
+        next unless m
+        m.start_operation('OCC Show', true)
+        @occ_results.each do |r|
+          next unless status == 'all' || r[:status] == status
+          e = TakeoffTool.find_entity(r[:eid])
+          next unless e && e.valid?
+          e.hidden = false
+        end
+        m.commit_operation
+      end
+
+      @occ_dialog.add_action_callback('occSolo') do |_ctx, status|
+        m = Sketchup.active_model
+        next unless m
+        m.start_operation('OCC Solo', true)
+        @occ_results.each do |r|
+          e = TakeoffTool.find_entity(r[:eid])
+          next unless e && e.valid?
+          e.hidden = (r[:status] != status)
+        end
+        m.commit_operation
+      end
+
+      @occ_dialog.add_action_callback('occApply') do |_ctx|
+        sr = TakeoffTool.instance_variable_get(:@scan_results) || []
+        applied = 0
+        restored = 0
+        @occ_results.each do |item|
+          match = sr.find { |r| r[:entity_id] == item[:eid] }
+          next unless match
+          # Save original if not already saved
+          unless @occ_original_sf.key?(item[:eid])
+            @occ_original_sf[item[:eid]] = match[:area_sf]
+          end
+          if item[:included]
+            # Restore original value
+            match[:area_sf] = @occ_original_sf[item[:eid]]
+            restored += 1
+          else
+            # Zero out excluded
+            match[:area_sf] = 0
+            applied += 1
+          end
+        end
+        puts "[FF OCC] Applied: #{applied} excluded (zeroed), #{restored} included (restored)"
+        # Refresh dashboard
+        Dashboard.send_live_data if defined?(Dashboard)
+        # Notify dialog
+        @occ_dialog.execute_script("showApplied(#{applied},#{restored})") if @occ_dialog&.visible?
+      end
+
+      @occ_dialog.add_action_callback('occClear') do |_ctx|
+        # Deactivate pick tool if active
+        if @occ_pick_active
+          @occ_pick_active = false
+          Sketchup.active_model.select_tool(nil)
+        end
+        # Restore original SF values
+        if @occ_original_sf.any?
+          sr = TakeoffTool.instance_variable_get(:@scan_results) || []
+          @occ_original_sf.each do |eid, orig_sf|
+            match = sr.find { |r| r[:entity_id] == eid }
+            match[:area_sf] = orig_sf if match
+          end
+          @occ_original_sf = {}
+          Dashboard.send_live_data if defined?(Dashboard)
+        end
+        clear_debug
+        # Restore visibility
+        m = Sketchup.active_model
+        if m
+          m.start_operation('OCC Clear', true)
+          @occ_results.each do |r|
+            e = TakeoffTool.find_entity(r[:eid])
+            e.hidden = false if e && e.valid?
+          end
+          m.commit_operation
+        end
+        @occ_results = []
+        @occ_dialog.close if @occ_dialog&.visible?
+      end
+
+      @occ_dialog.set_on_closed do
+        @occ_dialog = nil
+      end
+
+      @occ_dialog.show
+    end
+
+    def self.send_occ_data
+      return unless @occ_dialog && @occ_dialog.visible? && @occ_results
+      begin
+        require 'json'
+        payload = { category: @occ_category, items: @occ_results }
+        js = JSON.generate(payload).gsub('</') { '<\\/' }
+        @occ_dialog.execute_script("receiveOccData(#{js})")
+      rescue => e
+        puts "[FF OCC] send_occ_data error: #{e.message}"
+      end
+    end
+
+    def self.occ_review_html(data_json)
+      # Embed JSON directly as JS object literal — no string escaping needed
+      # Only guard against </script> breaking the HTML
+      safe_json = data_json.gsub('</') { '<\\/' }
+      <<~HTML
+      <!DOCTYPE html>
+      <html>
+      <head>
+      <meta charset="utf-8">
+      <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#1e1e2e;color:#cdd6f4;font-family:'Segoe UI',sans-serif;font-size:12px;padding:10px}
+        .hdr{font-size:14px;font-weight:600;color:#a6e3a1;margin-bottom:8px}
+        .summary{display:flex;gap:12px;margin-bottom:10px;padding:8px;background:#313244;border-radius:6px}
+        .sum-item{text-align:center;flex:1}
+        .sum-val{font-size:18px;font-weight:700}
+        .sum-lbl{font-size:10px;color:#a6adc8;margin-top:2px}
+        .s-open .sum-val{color:#a6e3a1}
+        .s-partial .sum-val{color:#f9e2af}
+        .s-blocked .sum-val{color:#f38ba8}
+        .s-revised .sum-val{color:#89b4fa}
+        .list{max-height:240px;overflow-y:auto;border:1px solid #45475a;border-radius:4px}
+        .row{display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid #313244;gap:6px}
+        .row:hover{background:#313244}
+        .row.excluded{opacity:0.4;text-decoration:line-through}
+        .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+        .dot-open{background:#a6e3a1}
+        .dot-partial{background:#f9e2af}
+        .dot-blocked{background:#f38ba8}
+        .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+        .sf{color:#a6adc8;font-size:11px;min-width:60px;text-align:right}
+        .btn{background:none;border:1px solid #585b70;color:#cdd6f4;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:11px}
+        .btn:hover{background:#45475a}
+        .btn.inc{border-color:#a6e3a1;color:#a6e3a1}
+        .btn.exc{border-color:#f38ba8;color:#f38ba8}
+        .zoom-btn{background:none;border:none;cursor:pointer;color:#89b4fa;font-size:12px;padding:2px}
+        .zoom-btn:hover{color:#b4befe}
+        .toolbar{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+        .toolbar .btn{padding:4px 14px;font-size:12px}
+        .toolbar .btn.clr{border-color:#f38ba8;color:#f38ba8}
+        .filter{display:flex;gap:6px;margin-bottom:8px;align-items:center}
+        .filter label{color:#a6adc8;font-size:11px}
+        .filter select{background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:4px;padding:2px 6px;font-size:11px}
+        .vis{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+        .vis .vb{padding:3px 10px;font-size:11px;border-radius:4px;cursor:pointer;border:1px solid #585b70;background:none;color:#cdd6f4}
+        .vis .vb:hover{background:#45475a}
+        .vis .vb.g{border-color:#a6e3a1;color:#a6e3a1}
+        .vis .vb.y{border-color:#f9e2af;color:#f9e2af}
+        .vis .vb.r{border-color:#f38ba8;color:#f38ba8}
+        .vis .vb.solo{background:#45475a;font-weight:600}
+        .vis .lbl{color:#a6adc8;font-size:10px;align-self:center;margin-right:2px}
+        .pick-bar{display:flex;gap:6px;margin-bottom:8px;align-items:center}
+        .pick-btn{padding:4px 14px;font-size:12px;border-radius:4px;cursor:pointer;border:2px solid #89b4fa;background:none;color:#89b4fa;font-weight:600}
+        .pick-btn:hover{background:#313244}
+        .pick-btn.active{background:#89b4fa;color:#1e1e2e}
+        .pick-lbl{color:#a6adc8;font-size:10px}
+        .row.highlight{background:#45475a;outline:1px solid #89b4fa}
+      </style>
+      </head>
+      <body>
+      <div class="hdr" id="title">OCC Review</div>
+      <div class="summary">
+        <div class="sum-item s-open"><div class="sum-val" id="sOpen">-</div><div class="sum-lbl">Open SF</div></div>
+        <div class="sum-item s-partial"><div class="sum-val" id="sPartial">-</div><div class="sum-lbl">Partial SF</div></div>
+        <div class="sum-item s-blocked"><div class="sum-val" id="sBlocked">-</div><div class="sum-lbl">Blocked SF</div></div>
+        <div class="sum-item s-revised"><div class="sum-val" id="sRevised">-</div><div class="sum-lbl">Revised Total</div></div>
+      </div>
+      <div class="filter">
+        <label>Show:</label>
+        <select id="filterSel" onchange="applyFilter()">
+          <option value="all">All</option>
+          <option value="partial">Yellow + Red</option>
+          <option value="blocked">Red only</option>
+        </select>
+      </div>
+      <div class="vis">
+        <span class="lbl">Visibility:</span>
+        <button class="vb g" data-action="occHide" data-eid="open">Hide Green</button>
+        <button class="vb y" data-action="occHide" data-eid="partial">Hide Yellow</button>
+        <button class="vb r" data-action="occHide" data-eid="blocked">Hide Red</button>
+        <button class="vb g" data-action="occSolo" data-eid="open">Solo Green</button>
+        <button class="vb y" data-action="occSolo" data-eid="partial">Solo Yellow</button>
+        <button class="vb r" data-action="occSolo" data-eid="blocked">Solo Red</button>
+        <button class="vb" data-action="occShow" data-eid="all">Show All</button>
+      </div>
+      <div class="pick-bar">
+        <button class="pick-btn" id="pickBtn" data-action="occPick">Pick Mode</button>
+        <span class="pick-lbl" id="pickLbl">Click to activate, then click walls in model to toggle</span>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="toolbar">
+        <button class="btn" data-action="occApply" style="border-color:#89b4fa;color:#89b4fa">Apply to Dashboard</button>
+        <button class="btn clr" data-action="occClear">Clear &amp; Close</button>
+      </div>
+      <div id="applyMsg" style="display:none;text-align:center;padding:4px;margin-top:4px;font-size:11px;color:#a6e3a1;background:#313244;border-radius:4px"></div>
+      <script>
+      var ITEMS=[];
+      var FILTER='all';
+      function skCall(a,b){if(window.sketchup&&window.sketchup[a])window.sketchup[a](b||'');}
+      function receiveOccData(d){
+        if(typeof d==='string') d=JSON.parse(d);
+        document.getElementById('title').textContent='OCC Review \\u2014 '+d.category;
+        ITEMS=d.items;
+        render();
+      }
+      function render(){
+        var openSf=0,partSf=0,blockSf=0,revisedSf=0;
+        for(var i=0;i<ITEMS.length;i++){
+          var it=ITEMS[i];
+          if(it.status==='open')openSf+=it.sf;
+          else if(it.status==='partial')partSf+=it.sf;
+          else blockSf+=it.sf;
+          if(it.included)revisedSf+=it.sf;
+        }
+        document.getElementById('sOpen').textContent=openSf.toFixed(0);
+        document.getElementById('sPartial').textContent=partSf.toFixed(0);
+        document.getElementById('sBlocked').textContent=blockSf.toFixed(0);
+        document.getElementById('sRevised').textContent=revisedSf.toFixed(0);
+
+        var h='';
+        for(var i=0;i<ITEMS.length;i++){
+          var it=ITEMS[i];
+          if(FILTER==='partial'&&it.status==='open')continue;
+          if(FILTER==='blocked'&&it.status!=='blocked')continue;
+          var cls=it.included?'':'excluded';
+          var dot='dot-'+it.status;
+          var esc=it.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+          h+='<div class="row '+cls+'" id="row-'+it.eid+'">';
+          h+='<div class="dot '+dot+'"></div>';
+          h+='<button class="zoom-btn" data-action="occZoom" data-eid="'+it.eid+'" title="Zoom">&#8982;</button>';
+          h+='<span class="name" title="'+esc+'">'+esc+'</span>';
+          h+='<span class="sf">'+it.sf.toFixed(1)+' SF</span>';
+          h+='<button class="btn '+(it.included?'exc':'inc')+'" data-action="occToggle" data-eid="'+it.eid+'">'+(it.included?'\\u2212':'+')+'</button>';
+          h+='</div>';
+        }
+        document.getElementById('list').innerHTML=h;
+      }
+      function applyFilter(){FILTER=document.getElementById('filterSel').value;render();}
+      function setPickMode(active){
+        var btn=document.getElementById('pickBtn');
+        var lbl=document.getElementById('pickLbl');
+        if(active){btn.classList.add('active');lbl.textContent='ACTIVE — click walls in model to toggle';}
+        else{btn.classList.remove('active');lbl.textContent='Click to activate, then click walls in model to toggle';}
+      }
+      var _hlTimer=null;
+      function highlightRow(eid){
+        if(_hlTimer){clearTimeout(_hlTimer);_hlTimer=null;}
+        var prev=document.querySelectorAll('.row.highlight');
+        for(var i=0;i<prev.length;i++)prev[i].classList.remove('highlight');
+        var el=document.getElementById('row-'+eid);
+        if(!el)return;
+        el.classList.add('highlight');
+        el.scrollIntoView({block:'center',behavior:'smooth'});
+        _hlTimer=setTimeout(function(){el.classList.remove('highlight');_hlTimer=null;},3000);
+      }
+      function showApplied(exc,inc){
+        var el=document.getElementById('applyMsg');
+        el.textContent='Applied: '+exc+' excluded, '+inc+' included — dashboard updated';
+        el.style.display='block';
+        setTimeout(function(){el.style.display='none';},4000);
+      }
+      document.addEventListener('click',function(e){
+        var btn=e.target.closest('[data-action]');
+        if(!btn)return;
+        skCall(btn.dataset.action,btn.dataset.eid);
+      });
+      receiveOccData(#{safe_json});
+      </script>
+      </body>
+      </html>
+      HTML
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # debug_occlusion_single — Verbose per-ray occlusion for one entity
+    # ═══════════════════════════════════════════════════════════
+
+    def self.debug_occlusion_single(eid, threshold_in = 18.0)
+      e = TakeoffTool.find_entity(eid)
+      unless e && e.valid?
+        puts "[FF OCC Single] Entity #{eid} not found"
+        return
+      end
+
+      defn = e.respond_to?(:definition) ? e.definition : nil
+      unless defn
+        puts "[FF OCC Single] Entity #{eid} has no definition"
+        return
+      end
+
+      m = Sketchup.active_model
+      return unless m
+
+      xform = e.transformation
+      faces = defn.entities.grep(Sketchup::Face)
+      return if faces.empty?
+
+      # Lookup for blocker names
+      sr = TakeoffTool.filtered_scan_results
+      ca = TakeoffTool.category_assignments
+      blocker_lookup = {}
+      if sr
+        sr.each do |r|
+          bcat = ca[r[:entity_id]] || r[:parsed][:auto_category] || '?'
+          bdn = r[:display_name] || r[:definition_name] || ''
+          bdn = r[:parsed][:element_type] || r[:parsed][:function] || bdn[0..20] + '...' if bdn.length > 36 && bdn.include?('-')
+          blocker_lookup[r[:entity_id]] = "#{bcat}: #{bdn}"
+        end
+      end
+
+      match = sr&.find { |r| r[:entity_id] == eid }
+      cat = match ? (ca[eid] || match[:parsed][:auto_category]) : nil
+      dname = match ? (match[:display_name] || defn.name) : defn.name
+
+      # Find measured faces
+      measured = []
+      cat_re = cat || ''
+      if cat_re =~ SHEET_GOOD_RE
+        groups = {}
+        faces.each do |f|
+          n = f.normal
+          key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
+          groups[key] ||= { faces: [], area: 0.0 }
+          groups[key][:faces] << f
+          groups[key][:area] += world_face_area(f, xform)
+        end
+        dom_key = groups.max_by { |_k, v| v[:area] }&.first
+        measured = dom_key ? groups[dom_key][:faces] : []
+      elsif enclosed_3d?(faces)
+        largest = faces.max_by { |f| world_face_area(f, xform) }
+        measured = [largest] if largest
+      else
+        measured = faces
+      end
+
+      sf = measured.sum { |f| world_face_area(f, xform) } / 144.0
+
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "[FF OCC Single] Entity #{eid}: '#{dname}'"
+      puts "  Category: #{cat || '?'}"
+      puts "  Measured faces: #{measured.length}, #{sf.round(2)} SF"
+      puts "  Threshold: #{threshold_in}\""
+      puts "───────────────────────────────────────────────"
+
+      # Use more samples for single-entity debug
+      num_samples = 12
+
+      mat_open = m.materials['FF_DEBUG_OPEN'] || m.materials.add('FF_DEBUG_OPEN')
+      mat_open.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_partial = m.materials['FF_DEBUG_PARTIAL'] || m.materials.add('FF_DEBUG_PARTIAL')
+      mat_partial.color = Sketchup::Color.new(240, 200, 0, 180)
+      mat_blocked = m.materials['FF_DEBUG_BLOCKED'] || m.materials.add('FF_DEBUG_BLOCKED')
+      mat_blocked.color = Sketchup::Color.new(200, 0, 0, 180)
+
+      total_rays = 0
+      total_hits = 0
+      total_assembly = 0
+      total_open = 0
+
+      m.start_operation('OCC Single Debug', true)
+
+      measured.each_with_index do |face, fi|
+        normal_world = (xform * face.normal).normalize rescue face.normal
+        samples = face_sample_points(face, xform, num_samples)
+        next if samples.empty?
+
+        # Determine room side
+        test_pt = samples.first
+        pt_fwd = Geom::Point3d.new(
+          test_pt.x + normal_world.x * DEBUG_OCC_OFFSET,
+          test_pt.y + normal_world.y * DEBUG_OCC_OFFSET,
+          test_pt.z + normal_world.z * DEBUG_OCC_OFFSET
+        )
+        rev = Geom::Vector3d.new(-normal_world.x, -normal_world.y, -normal_world.z)
+        pt_rev = Geom::Point3d.new(
+          test_pt.x + rev.x * DEBUG_OCC_OFFSET,
+          test_pt.y + rev.y * DEBUG_OCC_OFFSET,
+          test_pt.z + rev.z * DEBUG_OCC_OFFSET
+        )
+        hit_fwd = m.raytest([pt_fwd, normal_world])
+        hit_rev = m.raytest([pt_rev, rev])
+        dist_fwd = hit_fwd ? pt_fwd.distance(hit_fwd[0]) : 99999
+        dist_rev = hit_rev ? pt_rev.distance(hit_rev[0]) : 99999
+        room_dir = normal_world
+        if dist_rev < dist_fwd && dist_rev < 6.0
+          room_dir = normal_world
+        elsif dist_fwd < dist_rev && dist_fwd < 6.0
+          room_dir = rev
+        end
+
+        n = face.normal
+        face_sf = world_face_area(face, xform) / 144.0
+        puts "  Face #{fi+1}: normal=(#{n.x.round(2)},#{n.y.round(2)},#{n.z.round(2)}), #{face_sf.round(2)} SF, #{samples.length} rays"
+
+        face_hits = 0
+        samples.each_with_index do |pt, ri|
+          ray_origin = Geom::Point3d.new(
+            pt.x + room_dir.x * DEBUG_OCC_OFFSET,
+            pt.y + room_dir.y * DEBUG_OCC_OFFSET,
+            pt.z + room_dir.z * DEBUG_OCC_OFFSET
+          )
+          result = m.raytest([ray_origin, room_dir])
+          total_rays += 1
+
+          if result
+            hit_pt = result[0]
+            dist = ray_origin.distance(hit_pt)
+            hit_path = result[1]
+
+            # Find containing component
+            hit_inst = nil
+            if hit_path.is_a?(Array)
+              hit_path.reverse_each do |pe|
+                if pe.is_a?(Sketchup::ComponentInstance) || pe.is_a?(Sketchup::Group)
+                  hit_inst = pe
+                  break
+                end
+              end
+            end
+
+            # Self check
+            is_self = false
+            if hit_inst
+              is_self = (hit_inst == e) || (hit_inst.respond_to?(:definition) && hit_inst.definition == defn)
+            else
+              is_self = true
+            end
+
+            if is_self
+              puts "    Ray #{ri+1}: SELF at #{dist.round(1)}\""
+              next
+            end
+
+            if dist < DEBUG_OCC_MIN || dist > threshold_in
+              puts "    Ray #{ri+1}: out of range (#{dist.round(1)}\")"
+              total_open += 1
+              next
+            end
+
+            # Get blocker info
+            hit_eid = hit_inst.respond_to?(:entityID) ? hit_inst.entityID : 0
+            hit_cat = blocker_lookup[hit_eid]&.split(':')&.first&.strip || ''
+            hit_tag = hit_inst.respond_to?(:layer) ? hit_inst.layer.name : ''
+            bname = blocker_lookup[hit_eid] || "#{hit_tag}: #{hit_inst.respond_to?(:definition) ? hit_inst.definition.name[0..30] : '?'}"
+
+            # Assembly filter check
+            is_assembly = (hit_cat =~ OCC_ASSEMBLY_RE) || (hit_tag =~ OCC_ASSEMBLY_RE)
+            if is_assembly
+              puts "    Ray #{ri+1}: ASSEMBLY at #{dist.round(1)}\" → #{bname} (ignored)"
+              total_assembly += 1
+            else
+              puts "    Ray #{ri+1}: BLOCKED at #{dist.round(1)}\" → #{bname}"
+              face_hits += 1
+              total_hits += 1
+            end
+          else
+            puts "    Ray #{ri+1}: OPEN (no hit)"
+            total_open += 1
+          end
+        end
+      end
+
+      # Paint the entity based on result
+      ratio = total_rays > 0 ? total_hits.to_f / total_rays : 0
+      color_mat = ratio >= 0.6 ? mat_blocked : ratio >= 0.2 ? mat_partial : mat_open
+      debug_paint_entity(e, color_mat)
+      m.commit_operation
+
+      # Zoom
+      begin
+        bb = Geom::BoundingBox.new
+        bb.add(e.bounds)
+        m.active_view.zoom(bb) unless bb.empty?
+      rescue; end
+
+      label = ratio >= 0.6 ? 'RED (blocked)' : ratio >= 0.2 ? 'YELLOW (partial)' : 'GREEN (open)'
+      puts "───────────────────────────────────────────────"
+      puts "  Total rays: #{total_rays}"
+      puts "  Blocked:    #{total_hits} (real occlusion)"
+      puts "  Assembly:   #{total_assembly} (filtered out)"
+      puts "  Open/self:  #{total_rays - total_hits - total_assembly}"
+      puts "  Result:     #{label} (#{(ratio * 100).round(0)}%)"
+      puts "═══════════════════════════════════════════════════════════"
+    end
+
+    # Get sample points on a face in world coordinates
+    def self.face_sample_points(face, xform, max_samples)
+      points = []
+      begin
+        mesh = face.mesh(0)
+        n_polys = mesh.count_polygons
+        return points if n_polys == 0
+
+        step = [n_polys / max_samples, 1].max
+        (1..n_polys).step(step) do |pi|
+          tri = mesh.polygon_points_at(pi)
+          next unless tri && tri.length >= 3
+          cx = (tri[0].x + tri[1].x + tri[2].x) / 3.0
+          cy = (tri[0].y + tri[1].y + tri[2].y) / 3.0
+          cz = (tri[0].z + tri[1].z + tri[2].z) / 3.0
+          points << (xform * Geom::Point3d.new(cx, cy, cz))
+          break if points.length >= max_samples
+        end
+      rescue => e
+        puts "[FF Occlusion] face_sample_points error: #{e.message}"
+      end
+      points
     end
 
     # Faces on 3+ distinct normal directions = enclosed 3D object
