@@ -1534,30 +1534,6 @@ module TakeoffTool
       n.strip
     end
 
-    # Build display groups: identical items grouped by cleaned def name within category+subcategory
-    def self.build_display_groups(rows)
-      groups = {}
-      order = []
-      rows.each do |row|
-        raw = row[:rawDefName] || row[:definitionName] || ''
-        clean = clean_def_name(raw)
-        next if clean.empty?
-        key = "#{row[:category]}|#{row[:subcategory] || ''}|#{clean}"
-        unless groups[key]
-          groups[key] = { n: clean, cat: row[:category], sub: row[:subcategory] || '', eids: [] }
-          order << key
-        end
-        groups[key][:eids] << row[:entityId]
-      end
-      result = []
-      order.each do |key|
-        g = groups[key]
-        next unless g[:eids].length > 1
-        result << g
-      end
-      puts "[FF Dashboard] build_display_groups: #{result.length} groups from #{rows.length} rows"
-      result
-    end
 
     # Helper: always sends data using live module state (no stale closures)
     def self.send_live_data
@@ -1624,7 +1600,6 @@ module TakeoffTool
           elementType: r[:parsed][:element_type], function: r[:parsed][:function],
           material: r[:parsed][:material] || r[:material], thickness: r[:parsed][:thickness],
           sizeNominal: r[:parsed][:size_nominal], isSolid: r[:is_solid],
-          instanceCount: r[:instance_count],
           volumeFt3: r[:volume_ft3], volumeBF: r[:volume_bf], areaSF: r[:area_sf],
           linearFt: r[:linear_ft],
           bbWidth: r[:bb_width_in], bbHeight: r[:bb_height_in], bbDepth: r[:bb_depth_in],
@@ -1664,8 +1639,7 @@ module TakeoffTool
       puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
       color_settings = ColorController.get_settings rescue {}
       oc_warnings = Scanner.overcount_warnings rescue []
-      display_groups = build_display_groups(rows)
-      js = JSON.generate({ rows: rows, displayGroups: display_groups, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers, overcountWarnings: oc_warnings })
+      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers, overcountWarnings: oc_warnings })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
