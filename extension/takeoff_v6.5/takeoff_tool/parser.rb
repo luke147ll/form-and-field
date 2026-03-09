@@ -57,7 +57,7 @@ module TakeoffTool
       'Masonry / Veneer'  => 'sf',
       'Siding'            => 'sf',
       'Exterior Finish'   => 'sf',
-      'Wall Framing'      => 'sf',
+      'Wall Framing'      => 'lf',
       'Wall Finish'       => 'sf',
       'Wall Structure'    => 'sf',
       'Wall Sheathing'    => 'sf_sheets',

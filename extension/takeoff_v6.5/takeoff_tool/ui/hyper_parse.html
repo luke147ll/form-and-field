@@ -64,6 +64,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .commit-bar{background:#181825;border-top:1px solid #313244;padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
 .commit-bar select,.commit-bar input[type=text]{background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:3px 6px;font-size:11px;font-family:inherit}
 .commit-bar select{max-width:180px;flex:1}
+select optgroup{color:#89b4fa;font-weight:700;font-size:10px}select option{color:#cdd6f4;font-weight:400}
 .commit-bar input[type=text]{width:120px}
 .commit-bar label{font-size:10px;color:#a6adc8}
 .commit-bar .cnt{font-size:11px;color:#cba6f7;font-weight:600;margin-left:auto}
@@ -215,6 +216,8 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
     <select id="catSelect"><option value="">-- select --</option></select>
     <label>Subcategory</label>
     <select id="subcatSelect"><option value="">--</option></select>
+    <label>Rule</label>
+    <input type="text" id="ruleKeyword" placeholder="match keyword" title="Scanner rule: entities with names containing this keyword will auto-categorize on future scans">
     <span class="cnt" id="selCount">0 selected</span>
     <button class="btn grn" id="btnCommit" onclick="doCommit()" disabled>Commit</button>
   </div>
@@ -244,29 +247,59 @@ window.addEventListener('load', function(){
 });
 
 /* ═══ Receive Categories ═══ */
+var CONTAINERS=[];
 function receiveCategories(json){
   try{
     var parsed=JSON.parse(json);
     // Handle both old format (array) and new format (object)
     if(Array.isArray(parsed)){
-      CATS=parsed;SUBCATS={};
+      CATS=parsed;SUBCATS={};CONTAINERS=[];
     }else{
-      CATS=parsed.categories||[];SUBCATS=parsed.subcategories||{};
+      CATS=parsed.categories||[];SUBCATS=parsed.subcategories||{};CONTAINERS=parsed.containers||[];
     }
-    var sel=document.getElementById('catSelect');
-    var cur=sel.value;
-    sel.innerHTML='<option value="">-- select --</option>';
-    CATS.forEach(function(c){
-      var o=document.createElement('option');
-      o.value=c; o.textContent=c;
-      sel.appendChild(o);
-    });
-    var custom=document.createElement('option');
-    custom.value='__custom__';custom.textContent='+ Custom...';
-    sel.appendChild(custom);
-    if(cur)sel.value=cur;
+    CATS.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+    populateCatSelect(document.getElementById('catSelect'));
     updateSubcatDropdown();
   }catch(e){console.log('receiveCategories err: '+e.message);}
+}
+function populateCatSelect(sel){
+  var cur=sel.value;
+  sel.innerHTML='<option value="">-- select --</option>';
+  if(CONTAINERS.length>0){
+    var inCont={};
+    CONTAINERS.forEach(function(cont){
+      if(!cont.categories||!cont.categories.length)return;
+      var grp=document.createElement('optgroup');
+      grp.label=cont.name;
+      var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      sorted.forEach(function(cat){
+        if(cat.name==='_IGNORE')return;
+        inCont[cat.name]=true;
+        var o=document.createElement('option');
+        o.value=cat.name;o.textContent=cat.name;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    });
+    // Add any categories not in a container
+    var orphans=CATS.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+    if(orphans.length){
+      var grp=document.createElement('optgroup');
+      grp.label='Other';
+      orphans.forEach(function(c){
+        var o=document.createElement('option');o.value=c;o.textContent=c;grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    }
+  }else{
+    CATS.forEach(function(c){
+      var o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);
+    });
+  }
+  var custom=document.createElement('option');
+  custom.value='__custom__';custom.textContent='+ Custom...';
+  sel.appendChild(custom);
+  if(cur)sel.value=cur;
 }
 function updateSubcatDropdown(){
   var cat=document.getElementById('catSelect').value;
@@ -490,7 +523,8 @@ document.addEventListener('change',function(e){
         var subSel=document.getElementById('subcatSelect');
         var sub=subSel.value;if(sub==='__custom_sub__')sub='';
         if(eids.length>0){
-          callJSON('commitParse',{eids:eids,category:name,subcategory:sub});
+          var ruleKw=(document.getElementById('ruleKeyword')||{}).value||'';
+          callJSON('commitParse',{eids:eids,category:name,subcategory:sub,ruleKeyword:ruleKw});
         }
         call('addCustomCategory',name);
         document.getElementById('catSelect').value=name;
@@ -510,7 +544,8 @@ document.addEventListener('change',function(e){
         if(SUBCATS[cat].indexOf(name)===-1){SUBCATS[cat].push(name);SUBCATS[cat].sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});}
         var eids=getSelectedEids();
         if(eids.length>0 && cat){
-          callJSON('commitParse',{eids:eids,category:cat,subcategory:name});
+          var ruleKw=(document.getElementById('ruleKeyword')||{}).value||'';
+          callJSON('commitParse',{eids:eids,category:cat,subcategory:name,ruleKeyword:ruleKw});
         }
         callJSON('addSubcategoryForCat',{cat:cat,name:name});
         updateSubcatDropdown();
@@ -525,9 +560,10 @@ function doCommit(){
   var subSel=document.getElementById('subcatSelect');
   var sub=subSel.value;
   if(sub==='__custom_sub__')sub='';
+  var ruleKw=(document.getElementById('ruleKeyword')||{}).value||'';
   var eids=Object.keys(HP_EIDS).map(Number);
   if(!cat||eids.length===0)return;
-  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
+  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub,ruleKeyword:ruleKw});
 }
 
 function receiveCommitResult(json){
@@ -798,6 +834,22 @@ function updateHpCount(){
   // Clear button visibility
   var clr=document.getElementById('btnClear');
   if(clr) clr.style.display=n>1?'inline-block':'none';
+  // Suggest rule keyword from selected group names
+  suggestRuleKeyword();
+}
+function suggestRuleKeyword(){
+  var rk=document.getElementById('ruleKeyword');
+  if(!rk)return;
+  // Collect selected group names
+  var names=[];
+  for(var k in SELECTED){
+    if(SELECTED[k]&&GROUPS[k]) names.push(GROUPS[k].name||'');
+  }
+  if(names.length===0){rk.placeholder='match keyword';return;}
+  // Extract common prefix from first name: first segment before hyphen
+  var first=names[0].split(',')[0].split('-')[0].replace(/\s*[\(\[]\d+[\)\]]\s*$/,'').trim();
+  if(first.length>=3) rk.placeholder=first;
+  else rk.placeholder='match keyword';
 }
 
 function clearHpSelection(){
@@ -811,18 +863,7 @@ function clearHpSelection(){
 
 /* ═══ Single-Entity Assign ═══ */
 function populateSampleCatDropdown(){
-  var sel=document.getElementById('sampleCatSelect');
-  var cur=sel.value;
-  sel.innerHTML='<option value="">-- select --</option>';
-  CATS.forEach(function(c){
-    var o=document.createElement('option');
-    o.value=c;o.textContent=c;
-    sel.appendChild(o);
-  });
-  var custom=document.createElement('option');
-  custom.value='__custom__';custom.textContent='+ Custom...';
-  sel.appendChild(custom);
-  if(cur)sel.value=cur;
+  populateCatSelect(document.getElementById('sampleCatSelect'));
   updateSampleSubDropdown();
 }
 function updateSampleSubDropdown(){
@@ -850,7 +891,8 @@ function doSingleAssign(){
   var eids=Object.keys(HP_EIDS).map(Number);
   if(eids.length===0&&SAMPLE_EID>0)eids=[SAMPLE_EID];
   if(eids.length===0)return;
-  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub});
+  var ruleKw=(document.getElementById('ruleKeyword')||{}).value||'';
+  callJSON('commitParse',{eids:eids,category:cat,subcategory:sub,ruleKeyword:ruleKw});
 }
 document.addEventListener('change',function(e){
   if(e.target.id==='sampleCatSelect'){

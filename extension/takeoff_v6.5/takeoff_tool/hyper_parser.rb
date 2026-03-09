@@ -230,7 +230,8 @@ module TakeoffTool
           eids = (data['eids'] || []).map(&:to_i)
           cat = data['category'].to_s.strip
           subcat = data['subcategory'].to_s.strip
-          commit_parse(eids, cat, subcat)
+          rule_kw = data['ruleKeyword'].to_s.strip
+          commit_parse(eids, cat, subcat, rule_kw)
         rescue => e
           puts "HyperParser: commitParse error: #{e.message}"
           send_commit_result(false, e.message)
@@ -468,7 +469,7 @@ module TakeoffTool
 
     # ─── Commit ───
 
-    def self.commit_parse(eids, category, subcategory)
+    def self.commit_parse(eids, category, subcategory, rule_keyword = '')
       return send_commit_result(false, "No category selected") if category.empty?
       return send_commit_result(false, "No entities selected") if eids.empty?
 
@@ -503,11 +504,12 @@ module TakeoffTool
       TakeoffTool.category_assignments = ca
       puts "HyperParser: Committed #{count} entities to '#{category}'"
 
-      # Learning system: capture from first entity
+      # Learning system: capture from first entity with optional explicit keyword
       if eids.length > 0
         begin
           LearningSystem.capture(eids.first, 'Uncategorized', category,
-            new_subcategory: subcategory.empty? ? nil : subcategory)
+            new_subcategory: subcategory.empty? ? nil : subcategory,
+            rule_keyword: rule_keyword.empty? ? nil : rule_keyword)
         rescue => le
           puts "HyperParser learning capture error: #{le.message}"
         end
@@ -766,7 +768,8 @@ module TakeoffTool
       return unless @dialog && @dialog.visible?
       require 'json'
       cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
-      payload = { categories: cats, subcategories: TakeoffTool.master_subcategories }
+      containers = TakeoffTool.master_containers || []
+      payload = { categories: cats, subcategories: TakeoffTool.master_subcategories, containers: containers }
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCategories('#{esc}')")

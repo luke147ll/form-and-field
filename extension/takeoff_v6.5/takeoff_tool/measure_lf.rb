@@ -97,6 +97,9 @@ module TakeoffTool
       @total_lf = 0.0
       @preset_category = preset_category
       @dialog_open = false
+      @lock_mode = :free    # :free, :horiz, :vert
+      @lock_z = nil         # Z value to lock to in :horiz mode
+      @lock_xy = nil        # [x,y] to lock to in :vert mode
     end
 
     def activate
@@ -120,8 +123,10 @@ module TakeoffTool
     def onMouseMove(flags, x, y, view)
       return if @dialog_open
       @ip.pick(view, x, y, @ip_start)
-      @mouse_pt = @ip.position if @ip.valid?
-      view.tooltip = @ip.tooltip if @ip.valid?
+      if @ip.valid?
+        @mouse_pt = apply_lock(@ip.position)
+        view.tooltip = @ip.tooltip
+      end
       view.invalidate
     end
 
@@ -130,8 +135,14 @@ module TakeoffTool
       @ip.pick(view, x, y, @ip_start)
       return unless @ip.valid?
 
-      pt = @ip.position
+      pt = apply_lock(@ip.position)
       chain = @segments.last
+
+      # Set lock reference from first point in chain
+      if chain.empty? && @lock_mode != :free
+        @lock_z = pt.z if @lock_mode == :horiz
+        @lock_xy = [pt.x, pt.y] if @lock_mode == :vert
+      end
 
       # Add segment length to total
       if chain.length > 0
@@ -157,7 +168,9 @@ module TakeoffTool
       if @segments.last.length > 0
         @segments << []
         @ip_start = Sketchup::InputPoint.new
-        Sketchup.status_text = "LF Tool: New segment started. Click to place first point. Total so far: #{format_length(@total_lf)}"
+        @lock_z = nil
+        @lock_xy = nil
+        update_status
         view.invalidate
       end
     end
@@ -178,8 +191,30 @@ module TakeoffTool
       case key
       when 13 # Enter — finish
         finish_measurement(view) if total_points >= 2
+      when 0x48 # H — toggle horizontal lock
+        if @lock_mode == :horiz
+          @lock_mode = :free
+          @lock_z = nil
+        else
+          @lock_mode = :horiz
+          @lock_z = @segments.last.last.z if @segments.last.length > 0
+        end
+        update_status
+        view.invalidate
+      when 0x56 # V — toggle vertical lock
+        if @lock_mode == :vert
+          @lock_mode = :free
+          @lock_xy = nil
+        else
+          @lock_mode = :vert
+          if @segments.last.length > 0
+            lp = @segments.last.last
+            @lock_xy = [lp.x, lp.y]
+          end
+        end
+        update_status
+        view.invalidate
       end
-      # Escape (27) not handled — SketchUp natively pops the tool, triggering deactivate
     end
 
     # ─── Draw ───
@@ -255,7 +290,25 @@ module TakeoffTool
       @total_lf = 0.0
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
+      @lock_z = nil
+      @lock_xy = nil
       update_vcb
+    end
+
+    def apply_lock(pt)
+      case @lock_mode
+      when :horiz
+        z = @lock_z || (@segments.last.length > 0 ? @segments.last.first.z : pt.z)
+        Geom::Point3d.new(pt.x, pt.y, z)
+      when :vert
+        if @lock_xy
+          Geom::Point3d.new(@lock_xy[0], @lock_xy[1], pt.z)
+        else
+          pt
+        end
+      else
+        pt
+      end
     end
 
     def update_vcb
@@ -266,13 +319,18 @@ module TakeoffTool
     def update_status
       n = total_points
       segs = @segments.select { |c| c.length >= 2 }.length
+      lock = case @lock_mode
+             when :horiz then " [H-LOCK]"
+             when :vert  then " [V-LOCK]"
+             else ""
+             end
       if n == 0
-        Sketchup.status_text = "LF Tool: Click to start. Right-click for new segment. Enter to finish. Esc to cancel."
+        Sketchup.status_text = "LF Tool:#{lock} Click to start. H=horiz lock, V=vert lock. Right-click=new seg. Enter=finish."
       elsif n == 1
-        Sketchup.status_text = "LF Tool: Click next point."
+        Sketchup.status_text = "LF Tool:#{lock} Click next point. H=toggle horiz, V=toggle vert."
       else
         seg_info = segs > 1 ? " (#{segs} segments)" : ""
-        Sketchup.status_text = "LF Tool: #{format_length(@total_lf)}#{seg_info} — Click to continue, Right-click for new segment, Enter/Dbl-click to finish, Esc to cancel."
+        Sketchup.status_text = "LF Tool:#{lock} #{format_length(@total_lf)}#{seg_info} — Click to continue, Enter/Dbl-click to finish."
       end
     end
 

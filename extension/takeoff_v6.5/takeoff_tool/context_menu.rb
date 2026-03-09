@@ -198,11 +198,25 @@ module TakeoffTool
 
         sub.add_separator
 
-        # Set Category submenu with dynamic categories
+        # Set Category submenu — grouped by container, sorted alphabetically
         cat_sub = sub.add_submenu('Set Category')
-        TakeoffTool.build_context_categories.each do |cat|
-          cat_sub.add_item(cat) do
-            TakeoffTool.apply_category_to_selection(sel.to_a, cat)
+        containers = TakeoffTool.master_containers || []
+        if containers.any?
+          containers.each do |cont|
+            cats = (cont['categories'] || []).reject { |c| c['name'] == '_IGNORE' }
+            next if cats.empty?
+            cont_sub = cat_sub.add_submenu(cont['name'])
+            cats.sort_by { |c| c['name'].downcase }.each do |cat_entry|
+              cont_sub.add_item(cat_entry['name']) do
+                TakeoffTool.apply_category_to_selection(sel.to_a, cat_entry['name'])
+              end
+            end
+          end
+        else
+          TakeoffTool.build_context_categories.sort_by(&:downcase).each do |cat|
+            cat_sub.add_item(cat) do
+              TakeoffTool.apply_category_to_selection(sel.to_a, cat)
+            end
           end
         end
         cat_sub.add_separator

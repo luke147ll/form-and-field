@@ -110,6 +110,7 @@ module TakeoffTool
     sub.add_item('Show All Elements') { Highlighter.show_all }
     sub.add_item('Hyper Parse') { HyperParser.show_dialog }
     sub.add_item('Learned Rules') { LearningSystem.show_dialog }
+    sub.add_item('Rule Builder') { LearningSystem.show_rule_builder }
     sub.add_separator
     mv_sub = sub.add_submenu('Multiverse')
     mv_sub.add_item('Import Comparison Model') { TakeoffTool.import_comparison_model }
@@ -504,6 +505,18 @@ module TakeoffTool
         end
         save_master_subcategories
       end
+
+      # Cascade container assignment — rename the category inside its container
+      (@master_containers || []).each do |cont|
+        (cont['categories'] || []).each do |c|
+          if c['name'] == old_name
+            c['name'] = new_name
+            break
+          end
+        end
+      end
+      save_master_containers
+      invalidate_container_lookup
 
       save_master_categories
       m.commit_operation

@@ -393,6 +393,7 @@ th.ck{width:20px;text-align:center;padding:1px}
 
 /* INLINE EDITABLE */
 select.cs{background:#313244;border:1px solid #45475a;color:#cdd6f4;font-size:10px;border-radius:3px;padding:1px 2px;max-width:110px;font-family:inherit}
+select optgroup{color:#89b4fa;font-weight:700;font-size:10px}select option{color:#cdd6f4;font-weight:400}
 select.cs-unit{background:#1e1e2e;border:1px solid #89b4fa;color:#89b4fa;font-size:11px;font-weight:600;border-radius:3px;padding:2px 6px;font-family:inherit;cursor:pointer}select.cs-unit:hover{background:#313244;border-color:#b4befe}select.cs-unit:focus{outline:none;border-color:#cba6f7;box-shadow:0 0 0 1px #cba6f7}
 select.cs.fl{border-color:#fab387;background:#3e3020}
 .sz{background:transparent;border:1px solid transparent;color:#cdd6f4;font-size:10px;padding:1px 3px;border-radius:3px;width:65px;font-family:inherit;cursor:pointer}
@@ -1429,9 +1430,7 @@ function buildDD(){
   var prevC=document.getElementById('fC').value;
   var prevCC=document.getElementById('fCC').value;
   var prevSub=document.getElementById('fSub').value;
-  var h='<option value="">All</option>';
-  for(i=0;i<cats.length;i++)h+='<option>'+X(cats[i])+'</option>';
-  document.getElementById('fC').innerHTML=h;
+  document.getElementById('fC').innerHTML=buildGroupedCatOptions('All',false);
   if(prevC)document.getElementById('fC').value=prevC;
   h='<option value="">All</option>';
   for(i=0;i<ccs.length;i++)h+='<option value="'+X(ccs[i])+'">'+X(ccs[i])+' ('+ccM[ccs[i]]+')</option>';
@@ -1467,11 +1466,53 @@ function buildAttrDD(selId,lblId,vals,counts,minVals){
   sel.innerHTML=h;
   if(prev)sel.value=prev;
 }
+function buildGroupedCatOptions(placeholder,includeCustom){
+  var h='<option value="">'+X(placeholder||'--')+'</option>';
+  if(CONTAINERS&&CONTAINERS.length>0){
+    var inCont={};
+    for(var ci=0;ci<CONTAINERS.length;ci++){
+      var cont=CONTAINERS[ci];if(!cont.categories||!cont.categories.length)continue;
+      var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      h+='<optgroup label="'+X(cont.name)+'">';
+      for(var j=0;j<sorted.length;j++){if(sorted[j].name==='_IGNORE')continue;inCont[sorted[j].name]=true;h+='<option value="'+X(sorted[j].name)+'">'+X(sorted[j].name)+'</option>';}
+      h+='</optgroup>';
+    }
+    // Orphan categories not in any container
+    var orphans=ALL_CA.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'">'+X(orphans[oi])+'</option>';h+='</optgroup>';}
+  }else{
+    var sa=ALL_CA.slice().sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+    for(var i=0;i<sa.length;i++){if(sa[i]==='_IGNORE')continue;h+='<option value="'+X(sa[i])+'">'+X(sa[i])+'</option>';}
+  }
+  if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
+  return h;
+}
+function buildGroupedCatOptionsSelected(selCat,includeCustom){
+  var h='';
+  if(CONTAINERS&&CONTAINERS.length>0){
+    var inCont={};
+    for(var ci=0;ci<CONTAINERS.length;ci++){
+      var cont=CONTAINERS[ci];if(!cont.categories||!cont.categories.length)continue;
+      var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      h+='<optgroup label="'+X(cont.name)+'">';
+      for(var j=0;j<sorted.length;j++){
+        var cn=sorted[j].name;if(cn==='_IGNORE')continue;inCont[cn]=true;
+        h+='<option value="'+X(cn)+'"'+(cn===selCat?' selected':'')+'>'+X(cn)+'</option>';
+      }
+      h+='</optgroup>';
+    }
+    var orphans=ALL_CA.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'"'+(orphans[oi]===selCat?' selected':'')+'>'+X(orphans[oi])+'</option>';h+='</optgroup>';}
+  }else{
+    for(var i=0;i<ALL_CA.length;i++){
+      h+='<option value="'+X(ALL_CA[i])+'"'+(ALL_CA[i]===selCat?' selected':'')+'>'+X(ALL_CA[i])+'</option>';
+    }
+  }
+  if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
+  return h;
+}
 function buildBulkDDs(){
-  var h='<option value="">--</option>';
-  for(var i=0;i<ALL_CA.length;i++)h+='<option value="'+X(ALL_CA[i])+'">'+X(ALL_CA[i])+'</option>';
-  h+='<option value="__custom__">+ Custom...</option>';
-  document.getElementById('bulkCat').innerHTML=h;
+  document.getElementById('bulkCat').innerHTML=buildGroupedCatOptions('--',true);
   h='<option value="">--</option>';
   for(var i=0;i<CO.length;i++)h+='<option value="'+CO[i].code+'">'+X(CO[i].full)+'</option>';
   document.getElementById('bulkCC').innerHTML=h;
@@ -1886,9 +1927,7 @@ function renderEntityRow(row,gBy,gk,isChild){
   FIDX.push(row.entityId);
   var sel=!!SEL[row.entityId],rv=VIS[row.entityId]!==false;
   var wn=row.warnings&&row.warnings.length>0;
-  var co='';
-  for(var j=0;j<ALL_CA.length;j++)co+='<option value="'+ALL_CA[j]+'"'+(ALL_CA[j]===row.category?' selected':'')+'>'+X(ALL_CA[j])+'</option>';
-  co+='<option value="__custom__">+ Custom...</option>';
+  var co=buildGroupedCatOptionsSelected(row.category,true);
   var cco=buildCCOptions(row.costCode);
   var isCos=!!row.cosmetic;
   var cls=sel?(isCos?' class="sel cosmetic"':' class="sel"'):(isCos?' class="cosmetic"':'');
@@ -3108,12 +3147,28 @@ function buildSplitCatDD(panel){
     var c=rows[i].category||'Uncategorized';
     if(c!=='_IGNORE')cats[c]=true;
   }
-  var sorted=Object.keys(cats).sort();
   var sel=document.getElementById('splitCat'+panel.toUpperCase());
   if(!sel)return;
   var cur=sel.value;
   var h='<option value="">All</option>';
-  for(i=0;i<sorted.length;i++)h+='<option value="'+X2(sorted[i])+'">'+X(sorted[i])+'</option>';
+  if(CONTAINERS&&CONTAINERS.length>0){
+    for(var ci=0;ci<CONTAINERS.length;ci++){
+      var cont=CONTAINERS[ci];if(!cont.categories||!cont.categories.length)continue;
+      var inCont=cont.categories.filter(function(c){return cats[c.name];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      if(!inCont.length)continue;
+      h+='<optgroup label="'+X(cont.name)+'">';
+      for(var j=0;j<inCont.length;j++)h+='<option value="'+X2(inCont[j].name)+'">'+X(inCont[j].name)+'</option>';
+      h+='</optgroup>';
+    }
+    // Any categories not in containers
+    var contCatSet={};
+    for(var ci2=0;ci2<CONTAINERS.length;ci2++){(CONTAINERS[ci2].categories||[]).forEach(function(c){contCatSet[c.name]=true;});}
+    var orphans=Object.keys(cats).filter(function(c){return !contCatSet[c];}).sort();
+    if(orphans.length){h+='<optgroup label="Other">';for(i=0;i<orphans.length;i++)h+='<option value="'+X2(orphans[i])+'">'+X(orphans[i])+'</option>';h+='</optgroup>';}
+  }else{
+    var sorted=Object.keys(cats).sort();
+    for(i=0;i<sorted.length;i++)h+='<option value="'+X2(sorted[i])+'">'+X(sorted[i])+'</option>';
+  }
   sel.innerHTML=h;
   sel.value=cur;
 }
@@ -3625,9 +3680,19 @@ function renderScCard(g,idx){
   h+='<div class="sc-assign-row">';
   h+='<select class="sc-assign-dd" id="scCat'+idx+'" onchange="scCatChanged('+idx+')">';
   h+='<option value="">Select category...</option>';
-  for(var ci=0;ci<scCategories.length;ci++){
-    if(scCategories[ci]==='_IGNORE')continue;
-    h+='<option value="'+esc(scCategories[ci])+'">'+esc(scCategories[ci])+'</option>';
+  if(CONTAINERS&&CONTAINERS.length>0){
+    for(var cci=0;cci<CONTAINERS.length;cci++){
+      var cont=CONTAINERS[cci];if(!cont.categories||!cont.categories.length)continue;
+      var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      h+='<optgroup label="'+esc(cont.name)+'">';
+      for(var cj=0;cj<sorted.length;cj++){if(sorted[cj].name==='_IGNORE')continue;h+='<option value="'+esc(sorted[cj].name)+'">'+esc(sorted[cj].name)+'</option>';}
+      h+='</optgroup>';
+    }
+  }else{
+    for(var ci=0;ci<scCategories.length;ci++){
+      if(scCategories[ci]==='_IGNORE')continue;
+      h+='<option value="'+esc(scCategories[ci])+'">'+esc(scCategories[ci])+'</option>';
+    }
   }
   h+='</select>';
   h+='<select class="sc-assign-dd" id="scSub'+idx+'" style="max-width:120px"><option value="">Sub...</option></select>';

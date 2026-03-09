@@ -326,9 +326,23 @@ module TakeoffTool
         area = vi3/tin/144.0 if tin && tin > 0
       end
 
-      # Compute LF from longest bounding box dimension
-      longest_in = [w, h, d].max
-      linear_ft = longest_in / 12.0
+      # Compute LF from actual edge geometry (handles L-shapes, bends).
+      # Falls back to bounding box if geometry doesn't show a clear extrusion pattern.
+      acat = parsed[:auto_category]
+      mtype = parsed[:measurement_type] || Parser.measurement_for(acat)
+      geo_lf = nil
+      if mtype == 'lf'
+        geo_lf = geometry_linear_ft(defn, inst.transformation)
+      end
+      if geo_lf
+        linear_ft = geo_lf
+      elsif acat =~ /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Siding|Stucco|Exterior Finish/i
+        longest_in = [w, d].max  # horizontal run, skip h (Z = wall height)
+        linear_ft = longest_in / 12.0
+      else
+        longest_in = [w, h, d].max
+        linear_ft = longest_in / 12.0
+      end
 
       # For Rooms: compute area from BB width x depth (two largest dims)
       if parsed[:auto_category] == 'Rooms'
@@ -829,6 +843,78 @@ module TakeoffTool
         sf = total / 144.0
         puts "[FF Measure] '#{dname}': single-sided, total = #{sf.round(1)} SF (#{faces.length} faces)"
         sf
+      end
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # geometry_linear_ft — Compute LF from face geometry
+    #
+    # For any extrusion (trim, fascia, framing — straight, L, U, sloped):
+    #   path_length = total_side_face_area / profile_perimeter
+    #
+    # End faces (cross-section caps) are identified as the smallest faces.
+    # Side face area = total area minus end faces.
+    # Profile perimeter = edge lengths of one end face.
+    # Works for any profile shape and any bend/slope.
+    # Returns nil if geometry doesn't look like an extrusion.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.geometry_linear_ft(defn, xform = nil)
+      xf = xform || Geom::Transformation.new
+      face_data = []
+      collect_faces_for_lf(defn.entities, xf, face_data)
+
+      # Filter degenerate faces, need at least 2 end caps + 1 side
+      face_data.reject! { |fd| fd[:area] < 0.1 }
+      return nil if face_data.length < 3
+
+      face_data.sort_by! { |fd| fd[:area] }
+      total_area = face_data.sum { |fd| fd[:area] }
+
+      # End faces are the two smallest with similar areas,
+      # whose combined area is a small fraction of the total
+      ef1 = face_data[0]
+      ef2 = nil
+      (1...[face_data.length, 8].min).each do |i|
+        candidate = face_data[i]
+        ratio = candidate[:area] / [ef1[:area], 0.01].max
+        combined = ef1[:area] + candidate[:area]
+        if ratio < 2.0 && combined < total_area * 0.20
+          ef2 = candidate
+          break
+        end
+      end
+
+      return nil unless ef2
+
+      perimeter = ef1[:perimeter]
+      return nil if perimeter < 0.5
+
+      side_area = total_area - ef1[:area] - ef2[:area]
+      return nil if side_area < 1.0
+
+      lf_in = side_area / perimeter
+      lf_in / 12.0
+    end
+
+    def self.collect_faces_for_lf(ents, xform, result)
+      ents.grep(Sketchup::Face).each do |f|
+        area = world_face_area(f, xform)
+        perimeter = 0.0
+        f.loops.each do |loop|
+          loop.edges.each do |edge|
+            p1 = xform * edge.start.position
+            p2 = xform * edge.end.position
+            perimeter += p1.distance(p2)
+          end
+        end
+        result << { area: area, perimeter: perimeter }
+      end
+      ents.each do |child|
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        collect_faces_for_lf(child_defn.entities, xform * child.transformation, result)
       end
     end
 

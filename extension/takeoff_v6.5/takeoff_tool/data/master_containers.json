@@ -5,10 +5,10 @@
       "color": "#fab387",
       "order": 0,
       "categories": [
-        { "name": "Footings and Foundation", "code": "2.200", "unit": "LF" },
-        { "name": "Foundation Walls", "code": "2.210", "unit": "LF" },
-        { "name": "Interior Concrete Slabs", "code": "2.220", "unit": "CY" },
-        { "name": "Exterior Concrete Slabs", "code": "2.230", "unit": "CY" }
+        { "name": "Footings", "code": "2.200", "unit": "LF" },
+        { "name": "Stem Walls", "code": "2.210", "unit": "LF" },
+        { "name": "Slabs", "code": "2.220", "unit": "SF" },
+        { "name": "Concrete", "code": "2.230", "unit": "CY" }
       ]
     },
     {
@@ -32,6 +32,9 @@
       "order": 2,
       "categories": [
         { "name": "Exterior Wall Finish", "code": "7.100", "unit": "SF" },
+        { "name": "Siding", "code": "7.110", "unit": "SF" },
+        { "name": "Soffit", "code": "7.120", "unit": "SF" },
+        { "name": "Fascia", "code": "7.130", "unit": "LF" },
         { "name": "Windows", "code": "8.100", "unit": "EA" },
         { "name": "Exterior Doors", "code": "8.200", "unit": "EA" },
         { "name": "Roofing", "code": "7.500", "unit": "SF" },
@@ -47,13 +50,17 @@
       "categories": [
         { "name": "Drywall", "code": "9.100", "unit": "SF" },
         { "name": "Interior Doors", "code": "8.300", "unit": "EA" },
+        { "name": "Interior Railings", "code": "5.510", "unit": "LF" },
         { "name": "Trim and Millwork", "code": "6.800", "unit": "LF" },
         { "name": "Cabinets", "code": "12.100", "unit": "EA" },
         { "name": "Countertops", "code": "12.200", "unit": "LF" },
         { "name": "Flooring", "code": "9.600", "unit": "SF" },
         { "name": "Ceiling Finish", "code": "9.500", "unit": "SF" },
         { "name": "Paint", "code": "9.900", "unit": "SF" },
-        { "name": "Tile", "code": "9.300", "unit": "SF" }
+        { "name": "Tile", "code": "9.300", "unit": "SF" },
+        { "name": "Bath Accessories", "code": "10.100", "unit": "EA" },
+        { "name": "Decorative Metal", "code": "10.200", "unit": "EA" },
+        { "name": "Solid Surface Walls", "code": "9.200", "unit": "SF" }
       ]
     },
     {
@@ -64,8 +71,7 @@
         { "name": "Plumbing", "code": "22.000", "unit": "EA" },
         { "name": "HVAC", "code": "23.000", "unit": "EA" },
         { "name": "Electrical", "code": "26.000", "unit": "EA" },
-        { "name": "Fire Protection", "code": "21.000", "unit": "EA" },
-        { "name": "Low Voltage", "code": "27.000", "unit": "EA" }
+        { "name": "Fire Protection", "code": "21.000", "unit": "EA" }
       ]
     },
     {
@@ -88,6 +94,9 @@
       "categories": [
         { "name": "Stairs and Railings", "code": "5.500", "unit": "LF" },
         { "name": "Specialties", "code": "10.000", "unit": "EA" },
+        { "name": "Appliances", "code": "11.100", "unit": "EA" },
+        { "name": "Furniture", "code": "12.300", "unit": "EA" },
+        { "name": "Low Voltage", "code": "27.000", "unit": "EA" },
         { "name": "Equipment", "code": "11.000", "unit": "EA" },
         { "name": "Furnishings", "code": "12.000", "unit": "EA" }
       ]

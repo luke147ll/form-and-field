@@ -245,12 +245,41 @@ module TakeoffTool
     end
 
     def self.category_options(selected)
-      cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
-      opts = cats.map { |c|
-        sel = c == selected ? ' selected' : ''
-        "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
-      }.join("\n")
-      opts + "\n<option value=\"__custom__\">+ Custom...</option>"
+      containers = TakeoffTool.master_containers || []
+      all_cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
+      if containers.any?
+        in_cont = {}
+        opts = ''
+        containers.each do |cont|
+          cats = (cont['categories'] || []).reject { |c| c['name'] == '_IGNORE' }
+          next if cats.empty?
+          sorted = cats.sort_by { |c| c['name'].downcase }
+          opts += "<optgroup label=\"#{h(cont['name'])}\">"
+          sorted.each do |cat|
+            in_cont[cat['name']] = true
+            sel = cat['name'] == selected ? ' selected' : ''
+            opts += "<option value=\"#{h(cat['name'])}\"#{sel}>#{h(cat['name'])}</option>"
+          end
+          opts += "</optgroup>"
+        end
+        orphans = all_cats.reject { |c| in_cont[c] }.sort_by(&:downcase)
+        if orphans.any?
+          opts += "<optgroup label=\"Other\">"
+          orphans.each do |c|
+            sel = c == selected ? ' selected' : ''
+            opts += "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
+          end
+          opts += "</optgroup>"
+        end
+        opts + "\n<option value=\"__custom__\">+ Custom...</option>"
+      else
+        cats = all_cats.sort_by(&:downcase)
+        opts = cats.map { |c|
+          sel = c == selected ? ' selected' : ''
+          "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
+        }.join("\n")
+        opts + "\n<option value=\"__custom__\">+ Custom...</option>"
+      end
     end
 
     def self.subcategory_options(cat, selected)
@@ -271,7 +300,9 @@ module TakeoffTool
       return unless @dialog && @dialog.visible?
       require 'json'
       cats = TakeoffTool.master_categories.reject { |c| c == '_IGNORE' }
-      js = JSON.generate(cats)
+      containers = TakeoffTool.master_containers || []
+      payload = { categories: cats, containers: containers }
+      js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveCategories('#{esc}')") rescue nil
     end
@@ -512,16 +543,42 @@ module TakeoffTool
       }
       function receiveCategories(json){
         try{
-          var cats=JSON.parse(json);
+          var d=JSON.parse(json);
+          var cats=Array.isArray(d)?d:(d.categories||[]);
+          var containers=d.containers||[];
           var sel=document.getElementById('catSel');
           var cur=sel.value;
           sel.innerHTML='<option value="">-- Select --</option>';
-          cats.forEach(function(c){
-            var o=document.createElement('option');
-            o.value=c;o.textContent=c;
-            if(c===cur)o.selected=true;
-            sel.appendChild(o);
-          });
+          if(containers.length>0){
+            var inCont={};
+            containers.forEach(function(cont){
+              if(!cont.categories||!cont.categories.length)return;
+              var grp=document.createElement('optgroup');
+              grp.label=cont.name;
+              var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+              sorted.forEach(function(cat){
+                if(cat.name==='_IGNORE')return;
+                inCont[cat.name]=true;
+                var o=document.createElement('option');
+                o.value=cat.name;o.textContent=cat.name;
+                if(cat.name===cur)o.selected=true;
+                grp.appendChild(o);
+              });
+              sel.appendChild(grp);
+            });
+            var orphans=cats.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+            if(orphans.length){
+              var grp=document.createElement('optgroup');grp.label='Other';
+              orphans.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(c===cur)o.selected=true;grp.appendChild(o);});
+              sel.appendChild(grp);
+            }
+          }else{
+            cats.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+            cats.forEach(function(c){
+              var o=document.createElement('option');o.value=c;o.textContent=c;
+              if(c===cur)o.selected=true;sel.appendChild(o);
+            });
+          }
           var custom=document.createElement('option');
           custom.value='__custom__';custom.textContent='+ Custom...';
           sel.appendChild(custom);
