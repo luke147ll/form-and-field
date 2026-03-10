@@ -235,6 +235,13 @@ module TakeoffTool
         progress.call("Removed #{dups} duplicate entities") if progress
       end
 
+      # Report IFC geometry children skipped
+      if @ifc_geom_skipped && @ifc_geom_skipped > 0
+        puts "[FF Scanner] Skipped #{@ifc_geom_skipped} IFC geometry children (parent carries metadata)"
+        progress.call("Skipped #{@ifc_geom_skipped} IFC geometry children") if progress
+        @ifc_geom_skipped = 0
+      end
+
       # Post-scan: remove nested children from EA-measured categories
       # (e.g., a can light's bulb/trim/housing shouldn't count as separate fixtures)
       progress.call("Filtering nested EA children...") if progress
@@ -317,15 +324,31 @@ module TakeoffTool
         mat = f.material.display_name if f && f.material
       end
 
-      # Compute IFC type
+      # Compute IFC type (check IFC 4, IFC 2x3, and other schema versions)
       ifc = nil
       if defn.attribute_dictionaries
         a = defn.attribute_dictionaries['AppliedSchemaTypes']
-        ifc = a['IFC 4'] if a
+        if a
+          ifc = a['IFC 4'] || a['IFC 2x3'] || a['IFC 4x3'] || a['IFC2x3']
+        end
       end
 
       # Skip IFC organizational containers
       return if @is_ifc_model && %w[IfcBuilding IfcBuildingStorey IfcSite IfcProject].include?(tag)
+
+      # Skip IFC geometry children of named elements.
+      # IFC imports create: NamedElement (instance name "8x6 Joist") → Component (geometry).
+      # The parent carries all metadata and is scanned separately. The child is a
+      # duplicate with no name/IFC type — skip it to avoid double-counting.
+      if @is_ifc_model && display =~ /^Component\d*$/i
+        pd = inst.parent
+        if pd.is_a?(Sketchup::ComponentDefinition)
+          if pd.instances.any? { |pi| pi.name && !pi.name.empty? && pi.name !~ /^Component\d*$/i }
+            @ifc_geom_skipped = (@ifc_geom_skipped || 0) + 1
+            return
+          end
+        end
+      end
 
       # Skip datum/level markers
       return if display =~ /^T\.O\.|^B\.O\.|^Level|^Datum|S\.F\./i
@@ -490,18 +513,45 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════
 
     def self.scan_entity(inst, defn, display, tag, mat, ifc_type)
-      # Strategy 0: Steel shape early-exit — W shapes, HSS, L-angles, C-channels
-      # These are definitively structural steel regardless of material or other attributes
-      if display =~ /\bW\d+[xX]\d+\b/ ||
-         display =~ /^W-Wide Flange\b/i ||
-         display =~ /\bHSS\d/i ||
-         display =~ /\b[LC]\d+[xX]\d+\b/
+      # Strategy 0: Steel shape early-exit — W shapes, HSS, plates, L-angles, C-channels
+      # Assigns specific categories for identifiable steel shapes
+      if display =~ /\bW\d+[xX]\d+\b/ || display =~ /^W-Wide Flange\b/i
         return {
           raw: display, element_type: 'Steel Shape', function: nil,
-          material: mat, thickness: nil, size_nominal: display[/[\w\d]+[xX][\d.]+/],
+          material: mat, thickness: nil, size_nominal: display[/W[\d.]+[xX][\d.]+/],
+          revit_id: nil, auto_category: 'W-Beams',
+          auto_subcategory: display[/W\d+/] || 'W-Beam',
+          measurement_type: 'lf',
+          category_source: 'name', confidence: :high
+        }
+      end
+      if display =~ /\bHSS\d/i
+        return {
+          raw: display, element_type: 'Steel Shape', function: nil,
+          material: mat, thickness: nil, size_nominal: display[/HSS[\d.xX\/]+/],
+          revit_id: nil, auto_category: 'Steel Tubes (HSS)',
+          auto_subcategory: display[/HSS[\d.xX\/]+/] || 'HSS',
+          measurement_type: 'lf',
+          category_source: 'name', confidence: :high
+        }
+      end
+      if display =~ /^PL\d/i || display =~ /\bPL\s*\d/i
+        return {
+          raw: display, element_type: 'Steel Shape', function: nil,
+          material: mat, thickness: nil, size_nominal: display,
+          revit_id: nil, auto_category: 'Steel Plates',
+          auto_subcategory: 'Plate',
+          measurement_type: 'ea',
+          category_source: 'name', confidence: :high
+        }
+      end
+      if display =~ /\b[LC]\d+[xX]\d+\b/
+        return {
+          raw: display, element_type: 'Steel Shape', function: nil,
+          material: mat, thickness: nil, size_nominal: display[/[LC][\d.]+[xX][\d.]+/],
           revit_id: nil, auto_category: 'Structural Steel',
-          auto_subcategory: display[/^(W|HSS|[LC])\d*/] || 'Steel',
-          measurement_type: Parser.measurement_for('Structural Steel'),
+          auto_subcategory: display[/[LC]\d+/] || 'Steel',
+          measurement_type: 'lf',
           category_source: 'name', confidence: :high
         }
       end

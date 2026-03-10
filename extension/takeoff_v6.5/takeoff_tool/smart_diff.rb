@@ -50,26 +50,32 @@ module TakeoffTool
     # ═══ PUBLIC API ═══
 
     def self.enter(category_filter: nil, force_reclassify: false)
-      return if @active
+      if @active
+        puts "[SmartDiff] Already active — forcing re-entry"
+        begin; restore_all; rescue => e; puts "[SmartDiff] restore_all: #{e.message}"; end
+        @backed_up = {}
+        @active = false
+      end
       m = Sketchup.active_model
       return unless m
 
       # Clean slate
-      ColorController.deactivate if ColorController.highlights_active?
+      begin
+        ColorController.deactivate if ColorController.highlights_active?
+      rescue => e
+        puts "[SmartDiff] ColorController.deactivate: #{e.message}"
+      end
 
       @opacity    ||= DEFAULT_OPACITY.dup
-      @visibility ||= Hash[STATES.map { |s| [s, true] }]
+      @visibility = Hash[STATES.map { |s| [s, true] }]
       @geo_cache    = {}
+      @backed_up    = {}
 
       puts "[SmartDiff] Entering..."
       t0 = Time.now
 
-      if !force_reclassify && load_cached_classification(m)
-        puts "[SmartDiff] Using cached classification (#{@classification.length} entities)"
-      else
-        classify
-        save_classification_cache(m)
-      end
+      # Always reclassify fresh — cache caused stale state issues
+      classify
 
       backup_and_paint(m, category_filter: category_filter)
 
@@ -105,6 +111,7 @@ module TakeoffTool
       end
 
       clear_state
+      invalidate_cache
       m.active_view.invalidate if m
       puts "[SmartDiff] Exited"
     end

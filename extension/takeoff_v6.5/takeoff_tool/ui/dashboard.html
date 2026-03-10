@@ -277,6 +277,17 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .mv-scan-b-btn{padding:4px 14px;background:#89b4fa;color:#1e1e2e;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;transition:all .12s}
 .mv-scan-b-btn:hover{filter:brightness(1.1)}
 
+/* SCENES */
+.scene-row{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #252535;transition:background .12s}
+.scene-row:hover{background:#222236}
+.scene-row.active{background:rgba(148,226,213,0.06);border-left:3px solid #94e2d5;padding-left:9px}
+.scene-icon{width:22px;height:22px;border-radius:4px;background:#313244;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;color:#6c7086;transition:all .15s}
+.scene-row.active .scene-icon{background:#94e2d5;color:#1e1e2e}
+.scene-name{flex:1;font-size:12px;font-weight:500;color:#cdd6f4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene-row.active .scene-name{color:#94e2d5;font-weight:600}
+.scene-desc{font-size:10px;color:#6c7086;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene-idx{font-size:10px;color:#45475a;font-variant-numeric:tabular-nums;min-width:16px;text-align:center}
+
 /* SPLIT VERTICAL DASHBOARD */
 .split-container{display:none;flex:1;min-height:0;overflow:hidden}
 .split-panel{display:flex;flex-direction:column;min-width:0;overflow:hidden;width:50%}
@@ -1028,6 +1039,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <div class="info-tab" data-tab="notes" onclick="switchInfoTab('notes')">Notes</div>
     <div class="info-tab" data-tab="assemblies" onclick="switchInfoTab('assemblies')">Assemblies</div>
     <div class="info-tab" data-tab="multiverse" onclick="switchInfoTab('multiverse')">Multiverse</div>
+    <div class="info-tab" data-tab="scenes" onclick="switchInfoTab('scenes')">Scenes</div>
     <div class="info-tab-underline" id="tabUnderline"></div>
   </div>
 
@@ -1126,6 +1138,19 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
           <span class="mv-mgmt-btn" onclick="call('importComparisonModel')">Import New</span>
           <span class="mv-mgmt-btn danger" onclick="confirmRemoveMv()">Remove Model B</span>
         </div>
+      </div>
+    </div>
+
+    <!-- SCENES TAB -->
+    <div class="info-content" id="tab_scenes">
+      <div class="mp-toolbar" style="justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;color:#94e2d5">Scenes</span>
+        <button class="hb" onclick="refreshScenes()" style="font-size:10px;padding:2px 6px;color:#94e2d5;border-color:#94e2d5">Refresh</button>
+      </div>
+      <div class="sec-scroll" id="scenesScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
+        <div id="scenesList"></div>
+        <div id="scenesEmpty" class="notes-empty">No scenes found. Create scenes in SketchUp to control section cuts and CAD visibility.</div>
+        <div class="sec-scroll-fade" id="scenesFade"></div>
       </div>
     </div>
   </div>
@@ -5066,6 +5091,7 @@ document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key
 
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){
+  console.log('[FF doSetCat] eid='+eid+' (type='+typeof eid+') val='+v);
   if(v==='__custom__'){
     // Revert dropdown to current category while modal is open
     var curCat='';
@@ -5087,10 +5113,11 @@ function doSetCat(eid,v){
   applySetCat(eid,v);
 }
 function applySetCat(eid,v){
+  console.log('[FF applySetCat] eid='+eid+' val='+v+' selCount='+(SEL[eid]?getSelIds().length:0));
   var ids=(SEL[eid]&&getSelIds().length>1)?getSelIds():[String(eid)];
   recordUndo(ids,'category',v);
-  if(ids.length>1){callJSON('bulkSetCategory',{eids:ids,val:v});}
-  else{callJSON('setCategory',{eid:eid,val:v});}
+  if(ids.length>1){console.log('[FF applySetCat] bulk '+ids.length+' entities');callJSON('bulkSetCategory',{eids:ids,val:v});}
+  else{console.log('[FF applySetCat] single eid='+eid);callJSON('setCategory',{eid:eid,val:v});}
   for(var i=0;i<D.length;i++){if(ids.length>1?SEL[D[i].entityId]:D[i].entityId==eid){D[i].category=v;D[i].subcategory='';}}
   for(var j=0;j<ids.length;j++){
     var row=document.getElementById('r'+ids[j]);
@@ -5732,6 +5759,7 @@ function switchInfoTab(tabName){
   else if(tabName==='assemblies')call('loadAssemblies');
   else if(tabName==='notes')renderNotesPanel();
   else if(tabName==='multiverse')call('requestMultiverseData');
+  else if(tabName==='scenes')refreshScenes();
   setTimeout(checkAllScrollFades,50);
 }
 function initTabUnderline(){
@@ -5743,6 +5771,42 @@ function initTabUnderline(){
   }
 }
 window.addEventListener('resize',function(){initTabUnderline();});
+
+/* ═══ SCENES PANEL ═══ */
+var _scenes=[];
+var _activeScene='';
+function refreshScenes(){call('requestScenes');}
+function receiveScenes(data){
+  _scenes=data.scenes||[];
+  _activeScene=data.active||'';
+  renderScenes();
+}
+function renderScenes(){
+  var list=document.getElementById('scenesList');
+  var empty=document.getElementById('scenesEmpty');
+  if(!list)return;
+  if(_scenes.length===0){list.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  var html='';
+  for(var i=0;i<_scenes.length;i++){
+    var s=_scenes[i];
+    var isActive=(s.name===_activeScene);
+    var cls='scene-row'+(isActive?' active':'');
+    var desc=s.description?'<span class="scene-desc">'+esc(s.description)+'</span>':'';
+    html+='<div class="'+cls+'" onclick="activateScene(\''+esc(s.name).replace(/'/g,"\\'")+'\')" title="'+esc(s.name)+'">';
+    html+='<span class="scene-idx">'+(i+1)+'</span>';
+    html+='<span class="scene-icon">'+(isActive?'\u25B6':'\u25CB')+'</span>';
+    html+='<span class="scene-name">'+esc(s.name)+'</span>';
+    html+=desc;
+    html+='</div>';
+  }
+  list.innerHTML=html;
+}
+function activateScene(name){
+  _activeScene=name;
+  renderScenes();
+  callJSON('activateScene',{name:name});
+}
 
 /* ═══ NOTES PANEL ═══ */
 function renderNotesPanel(){

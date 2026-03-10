@@ -513,6 +513,13 @@ module TakeoffTool
 
     # Pure layer switching — no entity iteration needed.
     # All Model A entities are on FF_Model_A, all Model B on FF_Model_B.
+    # Reset all entity-level visibility before switching views.
+    # Split mode eye toggles set entity.visible = false directly;
+    # without this reset those entities stay hidden in single-model views.
+    model.start_operation('Switch View', true)
+    show_model_entities('model_a', true)
+    show_model_entities('model_b', true)
+
     case mode
     when 'a'
       layer_a.visible = true if layer_a
@@ -532,6 +539,7 @@ module TakeoffTool
     else
       puts "Multiverse: Unknown view mode '#{mode}'"
     end
+    model.commit_operation
 
     # Refresh dashboard with filtered data for the new view
     if Dashboard.visible?

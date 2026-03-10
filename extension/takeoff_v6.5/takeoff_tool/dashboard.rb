@@ -77,12 +77,23 @@ module TakeoffTool
           TakeoffTool.save_assignment(eid, 'category', cat)
           TakeoffTool.save_assignment(eid, 'subcategory', '')
           _sr.each { |r| if r[:entity_id] == eid; r[:parsed][:auto_subcategory] = ''; break; end }
+          # Cascade to nested children (IFC arrays/groups contain child scan entities)
+          nested = TakeoffTool.find_nested_scan_eids(eid)
+          if nested.any?
+            puts "  cascading '#{cat}' to #{nested.length} nested children"
+            nested.each do |ceid|
+              _ca[ceid] = cat
+              TakeoffTool.save_assignment(ceid, 'category', cat)
+              TakeoffTool.save_assignment(ceid, 'subcategory', '')
+              _sr.each { |r| if r[:entity_id] == ceid; r[:parsed][:auto_subcategory] = ''; break; end }
+            end
+          end
           # Learning system: capture reclassification
           begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           send_live_data
           TakeoffTool.trigger_backup
         rescue => e
-          puts "Takeoff setCategory error: #{e.message}"
+          puts "Takeoff setCategory error: #{e.message}\n  #{e.backtrace.first(3).join("\n  ")}"
         end
       end
 
@@ -325,8 +336,11 @@ module TakeoffTool
         m = Sketchup.active_model
         m.start_operation('Hide', true)
         meas_changed = false
-        ids_str.to_s.split(',').each do |id|
-          e = TakeoffTool.find_entity(id.to_i)
+        eids_to_hide = ids_str.to_s.split(',').map(&:to_i)
+        hide_set = Set.new(eids_to_hide)
+        scan_eid_set = Set.new((TakeoffTool.scan_results || []).map { |r| r[:entity_id] })
+        eids_to_hide.each do |id|
+          e = TakeoffTool.find_entity(id)
           next unless e && e.valid?
           # Route measurement entities through highlight hide
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
@@ -339,6 +353,11 @@ module TakeoffTool
             e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
             meas_changed = true
           else
+            # Don't hide if this entity contains scan children that should stay visible
+            # (SketchUp cascades hide to all children)
+            if e.respond_to?(:definition) && _has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
+              next
+            end
             e.visible = false
           end
         end
@@ -435,8 +454,17 @@ module TakeoffTool
           _ca = TakeoffTool.category_assignments
           _sr = TakeoffTool.scan_results
           first_old_cat = nil
+          all_eids = []
           eids.each do |eid|
             eid_i = eid.to_i
+            all_eids << eid_i
+            # Cascade to nested children
+            nested = TakeoffTool.find_nested_scan_eids(eid_i)
+            all_eids.concat(nested) if nested.any?
+          end
+          all_eids.uniq!
+          puts "  (#{all_eids.length} total with nested children)" if all_eids.length > eids.length
+          all_eids.each do |eid_i|
             old_cat = _ca[eid_i] || _sr.find { |r| r[:entity_id] == eid_i }&.dig(:parsed, :auto_category) || 'Uncategorized'
             first_old_cat ||= old_cat
             _ca[eid_i] = cat
@@ -879,6 +907,44 @@ module TakeoffTool
         TakeoffTool.rescan_model_b
       end
 
+      # ═══ SCENES ═══
+
+      @dialog.add_action_callback('requestScenes') do |_ctx|
+        begin
+          m = Sketchup.active_model
+          if m
+            require 'json'
+            pages = m.pages
+            scenes = pages.map { |p| { name: p.name, description: p.description.to_s } }
+            active_name = pages.selected_page ? pages.selected_page.name : ''
+            data = { scenes: scenes, active: active_name }
+            @dialog.execute_script("receiveScenes(#{JSON.generate(data)})")
+          end
+        rescue => e
+          puts "Dashboard: requestScenes error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('activateScene') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s
+          m = Sketchup.active_model
+          if m
+            page = m.pages[name]
+            if page
+              m.pages.selected_page = page
+              puts "Dashboard: Activated scene '#{name}'"
+            else
+              puts "Dashboard: Scene '#{name}' not found"
+            end
+          end
+        rescue => e
+          puts "Dashboard: activateScene error: #{e.message}"
+        end
+      end
+
       # ═══ MODEL COMPARISON (Quantity Delta + Visual Diff) ═══
 
       @dialog.add_action_callback('runCompare') do |_ctx|
@@ -937,8 +1003,10 @@ module TakeoffTool
           require 'json'
           @dialog.execute_script("onSmartDiffComplete(#{JSON.generate(counts)})")
         rescue => e
-          puts "SmartDiff error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
-          @dialog.execute_script("hideLoading()")
+          msg = "SmartDiff error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+          puts msg
+          esc = e.message.to_s.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", ' ')
+          @dialog.execute_script("hideLoading();alert('Smart Diff Error: #{esc}')")
         end
       end
 
@@ -1624,6 +1692,22 @@ module TakeoffTool
 
 
     # Helper: always sends data using live module state (no stale closures)
+    # Check if a definition contains scan entities that are NOT being hidden.
+    # Prevents hiding a parent from cascading to visible children in SketchUp.
+    def self._has_visible_scan_child?(defn, scan_eid_set, hide_set, visited = Set.new)
+      return false if visited.include?(defn.object_id)
+      visited.add(defn.object_id)
+      defn.entities.each do |e|
+        next unless e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+        eid = e.entityID
+        return true if scan_eid_set.include?(eid) && !hide_set.include?(eid)
+        if e.respond_to?(:definition)
+          return true if _has_visible_scan_child?(e.definition, scan_eid_set, hide_set, visited)
+        end
+      end
+      false
+    end
+
     def self.send_live_data
       @data_dirty = true
       send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)

@@ -90,6 +90,29 @@ module TakeoffTool
     @entity_cache = nil
   end
 
+  # Find all scan-result entity IDs nested inside a parent entity's definition.
+  # Used for cascade recat — changing a parent's category also changes children.
+  def self.find_nested_scan_eids(parent_eid)
+    parent = find_entity(parent_eid)
+    return [] unless parent && parent.valid? && parent.respond_to?(:definition)
+    scan_eid_set = Set.new(@scan_results.map { |r| r[:entity_id] })
+    nested = []
+    _collect_nested_eids(parent.definition, scan_eid_set, nested, Set.new)
+    nested
+  end
+
+  def self._collect_nested_eids(defn, scan_eid_set, result, visited)
+    return if visited.include?(defn.object_id)
+    visited.add(defn.object_id)
+    defn.entities.each do |e|
+      next unless e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+      result << e.entityID if scan_eid_set.include?(e.entityID)
+      if e.respond_to?(:definition)
+        _collect_nested_eids(e.definition, scan_eid_set, result, visited)
+      end
+    end
+  end
+
   # Selection observer removed — was calling Dashboard.scroll_to_entity on every
   # selection change via execute_script, causing performance issues in large models.
 

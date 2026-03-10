@@ -604,6 +604,15 @@ module TakeoffTool
 
       return nil unless size
 
+      # Map steel shape subcategories to specific categories
+      steel_cat = case subcat
+                  when 'W-Shape'  then 'W-Beams'
+                  when 'HSS'      then 'Steel Tubes (HSS)'
+                  when 'Plate'    then 'Steel Plates'
+                  else 'Structural Steel'
+                  end
+      steel_mt = (subcat == 'Plate') ? 'ea' : 'lf'
+
       {
         raw: name,
         element_type: 'Steel Member',
@@ -612,9 +621,9 @@ module TakeoffTool
         thickness: nil,
         size_nominal: size.strip,
         revit_id: nil,
-        auto_category: 'Structural Steel',
+        auto_category: steel_cat,
         auto_subcategory: subcat,
-        measurement_type: 'lf',
+        measurement_type: steel_mt,
         category_source: 'ifc_name',
         ifc_parsed: {
           material_type: 'steel',
