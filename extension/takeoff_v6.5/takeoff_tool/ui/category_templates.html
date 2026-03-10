@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; font-size:12px; color:#cdd6f4; background:#1e1e2e; padding:16px; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+  h2 { font-size:15px; color:#cdd6f4; margin-bottom:4px; }
+  .subtitle { color:#6c7086; font-size:11px; margin-bottom:12px; }
+
+  .panel { background:#313244; border-radius:8px; padding:12px; margin-bottom:10px; }
+  .panel-title { font-size:12px; font-weight:700; color:#89b4fa; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .panel-title .count { background:#45475a; color:#bac2de; font-size:10px; padding:1px 6px; border-radius:8px; font-weight:400; }
+
+  .save-row { display:flex; gap:6px; align-items:center; }
+  .save-row input { flex:1; background:#1e1e2e; border:1px solid #45475a; color:#cdd6f4; padding:5px 8px; border-radius:4px; font-size:12px; font-family:inherit; }
+  .save-row input:focus { outline:none; border-color:#89b4fa; }
+
+  .btn { padding:4px 10px; border-radius:4px; border:1px solid #45475a; background:#45475a; color:#cdd6f4; cursor:pointer; font-size:11px; font-family:inherit; white-space:nowrap; }
+  .btn:hover { background:#585b70; }
+  .btn.pri { background:#89b4fa; color:#1e1e2e; border-color:#89b4fa; font-weight:600; }
+  .btn.pri:hover { background:#74c7ec; }
+  .btn.grn { background:#a6e3a1; color:#1e1e2e; border-color:#a6e3a1; }
+  .btn.grn:hover { background:#94e2d5; }
+  .btn.red { background:#f38ba8; color:#1e1e2e; border-color:#f38ba8; }
+  .btn.red:hover { background:#eba0ac; }
+  .btn.sm { padding:2px 6px; font-size:10px; }
+  .btn.mauve { background:#cba6f7; color:#1e1e2e; border-color:#cba6f7; }
+  .btn.mauve:hover { background:#b4befe; }
+  .btn.teal { background:#94e2d5; color:#1e1e2e; border-color:#94e2d5; }
+  .btn.teal:hover { background:#89dcfe; }
+
+  .tpl-list { flex:1; overflow-y:auto; min-height:0; }
+  .tpl-item { display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid #45475a; }
+  .tpl-item:last-child { border-bottom:none; }
+  .tpl-item:hover { background:#45475a; border-radius:4px; }
+  .tpl-name { font-weight:600; color:#cdd6f4; flex:1; cursor:pointer; }
+  .tpl-name:hover { color:#89b4fa; }
+  .tpl-meta { color:#6c7086; font-size:10px; white-space:nowrap; }
+  .tpl-default { background:#a6e3a1; color:#1e1e2e; font-size:9px; padding:1px 5px; border-radius:8px; font-weight:700; }
+  .tpl-actions { display:flex; gap:3px; }
+
+  .preview { background:#1e1e2e; border:1px solid #45475a; border-radius:6px; padding:10px; margin-top:8px; max-height:180px; overflow-y:auto; display:none; }
+  .preview.show { display:block; }
+  .preview-header { font-size:11px; color:#89b4fa; font-weight:600; margin-bottom:6px; }
+  .cont-group { margin-bottom:6px; }
+  .cont-name { font-size:11px; font-weight:700; margin-bottom:2px; }
+  .cont-cat { font-size:10px; color:#bac2de; padding-left:12px; line-height:1.6; }
+  .cont-cat .code { color:#6c7086; }
+
+  .current-info { color:#bac2de; font-size:11px; }
+  .current-info b { color:#a6e3a1; }
+
+  .msg { padding:6px 10px; border-radius:4px; font-size:11px; margin-top:6px; display:none; }
+  .msg.success { background:#1e3a2f; color:#a6e3a1; border:1px solid #a6e3a1; display:block; }
+  .msg.error { background:#3a1e2f; color:#f38ba8; border:1px solid #f38ba8; display:block; }
+
+  .empty { color:#6c7086; font-style:italic; padding:16px; text-align:center; font-size:11px; }
+
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:#181825; }
+  ::-webkit-scrollbar-thumb { background:#45475a; border-radius:3px; }
+</style>
+</head>
+<body>
+  <h2>Category Templates</h2>
+  <div class="subtitle">Save and apply reusable category structures across models</div>
+
+  <div class="panel">
+    <div class="panel-title">Save Current Categories <span class="count" id="currentCount">&mdash;</span></div>
+    <div class="current-info" id="currentInfo">Loading...</div>
+    <div class="save-row" style="margin-top:8px">
+      <input type="text" id="tplName" placeholder="Template name..." maxlength="50" />
+      <button class="btn pri" onclick="saveTemplate()">Save Template</button>
+    </div>
+  </div>
+
+  <div class="panel" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+    <div class="panel-title">Saved Templates <span class="count" id="tplCount">0</span></div>
+    <div class="tpl-list" id="tplList">
+      <div class="empty">No templates saved yet</div>
+    </div>
+    <div class="preview" id="previewPanel"></div>
+  </div>
+
+  <div id="msgBox" class="msg"></div>
+
+  <script>
+    var TEMPLATES = [];
+    var DEFAULT_TPL = '';
+
+    function init() {
+      if (typeof sketchup === 'undefined') { setTimeout(init, 50); return; }
+      sketchup.getTemplates();
+      sketchup.getCurrentContainers();
+    }
+
+    function receiveTemplates(payload) {
+      TEMPLATES = payload.templates || [];
+      DEFAULT_TPL = payload.default_template || '';
+      document.getElementById('tplCount').textContent = TEMPLATES.length;
+      renderList();
+    }
+
+    function receiveCurrentContainers(payload) {
+      var containers = payload.containers || [];
+      var catCount = payload.category_count || 0;
+      var ruleCount = payload.rule_count || 0;
+      var defnCount = payload.definition_count || 0;
+      document.getElementById('currentCount').textContent = containers.length + ' containers, ' + catCount + ' categories, ' + defnCount + ' assigned';
+      document.getElementById('currentInfo').innerHTML =
+        '<b>' + containers.length + '</b> containers, <b>' + catCount + '</b> categories, <b>' + defnCount + '</b> categorized entities';
+    }
+
+    function renderList() {
+      var el = document.getElementById('tplList');
+      if (TEMPLATES.length === 0) {
+        el.innerHTML = '<div class="empty">No templates saved yet</div>';
+        return;
+      }
+      var html = '';
+      TEMPLATES.forEach(function(t) {
+        var isDefault = (DEFAULT_TPL === t.name);
+        html += '<div class="tpl-item">';
+        html += '<span class="tpl-name" onclick="previewTpl(\'' + escQ(t.name) + '\')">' + esc(t.name) + '</span>';
+        if (isDefault) html += '<span class="tpl-default">DEFAULT</span>';
+        html += '<span class="tpl-meta">' + t.containers + 'c / ' + t.categories + 'cat / ' + (t.definitions || 0) + ' defs';
+        if (t.updated) html += ' &middot; updated ' + esc(t.updated);
+        else if (t.created) html += ' &middot; ' + esc(t.created);
+        html += '</span>';
+        html += '<span class="tpl-actions">';
+        html += '<button class="btn grn sm" onclick="applyTpl(\'' + escQ(t.name) + '\')">Apply</button>';
+        html += '<button class="btn teal sm" onclick="updateTpl(\'' + escQ(t.name) + '\')">Update</button>';
+        if (!isDefault) {
+          html += '<button class="btn mauve sm" onclick="setDefault(\'' + escQ(t.name) + '\')">Set Default</button>';
+        } else {
+          html += '<button class="btn sm" onclick="clearDefault()">Unset</button>';
+        }
+        html += '<button class="btn red sm" onclick="deleteTpl(\'' + escQ(t.name) + '\')">Delete</button>';
+        html += '</span>';
+        html += '</div>';
+      });
+      el.innerHTML = html;
+    }
+
+    function saveTemplate() {
+      var name = document.getElementById('tplName').value.trim();
+      if (!name) { showMsg('Enter a template name', 'error'); return; }
+      var exists = TEMPLATES.some(function(t) { return t.name.toLowerCase() === name.toLowerCase(); });
+      if (exists && !confirm('Template "' + name + '" already exists. Overwrite?')) return;
+      sketchup.saveTemplate(name);
+      document.getElementById('tplName').value = '';
+    }
+
+    function applyTpl(name) {
+      if (!confirm('Apply template "' + name + '" to current model?\nThis will replace your current category structure.')) return;
+      sketchup.applyTemplate(name);
+    }
+
+    function updateTpl(name) {
+      if (!confirm('Update template "' + name + '" with current model state?\nThis merges new definitions and updates changed categories.')) return;
+      sketchup.updateTemplate(name);
+    }
+
+    function deleteTpl(name) {
+      if (!confirm('Delete template "' + name + '"?')) return;
+      sketchup.deleteTemplate(name);
+      document.getElementById('previewPanel').className = 'preview';
+    }
+
+    function previewTpl(name) {
+      sketchup.previewTemplate(name);
+    }
+
+    function setDefault(name) {
+      sketchup.setDefault(name);
+    }
+
+    function clearDefault() {
+      sketchup.clearDefault();
+    }
+
+    function receivePreview(data) {
+      var panel = document.getElementById('previewPanel');
+      var containers = data.containers || [];
+      var rules = data.rules || [];
+      var html = '<div class="preview-header">Template: ' + esc(data.template_name || '?') + '</div>';
+      containers.forEach(function(cont) {
+        var cats = cont.categories || [];
+        html += '<div class="cont-group">';
+        html += '<div class="cont-name" style="color:' + (cont.color || '#89b4fa') + '">' + esc(cont.name) + ' (' + cats.length + ')</div>';
+        cats.forEach(function(c) {
+          html += '<div class="cont-cat">' + esc(c.name);
+          if (c.code) html += ' <span class="code">[' + esc(c.code) + ']</span>';
+          if (c.unit) html += ' <span class="code">' + esc(c.unit) + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+      // Show definition map summary
+      var defnMap = data.definition_map || {};
+      var defnKeys = Object.keys(defnMap);
+      if (defnKeys.length > 0) {
+        // Count per category
+        var catCounts = {};
+        defnKeys.forEach(function(k) {
+          var cat = defnMap[k].category || '?';
+          catCounts[cat] = (catCounts[cat] || 0) + 1;
+        });
+        html += '<div style="margin-top:8px;border-top:1px solid #45475a;padding-top:6px">';
+        html += '<div class="cont-name" style="color:#a6e3a1">Definition Map (' + defnKeys.length + ' objects)</div>';
+        Object.keys(catCounts).sort().forEach(function(cat) {
+          html += '<div class="cont-cat"><span style="color:#94e2d5">' + esc(cat) + '</span> <span class="code">(' + catCounts[cat] + ')</span></div>';
+        });
+        html += '</div>';
+      }
+      if (rules.length > 0) {
+        html += '<div style="margin-top:6px">';
+        html += '<div class="cont-cat"><span class="code">' + rules.length + ' learned rules (fallback)</span></div>';
+        html += '</div>';
+      }
+      panel.innerHTML = html;
+      panel.className = 'preview show';
+    }
+
+    function showMsg(text, type) {
+      var el = document.getElementById('msgBox');
+      el.textContent = text;
+      el.className = 'msg ' + type;
+      setTimeout(function() { el.className = 'msg'; }, 3000);
+    }
+
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    function escQ(s) {
+      return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    document.getElementById('tplName').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') saveTemplate();
+    });
+
+    // Start init
+    init();
+  </script>
+</body>
+</html>

@@ -207,6 +207,12 @@ module TakeoffTool
       skipped = 0
 
       b_results.each do |r|
+        # Skip entities that already have a pre-existing category assignment
+        if category_assignments[r[:entity_id]]
+          skipped += 1
+          next
+        end
+
         # Skip high-confidence entities
         conf = InteractiveScanner.confidence_pct(r) rescue 0
         if conf >= 85

@@ -106,7 +106,7 @@ module TakeoffTool
     # Returns a parse result hash or nil
     # ═══════════════════════════════════════════════════════════
 
-    def self.apply(display, mat, ifc_type)
+    def self.apply(display, mat, ifc_type, definition_name: nil)
       load_rules unless @rules
       return nil if @rules.empty?
 
@@ -452,40 +452,58 @@ module TakeoffTool
     #   "Bath_Accessory-Delta-Ara-Towel_Bar-77518, 18" Chrome" → "Bath_Accessory"
     #   "Basic Wall, Finish - Tile on CMU" → "Finish - Tile"
     #   "M_Toilet-Commercial-Wall Mounted, Type A" → "M_Toilet"
-    def self.extract_keyword(display_name, definition_name)
-      name = definition_name.to_s.strip
-      name = display_name.to_s.strip if name.empty?
-      return nil if name.empty?
+    # Detect Revit GUIDs: "ace8a45d-794c-4d45-b..." or plain hex "8db9691d"
+    GUID_RE = /^[0-9a-f]{8}(-[0-9a-f]{4,})+$/i
+    HEX_ONLY_RE = /^[0-9a-f]{6,}$/i
 
-      # Remove Revit hex IDs
+    def self.guid?(s)
+      s = s.to_s.strip
+      s.match?(GUID_RE) || s.match?(HEX_ONLY_RE)
+    end
+
+    def self.extract_keyword(display_name, definition_name)
+      # Prefer display_name for keyword extraction — it contains meaningful
+      # Revit type names. Definition names are usually GUIDs (handled by
+      # the template definition_map for same-project matching instead).
+      dname = definition_name.to_s.strip
+      name = display_name.to_s.strip
+      # Fall back to definition_name only if display_name is empty AND it's not a GUID
+      if name.empty?
+        return nil if dname.empty? || guid?(dname)
+        name = dname
+      end
+
+      # Strip trailing Revit hex instance ID (last comma segment)
       parts = name.split(',').map(&:strip)
       parts.pop if parts.last && parts.last.match?(/^[0-9A-Fa-f]+$/)
 
-      cleaned = parts.first.to_s.strip  # take first comma-segment only
-      return nil if cleaned.empty?
-
-      # For "Basic Wall, ..." or "Basic Roof, ..." — use the detail after "Basic X"
+      # For "Basic Wall, Foundation - Concrete - 2"" → use detail after "Basic X,"
       if name =~ /^Basic (?:Wall|Roof|Floor),?\s*(.*)/i
         detail = $1.split(',').first.to_s.strip
+        detail = detail.sub(/,?\s*[0-9A-Fa-f]{6,}\s*$/, '').strip
         return detail unless detail.empty?
       end
 
+      # "Foundation Slab, 10" Concrete" → "Foundation Slab"
+      # "Wall Foundation, Wall Foundation 1'-2" Heel" → "Wall Foundation"
+      cleaned = parts.first.to_s.strip
+      return nil if cleaned.empty?
+      return nil if guid?(cleaned)
+
       # Take the first segment before hyphen (the category/type prefix)
-      # "Bath_Accessory-Delta-Ara-..." → "Bath_Accessory"
-      # "M_Toilet-Commercial-Wall Mounted" → "M_Toilet"
       first_seg = cleaned.split('-').first.to_s.strip
 
-      # If the first segment looks like a model number or is too short, use more
-      if first_seg.length < 4 || first_seg =~ /^\d+$/
-        # Use first two segments
+      if first_seg.length < 4 || first_seg =~ /^\d+$/ || guid?(first_seg)
         segs = cleaned.split('-').first(2).join('-').strip
+        return nil if guid?(segs)
         return segs unless segs.empty?
       end
 
       # Strip trailing instance numbers like " (1)" or " [2]"
       first_seg = first_seg.sub(/\s*[\(\[]\d+[\)\]]\s*$/, '').strip
 
-      first_seg.empty? ? cleaned : first_seg
+      result = first_seg.empty? ? cleaned : first_seg
+      guid?(result) ? nil : result
     end
 
     def self.build_dialog_html

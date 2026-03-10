@@ -571,6 +571,9 @@ function receiveCommitResult(json){
     var d=JSON.parse(json);
     if(d.success){
       showToast(d.message,'ok');
+      // Clear rule keyword so it doesn't carry over
+      var rkEl=document.getElementById('ruleKeyword');
+      if(rkEl)rkEl.value='';
       // Re-parse with same method
       HP_EIDS={};SELECTED={};
       if(METHOD==='name') call('parseByName');
@@ -637,11 +640,14 @@ function receiveSampledProperties(json){
     var d=JSON.parse(json);
     SAMPLE_PROPS=d.properties||[];
     SAMPLE_EID=d.entity_id||0;
+    var curCat=d.category||'Uncategorized';
+    var curSub=d.subcategory||'';
     // Show sample panel
     document.getElementById('resultsArea').classList.remove('show');
     document.getElementById('samplePanel').style.display='flex';
-    document.getElementById('sampleInfo').textContent='Entity #'+SAMPLE_EID+' \u2014 '+SAMPLE_PROPS.length+' properties';
-    document.getElementById('statusText').textContent='Inspecting entity #'+SAMPLE_EID;
+    var catLabel=curCat==='Uncategorized'?'<span style="color:#f38ba8">Uncategorized</span>':'<span style="color:#a6e3a1">'+curCat+'</span>';
+    document.getElementById('sampleInfo').innerHTML='Entity #'+SAMPLE_EID+' \u2014 '+catLabel+(curSub?' / <span style="color:#89b4fa">'+curSub+'</span>':'');
+    document.getElementById('statusText').textContent='Inspecting entity #'+SAMPLE_EID+' — '+curCat;
     // Remember checked property keys across grabs
     var wasChecked={};
     var oldChecks=document.querySelectorAll('#sampleProps input[type=checkbox]');
@@ -661,6 +667,12 @@ function receiveSampledProperties(json){
     if(SAMPLE_EID>0){
       document.getElementById('sampleCommitBar').style.display='flex';
       populateSampleCatDropdown();
+      // Pre-select current category
+      if(curCat&&curCat!=='Uncategorized'){
+        document.getElementById('sampleCatSelect').value=curCat;
+        updateSampleSubDropdown();
+        if(curSub)document.getElementById('sampleSubSelect').value=curSub;
+      }
       document.getElementById('btnAssign').disabled=!document.getElementById('sampleCatSelect').value;
     }
     onPropCheck();

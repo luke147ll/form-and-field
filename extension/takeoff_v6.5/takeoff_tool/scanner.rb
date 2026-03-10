@@ -255,6 +255,47 @@ module TakeoffTool
       @overcount_warnings || []
     end
 
+    # ═══════════════════════════════════════════════════════════
+    # recalculate_sf — Re-compute area_sf for all scan results
+    #   using current category assignments (no full rescan needed)
+    # ═══════════════════════════════════════════════════════════
+
+    def self.recalculate_sf
+      results = TakeoffTool.scan_results
+      return 0 unless results && !results.empty?
+
+      ca = TakeoffTool.category_assignments
+      updated = 0
+
+      results.each do |r|
+        eid = r[:entity_id]
+        e = TakeoffTool.find_entity(eid)
+        next unless e && e.valid?
+
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        next unless defn
+
+        # Use user's assigned category, fall back to auto_category
+        user_cat = ca[eid]
+        cat = user_cat || r[:parsed][:auto_category]
+        mtype = r[:parsed][:measurement_type] || Parser.measurement_for(cat)
+
+        next unless %w[sf sf_cy sf_sheets].include?(mtype)
+
+        geo_sf = face_area_for_entity(defn, cat, e.transformation)
+        next unless geo_sf
+
+        old_sf = r[:area_sf]
+        if old_sf.nil? || (geo_sf.round(2) - (old_sf || 0)).abs > 0.1
+          r[:area_sf] = geo_sf.round(2)
+          updated += 1
+        end
+      end
+
+      puts "Takeoff: Recalculated SF for #{updated} entities"
+      updated
+    end
+
     private
 
     # ═══════════════════════════════════════════════════════════
@@ -326,19 +367,20 @@ module TakeoffTool
         area = vi3/tin/144.0 if tin && tin > 0
       end
 
-      # Compute LF from actual edge geometry (handles L-shapes, bends).
-      # Falls back to bounding box if geometry doesn't show a clear extrusion pattern.
+      # Compute LF from actual edge geometry.
+      # Wall categories use XY-projected edge geometry (handles rotated/angled walls).
+      # Other LF items use extrusion detection. BB fallback as last resort.
       acat = parsed[:auto_category]
       mtype = parsed[:measurement_type] || Parser.measurement_for(acat)
       geo_lf = nil
       if mtype == 'lf'
-        geo_lf = geometry_linear_ft(defn, inst.transformation)
+        if acat =~ /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Siding|Stucco|Exterior Finish/i
+          geo_lf = wall_linear_ft(defn, inst.transformation)
+        end
+        geo_lf ||= geometry_linear_ft(defn, inst.transformation)
       end
       if geo_lf
         linear_ft = geo_lf
-      elsif acat =~ /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Siding|Stucco|Exterior Finish/i
-        longest_in = [w, d].max  # horizontal run, skip h (Z = wall height)
-        linear_ft = longest_in / 12.0
       else
         longest_in = [w, h, d].max
         linear_ft = longest_in / 12.0
@@ -388,11 +430,15 @@ module TakeoffTool
         end
       end
 
-      # ─── SF area from actual face geometry only (no BB fallback) ───
-      if !area
-        mtype = parsed[:measurement_type] || Parser.measurement_for(cat)
-        if %w[sf sf_cy sf_sheets].include?(mtype)
-          area = face_area_for_entity(defn, cat, inst.transformation)
+      # ─── SF area from face geometry (dominant side) ───
+      # Always use face geometry for all SF items — volume/thickness is
+      # unreliable for compound structures (inflates area).
+      sf_cat = inst.get_attribute('TakeoffAssignments', 'category') || cat
+      mtype = parsed[:measurement_type] || Parser.measurement_for(sf_cat)
+      if %w[sf sf_cy sf_sheets].include?(mtype)
+        geo_sf = face_area_for_entity(defn, sf_cat, inst.transformation)
+        if geo_sf
+          area = geo_sf
         end
       end
 
@@ -512,7 +558,7 @@ module TakeoffTool
 
       # Tier 2: Learned rules override — user-verified classifications
       # Applied AFTER strategy selection so they always win when they match
-      learned = LearningSystem.apply(display, mat, ifc_type)
+      learned = LearningSystem.apply(display, mat, ifc_type, definition_name: defn&.name)
       if learned
         learned[:confidence] = :high
         learned[:cost_code_score] = 92
@@ -817,33 +863,85 @@ module TakeoffTool
     def self.face_area_for_entity(defn, category = nil, xform = nil)
       ents = defn.respond_to?(:entities) ? defn.entities : nil
       return nil unless ents
-      faces = ents.grep(Sketchup::Face)
-      return nil if faces.empty?
+
+      xf = xform || Geom::Transformation.new
+
+      # Use top-level faces when available (avoids counting compound
+      # structure layers from nested sub-groups).  Only recurse into
+      # child groups/components when the definition has no direct faces
+      # (e.g. flooring elements with all geometry nested).
+      top_faces = ents.grep(Sketchup::Face)
+      if top_faces.empty?
+        face_data = []
+        collect_faces_for_sf(ents, xf, face_data)
+        return nil if face_data.empty?
+      else
+        face_data = top_faces.map { |f| { face: f, xform: xf } }
+      end
 
       dname = defn.respond_to?(:name) ? defn.name : ''
 
-      if category && category =~ SHEET_GOOD_RE
-        sf = dominant_side_area(faces, xform) / 144.0
-        puts "[FF Measure] '#{dname}': sheet good, dominant side = #{sf.round(1)} SF (#{faces.length} faces)"
-        sf
-      elsif enclosed_3d?(faces)
-        # Enclosed 3D object: largest single face
-        largest = 0.0
-        faces.each do |f|
-          a = world_face_area(f, xform)
-          largest = a if a > largest
-        end
-        sf = largest / 144.0
-        puts "[FF Measure] '#{dname}': enclosed 3D, largest face = #{sf.round(1)} SF (#{faces.length} faces)"
-        sf
-      else
-        # Single-sided surface: total face area
-        total = 0.0
-        faces.each { |f| total += world_face_area(f, xform) }
-        sf = total / 144.0
-        puts "[FF Measure] '#{dname}': single-sided, total = #{sf.round(1)} SF (#{faces.length} faces)"
-        sf
+      # Dominant-side with compound-layer deduplication:
+      # 1. Group faces by world-space normal direction
+      # 2. Within each normal group, sub-group by plane distance
+      #    (separates compound structure layers on parallel planes)
+      # 3. Keep only the largest plane per normal direction
+      # 4. Dominant side = normal direction with largest deduped area
+      normal_groups = {}
+      face_data.each do |fd|
+        wn = fd[:xform] * fd[:face].normal
+        key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+        normal_groups[key] ||= { wn: wn, fds: [] }
+        normal_groups[key][:fds] << fd
       end
+
+      best_side = 0.0
+      normal_groups.each do |_nkey, grp|
+        fds = grp[:fds]
+        if fds.length == 1
+          layer_area = world_face_area(fds[0][:face], fds[0][:xform])
+        else
+          wn = grp[:wn]
+          # Sub-group by plane distance (d = normal · point)
+          planes = {}
+          fds.each do |fd|
+            wp = fd[:xform] * fd[:face].vertices.first.position
+            d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+            d_key = d.round(0)  # 1-inch resolution separates compound layers
+            planes[d_key] ||= 0.0
+            planes[d_key] += world_face_area(fd[:face], fd[:xform])
+          end
+          # Largest single plane = outermost layer only
+          layer_area = planes.values.max || 0.0
+        end
+        best_side = layer_area if layer_area > best_side
+      end
+
+      sf = best_side / 144.0
+      puts "[FF Measure] '#{dname}': dominant side = #{sf.round(1)} SF (#{face_data.length} faces, #{normal_groups.length} normals)"
+      sf
+    end
+
+    # Recursively collect faces from a definition and its nested groups/components
+    def self.collect_faces_for_sf(ents, xform, result)
+      ents.grep(Sketchup::Face).each { |f| result << { face: f, xform: xform } }
+      ents.each do |child|
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        collect_faces_for_sf(child_defn.entities, xform * child.transformation, result)
+      end
+    end
+
+    # enclosed_3d check using face_data with per-face transforms
+    def self.enclosed_3d_data?(face_data)
+      normals = {}
+      face_data.first(20).each do |fd|
+        wn = fd[:xform] * fd[:face].normal
+        key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+        normals[key] = true
+      end
+      normals.length >= 3
     end
 
     # ═══════════════════════════════════════════════════════════
@@ -895,6 +993,50 @@ module TakeoffTool
 
       lf_in = side_area / perimeter
       lf_in / 12.0
+    end
+
+    # Compute wall LF from actual edge geometry projected onto XY plane.
+    # Finds the longest horizontal edge in the entity — handles rotated,
+    # angled, and compound walls correctly (no bounding-box dependency).
+    def self.wall_linear_ft(defn, xform = nil)
+      xf = xform || Geom::Transformation.new
+      edge_segs = []
+      collect_wall_edges(defn.entities, xf, edge_segs)
+      return nil if edge_segs.empty?
+
+      # Filter to horizontal edges (both endpoints within 1" Z of each other)
+      horiz = edge_segs.select { |s| (s[:p1].z - s[:p2].z).abs < 1.0 }
+      return nil if horiz.empty?
+
+      # Compute XY-projected length for each horizontal edge
+      horiz.each do |s|
+        dx = s[:p2].x - s[:p1].x
+        dy = s[:p2].y - s[:p1].y
+        s[:xy_len] = Math.sqrt(dx * dx + dy * dy)
+      end
+
+      # Find longest horizontal edge — this is the wall's run length
+      best = horiz.max_by { |s| s[:xy_len] }
+      return nil unless best && best[:xy_len] > 0.5
+
+      lf = best[:xy_len] / 12.0
+      dname = defn.respond_to?(:name) ? defn.name : ''
+      puts "[FF Measure] '#{dname}': wall LF = #{lf.round(2)} ft (#{edge_segs.length} edges, #{horiz.length} horizontal)"
+      lf
+    end
+
+    def self.collect_wall_edges(ents, xform, result)
+      ents.grep(Sketchup::Edge).each do |edge|
+        p1 = xform * edge.start.position
+        p2 = xform * edge.end.position
+        result << { p1: p1, p2: p2 }
+      end
+      ents.each do |child|
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        collect_wall_edges(child_defn.entities, xform * child.transformation, result)
+      end
     end
 
     def self.collect_faces_for_lf(ents, xform, result)
@@ -976,8 +1118,10 @@ module TakeoffTool
       end
 
       xform = e.transformation
-      faces = defn.entities.grep(Sketchup::Face)
-      if faces.empty?
+      face_data = []
+      collect_faces_for_sf(defn.entities, xform, face_data)
+      top_faces = defn.entities.grep(Sketchup::Face)
+      if face_data.empty?
         puts "[FF Debug Area] Entity #{eid} '#{defn.name}' has no faces"
         return
       end
@@ -993,8 +1137,8 @@ module TakeoffTool
       puts "[FF Debug Area] Entity #{eid}: '#{dname}'"
       puts "  Category: #{cat || '(unknown)'}"
       puts "  Transform scale: x=#{Geom::Vector3d.new(xform.xaxis).length.round(4)} y=#{Geom::Vector3d.new(xform.yaxis).length.round(4)} z=#{Geom::Vector3d.new(xform.zaxis).length.round(4)}"
-      puts "  Total faces: #{faces.length}"
-      puts "  Enclosed 3D: #{enclosed_3d?(faces)}"
+      puts "  Total faces: #{face_data.length} (#{top_faces.length} top-level, #{face_data.length - top_faces.length} nested)"
+      puts "  Enclosed 3D: #{enclosed_3d_data?(face_data)}"
       puts "  Sheet good match: #{cat && cat =~ SHEET_GOOD_RE ? 'YES' : 'no'}"
       puts "───────────────────────────────────────────────"
 
@@ -1008,56 +1152,56 @@ module TakeoffTool
       mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
 
       # Determine which faces are measured based on the same logic as face_area_for_entity
-      measured_faces = []
-      excluded_faces = []
+      measured_fd = []
+      excluded_fd = []
 
       if cat && cat =~ SHEET_GOOD_RE
-        # Sheet goods: dominant normal group
+        # Sheet goods: dominant normal group (world-space normals)
         groups = {}
-        faces.each do |f|
-          n = f.normal
-          key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
-          groups[key] ||= { faces: [], area: 0.0 }
-          groups[key][:faces] << f
-          groups[key][:area] += world_face_area(f, xform)
+        face_data.each do |fd|
+          wn = fd[:xform] * fd[:face].normal
+          key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+          groups[key] ||= { fds: [], area: 0.0 }
+          groups[key][:fds] << fd
+          groups[key][:area] += world_face_area(fd[:face], fd[:xform])
         end
         dominant_key = groups.max_by { |_k, v| v[:area] }&.first
         puts "  Mode: SHEET GOOD (dominant side)"
         groups.each do |key, v|
           is_dom = key == dominant_key
           sf = v[:area] / 144.0
-          puts "    Normal #{key}: #{v[:faces].length} faces, #{sf.round(2)} SF #{is_dom ? '← MEASURED' : '(excluded)'}"
-          v[:faces].each { |f| is_dom ? measured_faces << f : excluded_faces << f }
+          puts "    Normal #{key}: #{v[:fds].length} faces, #{sf.round(2)} SF #{is_dom ? '← MEASURED' : '(excluded)'}"
+          v[:fds].each { |fd| is_dom ? measured_fd << fd : excluded_fd << fd }
         end
-      elsif enclosed_3d?(faces)
+      elsif enclosed_3d_data?(face_data)
         # Largest single face
-        face_areas = faces.map { |f| [f, world_face_area(f, xform)] }
-        largest_face, largest_area = face_areas.max_by { |_f, a| a }
+        fd_areas = face_data.map { |fd| [fd, world_face_area(fd[:face], fd[:xform])] }
+        largest_fd, _largest_area = fd_areas.max_by { |_fd, a| a }
         puts "  Mode: ENCLOSED 3D (largest face)"
-        face_areas.sort_by { |_f, a| -a }.first(10).each_with_index do |(f, a), i|
+        fd_areas.sort_by { |_fd, a| -a }.first(10).each_with_index do |(fd, a), i|
           sf = a / 144.0
-          is_lg = f == largest_face
-          n = f.normal
-          puts "    Face #{i+1}: #{sf.round(2)} SF, normal=(#{n.x.round(2)},#{n.y.round(2)},#{n.z.round(2)}) #{is_lg ? '← MEASURED' : ''}"
+          is_lg = fd.equal?(largest_fd)
+          wn = fd[:xform] * fd[:face].normal
+          puts "    Face #{i+1}: #{sf.round(2)} SF, normal=(#{wn.x.round(2)},#{wn.y.round(2)},#{wn.z.round(2)}) #{is_lg ? '← MEASURED' : ''}"
         end
-        if face_areas.length > 10
-          puts "    ... and #{face_areas.length - 10} more faces"
+        if fd_areas.length > 10
+          puts "    ... and #{fd_areas.length - 10} more faces"
         end
-        measured_faces << largest_face
-        excluded_faces = faces.reject { |f| f == largest_face }
+        measured_fd << largest_fd
+        excluded_fd = face_data.reject { |fd| fd.equal?(largest_fd) }
       else
         # Single-sided: all faces measured
         puts "  Mode: SINGLE-SIDED (all faces)"
-        measured_faces = faces
+        measured_fd = face_data
       end
 
-      total_measured_sf = measured_faces.sum { |f| world_face_area(f, xform) } / 144.0
-      total_excluded_sf = excluded_faces.sum { |f| world_face_area(f, xform) } / 144.0
-      local_sf = measured_faces.sum { |f| f.area } / 144.0
+      total_measured_sf = measured_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
+      total_excluded_sf = excluded_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
+      local_sf = measured_fd.sum { |fd| fd[:face].area } / 144.0
 
       puts "───────────────────────────────────────────────"
-      puts "  Measured: #{measured_faces.length} faces = #{total_measured_sf.round(2)} SF (world)"
-      puts "  Excluded: #{excluded_faces.length} faces = #{total_excluded_sf.round(2)} SF (world)"
+      puts "  Measured: #{measured_fd.length} faces = #{total_measured_sf.round(2)} SF (world)"
+      puts "  Excluded: #{excluded_fd.length} faces = #{total_excluded_sf.round(2)} SF (world)"
       puts "  Local (no transform): #{local_sf.round(2)} SF"
       puts "  Stored area_sf: #{match ? match[:area_sf] : 'N/A'}"
       puts "═══════════════════════════════════════════════"
@@ -1065,8 +1209,8 @@ module TakeoffTool
 
       # Paint the faces (save originals first)
       m.start_operation('Debug Area', true)
-      measured_faces.each { |f| debug_paint(f, mat_measured) }
-      excluded_faces.each { |f| debug_paint(f, mat_excluded) }
+      measured_fd.each { |fd| debug_paint(fd[:face], mat_measured) }
+      excluded_fd.each { |fd| debug_paint(fd[:face], mat_excluded) }
       m.commit_operation
 
       # Zoom to entity
@@ -1159,39 +1303,40 @@ module TakeoffTool
         next unless defn
 
         xform = e.transformation
-        faces = defn.entities.grep(Sketchup::Face)
-        next if faces.empty?
+        fd_list = []
+        collect_faces_for_sf(defn.entities, xform, fd_list)
+        next if fd_list.empty?
 
         cat = category
         dname = r[:display_name] || defn.name
-        measured_faces = []
-        excluded_faces = []
+        measured_fd = []
+        excluded_fd = []
 
         if cat =~ SHEET_GOOD_RE
-          # Sheet goods: dominant normal
+          # Sheet goods: dominant normal (world-space)
           groups = {}
-          faces.each do |f|
-            n = f.normal
-            key = "#{n.x.round(1)},#{n.y.round(1)},#{n.z.round(1)}"
-            groups[key] ||= { faces: [], area: 0.0 }
-            groups[key][:faces] << f
-            groups[key][:area] += world_face_area(f, xform)
+          fd_list.each do |fd|
+            wn = fd[:xform] * fd[:face].normal
+            key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+            groups[key] ||= { fds: [], area: 0.0 }
+            groups[key][:fds] << fd
+            groups[key][:area] += world_face_area(fd[:face], fd[:xform])
           end
           dominant_key = groups.max_by { |_k, v| v[:area] }&.first
           groups.each do |key, v|
-            v[:faces].each { |f| key == dominant_key ? measured_faces << f : excluded_faces << f }
+            v[:fds].each { |fd| key == dominant_key ? measured_fd << fd : excluded_fd << fd }
           end
-        elsif enclosed_3d?(faces)
-          face_areas = faces.map { |f| [f, world_face_area(f, xform)] }
-          largest_face = face_areas.max_by { |_f, a| a }&.first
-          measured_faces << largest_face if largest_face
-          excluded_faces = faces.reject { |f| f == largest_face }
+        elsif enclosed_3d_data?(fd_list)
+          fd_areas = fd_list.map { |fd| [fd, world_face_area(fd[:face], fd[:xform])] }
+          largest_fd = fd_areas.max_by { |_fd, a| a }&.first
+          measured_fd << largest_fd if largest_fd
+          excluded_fd = fd_list.reject { |fd| fd.equal?(largest_fd) }
         else
-          measured_faces = faces
+          measured_fd = fd_list
         end
 
-        entity_sf = measured_faces.sum { |f| world_face_area(f, xform) } / 144.0
-        excl_sf = excluded_faces.sum { |f| world_face_area(f, xform) } / 144.0
+        entity_sf = measured_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
+        excl_sf = excluded_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
         stored_sf = r[:area_sf] || 0
 
         grand_measured += entity_sf
@@ -1205,11 +1350,11 @@ module TakeoffTool
         by_defn[dname][:stored] += stored_sf
 
         # Paint faces (save originals first)
-        measured_faces.each { |f| debug_paint(f, mat_measured) }
-        excluded_faces.each { |f| debug_paint(f, mat_excluded) }
+        measured_fd.each { |fd| debug_paint(fd[:face], mat_measured) }
+        excluded_fd.each { |fd| debug_paint(fd[:face], mat_excluded) }
 
-        all_measured_faces.concat(measured_faces)
-        all_excluded_faces.concat(excluded_faces)
+        all_measured_faces.concat(measured_fd.map { |fd| fd[:face] })
+        all_excluded_faces.concat(excluded_fd.map { |fd| fd[:face] })
       end
 
       m.commit_operation

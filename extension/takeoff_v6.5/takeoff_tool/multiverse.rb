@@ -285,6 +285,9 @@ module TakeoffTool
     Dashboard.scan_log_start
     Dashboard.scan_log_msg("Preparing Model B scan...")
 
+    # Invalidate smart diff cache — model is changing
+    SmartDiff.invalidate_cache rescue nil
+
     # ── Step 0: If Model B is still a single import component, explode + tag it now ──
     import_inst = find_model_b_import(model)
     if import_inst
@@ -356,7 +359,61 @@ module TakeoffTool
     @scan_results = @scan_results + b_results
     @scan_results.sort_by! { |r| [r[:tag] || 'zzz', r[:display_name] || ''] }
 
+    # ── Step 3: Load pre-existing assignments from Model B entities ──
+    # If Model B was pre-categorized in a separate FF session, its entities
+    # will have TakeoffAssignments attributes baked into the .skp file.
+    # Must run BEFORE geometry matching so matched entities are skipped.
+    b_precat = 0
+    b_presub = 0
+    b_precc = 0
+    b_results.each do |r|
+      e = @entity_registry[r[:entity_id]]
+      next unless e && e.valid?
+      begin
+        cat = e.get_attribute('TakeoffAssignments', 'category')
+        if cat && !cat.to_s.empty?
+          unless @category_assignments[r[:entity_id]]
+            @category_assignments[r[:entity_id]] = cat
+            b_precat += 1
+          end
+        end
+        sub = e.get_attribute('TakeoffAssignments', 'subcategory')
+        if sub && !sub.to_s.empty?
+          b_presub += 1
+        end
+        cc = e.get_attribute('TakeoffAssignments', 'cost_code')
+        if cc && !cc.to_s.empty?
+          unless @cost_code_assignments[r[:entity_id]]
+            @cost_code_assignments[r[:entity_id]] = cc
+            b_precc += 1
+          end
+        end
+        sz = e.get_attribute('TakeoffAssignments', 'size')
+        if sz && !sz.to_s.empty?
+          r[:parsed][:size_nominal] = sz
+        end
+      rescue => err
+        puts "Multiverse: pre-cat load error eid=#{r[:entity_id]}: #{err.message}"
+      end
+    end
+    if b_precat > 0
+      puts "Multiverse: Imported #{b_precat} pre-existing category assignments from Model B"
+      Dashboard.scan_log_msg("Found #{b_precat} pre-categorized entities in Model B")
+    end
+
+    # ── Apply pending template definition map to Model B entities ──
+    if defined?(CategoryTemplates) && CategoryTemplates.pending_definition_map?
+      Dashboard.scan_log_msg("Applying template definition map to Model B...")
+      tpl_applied = CategoryTemplates.apply_definition_map
+      tpl_new = CategoryTemplates.new_entity_count
+      if tpl_applied > 0
+        Dashboard.scan_log_msg("Template: #{tpl_applied} matched, #{tpl_new} new")
+        puts "Multiverse: Template definition map — #{tpl_applied} matched, #{tpl_new} new"
+      end
+    end
+
     # ── Geometry matching (Model A reference → Model B reclassification) ──
+    # Skips entities that already have pre-existing assignments
     if @category_assignments && @category_assignments.any?
       Dashboard.scan_log_msg("Matching Model B geometry against Model A reference...")
       puts "Multiverse: Building geometry reference from #{@category_assignments.keys.length} assignments"
@@ -374,23 +431,39 @@ module TakeoffTool
       puts "Multiverse: Skipping geometry matching — no category assignments"
     end
 
-    # ── Step 3: Load categories + save ──
+    # Load any remaining saved assignments (Model A re-check + fallback)
     load_saved_assignments
     load_master_categories
     merge_scan_categories_into_master
     prune_empty_categories
     load_master_subcategories
+    load_master_containers
 
     save_scan_to_model rescue nil
 
     total = (Time.now - t_start).round(1)
-    summary = "Model B scan: #{b_results.length} entities in #{total}s"
+    pre_info = b_precat > 0 ? " (#{b_precat} pre-categorized)" : ""
+    summary = "Model B scan: #{b_results.length} entities#{pre_info} in #{total}s"
     Dashboard.scan_log_end(summary)
     puts "Multiverse: #{summary}"
 
     if Dashboard.visible?
       Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
       Dashboard.send_multiverse_data
+    end
+
+    # ── Show new entities banner if template detected new entities ──
+    if defined?(CategoryTemplates) && CategoryTemplates.new_entity_count > 0
+      new_ents = CategoryTemplates.new_entities
+      by_cat = {}
+      new_ents.each do |ne|
+        cat = ne[:scanner_category] || 'Uncategorized'
+        by_cat[cat] ||= []
+        by_cat[cat] << ne[:display_name]
+      end
+      UI.start_timer(1.0, false) do
+        Dashboard.send_new_entities_banner(new_ents.length, by_cat)
+      end
     end
 
     # ── Show alignment review if geometry matches found ──

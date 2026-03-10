@@ -23,8 +23,11 @@ module TakeoffTool
       return if entities.empty?
       @current_entities = entities
       html_body = entities.length == 1 ? build_single_body(entities.first) : build_multi_body(entities)
-      esc = html_body.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\n")
-      @dialog.execute_script("updateContent('#{esc}')") rescue nil
+      require 'json'
+      safe = JSON.generate(html_body)
+      @dialog.execute_script("updateContent(#{safe})")
+    rescue => e
+      puts "IdentifyDialog: selection update error: #{e.message}"
     end
 
     def self.detach_observer
@@ -81,22 +84,23 @@ module TakeoffTool
 
         # Update viewport isolation if active
         hidden_count = 0
-        @current_entities.each do |e|
-          result = Highlighter.update_entity_isolation(e.entityID, cat)
-          hidden_count += 1 if result
+        if Highlighter.isolated_categories
+          @current_entities.each do |e|
+            result = Highlighter.update_entity_isolation(e.entityID, cat)
+            hidden_count += 1 if result
+          end
         end
+
+        # Refresh dashboard so HIDDEN_CATS visibility is enforced
+        Dashboard.send_live_data if defined?(Dashboard) && Dashboard.respond_to?(:send_live_data)
 
         # Build feedback message
         n = @current_entities.length
-        if Highlighter.isolated_categories
-          if hidden_count > 0
-            if n == 1
-              msg = "Moved to #{cat} — hidden (not in current isolation)"
-            else
-              msg = "#{n} entities → #{cat} — #{hidden_count} hidden (not in current isolation)"
-            end
+        if hidden_count > 0
+          if n == 1
+            msg = "Moved to #{cat} — hidden (not in current isolation)"
           else
-            msg = n == 1 ? "Applied: #{cat}" : "#{n} entities → #{cat}"
+            msg = "#{n} entities → #{cat} — #{hidden_count} hidden (not in current isolation)"
           end
         else
           msg = n == 1 ? "Applied: #{cat}" : "#{n} entities → #{cat}"

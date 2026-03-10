@@ -323,7 +323,7 @@ module TakeoffTool
       end
 
       # Try learned rules
-      learned = LearningSystem.apply(text, mat, ifc)
+      learned = LearningSystem.apply(text, mat, ifc, definition_name: group[:definition_name])
       if learned
         guesses << {
           category: learned[:auto_category],

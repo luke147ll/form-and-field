@@ -417,19 +417,21 @@ module TakeoffTool
         return
       end
 
-      keep_ids, keep_layers = build_keep_visible_set(visible)
+      keep_ids, _keep_layers = build_keep_visible_set(visible)
 
       m.start_operation('Isolate Entities', true)
+      # Hide all scan entities not in keep set
       sr.each do |r|
         e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
         e.visible = !!keep_ids[e.entityID]
       end
+      # Ensure ancestors of visible entities are shown (parent groups/components)
       keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
-      keep_layers.each_key do |ln|
-        l = m.layers[ln]; l.visible = true if l && !l.visible?
-      end
+      # NOTE: We intentionally do NOT force layers visible here.
+      # Entity-level isolation uses entity.visible only — forcing layers
+      # visible would un-hide non-scan entities on shared layers (e.g. casework).
       m.commit_operation
-      puts "HL: isolate_entities done — kept #{keep_ids.length} entities, #{keep_layers.length} layers"
+      puts "HL: isolate_entities done — kept #{keep_ids.length} entities"
     end
 
     def self.isolate_tag(tn)

@@ -49,7 +49,7 @@ module TakeoffTool
 
     # ═══ PUBLIC API ═══
 
-    def self.enter(category_filter: nil)
+    def self.enter(category_filter: nil, force_reclassify: false)
       return if @active
       m = Sketchup.active_model
       return unless m
@@ -64,7 +64,13 @@ module TakeoffTool
       puts "[SmartDiff] Entering..."
       t0 = Time.now
 
-      classify
+      if !force_reclassify && load_cached_classification(m)
+        puts "[SmartDiff] Using cached classification (#{@classification.length} entities)"
+      else
+        classify
+        save_classification_cache(m)
+      end
+
       backup_and_paint(m, category_filter: category_filter)
 
       @active = true
@@ -120,6 +126,31 @@ module TakeoffTool
     def self.set_visibility(state, visible)
       @visibility ||= Hash[STATES.map { |s| [s, true] }]
       @visibility[state.to_sym] = visible
+    end
+
+    # Fast visibility toggle — only show/hide entities of one state.
+    # Avoids full restore_all + repaint cycle that freezes SketchUp.
+    def self.toggle_state_fast(state, visible, category_filter: nil)
+      sym = state.to_sym
+      m = Sketchup.active_model
+      return unless m && @active && @classification.any?
+      cat_set = category_filter ? category_filter.map(&:to_s) : nil
+      m.start_operation('Smart Diff Toggle', true)
+      count = 0
+      @classification.each do |eid, s|
+        next unless s == sym
+        e = TakeoffTool.find_entity(eid)
+        next unless e && e.valid?
+        if cat_set
+          ent_cat = (@categories[eid] || '').to_s
+          next unless cat_set.include?(ent_cat)
+        end
+        e.visible = visible
+        count += 1
+      end
+      m.commit_operation
+      m.active_view.invalidate
+      puts "[SmartDiff] Toggled #{sym} #{visible ? 'visible' : 'hidden'}: #{count} entities"
     end
 
     def self.repaint(category_filter: nil)
@@ -768,6 +799,77 @@ module TakeoffTool
       when 'bf'                    then r[:volume_bf]   || 0.0
       else 1.0
       end
+    end
+
+    # ═══ CLASSIFICATION CACHE ═══
+
+    def self.save_classification_cache(model)
+      return if @classification.empty?
+      require 'json'
+
+      # Build cache fingerprint from scan result count + entity count
+      sr = TakeoffTool.scan_results || []
+      fingerprint = "#{sr.length}_#{model.definitions.count { |d| !d.image? && d.instances.length > 0 }}"
+
+      cache = {
+        'fingerprint' => fingerprint,
+        'timestamp' => Time.now.to_i,
+        'classification' => {},
+        'categories' => {},
+        'counts' => {}
+      }
+      @classification.each { |eid, state| cache['classification'][eid.to_s] = state.to_s }
+      @categories.each { |eid, cat| cache['categories'][eid.to_s] = cat }
+      @counts.each { |state, n| cache['counts'][state.to_s] = n }
+
+      model.set_attribute('FormAndField', 'smart_diff_cache', JSON.generate(cache))
+      puts "[SmartDiff] Classification cached (#{@classification.length} entities, fingerprint=#{fingerprint})"
+    end
+
+    def self.load_cached_classification(model)
+      json = model.get_attribute('FormAndField', 'smart_diff_cache')
+      return false unless json && !json.empty?
+
+      require 'json'
+      cache = JSON.parse(json) rescue nil
+      return false unless cache
+
+      # Validate fingerprint — model must not have changed
+      sr = TakeoffTool.scan_results || []
+      fingerprint = "#{sr.length}_#{model.definitions.count { |d| !d.image? && d.instances.length > 0 }}"
+      if cache['fingerprint'] != fingerprint
+        puts "[SmartDiff] Cache stale (#{cache['fingerprint']} vs #{fingerprint}) — reclassifying"
+        return false
+      end
+
+      # Restore classification
+      @classification = {}
+      @categories = {}
+      @counts = Hash[STATES.map { |s| [s, 0] }]
+
+      (cache['classification'] || {}).each do |eid_s, state_s|
+        eid = eid_s.to_i
+        state = state_s.to_sym
+        next unless STATES.include?(state)
+        # Verify entity still exists
+        e = TakeoffTool.find_entity(eid)
+        next unless e && e.valid?
+        @classification[eid] = state
+        @counts[state] += 1
+      end
+      (cache['categories'] || {}).each do |eid_s, cat|
+        @categories[eid_s.to_i] = cat
+      end
+
+      age = Time.now.to_i - (cache['timestamp'] || 0)
+      puts "[SmartDiff] Cache loaded: #{@classification.length} entities, age=#{age}s"
+      @classification.any?
+    end
+
+    def self.invalidate_cache
+      m = Sketchup.active_model
+      m.set_attribute('FormAndField', 'smart_diff_cache', nil) if m
+      puts "[SmartDiff] Cache invalidated"
     end
 
     def self.clear_state

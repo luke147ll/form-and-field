@@ -504,6 +504,12 @@ module TakeoffTool
       TakeoffTool.category_assignments = ca
       puts "HyperParser: Committed #{count} entities to '#{category}'"
 
+      # Ensure category is in master list (keeps dropdowns in sync)
+      TakeoffTool.add_category(category)
+      if !subcategory.empty?
+        TakeoffTool.add_subcategory(category, subcategory) rescue nil
+      end
+
       # Learning system: capture from first entity with optional explicit keyword
       if eids.length > 0
         begin
@@ -515,10 +521,8 @@ module TakeoffTool
         end
       end
 
-      # Refresh dashboard if open
-      if Dashboard.visible?
-        Dashboard.send_data(TakeoffTool.filtered_scan_results, ca, TakeoffTool.cost_code_assignments)
-      end
+      # Refresh all open dialogs (dashboard, HP, identify)
+      TakeoffTool.broadcast_category_update
 
       send_commit_result(true, "#{count} entities → #{category}")
     end
@@ -786,7 +790,18 @@ module TakeoffTool
     def self.send_sampled_properties(eid, props)
       return unless @dialog && @dialog.visible?
       require 'json'
-      payload = { entity_id: eid, properties: props }
+      # Include current category assignment
+      cat = TakeoffTool.category_assignments[eid]
+      unless cat
+        sr = TakeoffTool.filtered_scan_results
+        match = sr&.find { |r| r[:entity_id] == eid }
+        cat = match[:parsed][:auto_category] if match && match[:parsed]
+      end
+      cat ||= 'Uncategorized'
+      sub = nil
+      e = TakeoffTool.find_entity(eid)
+      sub = (e.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) if e
+      payload = { entity_id: eid, properties: props, category: cat, subcategory: sub || '' }
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveSampledProperties('#{esc}')")

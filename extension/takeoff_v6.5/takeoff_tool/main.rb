@@ -27,6 +27,8 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')
   load File.join(PLUGIN_DIR, 'smart_diff.rb')
+  load File.join(PLUGIN_DIR, 'category_templates.rb')
+  load File.join(PLUGIN_DIR, 'section_cuts.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -111,6 +113,7 @@ module TakeoffTool
     sub.add_item('Hyper Parse') { HyperParser.show_dialog }
     sub.add_item('Learned Rules') { LearningSystem.show_dialog }
     sub.add_item('Rule Builder') { LearningSystem.show_rule_builder }
+    sub.add_item('Category Templates') { CategoryTemplates.show_dialog }
     sub.add_separator
     mv_sub = sub.add_submenu('Multiverse')
     mv_sub.add_item('Import Comparison Model') { TakeoffTool.import_comparison_model }
@@ -236,6 +239,9 @@ module TakeoffTool
     begin
       Dashboard.scan_log_start
 
+      # Invalidate smart diff cache — model is changing
+      SmartDiff.invalidate_cache rescue nil
+
       mv_active = active_mv_view
       if mv_active
         # Multiverse active: only rescan Model A, preserve Model B results
@@ -273,6 +279,15 @@ module TakeoffTool
       load_custom_categories
       load_master_categories
       load_master_containers
+
+      # Apply template definition map (exact GUID→category from template model)
+      @template_new_entities = 0
+      if defined?(CategoryTemplates) && CategoryTemplates.pending_definition_map?
+        defn_applied = CategoryTemplates.apply_definition_map
+        @template_new_entities = CategoryTemplates.new_entity_count
+        Dashboard.scan_log_msg("Template: #{defn_applied} matched, #{@template_new_entities} new") if defn_applied > 0
+      end
+
       merge_scan_categories_into_master
       prune_empty_categories
       load_master_subcategories
@@ -327,7 +342,34 @@ module TakeoffTool
           puts "Takeoff: InteractiveScanner error: #{is_err.message}"
         end
 
+        # Report new entities from template comparison
+        if defined?(CategoryTemplates) && (@template_new_entities || 0) > 0
+          new_ents = CategoryTemplates.new_entities
+          # Build summary by scanner-assigned category
+          by_cat = {}
+          new_ents.each do |ne|
+            cat = ne[:scanner_category] || 'Uncategorized'
+            by_cat[cat] ||= []
+            by_cat[cat] << ne[:display_name]
+          end
+          lines = ["#{new_ents.length} NEW entities not in template:"]
+          by_cat.sort_by { |_k, v| -v.length }.each do |cat, names|
+            unique = names.uniq.length
+            lines << "  #{cat}: #{names.length} (#{unique} types)"
+          end
+          Dashboard.scan_log_msg(lines.join("\n"))
+          @pending_new_entities_banner = { count: new_ents.length, by_cat: by_cat }
+        end
+
         open_dashboard
+        # Send new entities banner after dashboard is fully loaded
+        if @pending_new_entities_banner
+          banner = @pending_new_entities_banner
+          @pending_new_entities_banner = nil
+          UI.start_timer(1.0, false) do
+            Dashboard.send_new_entities_banner(banner[:count], banner[:by_cat])
+          end
+        end
       end
     rescue => e
       Dashboard.scan_log_end("ERROR: #{e.message}")
@@ -426,6 +468,7 @@ module TakeoffTool
   end
 
   # Add a category to the master list. No-op if duplicate or empty. Returns boolean.
+  # Also auto-assigns to a container by keyword matching if possible.
   def self.add_category(name)
     return false if name.nil? || name.to_s.strip.empty?
     name = name.to_s.strip
@@ -433,6 +476,7 @@ module TakeoffTool
     @master_categories << name
     sort_master_categories!
     save_master_categories
+    assign_categories_to_containers([name])
     broadcast_category_update
     true
   end
@@ -625,17 +669,21 @@ module TakeoffTool
       require 'json'
       @master_containers = JSON.parse(json) rescue []
     else
-      # First load — read from JSON file
+      # First load — try default template, then fall back to JSON seed file
       require 'json'
-      path = File.join(PLUGIN_DIR, 'data', 'master_containers.json')
-      if File.exist?(path)
-        data = JSON.parse(File.read(path)) rescue {}
-        @master_containers = data['containers'] || []
+      if defined?(CategoryTemplates) && CategoryTemplates.auto_apply_default
+        # Default template was applied — containers already set
       else
-        @master_containers = []
+        path = File.join(PLUGIN_DIR, 'data', 'master_containers.json')
+        if File.exist?(path)
+          data = JSON.parse(File.read(path)) rescue {}
+          @master_containers = data['containers'] || []
+        else
+          @master_containers = []
+        end
+        save_master_containers
+        puts "Takeoff: Loaded master containers from JSON file (#{@master_containers.length} containers)"
       end
-      save_master_containers
-      puts "Takeoff: Loaded master containers from JSON file (#{@master_containers.length} containers)"
     end
     build_container_lookup
   end
@@ -849,23 +897,55 @@ module TakeoffTool
   # Add any scan-discovered categories not already in master list
   def self.merge_scan_categories_into_master
     changed = false
+    new_cats = []
     (@scan_results || []).each do |r|
       c = r[:parsed][:auto_category]
       if c && !c.empty? && !@master_categories.include?(c)
         @master_categories << c
+        new_cats << c
         changed = true
       end
     end
     @category_assignments.each_value do |c|
       if c && !c.empty? && !@master_categories.include?(c)
         @master_categories << c
+        new_cats << c
         changed = true
       end
     end
     if changed
       sort_master_categories!
       save_master_categories
-      puts "Takeoff: Merged new categories into master list (#{@master_categories.length} total)"
+      # Auto-assign new categories to containers by keyword matching
+      assign_categories_to_containers(new_cats)
+      puts "Takeoff: Merged #{new_cats.length} new categories into master list (#{@master_categories.length} total)"
+    end
+  end
+
+  # Auto-assign categories to containers using keyword matching.
+  # Only assigns categories not already in a container.
+  def self.assign_categories_to_containers(cat_names)
+    return if cat_names.empty? || (@master_containers || []).empty?
+    build_container_lookup unless @container_lookup
+    added = 0
+    cat_names.each do |cat|
+      next if cat == 'Uncategorized' || cat == '_IGNORE'
+      next if @container_lookup && @container_lookup[cat]  # already in a container
+      match = match_container_by_keyword(cat)
+      next unless match && match['name'] != 'Other'
+      # Find the container and add the category
+      target = (@master_containers || []).find { |c| c['name'] == match['name'] }
+      if target
+        target['categories'] ||= []
+        target['categories'] << { 'name' => cat, 'code' => '', 'unit' => 'EA' }
+        added += 1
+      end
+    end
+    if added > 0
+      save_master_containers
+      invalidate_container_lookup
+      build_container_lookup
+      puts "Takeoff: Auto-assigned #{added} categories to containers"
     end
   end
 
@@ -879,10 +959,13 @@ module TakeoffTool
       in_use[cat] = true if cat && !cat.empty?
     end
 
-    # Keep: in-use, user-created, Uncategorized, _IGNORE
+    # Keep: in-use, user-created, in-container, Uncategorized, _IGNORE
     keep = {}
     in_use.each_key { |c| keep[c] = true }
     (@custom_categories || []).each { |c| keep[c] = true }
+    (@master_containers || []).each do |cont|
+      (cont['categories'] || []).each { |c| keep[c['name']] = true }
+    end
     keep['Uncategorized'] = true
     keep['_IGNORE'] = true
 

@@ -233,7 +233,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 .cont-hdr.cont-drop-hover{background:rgba(203,166,247,0.15) !important;border-left:3px solid #cba6f7;transition:all .15s ease}
 
 /* MULTIVERSE TOGGLE BAR */
-.mv-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0}
+.mv-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#181825;border-bottom:1px solid #313244;flex-shrink:0;flex-wrap:wrap}
 .mv-toggle{display:inline-flex;background:#313244;border-radius:6px;overflow:hidden}
 .mv-btn{padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;color:#6c7086;transition:all .15s;user-select:none}
 .mv-btn:hover{color:#cdd6f4}
@@ -576,6 +576,61 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .sb-btn:hover{filter:brightness(1.1)}
 .sb-dismiss{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
 .sb-dismiss:hover{color:#cdd6f4}
+/* ── New Entities Banner ── */
+.new-entities-banner{display:none;padding:8px 12px;background:rgba(148,226,213,0.08);border-bottom:1px solid rgba(148,226,213,0.2);align-items:center;gap:8px}
+.new-entities-banner.active{display:flex}
+.neb-icon{color:#94e2d5;flex-shrink:0;font-size:13px}
+.neb-text{flex:1;color:#cdd6f4;font-size:11px}
+.neb-text b{color:#94e2d5}
+.neb-cats{display:flex;flex-wrap:wrap;gap:4px;margin-left:6px}
+.neb-cat{background:rgba(148,226,213,0.12);color:#94e2d5;font-size:10px;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.neb-dismiss{background:none;border:none;color:#6c7086;cursor:pointer;font-size:14px;padding:2px}
+.neb-dismiss:hover{color:#cdd6f4}
+.neb-review-btn{padding:3px 10px;background:#94e2d5;color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.neb-review-btn:hover{filter:brightness(1.1)}
+/* ── New Entities Review Panel ── */
+.ne-review{display:none;background:#1e1e2e;border-bottom:1px solid rgba(148,226,213,0.15);max-height:260px;overflow-y:auto}
+.ne-review.active{display:block}
+.ne-review-header{display:flex;align-items:center;gap:8px;padding:6px 12px;background:rgba(148,226,213,0.05);border-bottom:1px solid #313244;position:sticky;top:0;z-index:1}
+.ne-review-header .ne-title{font-size:11px;font-weight:700;color:#94e2d5;flex:1}
+.ne-review-header .ne-progress{font-size:10px;color:#6c7086}
+.ne-review-header .ne-progress b{color:#a6e3a1}
+.ne-iso-btn{padding:2px 8px;background:#45475a;color:#cdd6f4;border:1px solid #585b70;border-radius:3px;font-size:10px;cursor:pointer}
+.ne-iso-btn:hover{background:#585b70}
+.ne-iso-btn.active{background:rgba(148,226,213,0.15);border-color:#94e2d5;color:#94e2d5}
+.ne-group{margin-bottom:2px}
+.ne-group-hdr{display:flex;align-items:center;gap:6px;padding:4px 12px;background:#181825;cursor:pointer;user-select:none}
+.ne-group-hdr:hover{background:#313244}
+.ne-group-hdr .ne-arrow{color:#6c7086;font-size:9px;width:10px;transition:transform .15s}
+.ne-group-hdr .ne-arrow.open{transform:rotate(90deg)}
+.ne-group-hdr .ne-gname{font-size:11px;font-weight:600;color:#cdd6f4;flex:1}
+.ne-group-hdr .ne-gcount{font-size:10px;color:#6c7086}
+.ne-group-hdr .ne-gdone{font-size:10px;color:#a6e3a1}
+.ne-items{display:none}
+.ne-items.open{display:block}
+.ne-item{display:flex;align-items:center;gap:6px;padding:3px 12px 3px 28px;border-bottom:1px solid #181825;font-size:10px;cursor:pointer}
+.ne-item:hover{background:rgba(148,226,213,0.05)}
+.ne-item.done{opacity:0.4}
+.ne-item .ne-check{width:14px;height:14px;border:1px solid #45475a;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;color:#a6e3a1}
+.ne-item.done .ne-check{border-color:#a6e3a1;background:rgba(166,227,161,0.1)}
+.ne-item .ne-iname{flex:1;color:#bac2de;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ne-item .ne-itag{color:#6c7086;font-size:9px}
+.ne-item .ne-icat{color:#94e2d5;font-size:9px}
+.ne-item .ne-zoom{background:none;border:none;color:#6c7086;cursor:pointer;font-size:11px;padding:0 2px}
+.ne-item .ne-zoom:hover{color:#89b4fa}
+.ne-item .ne-approve{background:none;border:1px solid #45475a;color:#6c7086;cursor:pointer;font-size:9px;padding:1px 5px;border-radius:3px;white-space:nowrap}
+.ne-item .ne-approve:hover{border-color:#a6e3a1;color:#a6e3a1}
+.ne-item .ne-cat-sel{background:#1e1e2e;border:1px solid #45475a;color:#bac2de;font-size:9px;padding:1px 4px;border-radius:3px;font-family:inherit;max-width:120px;cursor:pointer}
+.ne-item .ne-cat-sel:hover{border-color:#89b4fa}
+.ne-item .ne-cat-sel:focus{outline:none;border-color:#89b4fa}
+.ne-group-actions{display:flex;gap:3px;margin-left:auto}
+.ne-gbtn{padding:1px 6px;font-size:9px;border:1px solid #45475a;background:#313244;color:#bac2de;border-radius:3px;cursor:pointer;white-space:nowrap}
+.ne-gbtn:hover{background:#45475a}
+.ne-gbtn.iso{border-color:#89b4fa;color:#89b4fa}
+.ne-gbtn.iso:hover{background:rgba(137,180,250,0.1)}
+.ne-gbtn.iso.active{background:rgba(137,180,250,0.15)}
+.ne-gbtn.appr{border-color:#a6e3a1;color:#a6e3a1}
+.ne-gbtn.appr:hover{background:rgba(166,227,161,0.1)}
 /* ── Scanner Mode Overlay ── */
 .scanner-overlay{display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:#1e1e2e;z-index:100;flex-direction:column}
 .scanner-overlay.active{display:flex}
@@ -644,6 +699,30 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .comp-actions{display:flex;gap:8px;margin-top:4px;align-items:center}
 .comp-report-btn{padding:4px 12px;background:none;border:1px solid #cba6f7;color:#cba6f7;border-radius:4px;font-size:11px;cursor:pointer}
 .comp-report-btn:hover{background:rgba(203,166,247,0.1)}
+/* ═══ APPLE COMPARISON GRAPH ═══ */
+.apple-btn{background:none;border:none;cursor:pointer;font-size:10px;padding:1px 2px;opacity:0.2;transition:opacity .15s,transform .15s;line-height:1}.apple-btn:hover{opacity:0.55;transform:scale(1.15)}.apple-btn.sel{opacity:1;transform:scale(1.1)}
+.mv-graph-btn{padding:4px 12px;background:linear-gradient(135deg,#f9e2af,#fab387);color:#1e1e2e;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}.mv-graph-btn:hover{filter:brightness(1.1)}
+.graph-overlay{display:none;flex-direction:column;background:#181825;border-bottom:1px solid #45475a;flex-shrink:0;max-height:55vh;overflow-y:auto}
+.graph-overlay.active{display:flex}
+.graph-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #313244}
+.graph-title{font-size:12px;font-weight:600;color:#f9e2af}
+.graph-close{background:none;border:none;color:#6c7086;cursor:pointer;font-size:16px;padding:2px}.graph-close:hover{color:#f38ba8}
+.graph-legend{display:flex;gap:16px;padding:5px 12px;font-size:10px;border-bottom:1px solid rgba(49,50,68,0.5)}
+.graph-legend-a{color:#a6e3a1}.graph-legend-b{color:#89b4fa}
+.graph-body{padding:4px 12px 8px}
+.graph-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(49,50,68,0.25)}
+.graph-cat{width:110px;font-size:10px;color:#cdd6f4;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.graph-bars{flex:1;display:flex;flex-direction:column;gap:2px}
+.graph-bar-wrap{display:flex;align-items:center;gap:4px;height:14px}
+.graph-bar{height:12px;border-radius:2px;transition:width .5s ease;min-width:2px}
+.bar-a{background:linear-gradient(90deg,#a6e3a1,#94e2d5)}.bar-b{background:linear-gradient(90deg,#89b4fa,#74c7ec)}
+.graph-val{font-size:9px;color:#a6adc8;white-space:nowrap}
+.graph-delta{width:80px;text-align:right;font-size:10px;flex-shrink:0;font-variant-numeric:tabular-nums;line-height:1.3}
+.graph-count{font-size:8px;color:#585b70}
+.graph-avg{display:flex;align-items:center;justify-content:center;padding:12px;border-top:2px solid #45475a;gap:6px}
+.graph-avg-val{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.5px}
+.graph-avg-label{font-size:11px;color:#a6adc8;font-weight:500}
+.avg-pos{color:#a6e3a1}.avg-neg{color:#f38ba8}.avg-zero{color:#6c7086}
 .split-commit-btn{background:none;border:none;color:#a6e3a1;cursor:pointer;font-size:12px;padding:1px 4px;opacity:0.6;font-weight:bold}
 .split-commit-btn:hover{opacity:1}
 /* ═══ PORTAL OVERLAY ═══ */
@@ -751,6 +830,16 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button class="hb" onclick="call('activateElevation')" style="font-size:10px;padding:2px 8px;color:#cba6f7;border-color:#cba6f7">Tag</button>
 </div>
 
+<!-- SECTION CUTS BAR -->
+<div id="scBar" style="display:none;background:#1a1a2e;border-bottom:1px solid #313244;padding:4px 12px;font-size:11px;flex-shrink:0;align-items:center;gap:6px">
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#f9e2af" stroke-width="1.5" stroke-linecap="round" style="flex-shrink:0"><line x1="1" y1="8" x2="15" y2="8" stroke-dasharray="3 2"/><line x1="1" y1="4" x2="1" y2="12"/><line x1="15" y1="4" x2="15" y2="12"/></svg>
+  <span style="color:#f9e2af;font-weight:600;flex-shrink:0">Section Cut:</span>
+  <select id="scSelect" onchange="scOnChange(this)" style="background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:3px;font-size:11px;padding:2px 4px;max-width:180px">
+    <option value="">-- Off --</option>
+  </select>
+  <button class="hb" onclick="call('refreshSectionCuts')" title="Refresh from elevation tags" style="font-size:10px;padding:2px 6px;color:#f9e2af;border-color:#f9e2af">Refresh</button>
+</div>
+
 <!-- BULK EDIT BAR -->
 <div class="bulk" id="bulkBar">
   <span class="cnt" id="bulkCnt">0</span>
@@ -774,6 +863,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button id="mvExitAnalysis" onclick="exitAnalysisMode()" style="display:none;font-size:11px;padding:4px 14px;background:#f38ba8;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:700;font-family:inherit;">Exit Analysis</button>
   <span class="mv-label" id="mvLabel"></span>
   <button class="mv-compare-btn" id="mvCompareBtn" onclick="runCompare()">Compare</button>
+  <button class="mv-graph-btn" id="mvGraphBtn" onclick="showGraph()" style="display:none">&#127822; Graph</button>
   <span class="mv-diff-toggle" id="mvDiffToggle" onclick="toggleDiff()">Diff</span>
   <span class="mv-filter-toggle" id="mvMatchedToggle" onclick="toggleMatchedFilter()" style="display:none">Matched Only</span>
   <span class="mv-summary" id="mvSummary"></span>
@@ -786,6 +876,16 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <button class="sb-btn" onclick="enterScannerMode()">Classify Now</button>
   <button class="sb-dismiss" onclick="dismissScannerBanner()" title="Dismiss">&times;</button>
 </div>
+
+<!-- NEW ENTITIES BANNER (template comparison) -->
+<div class="new-entities-banner" id="newEntitiesBanner">
+  <span class="neb-icon">&#9733;</span>
+  <span class="neb-text" id="nebText"></span>
+  <span class="neb-cats" id="nebCats"></span>
+  <button class="neb-review-btn" onclick="toggleNewEntitiesReview()">Review</button>
+  <button class="neb-dismiss" onclick="dismissNewEntitiesBanner()" title="Dismiss">&times;</button>
+</div>
+<div class="ne-review" id="neReviewPanel"></div>
 
 <!-- FILTER BAR -->
 <div class="fbar">
@@ -889,6 +989,20 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     </div>
   </div>
 
+  <!-- GRAPH OVERLAY (apples-to-apples comparison) -->
+  <div class="graph-overlay" id="graphOverlay">
+    <div class="graph-header">
+      <span class="graph-title">&#127822; Apples to Apples &mdash; Quantity Comparison</span>
+      <button class="graph-close" onclick="closeGraph()">&times;</button>
+    </div>
+    <div class="graph-legend">
+      <span class="graph-legend-a">&#9632; Model A</span>
+      <span class="graph-legend-b">&#9632; Model B</span>
+    </div>
+    <div class="graph-body" id="graphBody"></div>
+    <div class="graph-avg" id="graphAvg"></div>
+  </div>
+
   <!-- SCANNER MODE OVERLAY -->
   <div class="scanner-overlay" id="scannerOverlay">
     <div class="sc-toolbar">
@@ -926,6 +1040,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
         <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg>Elev</button>
         <span style="flex:1"></span>
+        <button class="hb" onclick="recalcSF()" title="Recalculate SF for all entities using current category assignments" style="font-size:10px;padding:2px 6px;color:#f9e2af;border-color:#f9e2af">Recalc SF</button>
         <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
         <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
       </div>
@@ -1394,6 +1509,7 @@ function receiveData(json){
     syncIsolation();
     filt();
     renderOvercountWarnings();
+    neRefreshReview();
   }catch(e){
     log('PARSE: '+e.message,'err');
     document.getElementById('dp').innerHTML='<div style="padding:20px;color:#f38ba8">'+e.message+'</div>';
@@ -2804,9 +2920,12 @@ function setMvView(mode){
   // Show Compare button only in A+B mode
   var cmpBtn=document.getElementById('mvCompareBtn');
   if(cmpBtn)cmpBtn.style.display=(mode==='ab')?'inline-block':'none';
+  var gBtn=document.getElementById('mvGraphBtn');
+  if(gBtn)gBtn.style.display=(mode==='ab')?'inline-block':'none';
   // Clear diff state when leaving A+B
   if(mode!=='ab'){
     diffActive=false;diffComputed=false;comparisonResults=null;
+    graphCats={};closeGraph();
     var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
     document.getElementById('compResults').classList.remove('active');
     call('clearCompareHighlights');
@@ -3121,6 +3240,7 @@ function enterSplitMode(){
   if(dpWrap)dpWrap.style.display='none';
   if(sc)sc.style.display='flex';
   if(mmt)mmt.style.display='';
+  var gBtn=document.getElementById('mvGraphBtn');if(gBtn)gBtn.style.display='inline-block';
   // Populate panel headers
   document.getElementById('panelAName').textContent=mvModelA||'';
   document.getElementById('panelBName').textContent=mvModelB||'';
@@ -3230,6 +3350,8 @@ function renderSplitPanel(panel){
     var isIso2=(splitIsolateState[panel]===gk);
     catH+='<button class="split-iso-btn'+(isIso2?' iso-active':'')+'" data-cat="'+X2(gk)+'" onclick="event.stopPropagation();isolateSplitCat(\''+X2(gk)+'\',\''+panel+'\')" title="Isolate">&#8857;</button>';
     if(panel==='b'){catH+='<button class="split-commit-btn" onclick="event.stopPropagation();commitCategory(\''+X2(gk)+'\')" title="Commit to Model A">&#8599;</button>';}
+    var isAppled=!!graphCats[gk];
+    catH+='<button class="apple-btn'+(isAppled?' sel':'')+'" onclick="event.stopPropagation();toggleGraphCat(\''+X2(gk)+'\')" title="Select for graph comparison">&#127822;</button>';
     catH+='<span class="arr">&#9660;</span>';
     catH+=catNameSpan(gk);
     catH+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
@@ -3503,6 +3625,103 @@ function clearCompareUI(){
   comparisonResults=null;diffActive=false;diffComputed=false;
   document.getElementById('compResults').classList.remove('active');
   updateDiffToggle();
+  graphCats={};closeGraph();
+}
+/* ═══ GRAPH — APPLES TO APPLES ═══ */
+var graphCats={};
+function toggleGraphCat(cat){
+  graphCats[cat]=!graphCats[cat];
+  if(!graphCats[cat])delete graphCats[cat];
+  renderSplitPanel('a');renderSplitPanel('b');
+  updateGraphBtnLabel();
+}
+function updateGraphBtnLabel(){
+  var btn=document.getElementById('mvGraphBtn');if(!btn)return;
+  var n=Object.keys(graphCats).length;
+  btn.innerHTML=n>0?'&#127822; Graph ('+n+')':'&#127822; Graph';
+}
+function showGraph(){
+  if(!splitData||!splitData.a||!splitData.b)return;
+  var selected=Object.keys(graphCats);
+  if(selected.length===0){
+    var allCats={};
+    for(var i=0;i<splitData.a.rows.length;i++){var c=splitData.a.rows[i].category;if(c&&c!=='_IGNORE')allCats[c]=true;}
+    for(var i=0;i<splitData.b.rows.length;i++){var c=splitData.b.rows[i].category;if(c&&c!=='_IGNORE')allCats[c]=true;}
+    selected=Object.keys(allCats);
+  }
+  selected.sort();
+  var data=[];
+  for(var i=0;i<selected.length;i++){
+    var cat=selected[i],aItems=[],bItems=[];
+    for(var j=0;j<splitData.a.rows.length;j++){if(splitData.a.rows[j].category===cat)aItems.push(splitData.a.rows[j]);}
+    for(var j=0;j<splitData.b.rows.length;j++){if(splitData.b.rows[j].category===cat)bItems.push(splitData.b.rows[j]);}
+    var allI=aItems.concat(bItems);
+    if(allI.length===0)continue;
+    var mt=allI[0].measurementType||'volume';
+    var qA=graphSum(aItems,mt),qB=graphSum(bItems,mt);
+    var delta=qB-qA;
+    var pct=qA>0?(delta/qA*100):(qB>0?100:0);
+    data.push({category:cat,qtyA:qA,qtyB:qB,delta:delta,pct:pct,unit:uLabel(mt),mt:mt,countA:aItems.length,countB:bItems.length});
+  }
+  renderGraphChart(data);
+}
+function graphSum(items,mt){
+  var t=0;
+  for(var i=0;i<items.length;i++){var r=items[i];if(r.cosmetic)continue;
+    if(mt==='ea'||mt==='ea_bf'||mt==='ea_sf')t+=1;
+    else if(mt==='lf')t+=(r.linearFt||0);
+    else if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')t+=(r.areaSF||0);
+    else t+=(r.volumeFt3||0);
+  }
+  return t;
+}
+function graphFmt(val,mt){
+  if(mt==='ea'||mt==='ea_bf'||mt==='ea_sf')return Math.round(val).toString();
+  if(mt==='lf'||mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')return val.toFixed(1);
+  return val.toFixed(2);
+}
+function renderGraphChart(data){
+  if(data.length===0)return;
+  var maxQ=0;
+  for(var i=0;i<data.length;i++){maxQ=Math.max(maxQ,data[i].qtyA,data[i].qtyB);}
+  if(maxQ===0)maxQ=1;
+  var h='';
+  for(var i=0;i<data.length;i++){
+    var d=data[i];
+    var pA=Math.max(0.5,d.qtyA/maxQ*100),pB=Math.max(0.5,d.qtyB/maxQ*100);
+    var dc=d.delta>0?'delta-pos':(d.delta<0?'delta-neg':'delta-zero');
+    var ps;
+    if(d.qtyA===0&&d.qtyB>0)ps='NEW';
+    else if(d.qtyB===0&&d.qtyA>0)ps='REMOVED';
+    else if(d.delta===0)ps='—';
+    else ps=(d.pct>0?'+':'')+d.pct.toFixed(1)+'%';
+    h+='<div class="graph-row">';
+    h+='<div class="graph-cat" title="'+X(d.category)+'">'+X(d.category)+'</div>';
+    h+='<div class="graph-bars">';
+    h+='<div class="graph-bar-wrap"><div class="graph-bar bar-a" style="width:'+pA.toFixed(1)+'%"></div>';
+    h+='<span class="graph-val">'+graphFmt(d.qtyA,d.mt)+d.unit+' <span class="graph-count">('+d.countA+')</span></span></div>';
+    h+='<div class="graph-bar-wrap"><div class="graph-bar bar-b" style="width:'+pB.toFixed(1)+'%"></div>';
+    h+='<span class="graph-val">'+graphFmt(d.qtyB,d.mt)+d.unit+' <span class="graph-count">('+d.countB+')</span></span></div>';
+    h+='</div>';
+    h+='<div class="graph-delta '+dc+'">'+(d.delta>0?'+':'')+graphFmt(d.delta,d.mt)+'<br><span style="font-size:9px">'+ps+'</span></div>';
+    h+='</div>';
+  }
+  document.getElementById('graphBody').innerHTML=h;
+  // Average % change across all categories that have a computable delta
+  var pctSum=0,pctN=0;
+  for(var i=0;i<data.length;i++){
+    var d=data[i];
+    if(d.qtyA>0){pctSum+=d.pct;pctN++;}
+    else if(d.qtyB>0){pctSum+=100;pctN++;}
+  }
+  var avg=pctN>0?(pctSum/pctN):0;
+  var ac=avg>0?'avg-pos':(avg<0?'avg-neg':'avg-zero');
+  var sign=avg>0?'+':'';
+  document.getElementById('graphAvg').innerHTML='<span class="graph-avg-label">Average Change</span> <span class="graph-avg-val '+ac+'">'+sign+avg.toFixed(1)+'%</span>';
+  document.getElementById('graphOverlay').classList.add('active');
+}
+function closeGraph(){
+  document.getElementById('graphOverlay').classList.remove('active');
 }
 function recallFromVault(){call('recallFromVault');}
 function receiveRecallResult(s){
@@ -3581,6 +3800,271 @@ function receiveScannerBanner(s){
 
 function dismissScannerBanner(){
   document.getElementById('scannerBanner').classList.remove('active');
+}
+
+var NE_ENTITIES=[];  // full new entity list from template comparison
+var NE_OPEN_GROUPS={};
+var NE_ISOLATED=false;
+var NE_ISOLATED_CAT=null;  // track which group is isolated
+var NE_APPROVED={};  // eid → true for manually approved items
+
+function receiveNewEntitiesBanner(s){
+  var d=JSON.parse(s);
+  NE_ENTITIES=d.entities||[];
+  var el=document.getElementById('newEntitiesBanner');
+  var txt=document.getElementById('nebText');
+  var cats=document.getElementById('nebCats');
+  var remaining=neCountRemaining();
+  txt.innerHTML='<b>'+d.count+'</b> new entit'+(d.count!==1?'ies':'y')+' detected (not in template)';
+  var html='';
+  (d.categories||[]).forEach(function(c){
+    html+='<span class="neb-cat">'+esc(c.name)+': '+c.count+'</span>';
+  });
+  cats.innerHTML=html;
+  el.classList.add('active');
+}
+
+function dismissNewEntitiesBanner(){
+  if(NE_ISOLATED){
+    var showIds=[];
+    NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
+    call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+  }
+  document.getElementById('newEntitiesBanner').classList.remove('active');
+  document.getElementById('neReviewPanel').classList.remove('active');
+  NE_ISOLATED=false;
+  NE_ISOLATED_CAT=null;
+}
+
+function toggleNewEntitiesReview(){
+  var panel=document.getElementById('neReviewPanel');
+  if(panel.classList.contains('active')){
+    panel.classList.remove('active');
+    return;
+  }
+  renderNewEntitiesReview();
+  panel.classList.add('active');
+}
+
+function renderNewEntitiesReview(){
+  if(!NE_ENTITIES.length)return;
+  // Group by scanner category
+  var groups={},order=[];
+  NE_ENTITIES.forEach(function(e){
+    var cat=e.scannerCat||'Uncategorized';
+    if(!groups[cat]){groups[cat]=[];order.push(cat);}
+    groups[cat].push(e);
+  });
+  var remaining=neCountRemaining();
+  var total=NE_ENTITIES.length;
+  var done=total-remaining;
+
+  var html='<div class="ne-review-header">';
+  html+='<span class="ne-title">New Entities Review</span>';
+  html+='<span class="ne-progress"><b>'+done+'</b>/'+total+' reviewed</span>';
+  html+='<button class="ne-iso-btn'+(NE_ISOLATED?' active':'')+'" onclick="neIsolateAll()" title="Isolate all new entities in viewport">Isolate All</button>';
+  html+='</div>';
+
+  order.forEach(function(cat){
+    var items=groups[cat];
+    var catDone=0;
+    var catRemaining=0;
+    items.forEach(function(e){if(neIsDone(e))catDone++;else catRemaining++;});
+    var isOpen=NE_OPEN_GROUPS[cat]||false;
+    var allDone=catRemaining===0;
+    html+='<div class="ne-group">';
+    html+='<div class="ne-group-hdr">';
+    html+='<span class="ne-arrow'+(isOpen?' open':'')+'" onclick="neToggleGroup(\''+escQ(cat)+'\')">&#9654;</span>';
+    html+='<span class="ne-gname" onclick="neToggleGroup(\''+escQ(cat)+'\')">'+esc(cat)+'</span>';
+    if(catDone>0)html+='<span class="ne-gdone">'+catDone+'/'+items.length+'</span>';
+    html+='<span class="ne-gcount">'+items.length+'</span>';
+    html+='<span class="ne-group-actions">';
+    if(!allDone){
+      html+='<button class="ne-gbtn iso" onclick="event.stopPropagation();neIsolateGroup(\''+escQ(cat)+'\')" title="Isolate this category in viewport">Isolate</button>';
+      html+='<button class="ne-gbtn appr" onclick="event.stopPropagation();neApproveGroup(\''+escQ(cat)+'\')" title="Approve all in this category">Approve All</button>';
+    }else{
+      html+='<span class="ne-gdone" style="font-style:italic">all reviewed</span>';
+    }
+    html+='</span>';
+    html+='</div>';
+    html+='<div class="ne-items'+(isOpen?' open':'')+'">';
+    items.forEach(function(e){
+      var isDone=neIsDone(e);
+      var currentCat=neCurrentCat(e);
+      html+='<div class="ne-item'+(isDone?' done':'')+'" onclick="neClickItem('+e.eid+')">';
+      html+='<span class="ne-check">'+(isDone?'&#10003;':'')+'</span>';
+      html+='<span class="ne-iname" title="'+esc(e.name)+'">'+esc(neShortName(e.name))+'</span>';
+      if(e.tag)html+='<span class="ne-itag">'+esc(e.tag)+'</span>';
+      if(isDone&&currentCat!==e.scannerCat)html+='<span class="ne-icat">&#8594; '+esc(currentCat)+'</span>';
+      if(!isDone){
+        html+='<select class="ne-cat-sel" onclick="event.stopPropagation()" onchange="neSetCat('+e.eid+',this.value)">'+buildGroupedCatOptionsSelected(currentCat,false)+'</select>';
+        html+='<button class="ne-approve" onclick="event.stopPropagation();neApproveItem('+e.eid+')" title="Approve — scanner got it right">&#10003;</button>';
+      }
+      html+='<button class="ne-zoom" onclick="event.stopPropagation();call(\'zoomToEntity\',\''+e.eid+'\')" title="Zoom">&#128269;</button>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+  document.getElementById('neReviewPanel').innerHTML=html;
+}
+
+function neToggleGroup(cat){
+  NE_OPEN_GROUPS[cat]=!NE_OPEN_GROUPS[cat];
+  renderNewEntitiesReview();
+}
+
+function neClickItem(eid){
+  call('selectEntity',''+eid);
+  call('zoomToEntity',''+eid);
+}
+
+function neIsolateAll(){
+  if(NE_ISOLATED){
+    // Show all NE entities back, don't touch anything else
+    var showIds=[];
+    NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
+    call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+    NE_ISOLATED=false;
+    NE_ISOLATED_CAT=null;
+  }else{
+    var show=[],hide=[];
+    NE_ENTITIES.forEach(function(e){
+      if(!neIsDone(e))show.push(e.eid); else hide.push(e.eid);
+    });
+    // Hide done items, show remaining — only touches NE entities
+    call('neIsolate',JSON.stringify({show:show,hide:hide}));
+    NE_ISOLATED=true;
+    NE_ISOLATED_CAT=null;
+  }
+  renderNewEntitiesReview();
+}
+
+function neIsolateGroup(cat){
+  var show=[],hide=[];
+  NE_ENTITIES.forEach(function(e){
+    if((e.scannerCat||'Uncategorized')===cat && !neIsDone(e))show.push(e.eid);
+    else hide.push(e.eid);
+  });
+  if(show.length){
+    call('neIsolate',JSON.stringify({show:show,hide:hide}));
+    NE_ISOLATED=true;
+    NE_ISOLATED_CAT=cat;
+    renderNewEntitiesReview();
+  }
+}
+
+function neSetCat(eid,val){
+  if(!val)return;
+  // Use the dashboard's standard setCategory flow
+  callJSON('setCategory',{eid:eid,val:val});
+  // Update local data
+  for(var i=0;i<D.length;i++){if(D[i].entityId===eid){D[i].category=val;D[i].subcategory='';break;}}
+  NE_APPROVED[eid]=true;
+  renderNewEntitiesReview();
+  neUpdateBanner();
+}
+
+function neApproveItem(eid){
+  NE_APPROVED[eid]=true;
+  // Commit scanner category as firm assignment in Ruby
+  call('neApprove',JSON.stringify([eid]));
+  renderNewEntitiesReview();
+  neUpdateBanner();
+}
+
+function neApproveGroup(cat){
+  var eids=[];
+  NE_ENTITIES.forEach(function(e){
+    if((e.scannerCat||'Uncategorized')===cat && !neIsDone(e)){
+      NE_APPROVED[e.eid]=true;
+      eids.push(e.eid);
+    }
+  });
+  // Commit all scanner categories as firm assignments in Ruby
+  if(eids.length)call('neApprove',JSON.stringify(eids));
+  renderNewEntitiesReview();
+  neUpdateBanner();
+}
+
+function neUpdateBanner(){
+  var remaining=neCountRemaining();
+  var txt=document.getElementById('nebText');
+  if(remaining===0){
+    txt.innerHTML='All new entities reviewed! <b>Template can be updated.</b>';
+  }else{
+    txt.innerHTML='<b>'+remaining+'</b> of '+NE_ENTITIES.length+' new entit'+(NE_ENTITIES.length!==1?'ies':'y')+' remaining';
+  }
+}
+
+// Check if an entity is done: approved by user OR recategorized away from scanner default
+function neIsDone(e){
+  if(NE_APPROVED[e.eid])return true;
+  if(!D||!D.length)return false;
+  for(var i=0;i<D.length;i++){
+    if(D[i].entityId===e.eid){
+      var cur=D[i].category;
+      return cur!==e.scannerCat && cur!=='Uncategorized';
+    }
+  }
+  return false;
+}
+
+function neCurrentCat(e){
+  if(!D||!D.length)return e.scannerCat;
+  for(var i=0;i<D.length;i++){
+    if(D[i].entityId===e.eid)return D[i].category;
+  }
+  return e.scannerCat;
+}
+
+function neCountRemaining(){
+  var count=0;
+  NE_ENTITIES.forEach(function(e){if(!neIsDone(e))count++;});
+  return count;
+}
+
+function neShortName(name){
+  if(!name)return '?';
+  // Strip trailing hex instance ID (Revit pattern)
+  var m=name.match(/^(.+?),\s*[0-9A-Fa-f]{4,}$/);
+  if(m)return m[1];
+  return name.length>50?name.substr(0,47)+'...':name;
+}
+
+// Called after receiveData to refresh the review panel state
+function neRefreshReview(){
+  if(!NE_ENTITIES.length)return;
+  var panel=document.getElementById('neReviewPanel');
+  if(!panel||!panel.classList.contains('active'))return;
+  renderNewEntitiesReview();
+  // Update banner count
+  var remaining=neCountRemaining();
+  var txt=document.getElementById('nebText');
+  if(remaining===0){
+    txt.innerHTML='All new entities reviewed! <b>Template can be updated.</b>';
+    if(NE_ISOLATED){
+      NE_ISOLATED=false;NE_ISOLATED_CAT=null;
+      var showIds=[];NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
+      call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+    }
+  }else{
+    txt.innerHTML='<b>'+remaining+'</b> of '+NE_ENTITIES.length+' new entit'+(NE_ENTITIES.length!==1?'ies':'y')+' remaining';
+  }
+  // Re-isolate remaining new entities if isolation is active
+  if(NE_ISOLATED && remaining>0){
+    var show=[],hide=[];
+    NE_ENTITIES.forEach(function(e){
+      if(!neIsDone(e)){
+        // If isolating a specific group, only show that group's items
+        if(!NE_ISOLATED_CAT || (e.scannerCat||'Uncategorized')===NE_ISOLATED_CAT)
+          show.push(e.eid);
+        else hide.push(e.eid);
+      }else{
+        hide.push(e.eid);
+      }
+    });
+    if(show.length)call('neIsolate',JSON.stringify({show:show,hide:hide}));
+  }
 }
 
 function enterScannerMode(){
@@ -4316,6 +4800,7 @@ function togMeasCat(cat){openMeasCats[cat]=openMeasCats[cat]===false?true:false;
 function togMeasVis(eid,show){callJSON('toggleMeasurement',{eid:eid,show:show});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].visible=show;break;}}renderMeasPanel();}
 function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
+function recalcSF(){call('recalculateSF');}
 function hideMeasurements(){call('hideAllMeasurements');}
 function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();});}
 
@@ -4379,6 +4864,40 @@ function renderBenchmark(){
     else info.textContent=BMK.name+' = '+v+' '+BMK.unit;
   }else{
     bar.style.display='none';
+  }
+}
+
+/* ═══ SECTION CUTS ═══ */
+var SC_PRESETS=[],SC_ACTIVE=null;
+function receiveSectionCuts(json){
+  try{
+    var d=JSON.parse(json);
+    SC_PRESETS=d.presets||[];
+    SC_ACTIVE=d.active||null;
+  }catch(e){SC_PRESETS=[];SC_ACTIVE=null;}
+  renderSectionCuts();
+}
+function renderSectionCuts(){
+  var bar=document.getElementById('scBar');
+  var sel=document.getElementById('scSelect');
+  if(!SC_PRESETS.length){bar.style.display='none';return;}
+  bar.style.display='flex';
+  sel.innerHTML='<option value="">-- Off --</option>';
+  for(var i=0;i<SC_PRESETS.length;i++){
+    var p=SC_PRESETS[i];
+    var o=document.createElement('option');
+    o.value=p.name;
+    o.textContent=p.name;
+    if(p.active)o.selected=true;
+    sel.appendChild(o);
+  }
+  if(!SC_ACTIVE)sel.value='';
+}
+function scOnChange(sel){
+  if(sel.value){
+    call('activateSectionCut',sel.value);
+  }else{
+    call('deactivateSectionCuts');
   }
 }
 
@@ -4657,9 +5176,6 @@ function setMT(cat,mt){
   for(var i=0;i<D.length;i++){if(D[i].category===cat)D[i].measurementType=mt;}
   if(CATMT[cat])CATMT[cat].mt=mt;
   callJSON('setMeasurementType',{cat:cat,mt:mt});filt();
-  // Activate measurement tool when SF or LF unit is selected
-  if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets'||mt==='ea_sf')call('activateSFForCat',cat);
-  else if(mt==='lf'||mt==='ea_bf')call('activateLFForCat',cat);
 }
 
 function scrollToEntity(eid){

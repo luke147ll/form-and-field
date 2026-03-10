@@ -495,6 +495,16 @@ module TakeoffTool
         puts "[FF Debug]\n#{msg}"
       end
 
+      @dialog.add_action_callback('recalculateSF') do |_ctx|
+        begin
+          count = Scanner.recalculate_sf
+          send_live_data
+          @dialog.execute_script("console.log('Recalculated SF for #{count} entities')")
+        rescue => e
+          puts "Dashboard: recalculateSF error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       @dialog.add_action_callback('debugArea') do |_ctx, eid_str|
         begin
           eid = eid_str.to_i
@@ -790,6 +800,63 @@ module TakeoffTool
         TakeoffTool.activate_elevation_tool
       end
 
+      # ═══ SECTION CUTS ═══
+
+      @dialog.add_action_callback('requestSectionCuts') do |_ctx|
+        send_section_cuts
+      end
+
+      @dialog.add_action_callback('activateSectionCut') do |_ctx, name_str|
+        begin
+          name = name_str.to_s
+          puts "Dashboard: activateSectionCut '#{name}'"
+          SectionCuts.activate_cut(name)
+          send_section_cuts
+        rescue => e
+          puts "Dashboard: activateSectionCut error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      @dialog.add_action_callback('deactivateSectionCuts') do |_ctx|
+        begin
+          SectionCuts.deactivate_all
+          send_section_cuts
+        rescue => e
+          puts "Dashboard: deactivateSectionCuts error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('refreshSectionCuts') do |_ctx|
+        begin
+          SectionCuts.remove_all_planes
+          SectionCuts.cuts.clear
+          SectionCuts.build_presets
+          SectionCuts.sync_planes
+          send_section_cuts
+        rescue => e
+          puts "Dashboard: refreshSectionCuts error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      @dialog.add_action_callback('removeSectionCut') do |_ctx, name_str|
+        SectionCuts.remove_cut(name_str.to_s)
+        send_section_cuts
+      end
+
+      @dialog.add_action_callback('addCustomSectionCut') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          label = data['label'].to_s.strip
+          z = data['z'].to_f
+          next if label.empty? || z == 0
+          SectionCuts.add_custom_cut(label, z)
+          send_section_cuts
+        rescue => e
+          puts "Dashboard: addCustomSectionCut error: #{e.message}"
+        end
+      end
+
       # ═══ MULTIVERSE ═══
 
       @dialog.add_action_callback('setMultiverseView') do |_ctx, mode_str|
@@ -871,6 +938,7 @@ module TakeoffTool
           @dialog.execute_script("onSmartDiffComplete(#{JSON.generate(counts)})")
         rescue => e
           puts "SmartDiff error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+          @dialog.execute_script("hideLoading()")
         end
       end
 
@@ -894,7 +962,7 @@ module TakeoffTool
           visible = data['visible'] == true
           cats = data['categories']  # nil = all, array = filter
           SmartDiff.set_visibility(state, visible)
-          SmartDiff.repaint(category_filter: cats)
+          SmartDiff.toggle_state_fast(state, visible, category_filter: cats)
         rescue => e
           puts "setSmartDiffVisibility error: #{e.message}"
         end
@@ -1071,6 +1139,63 @@ module TakeoffTool
         ids = ids_str.to_s.split(',').map(&:to_i)
         puts "Takeoff: isolateEntities #{ids.length} items"
         Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, ids)
+      end
+
+      # NE review: approve entities — commits scanner category as a firm assignment
+      @dialog.add_action_callback('neApprove') do |_ctx, json_str|
+        begin
+          require 'json'
+          eids = JSON.parse(json_str.to_s).map(&:to_i)
+          ca = TakeoffTool.category_assignments
+          sr = TakeoffTool.scan_results
+          count = 0
+          eids.each do |eid|
+            # Get the entity's current effective category
+            cat = ca[eid]
+            if cat.nil? || cat.empty? || cat == 'Uncategorized'
+              r = sr.find { |r| r[:entity_id] == eid }
+              cat = r[:parsed][:auto_category] if r
+            end
+            next unless cat && !cat.empty? && cat != 'Uncategorized'
+            ca[eid] = cat
+            TakeoffTool.save_assignment(eid, 'category', cat)
+            count += 1
+          end
+          puts "Takeoff: neApprove committed #{count} entities"
+          send_live_data if count > 0
+        rescue => e
+          puts "Takeoff: neApprove error: #{e.message}"
+        end
+      end
+
+      # NE review isolation: only hides/shows entities in the new entities list,
+      # leaves all other scan entities untouched (no casework bleed-through)
+      @dialog.add_action_callback('neIsolate') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          show_ids = (data['show'] || []).map(&:to_i)
+          hide_ids = (data['hide'] || []).map(&:to_i)
+          show_set = show_ids.to_set
+          hide_set = hide_ids.to_set
+          m = Sketchup.active_model; next unless m
+          m.start_operation('NE Isolate', true)
+          visible = []
+          hide_ids.each do |eid|
+            e = TakeoffTool.find_entity(eid); next unless e && e.valid?
+            e.visible = false
+          end
+          show_ids.each do |eid|
+            e = TakeoffTool.find_entity(eid); next unless e && e.valid?
+            e.visible = true
+            visible << e
+          end
+          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+          m.commit_operation
+          puts "Takeoff: neIsolate show=#{show_ids.length} hide=#{hide_ids.length}"
+        rescue => e
+          puts "Takeoff: neIsolate error: #{e.message}"
+        end
       end
 
       # ═══ CUSTOM COLORS (via ColorController) ═══
@@ -1367,6 +1492,28 @@ module TakeoffTool
       @dialog.execute_script("if(typeof receiveScannerBanner==='function')receiveScannerBanner('#{esc}')")
     end
 
+    def self.send_new_entities_banner(count, by_cat)
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      cats = by_cat.sort_by { |_k, v| -v.length }.map { |cat, names| { name: cat, count: names.length } }
+      # Also send the full entity list for the review panel
+      new_ents = defined?(CategoryTemplates) ? CategoryTemplates.new_entities : []
+      entities = new_ents.map do |ne|
+        {
+          eid: ne[:entity_id],
+          name: ne[:display_name],
+          defn: ne[:definition_name],
+          tag: ne[:tag],
+          ifc: ne[:ifc_type],
+          scannerCat: ne[:scanner_category]
+        }
+      end
+      payload = { count: count, categories: cats, entities: entities }
+      js = JSON.generate(payload)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("if(typeof receiveNewEntitiesBanner==='function')receiveNewEntitiesBanner('#{esc}')")
+    end
+
     def self.send_scanner_groups
       return unless @dialog
       require 'json'
@@ -1654,6 +1801,7 @@ module TakeoffTool
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveMeasurements('#{esc}')")
       send_benchmark_data
+      send_section_cuts
     end
 
     def self.send_multiverse_data
@@ -1683,6 +1831,19 @@ module TakeoffTool
       js = bmk ? JSON.generate(bmk) : 'null'
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveBenchmark('#{esc}')")
+    end
+
+    def self.send_section_cuts
+      return unless @dialog && @dialog.visible?
+      begin
+        require 'json'
+        payload = SectionCuts.build_payload
+        js = JSON.generate(payload)
+        esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+        @dialog.execute_script("receiveSectionCuts('#{esc}')")
+      rescue => e
+        puts "Dashboard: send_section_cuts error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+      end
     end
 
     def self.visible?
