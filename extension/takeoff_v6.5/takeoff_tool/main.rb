@@ -29,6 +29,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'smart_diff.rb')
   load File.join(PLUGIN_DIR, 'category_templates.rb')
   load File.join(PLUGIN_DIR, 'section_cuts.rb')
+  load File.join(PLUGIN_DIR, 'flatten_pass.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -264,6 +265,24 @@ module TakeoffTool
 
       # Invalidate smart diff cache — model is changing
       SmartDiff.invalidate_cache rescue nil
+
+      # Flatten import hierarchy (IFC/Revit nesting) before scanning
+      if FlattenPass.needs_flatten?(m)
+        Dashboard.scan_log_status("FLATTENING HIERARCHY") rescue nil
+        Dashboard.scan_log_msg("Flattening import hierarchy...") rescue nil
+        flatten_stats = FlattenPass.run(m) do |msg|
+          Dashboard.scan_log_msg(msg)
+          if progress_dlg
+            safe = msg.to_s.gsub("\\", "\\\\").gsub("'", "\\\\'")
+            progress_dlg.execute_script("if(typeof scanMsg==='function')scanMsg('#{safe}')") rescue nil
+          end
+        end
+        # Mark model as flattened so we don't re-flatten on rescan
+        m.set_attribute('FF_Flatten', 'flattened', true)
+        msg = "Flatten complete: #{flatten_stats[:exploded]} containers removed, #{flatten_stats[:kept]} assemblies kept"
+        Dashboard.scan_log_msg(msg) rescue nil
+        puts "[FF] #{msg}"
+      end
 
       mv_active = active_mv_view
       if mv_active

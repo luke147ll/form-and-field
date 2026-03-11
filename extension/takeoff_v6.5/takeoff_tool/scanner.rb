@@ -315,6 +315,16 @@ module TakeoffTool
       display = iname || dname
       tag = inst.layer ? inst.layer.name : 'Untagged'
 
+      # Flatten pass fallback: inherit name/tag from flattened parent
+      inherited_name = inst.get_attribute('FF_Flatten', 'inherited_name') rescue nil
+      if inherited_name && display =~ /^Component\d*$/i
+        display = inherited_name
+      end
+      parent_tag = inst.get_attribute('FF_Flatten', 'parent_tag') rescue nil
+      if parent_tag && (tag == 'Untagged' || tag == 'Layer0')
+        tag = parent_tag
+      end
+
       # Compute material
       mat = nil
       if inst.material
@@ -331,6 +341,11 @@ module TakeoffTool
         if a
           ifc = a['IFC 4'] || a['IFC 2x3'] || a['IFC 4x3'] || a['IFC2x3']
         end
+      end
+      # Flatten pass fallback: inherit IFC type from flattened parent
+      if !ifc
+        parent_ifc = inst.get_attribute('FF_Flatten', 'parent_ifc_type') rescue nil
+        ifc = parent_ifc if parent_ifc
       end
 
       # Skip IFC organizational containers
