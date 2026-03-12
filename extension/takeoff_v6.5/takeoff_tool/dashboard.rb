@@ -551,6 +551,30 @@ module TakeoffTool
         TakeoffTool.activate_box_tool_for_category(cat_str.to_s)
       end
 
+      @dialog.add_action_callback('importCadSheet') do |_ctx|
+        CadOverlay.import_sheet
+      end
+
+      @dialog.add_action_callback('toggleCadSheet') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          show = data['show']
+          grp = CadOverlay.find_sheet_group(Sketchup.active_model, eid)
+          if grp && grp.layer
+            grp.layer.visible = !!show
+          end
+        rescue => e
+          puts "Dashboard: toggleCadSheet error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('deleteCadSheet') do |_ctx, eid_str|
+        CadOverlay.delete_sheet(eid_str.to_i)
+        send_cad_sheets
+      end
+
       @dialog.add_action_callback('clearNormal') do |_ctx, cat_str|
         begin
           cat = cat_str.to_s
@@ -2008,6 +2032,7 @@ module TakeoffTool
       send_assemblies
       send_parts_data
       send_multiverse_data
+      send_cad_sheets
 
       rescue => e
         puts "[FF Dashboard] send_data error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
@@ -2085,6 +2110,15 @@ module TakeoffTool
       @dialog.execute_script("receiveMeasurements('#{esc}')")
       send_benchmark_data
       send_section_cuts
+    end
+
+    def self.send_cad_sheets
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      sheets = CadOverlay.list_sheets
+      js = JSON.generate(sheets)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveCadSheets('#{esc}')")
     end
 
     def self.send_multiverse_data

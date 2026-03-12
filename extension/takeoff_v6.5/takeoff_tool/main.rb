@@ -31,6 +31,8 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'category_templates.rb')
   load File.join(PLUGIN_DIR, 'section_cuts.rb')
   load File.join(PLUGIN_DIR, 'flatten_pass.rb')
+  load File.join(PLUGIN_DIR, 'annotation_tags.rb')
+  load File.join(PLUGIN_DIR, 'cad_overlay.rb')
 
   @scan_results = []
   @category_assignments = {}
@@ -128,6 +130,7 @@ module TakeoffTool
     sub.add_item('Set Elevation Benchmark') { TakeoffTool.activate_benchmark_tool }
     sub.add_item('Elevation Tag Tool') { TakeoffTool.activate_elevation_tool }
     sub.add_item('Note Tag Tool') { TakeoffTool.activate_note_tool }
+    sub.add_item('Annotation Tag Tool') { TakeoffTool.activate_annotation_tag_tool }
     sub.add_item('📦 Box Measure Tool') { TakeoffTool.activate_box_tool }
     nav_cmd = UI::Command.new('Precision Navigation') { PrecisionNav.toggle }
     nav_cmd.set_validation_proc { PrecisionNav.enabled? ? MF_CHECKED : MF_UNCHECKED }
@@ -144,6 +147,9 @@ module TakeoffTool
     mv_sub = sub.add_submenu('Multiverse')
     mv_sub.add_item('Import Comparison Model') { TakeoffTool.import_comparison_model }
     mv_sub.add_item('Remove Comparison Model') { TakeoffTool.remove_comparison_model }
+    cad_sub = sub.add_submenu('CAD Overlays')
+    cad_sub.add_item('Import DWG Sheet') { TakeoffTool.import_cad_sheet }
+    cad_sub.add_item('Manage Overlays') { TakeoffTool.show_cad_manager }
     sub.add_separator
     sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
@@ -219,6 +225,14 @@ module TakeoffTool
     cmd_note.status_bar_text = "Click a point to place a text note annotation"
     cmd_note.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_note)
+
+    cmd_anno = UI::Command.new("Annotation Tag") { TakeoffTool.activate_annotation_tag_tool }
+    cmd_anno.small_icon = File.join(PLUGIN_DIR, "icons", "note_tag_24.png")
+    cmd_anno.large_icon = File.join(PLUGIN_DIR, "icons", "note_tag_32.png")
+    cmd_anno.tooltip = "Annotation Tag — Gridlines, Sections, Details"
+    cmd_anno.status_bar_text = "Click to place numbered/lettered annotation tags"
+    cmd_anno.set_validation_proc { MF_ENABLED }
+    toolbar.add_item(cmd_anno)
 
     # Dev reload button (only in debug mode)
     if Sketchup.read_default("FormAndField", "debug_mode", false)
@@ -1510,13 +1524,22 @@ module TakeoffTool
     (grp && grp.valid? && grp.is_a?(Sketchup::Group)) ? grp : nil
   end
 
+  # Count active definitions excluding CAD overlay groups
+  def self.scannable_def_count(model)
+    cad_defs = {}
+    model.active_entities.grep(Sketchup::Group).each do |grp|
+      next unless grp.valid? && grp.get_attribute('FF_CadOverlay', 'sheet_name')
+      Scanner.mark_cad_skip_defs(grp.definition, cad_defs) if grp.respond_to?(:definition)
+    end
+    model.definitions.count { |d| !d.image? && d.instances.length > 0 && !cad_defs[d] }
+  end
+
   # Save model-level scan metadata
   def self.save_scan_metadata(model)
     model.set_attribute('FormAndField', 'scan_version', PLUGIN_VERSION)
     model.set_attribute('FormAndField', 'scan_time', Time.now.to_i)
     model.set_attribute('FormAndField', 'scan_count', @scan_results.length)
-    model.set_attribute('FormAndField', 'def_count',
-      model.definitions.count { |d| !d.image? && d.instances.length > 0 })
+    model.set_attribute('FormAndField', 'def_count', scannable_def_count(model))
   end
 
   # Persist scan results to entity attributes so data survives between sessions
@@ -1670,11 +1693,19 @@ module TakeoffTool
     load_manual_measurements
     load_multiverse_data
 
-    # Change detection
+    # Change detection (exclude CAD overlays from count)
     saved_defs = m.get_attribute('FormAndField', 'def_count') || 0
-    current_defs = m.definitions.count { |dd| !dd.image? && dd.instances.length > 0 }
-    if saved_defs > 0 && (current_defs - saved_defs).abs > [saved_defs * 0.1, 5].max
-      puts "Takeoff: WARNING - Model changed since last scan (#{saved_defs} -> #{current_defs} active defs). Consider rescanning."
+    current_scannable = scannable_def_count(m)
+    current_full = m.definitions.count { |d| !d.image? && d.instances.length > 0 }
+
+    if saved_defs > 0
+      if saved_defs == current_full && current_full != current_scannable
+        # Stored count used old method (included CAD) — migrate silently
+        m.set_attribute('FormAndField', 'def_count', current_scannable)
+        puts "Takeoff: Migrated def_count to exclude CAD overlays (#{saved_defs} -> #{current_scannable})"
+      elsif (current_scannable - saved_defs).abs > [saved_defs * 0.1, 5].max
+        puts "Takeoff: WARNING - Model changed since last scan (#{saved_defs} -> #{current_scannable} active defs). Consider rescanning."
+      end
     end
 
     puts "Takeoff: Loaded #{@scan_results.length} elements from saved scan data"
@@ -1703,11 +1734,11 @@ module TakeoffTool
       load_multiverse_data rescue nil
     end
 
-    # Check staleness
+    # Check staleness (exclude CAD overlays from count)
     m = Sketchup.active_model
     if m
       saved_defs = m.get_attribute('FormAndField', 'def_count') || 0
-      current_defs = m.definitions.count { |d| !d.image? && d.instances.length > 0 }
+      current_defs = scannable_def_count(m)
       if saved_defs > 0 && (current_defs - saved_defs).abs > [saved_defs * 0.1, 5].max
         r = UI.messagebox("Model appears to have changed since last scan.\nRescan now?", MB_YESNO)
         return run_scan if r == IDYES

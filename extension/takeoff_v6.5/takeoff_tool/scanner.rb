@@ -186,6 +186,13 @@ module TakeoffTool
       all_parts = TakeoffTool.load_parts rescue {}
       parts_found = 0
 
+      # Pre-collect CAD overlay group definitions so scanner skips them
+      cad_overlay_defs = {}
+      model.active_entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid? && grp.get_attribute('FF_CadOverlay', 'sheet_name')
+        mark_cad_skip_defs(grp.definition, cad_overlay_defs) if grp.respond_to?(:definition)
+      end
+
       defs = model.definitions.select { |d| !d.image? }
       total_defs = defs.length
       progress.call("Found #{total_defs} definitions to process#{filter_label}") if progress
@@ -215,6 +222,9 @@ module TakeoffTool
             parts_found += 1
             next
           end
+
+          # Skip entities inside CAD overlay groups
+          next if cad_overlay_defs[inst.parent]
 
           # Skip entities nested inside a part group (their parent def is a part)
           if inst.parent.is_a?(Sketchup::ComponentDefinition)
@@ -591,6 +601,18 @@ module TakeoffTool
     #   5.   Keyword Scan      (LOW)           — all models (name+tag+mat keywords)
     #   6.   Material Fallback (LOW)           — all models (material name only)
     # ═══════════════════════════════════════════════════════════
+
+    # Recursively mark definitions inside CAD overlays for scanner skip
+    # Handles both Groups and ComponentInstances (DWG imports create ComponentInstances)
+    def self.mark_cad_skip_defs(defn, skip_set)
+      skip_set[defn] = true
+      defn.entities.each do |e|
+        if (e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)) && e.respond_to?(:definition)
+          next if skip_set[e.definition]  # avoid cycles
+          mark_cad_skip_defs(e.definition, skip_set)
+        end
+      end
+    end
 
     def self.scan_entity(inst, defn, display, tag, mat, ifc_type)
       # Strategy 0: Steel shape early-exit — W shapes, HSS, plates, L-angles, C-channels

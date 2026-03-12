@@ -1041,6 +1041,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <div class="info-tab" data-tab="assemblies" onclick="switchInfoTab('assemblies')">Assemblies</div>
     <div class="info-tab" data-tab="multiverse" onclick="switchInfoTab('multiverse')">Multiverse</div>
     <div class="info-tab" data-tab="scenes" onclick="switchInfoTab('scenes')">Scenes</div>
+    <div class="info-tab" data-tab="cad" onclick="switchInfoTab('cad')">CAD</div>
     <div class="info-tab-underline" id="tabUnderline"></div>
   </div>
 
@@ -1154,6 +1155,20 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <div class="sec-scroll-fade" id="scenesFade"></div>
       </div>
     </div>
+
+    <!-- CAD OVERLAYS TAB -->
+    <div class="info-content" id="tab_cad">
+      <div class="mp-toolbar" style="justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;color:#89b4fa">CAD Overlays</span>
+        <button class="hb" onclick="call('importCadSheet')" style="font-size:10px;padding:2px 6px;color:#89b4fa;border-color:#89b4fa">+ Import DWG</button>
+      </div>
+      <div class="sec-scroll" id="cadScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
+        <div id="cadBody"></div>
+        <div id="cadEmpty" class="notes-empty">No CAD sheets imported. Use Import DWG to overlay floor plans.</div>
+        <div class="sec-scroll-fade" id="cadFade"></div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -4983,6 +4998,28 @@ function hideAllMeas(){call('hideAllMeasurements');}
 function recalcSF(){call('recalculateSF');}
 function hideMeasurements(){call('hideAllMeasurements');}
 function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();});}
+
+/* ═══ CAD OVERLAYS ═══ */
+var CAD_SHEETS=[];
+function receiveCadSheets(json){try{CAD_SHEETS=JSON.parse(json);}catch(e){CAD_SHEETS=[];}renderCadPanel();}
+function renderCadPanel(){
+  var el=document.getElementById('cadBody'),emp=document.getElementById('cadEmpty');
+  if(!CAD_SHEETS.length){el.innerHTML='';emp.style.display='';return;}
+  emp.style.display='none';
+  var h='';
+  for(var i=0;i<CAD_SHEETS.length;i++){
+    var s=CAD_SHEETS[i],vis=!!s.visible;
+    h+='<div class="mp-item" style="flex-wrap:wrap">';
+    h+='<button class="ey'+(vis?'':' off')+'" onclick="togCad('+s.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    h+='<span class="mp-desc" style="color:#89b4fa;font-weight:600">'+X(s.name)+'</span>';
+    h+='<span class="mp-val" style="color:#6c7086;font-size:11px">EL. '+s.elevation_ft.toFixed(1)+"'</span>";
+    h+='<button class="mp-del" onclick="delCad('+s.eid+',\''+X2(s.name)+'\')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+function togCad(eid,show){callJSON('toggleCadSheet',{eid:eid,show:show});for(var i=0;i<CAD_SHEETS.length;i++){if(CAD_SHEETS[i].eid===eid){CAD_SHEETS[i].visible=show;break;}}renderCadPanel();}
+function delCad(eid,name){showConfirmModal('Delete CAD sheet "'+name+'"? This cannot be undone.',function(){call('deleteCadSheet',''+eid);CAD_SHEETS=CAD_SHEETS.filter(function(s){return s.eid!==eid;});renderCadPanel();});}
 
 function editElevLabel(eid,span){
   var it=MEAS.find(function(m){return m.eid===eid;});
