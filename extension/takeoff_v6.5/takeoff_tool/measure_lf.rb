@@ -90,25 +90,27 @@ module TakeoffTool
   class MeasureLFTool
 
     def initialize(preset_category = nil)
-      @segments = [[]]    # Array of arrays of Point3d — each sub-array is a connected chain
+      @segments = [[]]
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
       @mouse_pt = nil
       @total_lf = 0.0
       @preset_category = preset_category
-      @dialog_open = false
-      @lock_mode = :free    # :free, :horiz, :vert
-      @lock_z = nil         # Z value to lock to in :horiz mode
-      @lock_xy = nil        # [x,y] to lock to in :vert mode
+      @panel = nil
+      @save_pending = false
+      @lock_mode = :free
+      @lock_z = nil
+      @lock_xy = nil
     end
 
     def activate
       reset_full
+      open_panel
       update_status
     end
 
     def deactivate(view)
-      @pick_dlg.close if @pick_dlg rescue nil
+      close_panel
       reset_full
       view.invalidate
     end
@@ -121,7 +123,7 @@ module TakeoffTool
     # ─── Mouse ───
 
     def onMouseMove(flags, x, y, view)
-      return if @dialog_open
+      return if @save_pending
       @ip.pick(view, x, y, @ip_start)
       if @ip.valid?
         @mouse_pt = apply_lock(@ip.position)
@@ -131,20 +133,24 @@ module TakeoffTool
     end
 
     def onLButtonDown(flags, x, y, view)
-      return if @dialog_open
+      return if @save_pending
       @ip.pick(view, x, y, @ip_start)
       return unless @ip.valid?
+
+      # Auto-detect category from the first clicked entity
+      if total_points == 0
+        cat = detect_category_at(x, y, view)
+        set_panel_category(cat) if cat
+      end
 
       pt = apply_lock(@ip.position)
       chain = @segments.last
 
-      # Set lock reference from first point in chain
       if chain.empty? && @lock_mode != :free
         @lock_z = pt.z if @lock_mode == :horiz
         @lock_xy = [pt.x, pt.y] if @lock_mode == :vert
       end
 
-      # Add segment length to total
       if chain.length > 0
         @total_lf += chain.last.distance(pt)
       end
@@ -154,43 +160,42 @@ module TakeoffTool
 
       update_vcb
       update_status
+      update_panel
       view.invalidate
     end
 
     def onLButtonDoubleClick(flags, x, y, view)
-      return if @dialog_open
-      finish_measurement(view) if total_points >= 2
+      trigger_save if total_points >= 2
     end
 
     # ─── Right-click: start a new disconnected segment ───
     def onRButtonDown(flags, x, y, view)
-      # Only start new segment if current chain has points
       if @segments.last.length > 0
         @segments << []
         @ip_start = Sketchup::InputPoint.new
         @lock_z = nil
         @lock_xy = nil
         update_status
+        update_panel
         view.invalidate
       end
     end
 
     def getMenu(menu, flags, x, y, view)
-      # Suppress default context menu — we handle right-click for new segment
       menu.add_item("Start New Segment") { onRButtonDown(flags, x, y, view) }
       if total_points >= 2
-        menu.add_item("Finish (#{format_length(@total_lf)})") { finish_measurement(view) }
+        menu.add_item("Save (#{format_length(@total_lf)})") { trigger_save }
       end
       menu.add_item("Cancel") { cancel(view) }
-      true  # return true to show our custom menu
+      true
     end
 
     # ─── Keyboard ───
 
     def onKeyDown(key, repeat, flags, view)
       case key
-      when 13 # Enter — finish
-        finish_measurement(view) if total_points >= 2
+      when 13
+        trigger_save if total_points >= 2
       when 0x48 # H — toggle horizontal lock
         if @lock_mode == :horiz
           @lock_mode = :free
@@ -214,13 +219,18 @@ module TakeoffTool
         end
         update_status
         view.invalidate
+      when 27
+        cancel(view)
       end
+    end
+
+    def onCancel(reason, view)
+      cancel(view)
     end
 
     # ─── Draw ───
 
     def draw(view)
-      # Draw all completed segments
       @segments.each do |chain|
         next if chain.length < 2
         chain.each_cons(2) do |a, b|
@@ -231,25 +241,20 @@ module TakeoffTool
         end
       end
 
-      # Draw all placed points
-      all_pts = @segments.flatten
-      # flatten doesn't work on Point3d arrays, collect them
       pts = []
       @segments.each { |chain| chain.each { |p| pts << p } }
       if pts.length > 0
         view.draw_points(pts, 8, 2, Sketchup::Color.new(255, 200, 80))
       end
 
-      # Draw rubber-band to cursor (hidden while save dialog is open)
       chain = @segments.last
-      if chain.length >= 1 && @mouse_pt && !@dialog_open
+      if chain.length >= 1 && @mouse_pt
         view.drawing_color = Sketchup::Color.new(255, 80, 255, 128)
         view.line_width = 2
         view.line_stipple = '_'
         view.draw_line(chain.last, @mouse_pt)
         view.line_stipple = ''
 
-        # Show measurements near cursor
         seg = chain.last.distance(@mouse_pt)
         running = @total_lf + seg
         mid = Geom::Point3d.linear_combination(0.5, chain.last, 0.5, @mouse_pt)
@@ -258,7 +263,6 @@ module TakeoffTool
           color: Sketchup::Color.new(255, 220, 100))
       end
 
-      # Show total near first point if we have measurements
       if pts.length > 0 && @total_lf > 0
         screen = view.screen_coords(pts.first)
         screen.y -= 20
@@ -276,6 +280,163 @@ module TakeoffTool
 
     private
 
+    # ─── Panel ───
+
+    def open_panel
+      all_cats = TakeoffTool.master_categories
+      default_cat = @preset_category || @last_cat || 'Trim'
+      cat_opts = all_cats.map { |c|
+        sel = c == default_cat ? ' selected' : ''
+        "<option value=\"#{c}\"#{sel}>#{c}</option>"
+      }.join
+      cat_opts += '<option value="__custom__">+ Custom...</option>'
+
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "LF Measurement",
+        width: 260, height: 440,
+        left: 80, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+
+      lf_tool = self
+
+      @panel.add_action_callback('save') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['cat'].to_s.strip
+          cc  = data['cc'].to_s
+          note = data['note'].to_s
+          part_name = data['name'].to_s.strip
+          lf_tool.send(:save_measurement, cat, cc, note, part_name) unless cat.empty?
+        rescue => e
+          puts "Takeoff LF: save error: #{e.message}"
+        end
+      end
+
+      @panel.add_action_callback('cancel') do |_ctx|
+        Sketchup.active_model.select_tool(nil)
+      end
+
+      @panel.set_on_closed do
+        @panel = nil
+        UI.start_timer(0) { Sketchup.active_model.select_tool(nil) }
+      end
+
+      @panel.set_html(lf_panel_html(cat_opts))
+      @panel.show
+    end
+
+    def close_panel
+      return unless @panel
+      p = @panel
+      @panel = nil
+      begin; p.set_on_closed {}; p.close; rescue; end
+    end
+
+    def update_panel
+      return unless @panel
+      require 'json'
+      total_str = format_length(@total_lf)
+      pts = total_points
+      segs = @segments.select { |c| c.length >= 2 }.length
+      @panel.execute_script("updateTotal(#{JSON.generate(total_str)},#{pts},#{segs})") rescue nil
+    end
+
+    def trigger_save
+      return unless @panel && total_points >= 2
+      @save_pending = true
+      @panel.bring_to_front rescue nil
+      @panel.execute_script("focusName()") rescue nil
+    end
+
+    def lf_panel_html(cat_options)
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow:hidden}
+        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
+        .total-val{font-size:28px;font-weight:700;color:#a6e3a1;text-align:center;margin:4px 0 2px}
+        .total-detail{font-size:11px;color:#6c7086;text-align:center;margin-bottom:10px}
+        .divider{height:1px;background:#313244;margin:0 -14px 10px}
+        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:3px;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        label:first-of-type{margin-top:0}
+        select,input[type=text]{width:100%;padding:7px 9px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
+        select:focus,input:focus{outline:none;border-color:#89b4fa}
+        .btns{display:flex;gap:8px;margin-top:14px}
+        .btn{flex:1;padding:8px 0;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
+        .btn-save{background:#a6e3a1;color:#1e1e2e}
+        .btn-save:hover:not(:disabled){background:#8cd68c}
+        .btn-save:disabled{opacity:0.4;cursor:default}
+        .btn-cancel{background:#45475a;color:#cdd6f4}
+        .btn-cancel:hover{background:#585b70}
+        #customRow{display:none;margin-top:6px}
+        #customRow.show{display:block}
+        </style></head><body>
+        <div class="hdr">LF Measurement</div>
+        <div class="total-val" id="totalVal">0'-0"</div>
+        <div class="total-detail" id="totalDetail">Click to start measuring</div>
+        <div class="divider"></div>
+        <label>Name</label>
+        <input id="name" type="text" placeholder="e.g. Drip Edge, Crown Mold...">
+        <label>Category</label>
+        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
+        <div id="customRow"><input id="customName" type="text" placeholder="New category name..."></div>
+        <label>Cost Code</label>
+        <input id="cc" type="text" placeholder="Optional">
+        <label>Note</label>
+        <input id="note" type="text" placeholder="Optional">
+        <div class="btns">
+          <button class="btn btn-cancel" onclick="doCancel()">Cancel</button>
+          <button class="btn btn-save" id="saveBtn" onclick="doSave()" disabled>Save</button>
+        </div>
+        <script>
+        function updateTotal(totalStr,points,segments){
+          document.getElementById('totalVal').textContent=totalStr;
+          var d=points+' point'+(points!==1?'s':'');
+          if(segments>1) d+=' \\u00b7 '+segments+' segment'+(segments!==1?'s':'');
+          document.getElementById('totalDetail').textContent=d;
+          document.getElementById('saveBtn').disabled=points<2;
+        }
+        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
+        function doSave(){
+          var cat=document.getElementById('cat').value;
+          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
+          if(document.getElementById('saveBtn').disabled)return;
+          sketchup.save(JSON.stringify({name:document.getElementById('name').value,cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
+        }
+        function doCancel(){sketchup.cancel();}
+        function focusName(){document.getElementById('name').focus();}
+        function setCategory(cat){var sel=document.getElementById('cat');for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===cat){sel.selectedIndex=i;onCatChange();return;}}}
+        document.addEventListener('keydown',function(e){if(e.key==='Escape')doCancel();});
+        </script>
+        </body></html>
+      HTML
+    end
+
+    def detect_category_at(x, y, view)
+      ph = view.pick_helper
+      ph.do_pick(x, y)
+      path = ph.path_at(0)
+      return nil unless path
+      assignments = TakeoffTool.category_assignments
+      path.each do |ent|
+        next unless ent.respond_to?(:entityID)
+        cat = assignments[ent.entityID]
+        return cat if cat
+      end
+      nil
+    end
+
+    def set_panel_category(cat)
+      return unless @panel
+      require 'json'
+      @panel.execute_script("setCategory(#{JSON.generate(cat)})") rescue nil
+    end
+
+    # ─── Helpers ───
+
     def total_points
       @segments.reduce(0) { |s, chain| s + chain.length }
     end
@@ -288,6 +449,7 @@ module TakeoffTool
       @segments = [[]]
       @mouse_pt = nil
       @total_lf = 0.0
+      @save_pending = false
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
       @lock_z = nil
@@ -325,12 +487,12 @@ module TakeoffTool
              else ""
              end
       if n == 0
-        Sketchup.status_text = "LF Tool:#{lock} Click to start. H=horiz lock, V=vert lock. Right-click=new seg. Enter=finish."
+        Sketchup.status_text = "LF Tool:#{lock} Click to start. H=horiz lock, V=vert lock. Right-click=new seg. Enter=save."
       elsif n == 1
         Sketchup.status_text = "LF Tool:#{lock} Click next point. H=toggle horiz, V=toggle vert."
       else
         seg_info = segs > 1 ? " (#{segs} segments)" : ""
-        Sketchup.status_text = "LF Tool:#{lock} #{format_length(@total_lf)}#{seg_info} — Click to continue, Enter/Dbl-click to finish."
+        Sketchup.status_text = "LF Tool:#{lock} #{format_length(@total_lf)}#{seg_info} — Click to continue, Enter/Dbl-click to save."
       end
     end
 
@@ -361,9 +523,9 @@ module TakeoffTool
       "#{n}/#{d}"
     end
 
-    # ─── Finish and create artifact ───
+    # ─── Save ───
 
-    def finish_measurement(view)
+    def save_measurement(cat, cc, note, part_name = '')
       return if total_points < 2
 
       total_inches = 0.0
@@ -371,106 +533,25 @@ module TakeoffTool
         chain.each_cons(2) { |a, b| total_inches += a.distance(b) }
       end
       total_ft = total_inches / 12.0
-      saved_segments = @segments.map { |c| c.dup }
-      lf_tool = self
 
-      default_cat = @preset_category || @last_cat || 'Trim'
-      all_cats = TakeoffTool.master_categories
-      cat_options = all_cats.map { |c|
-        sel = c == default_cat ? ' selected' : ''
-        "<option value=\"#{c}\"#{sel}>#{c}</option>"
-      }.join
-      cat_options += '<option value="__custom__">+ Custom...</option>'
-
-      html = <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8">
-        <style>#{PICK_DIALOG_CSS}
-        body{overflow-y:auto}
-        #customRow{display:none;margin-top:8px}
-        #customRow.show{display:block}
-        #customName{width:100%;padding:8px 10px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:6px;font-size:13px;font-family:inherit}
-        #customName:focus{outline:none;border-color:#89b4fa}
-        </style></head><body>
-        <h1>LF Measurement &mdash; #{'%.1f' % total_ft} ft</h1>
-        <label>Category</label>
-        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
-        <div id="customRow"><label>New category name</label><input id="customName" type="text" placeholder="Enter name..."></div>
-        <label>Cost Code (optional)</label>
-        <input id="cc" type="text" value="#{(@last_cc || '').gsub('"', '&quot;')}">
-        <label>Note (optional)</label>
-        <input id="note" type="text" value="">
-        <div class="buttons">
-          <button class="btn btn-cancel" onclick="sketchup.cancel()">Cancel</button>
-          <button class="btn btn-ok" onclick="doOk()">OK</button>
-        </div>
-        <script>
-        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
-        function doOk(){
-          var cat=document.getElementById('cat').value;
-          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
-          sketchup.ok(JSON.stringify({cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
-        }
-        document.addEventListener('keydown',function(e){if(e.key==='Escape')sketchup.cancel();});
-        </script>
-        </body></html>
-      HTML
-
-      @pick_dlg.close if @pick_dlg rescue nil
-      @pick_dlg = UI::HtmlDialog.new(
-        dialog_title: "LF Measurement",
-        preferences_key: "TakeoffLFPick",
-        width: 320, height: 400,
-        left: 200, top: 200,
-        resizable: false,
-        style: UI::HtmlDialog::STYLE_DIALOG
-      )
-
-      @pick_dlg.add_action_callback('ok') do |_ctx, json_str|
-        @pick_dlg.close rescue nil
-        begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          cat = data['cat'].to_s.strip
-          cc = data['cc'].to_s
-          note = data['note'].to_s
-          unless cat.empty?
-            lf_tool.send(:on_lf_ok, cat, cc, note,
-                          total_ft, total_inches, saved_segments, view)
-          end
-        rescue => e
-          puts "Takeoff LF: OK callback error: #{e.message}"
-        end
-      end
-
-      @pick_dlg.add_action_callback('cancel') do |_ctx|
-        @pick_dlg.close rescue nil
-        @dialog_open = false
-        Sketchup.status_text = "LF Tool: Cancelled. Click to start a new measurement."
-        lf_tool.send(:reset_full)
-        view.invalidate
-      end
-
-      @dialog_open = true
-      @mouse_pt = nil
-      @pick_dlg.set_html(html)
-      @pick_dlg.show
-    end
-
-    def on_lf_ok(cat, cc, note, total_ft, total_inches, saved_segments, view)
-      @dialog_open = false
-      # Persist custom category if new
       TakeoffTool.add_custom_category(cat) unless TakeoffTool.master_categories.include?(cat)
       @last_cat = cat
       @last_cc = cc
       @last_note = note
-      orig = @segments
-      @segments = saved_segments
+      @last_part_name = part_name || ''
+
+      # Set category measurement type to LF if not already set
+      m = Sketchup.active_model
+      existing_mt = m.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
+      m.set_attribute('TakeoffMeasurementTypes', cat, 'lf') if !existing_mt || existing_mt.empty?
+
       create_ribbon_artifact(cat, total_ft, total_inches)
       add_to_results(cat, total_ft, total_inches)
-      @segments = orig
-      Sketchup.status_text = "LF Tool: Saved #{format_length(total_inches)} of #{cat}. Click to start a new measurement."
+
+      Sketchup.status_text = "LF Tool: Saved #{format_length(total_inches)} of #{cat}. Click to start new measurement."
       reset_full
-      view.invalidate
+      update_panel
+      Sketchup.active_model.active_view.invalidate
     end
 
     # ─── Create colored ribbon (thin face strip) for visibility ───
@@ -479,14 +560,13 @@ module TakeoffTool
       model = Sketchup.active_model
       model.start_operation('LF Measurement', true)
 
-      # Ensure tag exists
       tag = model.layers[LF_TAG] || model.layers.add(LF_TAG)
 
       grp = model.active_entities.add_group
       grp.layer = tag
-      grp.name = "TO_LF: #{cat} #{'%.1f' % total_ft} ft"
+      pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
+      grp.name = pn ? "TO_LF: #{pn} — #{cat} — #{'%.1f' % total_ft} ft" : "TO_LF: #{cat} — #{'%.1f' % total_ft} ft"
 
-      # Create a semi-transparent material for the ribbon
       rgba = LF_COLORS[cat] || LF_DEFAULT_COLOR
       mat_name = "TO_LF_#{cat.gsub(/\s+/,'_')}"
       mat = model.materials[mat_name]
@@ -496,7 +576,6 @@ module TakeoffTool
         mat.alpha = (rgba[3] || 160) / 255.0
       end
 
-      # For each segment chain, create ribbon faces
       @segments.each do |chain|
         next if chain.length < 2
         chain.each_cons(2) do |a, b|
@@ -504,7 +583,6 @@ module TakeoffTool
         end
       end
 
-      # Also add plain edges as backup (visible in wireframe mode)
       @segments.each do |chain|
         next if chain.length < 2
         chain.each_cons(2) do |a, b|
@@ -513,9 +591,9 @@ module TakeoffTool
         end
       end
 
-      # Store measurement data
       grp.set_attribute('TakeoffMeasurement', 'type', 'LF')
       grp.set_attribute('TakeoffMeasurement', 'category', cat)
+      grp.set_attribute('TakeoffMeasurement', 'part_name', @last_part_name || '')
       grp.set_attribute('TakeoffMeasurement', 'total_inches', total_inches)
       grp.set_attribute('TakeoffMeasurement', 'total_ft', total_ft)
       grp.set_attribute('TakeoffMeasurement', 'cost_code', @last_cc || '')
@@ -534,18 +612,13 @@ module TakeoffTool
       grp
     end
 
-    # Create a thin ribbon face between two points
     def add_ribbon_segment(entities, pt_a, pt_b, mat)
-      # Direction vector along the segment
       dir = pt_b.vector_to(pt_a).reverse
       return if dir.length < 0.001
 
-      # Find a perpendicular offset vector for ribbon width
-      # Try crossing with Z axis first
       up = Geom::Vector3d.new(0, 0, 1)
       perp = dir.cross(up)
 
-      # If segment is vertical, cross with X axis instead
       if perp.length < 0.001
         perp = dir.cross(Geom::Vector3d.new(1, 0, 0))
       end
@@ -554,7 +627,6 @@ module TakeoffTool
       perp.normalize!
       offset = perp.transform(Geom::Transformation.scaling(RIBBON_WIDTH / 2.0))
 
-      # Four corners of the ribbon
       p1 = pt_a.offset(offset)
       p2 = pt_a.offset(offset.reverse)
       p3 = pt_b.offset(offset.reverse)
@@ -567,19 +639,20 @@ module TakeoffTool
           face.back_material = mat
         end
       rescue => e
-        # If face creation fails (collinear points etc), just add an edge
         puts "Takeoff LF: ribbon face failed: #{e.message}"
       end
     end
 
     def add_to_results(cat, total_ft, total_inches)
       seg_count = @segments.select{|c| c.length >= 2}.length
+      pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
+      display = pn ? "#{pn} — #{cat} — #{'%.1f' % total_ft} LF" : "#{cat} — #{'%.1f' % total_ft} LF"
 
       result = {
         entity_id: @last_grp_eid,
         tag: LF_TAG,
-        definition_name: "Manual LF: #{cat}",
-        display_name: "📏 #{cat} — #{'%.1f' % total_ft} LF#{seg_count > 1 ? " (#{seg_count} segs)" : ''}#{@last_note && !@last_note.empty? ? ' — ' + @last_note : ''}",
+        definition_name: display,
+        display_name: display,
         material: '',
         is_solid: false,
         instance_count: 1,
@@ -592,7 +665,8 @@ module TakeoffTool
         warnings: [],
         parsed: {
           auto_category: cat,
-          element_type: 'Manual Measurement',
+          auto_subcategory: pn || '',
+          element_type: cat,
           function: 'LF',
           material: @last_note || '',
           thickness: '',
@@ -611,7 +685,6 @@ module TakeoffTool
         end
       end
 
-      # Refresh dashboard
       d = Dashboard.instance_variable_get(:@dialog)
       if d && d.visible?
         Dashboard.send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
@@ -643,24 +716,38 @@ module TakeoffTool
       next if mtype == 'BENCHMARK'
       next if mtype == 'NOTE'
 
+      part_name = grp.get_attribute('TakeoffMeasurement', 'part_name') || ''
+      vol_cf = 0
+
       if mtype == 'SF'
-        display = "📐 #{cat} — #{'%.1f' % total_sf} SF (#{face_count} face#{'s' if face_count>1})#{note && !note.empty? ? ' — ' + note : ''}"
+        display = part_name.empty? ? "#{cat} — #{'%.1f' % total_sf} SF" : "#{part_name} — #{cat} — #{'%.1f' % total_sf} SF"
         lf_val = 0.0
         sf_val = total_sf
+      elsif mtype == 'BOX'
+        w_in = grp.get_attribute('TakeoffMeasurement', 'width_in') || 0
+        d_in = grp.get_attribute('TakeoffMeasurement', 'depth_in') || 0
+        h_in = grp.get_attribute('TakeoffMeasurement', 'height_in') || 0
+        vol_cf = grp.get_attribute('TakeoffMeasurement', 'volume_cf') || 0
+        total_sf_val = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+        perim_lf = grp.get_attribute('TakeoffMeasurement', 'perimeter_lf') || 0
+        display = part_name.empty? ? "#{cat} — #{format_box_dim(w_in)} x #{format_box_dim(d_in)} x #{format_box_dim(h_in)}" : "#{part_name} — #{cat} — #{'%.1f' % vol_cf} CF"
+        lf_val = perim_lf
+        sf_val = total_sf_val
       elsif mtype == 'ELEV'
         elev_label = grp.get_attribute('TakeoffMeasurement', 'elevation_label') || ''
-        display = "📍 #{elev_label}"
+        display = elev_label
         lf_val = 0.0
         sf_val = 0.0
       else
-        display = "📏 #{cat} — #{'%.1f' % total_ft} LF#{seg_count > 1 ? " (#{seg_count} segs)" : ''}#{note && !note.empty? ? ' — ' + note : ''}"
+        display = part_name.empty? ? "#{cat} — #{'%.1f' % total_ft} LF" : "#{part_name} — #{cat} — #{'%.1f' % total_ft} LF"
         lf_val = total_ft
         sf_val = 0.0
       end
 
-      el_type = mtype == 'ELEV' ? 'Elevation Tag' : 'Manual Measurement'
+      el_type = mtype == 'ELEV' ? 'Elevation Tag' : cat
       src = case mtype
             when 'SF' then :manual_sf
+            when 'BOX' then :manual_box
             when 'ELEV' then :elevation_tag
             else :manual_lf
             end
@@ -668,12 +755,12 @@ module TakeoffTool
       result = {
         entity_id: grp.entityID,
         tag: mtype == 'ELEV' ? (defined?(ELEV_TAG) ? ELEV_TAG : 'FF_Elevation_Tags') : LF_TAG,
-        definition_name: mtype == 'ELEV' ? 'Elevation Tag' : "Manual #{mtype}: #{cat}",
+        definition_name: display,
         display_name: display,
         material: '',
-        is_solid: false,
+        is_solid: (mtype == 'BOX'),
         instance_count: 1,
-        volume_ft3: 0.0,
+        volume_ft3: vol_cf,
         volume_bf: 0.0,
         area_sf: sf_val,
         linear_ft: lf_val,
@@ -682,6 +769,7 @@ module TakeoffTool
         warnings: [],
         parsed: {
           auto_category: cat,
+          auto_subcategory: part_name.empty? ? '' : part_name,
           element_type: el_type,
           function: mtype,
           material: note,
@@ -701,6 +789,15 @@ module TakeoffTool
 
     puts "Takeoff: Loaded #{count} manual measurements from model" if count > 0
     count
+  end
+
+  def self.format_box_dim(inches)
+    return "0'-0\"" if inches.nil? || inches.to_f < 0.001
+    inches = inches.to_f.abs
+    ft = (inches / 12.0).floor
+    ins = inches - (ft * 12)
+    whole = ins.floor
+    "#{ft}'-#{whole}\""
   end
 
   def self.activate_lf_tool

@@ -10,8 +10,8 @@ module TakeoffTool
 
       @dialog = UI::HtmlDialog.new(
         dialog_title: "Form and Field",
-        preferences_key: "TakeoffStartup",
-        width: 420, height: 420,
+        preferences_key: "TakeoffStartup3",
+        width: 420, height: 480,
         left: 200, top: 200,
         resizable: false,
         style: UI::HtmlDialog::STYLE_DIALOG
@@ -22,7 +22,12 @@ module TakeoffTool
       @dialog.set_file(html_path)
       @dialog.center
 
-      @dialog.add_action_callback('startScan') do |_ctx|
+      @dialog.add_action_callback('startScan') do |_ctx, tpl_str|
+        tpl = tpl_str.to_s.strip
+        if !tpl.empty? && defined?(CategoryTemplates)
+          puts "Takeoff: Applying template '#{tpl}' before scan"
+          CategoryTemplates.apply_template(tpl)
+        end
         dlg = @dialog
         TakeoffTool.run_scan(dlg)
         # Close startup dialog after scan completes
@@ -38,6 +43,16 @@ module TakeoffTool
       end
 
       @dialog.show
+
+      # Send template list after dialog is visible
+      UI.start_timer(0.3) do
+        if @dialog && @dialog.visible?
+          names = defined?(CategoryTemplates) ? CategoryTemplates.list : []
+          require 'json'
+          safe = JSON.generate(names).gsub("'", "\\\\'")
+          @dialog.execute_script("receiveTemplates('#{safe}')") rescue nil
+        end
+      end
     end
 
     def self.close

@@ -90,6 +90,16 @@ module TakeoffTool
       show_benchmark_dialog(view)
     end
 
+    def onKeyDown(key, repeat, flags, view)
+      if key == 27
+        Sketchup.active_model.select_tool(nil)
+      end
+    end
+
+    def onCancel(reason, view)
+      Sketchup.active_model.select_tool(nil)
+    end
+
     def draw(view)
       return if @dialog_open
       if @hover_face
@@ -440,6 +450,16 @@ module TakeoffTool
           view.draw_text(screen, label, color: draw_color)
         end
       end
+    end
+
+    def onKeyDown(key, repeat, flags, view)
+      if key == 27
+        Sketchup.active_model.select_tool(nil)
+      end
+    end
+
+    def onCancel(reason, view)
+      Sketchup.active_model.select_tool(nil)
     end
 
     def getExtents

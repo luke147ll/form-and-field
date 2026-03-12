@@ -182,6 +182,10 @@ module TakeoffTool
 
       filter_label = model_source_filter == 'model_b' ? ' (Model B only)' : (model_source_filter == 'model_a' ? ' (Model A only)' : '')
 
+      # Pre-load parts registry for injection after scan
+      all_parts = TakeoffTool.load_parts rescue {}
+      parts_found = 0
+
       defs = model.definitions.select { |d| !d.image? }
       total_defs = defs.length
       progress.call("Found #{total_defs} definitions to process#{filter_label}") if progress
@@ -205,6 +209,23 @@ module TakeoffTool
             end
           end
 
+          # Detect part groups: skip processing, inject as 1 EA later
+          if (inst.get_attribute('FormAndField', 'is_part') rescue nil)
+            reg[inst.entityID] = inst
+            parts_found += 1
+            next
+          end
+
+          # Skip entities nested inside a part group (their parent def is a part)
+          if inst.parent.is_a?(Sketchup::ComponentDefinition)
+            parent_is_part = inst.parent.instances.any? { |pi|
+              (pi.get_attribute('FormAndField', 'is_part') rescue nil) == true
+            }
+            if parent_is_part
+              next
+            end
+          end
+
           reg[inst.entityID] = inst
           prev_len = results.length
           process(inst, defn, results)
@@ -223,6 +244,50 @@ module TakeoffTool
 
       Dashboard.scan_log_count(entity_count) rescue nil
       Dashboard.scan_log_status("FINALIZING") rescue nil
+
+      # Inject part results: 1 EA per named part group
+      if all_parts.any?
+        puts "[FF Scanner] Found #{parts_found} part group(s), injecting #{all_parts.length} part result(s)"
+        progress.call("Injecting #{all_parts.length} part(s)") if progress
+        all_parts.each do |part_name, pdata|
+          cat = pdata['category'] || 'Uncategorized'
+          sub = pdata['subcategory'] || ''
+          grp_eid = pdata['group_id']
+          results << {
+            entity_id: grp_eid || "part_#{part_name}",
+            entity_type: 'Part',
+            tag: '',
+            definition_name: part_name,
+            display_name: part_name,
+            instance_name: part_name,
+            is_solid: false,
+            instance_count: 1,
+            ifc_type: nil,
+            volume_in3: 0.0, volume_ft3: 0.0, volume_bf: 0.0,
+            bb_width_in: 0.0, bb_height_in: 0.0, bb_depth_in: 0.0,
+            linear_ft: nil, area_sf: nil, material: nil,
+            parsed: {
+              raw: part_name,
+              element_type: nil, function: nil, material: nil,
+              thickness: nil, size_nominal: nil, revit_id: nil,
+              auto_category: cat,
+              auto_subcategory: sub,
+              measurement_type: 'ea',
+              category_source: 'part',
+              confidence: :high,
+              cost_code: nil
+            },
+            warnings: [],
+            part_name: part_name,
+            part_child_count: pdata['child_count'] || 0
+          }
+          if !discovered_cats[cat]
+            discovered_cats[cat] = true
+            Dashboard.scan_log_pill(cat) rescue nil
+          end
+        end
+      end
+
       progress.call("Processing warnings...") if progress
       check_warnings(results)
 
@@ -925,6 +990,21 @@ module TakeoffTool
 
     SHEET_GOOD_RE = /sheathing|drywall|plywood|osb|roofing|siding|insulation|membrane|soffit|fascia|gypcrete|decking|flooring|tile|stucco|wall\s*finish|ceiling|shingle/i
 
+    NORMAL_TOLERANCE_RAD = 18.0 * Math::PI / 180.0
+
+    def self.load_sampled_normal(category)
+      return nil unless category
+      m = Sketchup.active_model
+      return nil unless m
+      json = m.get_attribute('TakeoffSFNormals', category) rescue nil
+      return nil unless json
+      require 'json'
+      arr = JSON.parse(json) rescue nil
+      return nil unless arr.is_a?(Array) && arr.length == 3
+      n = Geom::Vector3d.new(arr[0], arr[1], arr[2])
+      n.length > 0.001 ? n.normalize : nil
+    end
+
     def self.face_area_for_entity(defn, category = nil, xform = nil)
       ents = defn.respond_to?(:entities) ? defn.entities : nil
       return nil unless ents
@@ -960,6 +1040,37 @@ module TakeoffTool
         normal_groups[key][:fds] << fd
       end
 
+      # ── Sampled normal override: filter to matching normal groups ──
+      sampled = load_sampled_normal(category)
+      if sampled
+        matched_area = 0.0
+        normal_groups.each do |_nkey, grp|
+          wn = grp[:wn]
+          wn_n = wn.length > 0.001 ? Geom::Vector3d.new(wn.x, wn.y, wn.z).normalize : wn
+          angle = sampled.angle_between(wn_n)
+          next unless angle < NORMAL_TOLERANCE_RAD
+
+          fds = grp[:fds]
+          if fds.length == 1
+            matched_area += world_face_area(fds[0][:face], fds[0][:xform])
+          else
+            planes = {}
+            fds.each do |fd|
+              wp = fd[:xform] * fd[:face].vertices.first.position
+              d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+              d_key = d.round(0)
+              planes[d_key] ||= 0.0
+              planes[d_key] += world_face_area(fd[:face], fd[:xform])
+            end
+            matched_area += planes.values.max || 0.0
+          end
+        end
+        sf = matched_area / 144.0
+        puts "[FF Measure] '#{dname}': sampled normal = #{sf.round(1)} SF (#{face_data.length} faces)"
+        return sf
+      end
+
+      # ── Default: dominant side (largest normal group) ──
       best_side = 0.0
       normal_groups.each do |_nkey, grp|
         fds = grp[:fds]

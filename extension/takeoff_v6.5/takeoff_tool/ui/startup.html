@@ -28,6 +28,16 @@ body{font:13px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 /* DIVIDER */
 .divider{height:1px;background:#313244;margin:0 -32px 20px -32px}
 
+/* TEMPLATE SELECTOR */
+.tpl-section{margin-bottom:16px;flex:1;display:flex;flex-direction:column;min-height:0}
+.tpl-label{font-size:11px;color:#a6adc8;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.tpl-list{display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;min-height:0}
+.tpl-item{font-size:12px;color:#cdd6f4;display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 10px;border:1px solid #313244;border-radius:5px;background:#181825;transition:border-color 0.15s}
+.tpl-item:hover{border-color:#45475a}
+.tpl-item.active{border-color:#89b4fa;background:#1a1a2e}
+.tpl-item input[type=radio]{accent-color:#89b4fa}
+.tpl-item span{flex:1}
+
 /* SCANNING STATE */
 .scan-state{display:none;flex-direction:column;align-items:center;padding:16px 24px 16px 24px;flex:1}
 .scan-state.show{display:flex}
@@ -51,7 +61,12 @@ body{font:13px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 
   <div class="divider"></div>
 
-  <div class="detect-info">Auto-detects SketchUp, IFC, and Revit models</div>
+  <div class="tpl-section">
+    <div class="tpl-label">Template</div>
+    <div class="tpl-list" id="tplList">
+      <label class="tpl-item active" onclick="tplRadio(this)"><input type="radio" name="tpl" value="" checked><span>No Template</span></label>
+    </div>
+  </div>
 
   <div class="btns">
     <button class="btn" onclick="doCancel()">Cancel</button>
@@ -132,13 +147,30 @@ body{font:13px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 </div>
 
 <script>
+function tplRadio(lbl){
+  var labels=document.querySelectorAll('.tpl-item');
+  for(var i=0;i<labels.length;i++)labels[i].className='tpl-item';
+  lbl.className='tpl-item active';
+  lbl.querySelector('input').checked=true;
+}
+function receiveTemplates(json){
+  try{var names=JSON.parse(json);}catch(e){return;}
+  var list=document.getElementById('tplList');
+  var h='<label class="tpl-item active" onclick="tplRadio(this)"><input type="radio" name="tpl" value="" checked><span>No Template</span></label>';
+  for(var i=0;i<names.length;i++){
+    h+='<label class="tpl-item" onclick="tplRadio(this)"><input type="radio" name="tpl" value="'+names[i].replace(/"/g,'&quot;')+'"><span>'+names[i]+'</span></label>';
+  }
+  list.innerHTML=h;
+}
 function doScan(){
+  var sel=document.querySelector('input[name="tpl"]:checked');
+  var tpl=sel?sel.value:'';
   document.getElementById('formState').style.display='none';
   document.getElementById('scanState').className='scan-state show';
   if(window.sketchup&&typeof window.sketchup.startScan==='function')
-    window.sketchup.startScan();
+    window.sketchup.startScan(tpl);
   else
-    window.location='skp:startScan';
+    window.location='skp:startScan@'+tpl;
 }
 function doCancel(){
   if(window.sketchup&&typeof window.sketchup.cancel==='function')

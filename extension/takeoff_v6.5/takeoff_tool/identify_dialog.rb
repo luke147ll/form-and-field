@@ -116,6 +116,97 @@ module TakeoffTool
         puts "Takeoff: IdentifyDialog addCustomCategory '#{name}'"
       end
 
+      @dialog.add_action_callback('createPart') do |_ctx, arg_str|
+        begin
+          puts "[FF Parts] createPart callback fired, arg: #{arg_str}"
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s.strip
+          target_cat = data['category'].to_s.strip
+          target_sub = data['subcategory'].to_s.strip
+          if part_name.empty?
+            puts "[FF Parts] ERROR: empty part name"
+            next
+          end
+
+          entities = @current_entities
+          if entities.nil? || entities.empty?
+            puts "[FF Parts] ERROR: no current entities"
+            next
+          end
+
+          # If no category selected in dropdown, fall back to first entity's category
+          if target_cat.empty?
+            entities.each do |e|
+              c = e.get_attribute('TakeoffAssignments', 'category') rescue nil
+              unless c
+                sr = TakeoffTool.scan_results.find { |r| r[:entity_id] == e.entityID }
+                c = sr[:parsed][:auto_category] if sr
+              end
+              target_cat = c if c && !c.empty?
+              break if !target_cat.empty?
+            end
+            target_cat = 'Uncategorized' if target_cat.empty?
+          end
+
+          puts "[FF Parts] Creating part '#{part_name}' from #{entities.length} entities -> #{target_cat}"
+
+          # Move all entities to the target category
+          moved = 0
+          eids = []
+          entities.each do |e|
+            c = e.get_attribute('TakeoffAssignments', 'category') rescue nil
+            unless c
+              sr = TakeoffTool.scan_results.find { |r| r[:entity_id] == e.entityID }
+              c = sr[:parsed][:auto_category] if sr
+            end
+            c ||= 'Uncategorized'
+            if c != target_cat
+              TakeoffTool.apply_category_to_selection([e], target_cat)
+              moved += 1
+            end
+            TakeoffTool.save_assignment(e.entityID, 'subcategory', target_sub) unless target_sub.empty?
+            eids << e.entityID
+          end
+
+          TakeoffTool.create_part(part_name, eids, target_cat, target_sub)
+          puts "Takeoff: Created part '#{part_name}' with #{eids.length} entities in #{target_cat}#{moved > 0 ? " (#{moved} moved)" : ''}"
+          Dashboard.send_live_data if defined?(Dashboard) && Dashboard.respond_to?(:send_live_data)
+          msg = "Part '#{part_name}' created - #{eids.length} entities = 1 EA in #{target_cat}"
+          @dialog.execute_script("showApplyMsg('#{msg.gsub("'", "\\\\'")}',false)") rescue nil
+        rescue => e
+          puts "[FF Parts] createPart ERROR: #{e.message}"
+          puts e.backtrace.first(5).join("\n")
+        end
+      end
+
+      @dialog.add_action_callback('addToPart') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s.strip
+          next if part_name.empty?
+          entities = @current_entities
+          next if entities.nil? || entities.empty?
+
+          # Filter: skip entities that are already part groups
+          valid_ents = entities.reject { |e|
+            (e.get_attribute('FormAndField', 'is_part') rescue nil) == true
+          }
+          next if valid_ents.empty?
+
+          eids = valid_ents.map(&:entityID)
+          added = TakeoffTool.add_to_part(part_name, eids)
+          puts "[FF Parts] Added #{added} entities to part '#{part_name}'"
+          Dashboard.send_live_data if defined?(Dashboard) && Dashboard.respond_to?(:send_live_data)
+          msg = "Added #{added} to '#{part_name}'"
+          @dialog.execute_script("showApplyMsg('#{msg.gsub("'", "\\\\'")}',false)") rescue nil
+        rescue => e
+          puts "[FF Parts] addToPart ERROR: #{e.message}"
+          puts e.backtrace.first(3).join("\n")
+        end
+      end
+
       @dialog.add_action_callback('requestSubcategoriesForCat') do |_ctx, cat_str|
         send_subcategories_for(cat_str.to_s.strip)
       end
@@ -682,6 +773,23 @@ module TakeoffTool
         setTimeout(function(){el.style.transition='opacity 1s';el.style.opacity='0';},3000);
         setTimeout(function(){el.style.display='none';},4200);
       }
+      function doAddToPart(){
+        var sel=document.getElementById('addToPartSel');
+        if(!sel||!sel.value)return;
+        sketchup.addToPart(JSON.stringify({name:sel.value}));
+      }
+      function doCreatePart(){
+        var inp=document.getElementById('partNameInput');
+        if(!inp)return;
+        var name=inp.value.trim();
+        if(!name){inp.style.borderColor='#f38ba8';setTimeout(function(){inp.style.borderColor='#45475a';},1500);return;}
+        var catSel=document.getElementById('catSel');
+        var subSel=document.getElementById('subSel');
+        var cat=catSel?catSel.value:'';
+        var sub=subSel?subSel.value:'';
+        if(sub==='__custom_sub__')sub='';
+        sketchup.createPart(JSON.stringify({name:name,category:cat,subcategory:sub}));
+      }
     JS
 
     def self.build_single_body(entity)
@@ -787,6 +895,37 @@ module TakeoffTool
           <option value="__custom_sub__">+ Custom...</option>
         </select>
         <button class="apply-btn" onclick="doApply()">Apply</button>
+        <hr>
+        <div class="sect-label">Create Part</div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="partNameInput" placeholder="Part name (e.g. Bunk-1)"
+            style="flex:1;padding:7px 8px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-size:12px;font-family:inherit"
+            onkeydown="if(event.key==='Enter')doCreatePart()">
+          <button class="apply-btn" onclick="doCreatePart()" style="width:auto;padding:8px 14px">Create</button>
+        </div>
+        #{part_add_section}
+      HTML
+    end
+
+    def self.part_add_section
+      parts = TakeoffTool.load_parts rescue {}
+      return '' if parts.empty?
+      opts = parts.map { |name, pd|
+        cat = pd['category'] || '?'
+        cnt = pd['child_count'] || 0
+        "<option value=\"#{h(name)}\">#{h(name)} (#{cat}, #{cnt} items)</option>"
+      }.join("\n")
+      <<~HTML
+        <div style="margin-top:10px">
+          <div class="sect-label">Add to Existing Part</div>
+          <div style="display:flex;gap:6px">
+            <select id="addToPartSel" style="flex:1;padding:7px 8px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-size:12px">
+              <option value="">-- Select Part --</option>
+              #{opts}
+            </select>
+            <button class="apply-btn" onclick="doAddToPart()" style="width:auto;padding:8px 14px;background:#f9e2af;color:#1e1e2e">Add</button>
+          </div>
+        </div>
       HTML
     end
 

@@ -358,7 +358,7 @@ body{font:12px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;background:#1e1e2e
 
 /* CATPPUCCIN MODAL */
 .ff-modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center}
-.ff-modal{background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;min-width:280px;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.ff-modal{background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;min-width:280px;max-width:360px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
 .ff-modal h2{margin:0 0 14px;font-size:14px;font-weight:600;color:#cdd6f4}
 .ff-modal label{display:block;font-size:11px;color:#a6adc8;margin-bottom:4px}
 .ff-modal input{width:100%;box-sizing:border-box;padding:7px 10px;background:#1e1e2e;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;font-size:12px;font-family:inherit;outline:none;margin-bottom:10px}
@@ -988,11 +988,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <!-- COMPARISON RESULTS (quantity delta table) -->
   <div class="comp-results" id="compResults">
     <div class="comp-header">
-      <span class="comp-title">Quantity Delta &mdash; A vs B</span>
+      <span class="comp-title" id="compTitle">Quantity Delta &mdash; A vs B</span>
+      <button class="comp-flip-btn" onclick="flipCompBaseline()" title="Swap baseline" style="background:#45475a;color:#cdd6f4;border:1px solid #585b70;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px">&#8644; Flip</button>
       <button class="comp-close" onclick="closeCompResults()" title="Close">&times;</button>
     </div>
     <table class="comp-table" id="compTable">
-      <thead><tr><th>Category</th><th class="r">A</th><th class="r">B</th><th class="r">Delta</th><th class="r">%</th></tr></thead>
+      <thead><tr><th>Category</th><th class="r" id="compColA">A</th><th class="r" id="compColB">B</th><th class="r">Delta</th><th class="r">%</th></tr></thead>
       <tbody id="compTableBody"></tbody>
     </table>
     <div class="comp-actions">
@@ -1165,10 +1166,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <!-- Phase 1: Pre-scan form -->
   <div class="so-form" id="scanForm">
     <div class="so-desc">Analyze model geometry and extract quantities.</div>
-    <div class="so-radio-group">
-      <label class="active" onclick="scanRadio(this)"><input type="radio" name="scanSrc" value="sketchup" checked> SketchUp Model</label>
-      <label class="disabled"><input type="radio" name="scanSrc" value="ifc" disabled> IFC Import <span class="so-soon">Coming Soon</span></label>
-      <label class="disabled"><input type="radio" name="scanSrc" value="revit" disabled> Revit Import <span class="so-soon">Coming Soon</span></label>
+    <div style="margin-top:4px">
+      <label style="font-size:11px;color:#a6adc8;margin-bottom:6px;display:block;border:none;background:none;padding:0">Template</label>
+      <div class="so-radio-group" id="scanTplGroup">
+        <label class="active" onclick="scanRadio(this)"><input type="radio" name="scanTpl" value="" checked> No Template</label>
+      </div>
     </div>
   </div>
   <!-- Phase 2: Scanning -->
@@ -1328,6 +1330,7 @@ var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
 var ASMVIS={};
+var _prevAsmFilter='';
 var mvState={};
 var currentMvView=null;
 var CCOL={};
@@ -1374,6 +1377,7 @@ var ICO_X='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBo
 var ICO_TRASH='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 var ICO_LF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>';
 var ICO_SF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
+var ICO_BOX='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l6-3 6 3v6l-6 3-6-3z" fill="currentColor" fill-opacity="0.1"/><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="5" x2="8" y2="8"/><line x1="14" y1="5" x2="8" y2="8"/></svg>';
 /* Tiny inline unit icons for value cells (12px, no hover behavior) */
 var ICO_LF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="8" y1="6" x2="8" y2="10"/></svg>';
 var ICO_SF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="#a6adc8" fill-opacity="0.12"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
@@ -1402,14 +1406,34 @@ function unitOptionsFor(defMT){
   return opts;
 }
 /* Returns action-button icon and onclick for measurement tool based on unit */
+function normalLabel(n){
+  if(!n)return'';
+  var ax=Math.abs(n[0]),ay=Math.abs(n[1]),az=Math.abs(n[2]);
+  if(az>0.9)return n[2]>0?'Up':'Down';
+  if(ax>0.9)return n[0]>0?'East':'West';
+  if(ay>0.9)return n[1]>0?'North':'South';
+  return'Custom';
+}
+function normalBtn(gk){
+  var cmt=CATMT[gk];
+  var hasN=cmt&&cmt.sampledNormal;
+  var gke=X2(gk);
+  if(hasN){
+    var lbl=normalLabel(cmt.sampledNormal);
+    return'<button class="ib" onclick="call(\'startNormalSample\',\''+gke+'\')" title="Re-sample normal (current: '+lbl+')" style="color:#a6e3a1;font-size:10px">N:'+lbl+'</button>'
+      +'<button class="ib" onclick="call(\'clearNormal\',\''+gke+'\')" title="Clear sampled normal (revert to auto)" style="color:#f38ba8;font-size:10px">\u00d7N</button>';
+  }
+  return'<button class="ib" onclick="call(\'startNormalSample\',\''+gke+'\')" title="Sample face normal for SF direction" style="color:#f9e2af;font-size:10px">\u2316N</button>';
+}
 function mtBtn(mt,gk){
   var gke=X2(gk);
   if(mt==='lf')return'<button class="ib warn" onclick="call(\'activateLFForCat\',\''+gke+'\')" title="Measure LF">'+ICO_LF+'</button>';
-  if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
-  if(mt==='ea_sf')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>';
+  if(mt==='sf'||mt==='sf_cy'||mt==='sf_sheets')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>'+normalBtn(gk);
+  if(mt==='ea_sf')return'<button class="ib warn" onclick="call(\'activateSFForCat\',\''+gke+'\')" title="Measure SF">'+ICO_SF+'</button>'+normalBtn(gk);
   if(mt==='ea_bf')return'<button class="ib warn" onclick="call(\'activateLFForCat\',\''+gke+'\')" title="Measure LF">'+ICO_LF+'</button>';
   return '';
 }
+function boxBtn(gk){var gke=X2(gk);return'<button class="ib" style="color:#cba6f7" onclick="call(\'activateBoxForCat\',\''+gke+'\')" title="Measure Box">'+ICO_BOX+'</button>';}
 
 function log(m,c){var el=document.getElementById('dbg'),d=document.createElement('div');if(c)d.className=c;d.textContent='['+new Date().toLocaleTimeString()+'] '+m;el.appendChild(d);el.scrollTop=el.scrollHeight;}
 function toggleDebug(){debugOn=!debugOn;document.getElementById('dbg').className=debugOn?'show':'';}
@@ -1425,6 +1449,15 @@ function showScanDialog(){
   document.getElementById('scanBtns').innerHTML='<button class="hb" onclick="closeScanDialog()">Cancel</button><button class="hb grn" id="scanGoBtn" onclick="doScan()">Scan Model</button>';
   document.getElementById('scanBackdrop').className='show';
   document.getElementById('scanOverlay').className='show';
+  call('listTemplates');
+}
+function receiveTemplates(names){
+  var grp=document.getElementById('scanTplGroup');if(!grp)return;
+  var h='<label class="active" onclick="scanRadio(this)"><input type="radio" name="scanTpl" value="" checked> No Template</label>';
+  for(var i=0;i<names.length;i++){
+    h+='<label onclick="scanRadio(this)"><input type="radio" name="scanTpl" value="'+X(names[i])+'"> '+X(names[i])+'</label>';
+  }
+  grp.innerHTML=h;
 }
 function closeScanDialog(){
   document.getElementById('scanOverlay').className='';
@@ -1436,9 +1469,11 @@ function scanRadio(lbl){
   lbl.className='active';
 }
 function doScan(){
+  var sel=document.querySelector('input[name="scanTpl"]:checked');
+  var tpl=sel?sel.value:'';
   closeScanDialog();
   showLoading('INITIALIZING SCANNER');
-  call('rescan');
+  call('rescan',tpl);
 }
 function scanStart(){
   closeScanDialog();
@@ -1719,6 +1754,8 @@ function filt(){
   var fet=document.getElementById('fEt').value;
   var ffn=document.getElementById('fFn').value;
   var fasm=document.getElementById('fAsm').value;
+  if(_prevAsmFilter&&!fasm){call('showAll');VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};ISO_CATS=null;FISO=false;containerIsolate=null;updateFisoBtn();}
+  _prevAsmFilter=fasm;
   var asmIds=null;
   if(fasm&&ASMB[fasm]){asmIds={};var ai=ASMB[fasm].entity_ids||[];for(var ak=0;ak<ai.length;ak++)asmIds[ai[ak]]=true;}
   var i,r,x,tot=0;
@@ -2074,10 +2111,23 @@ function renderEntityRow(row,gBy,gk,isChild){
   var cls=sel?(isCos?' class="sel cosmetic"':' class="sel"'):(isCos?' class="cosmetic"':'');
   var h='<tr id="r'+row.entityId+'" data-vi="'+vi+'"'+cls+'>';
   h+='<td class="ck"><input type="checkbox" data-vi="'+vi+'" data-eid="'+row.entityId+'" onchange="ckClick(this,event)"'+(sel?' checked':'')+'></td>';
-  h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-  h+=' '+buildStaticDot(row.customColor);
-  h+='</td>';
-  if(gBy==='category'){
+  if(row.isPart){
+    h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button></td>';
+  }else{
+    h+='<td style="width:18px;text-align:center"><button class="ey'+(rv?'':' off')+'" onclick="togItemVis('+row.entityId+')">'+(rv?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    h+=' '+buildStaticDot(row.customColor);
+    h+='</td>';
+  }
+  if(row.isPart){
+    if(gBy==='category'){
+      h+='<td><select class="cs" onchange="doMovePartCat(\''+X(row.definitionName)+'\',this.value)" style="max-width:90px">'+co+'</select></td>';
+      h+='<td></td>';
+    }else{
+      h+='<td><select class="cs" onchange="doMovePartCat(\''+X(row.definitionName)+'\',this.value)">'+co+'</select></td>';
+      h+='<td></td>';
+      h+='<td>'+buildPartSubSelect(row)+'</td>';
+    }
+  }else if(gBy==='category'){
     h+='<td>'+buildSubSelect(row)+'</td>';
     h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
   }else{
@@ -2085,21 +2135,36 @@ function renderEntityRow(row,gBy,gk,isChild){
     h+='<td><select class="cs" onchange="doSetCC('+row.entityId+',this.value)" style="max-width:90px">'+cco+'</select></td>';
     h+='<td>'+buildSubSelect(row)+'</td>';
   }
-  h+='<td title="'+X(row.definitionName)+'">'+(isCos?'<span style="color:#6c7086" title="Cosmetic — not counted">&#9671; </span>':'')+X(T(row.definitionName,28));
-  if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
-  h+='</td>';
-  h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
-  h+='<td class="r">1</td>';
-  h+='<td class="r">'+pv(row)+'</td>';
-  h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
-  h+='<td style="white-space:nowrap">';
-  h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
-  h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
-  if(row.areaSF>0){
-    h+='<button class="ib" onclick="call(\'debugArea\',\''+row.entityId+'\')" title="Debug SF area" style="color:#f9e2af;font-size:10px">SF?</button>';
-    h+='<button class="ib" onclick="call(\'debugOccSingle\',\''+row.entityId+'\')" title="Occlusion debug" style="color:#fab387;font-size:10px">OCC</button>';
+  if(row.isPart){
+    h+='<td title="'+X(row.definitionName)+' - click to rename"><span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;background:#f9e2af;color:#1e1e2e;margin-right:5px;letter-spacing:0.5px;vertical-align:middle">PART</span>';
+    h+='<span style="cursor:pointer;border-bottom:1px dashed #6c7086" onclick="doRenamePart(\''+X(row.definitionName)+'\')">'+X(T(row.definitionName,24))+'</span>';
+    h+=' <span style="font-size:10px;color:#6c7086">('+row.partChildCount+')</span>';
+    h+='</td>';
+    h+='<td></td>';
+    h+='<td class="r">1</td>';
+    h+='<td class="r">1 EA</td>';
+    h+='<td class="r" style="font-size:10px;color:#6c7086">'+row.partChildCount+' items</td>';
+    h+='<td style="white-space:nowrap">';
+    h+='<button class="ib accent" onclick="call(\'isolatePartGroup\',\''+row.entityId+'\')" title="Isolate part">'+ICO_ISO+'</button>';
+    h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to part">'+ICO_ZOOM+'</button>';
+    h+='</td></tr>';
+  }else{
+    h+='<td title="'+X(row.definitionName)+'">'+(isCos?'<span style="color:#6c7086" title="Cosmetic — not counted">&#9671; </span>':'')+X(T(row.definitionName,28));
+    if(wn)h+=' <span class="wi" title="'+X(row.warnings.join('; '))+'">!</span>';
+    h+='</td>';
+    h+='<td><input class="sz" value="'+X(row.sizeNominal||row.thickness||'')+'" data-eid="'+row.entityId+'" onchange="doSetSize(this)" style="width:55px"></td>';
+    h+='<td class="r">1</td>';
+    h+='<td class="r">'+pv(row)+'</td>';
+    h+='<td class="r" style="font-size:10px;color:#a6adc8">'+sv2(row)+'</td>';
+    h+='<td style="white-space:nowrap">';
+    h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
+    h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
+    if(row.areaSF>0){
+      h+='<button class="ib" onclick="call(\'debugArea\',\''+row.entityId+'\')" title="Debug SF area" style="color:#f9e2af;font-size:10px">SF?</button>';
+      h+='<button class="ib" onclick="call(\'debugOccSingle\',\''+row.entityId+'\')" title="Occlusion debug" style="color:#fab387;font-size:10px">OCC</button>';
+    }
+    h+='</td></tr>';
   }
-  h+='</td></tr>';
   return h;
 }
 
@@ -2242,7 +2307,10 @@ function renderGroups(){
     h+='<th></th>'; // actions
     h+='</tr></thead><tbody>';
 
+    /* Parts always sort to top of their category group */
     items.sort(function(a,b){
+      var pa=a.isPart?0:1, pb=b.isPart?0:1;
+      if(pa!==pb)return pa-pb;
       var va=a[sc]||'',vb=b[sc]||'';
       if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;
       return String(va).localeCompare(String(vb))*sd;
@@ -2253,7 +2321,7 @@ function renderGroups(){
     if(gBy==='category'){
       var subSet={};for(var si2=0;si2<items.length;si2++)subSet[items[si2].subcategory||'']=1;
       var subKeys2=Object.keys(subSet);hasSubs=subKeys2.length>1||(subKeys2.length===1&&subKeys2[0]!=='');
-      if(hasSubs)items.sort(function(a,b){var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
+      if(hasSubs)items.sort(function(a,b){var pa=a.isPart?0:1,pb=b.isPart?0:1;if(pa!==pb)return pa-pb;var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
     }
 
     var subRowCount=0,subCapped=false;
@@ -2472,7 +2540,10 @@ function renderContainerGroups(){
         h+='<th style="text-align:right">Qty</th><th style="text-align:right">Primary</th><th style="text-align:right">2nd</th>';
         h+='<th></th>';
         h+='</tr></thead><tbody>';
+        /* Parts always sort to top */
         items.sort(function(a,b){
+          var pa=a.isPart?0:1,pb=b.isPart?0:1;
+          if(pa!==pb)return pa-pb;
           var va=a[sc]||'',vb=b[sc]||'';
           if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;
           return String(va).localeCompare(String(vb))*sd;
@@ -2481,7 +2552,7 @@ function renderContainerGroups(){
         var hasSubs=false,curSub=null;
         var subSet={};for(var si2=0;si2<items.length;si2++)subSet[items[si2].subcategory||'']=1;
         var subKeys2=Object.keys(subSet);hasSubs=subKeys2.length>1||(subKeys2.length===1&&subKeys2[0]!=='');
-        if(hasSubs)items.sort(function(a,b){var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
+        if(hasSubs)items.sort(function(a,b){var pa=a.isPart?0:1,pb=b.isPart?0:1;if(pa!==pb)return pa-pb;var sa=a.subcategory||'\uffff',sb=b.subcategory||'\uffff';if(sa!==sb)return sa==='\uffff'?1:sb==='\uffff'?-1:sa.localeCompare(sb);var va=a[sc]||'',vb=b[sc]||'';if(typeof va==='number'&&typeof vb==='number')return(va-vb)*sd;return String(va).localeCompare(String(vb))*sd;});
 
         var cSubRowCount=0,cSubCapped=false;
         for(var ri=0;ri<items.length;ri++){
@@ -3596,26 +3667,49 @@ function runCompare(){
   showPortalLoading('Comparing','Computing quantity deltas...');
   call('runCompare');
 }
+var compFlipped=false;
 function receiveComparisonResults(s){
   var d;
   try{d=JSON.parse(s);}catch(e){console.error('Comparison parse error',e);return;}
   if(d.error){hidePortal();showPortalError('Compare Error',d.error);return;}
   comparisonResults=d;
+  compFlipped=false;
+  renderCompTable();
+  document.getElementById('compResults').classList.add('active');
+  updatePortalProgress(50,'Computing visual diff...');
+}
+function renderCompTable(){
+  if(!comparisonResults)return;
+  var d=comparisonResults;
   var tb=document.getElementById('compTableBody');
+  var title=document.getElementById('compTitle');
+  var colA=document.getElementById('compColA');
+  var colB=document.getElementById('compColB');
+  if(title)title.innerHTML='Quantity Delta &mdash; '+(compFlipped?'B vs A':'A vs B');
+  if(colA)colA.textContent=compFlipped?'B':'A';
+  if(colB)colB.textContent=compFlipped?'A':'B';
   var h='';
   for(var i=0;i<d.length;i++){
     var r=d[i];
-    var dc=r.delta>0?'delta-pos':(r.delta<0?'delta-neg':'delta-zero');
-    var pctStr=Math.abs(r.pctChange)>999?'NEW':((r.pctChange>0?'+':'')+r.pctChange+'%');
+    var qBase=compFlipped?r.qtyB:r.qtyA;
+    var qComp=compFlipped?r.qtyA:r.qtyB;
+    var delta=qComp-qBase;
+    var roundDelta=Math.round(delta*100)/100;
+    var pct=qBase>0?(delta/qBase*100):(qComp>0?999.9:0);
+    var roundPct=Math.round(pct*10)/10;
+    var dc=roundDelta>0?'delta-pos':(roundDelta<0?'delta-neg':'delta-zero');
+    var pctStr=Math.abs(roundPct)>999?'NEW':((roundPct>0?'+':'')+roundPct+'%');
     h+='<tr><td>'+X(r.category)+'</td>';
-    h+='<td class="r">'+r.qtyA+' <span class="pct">'+X(r.unit)+'</span></td>';
-    h+='<td class="r">'+r.qtyB+' <span class="pct">'+X(r.unit)+'</span></td>';
-    h+='<td class="r '+dc+'">'+(r.delta>0?'+':'')+r.delta+'</td>';
+    h+='<td class="r">'+qBase+' <span class="pct">'+X(r.unit)+'</span></td>';
+    h+='<td class="r">'+qComp+' <span class="pct">'+X(r.unit)+'</span></td>';
+    h+='<td class="r '+dc+'">'+(roundDelta>0?'+':'')+roundDelta+'</td>';
     h+='<td class="r '+dc+'">'+pctStr+'</td></tr>';
   }
   tb.innerHTML=h;
-  document.getElementById('compResults').classList.add('active');
-  updatePortalProgress(50,'Computing visual diff...');
+}
+function flipCompBaseline(){
+  compFlipped=!compFlipped;
+  renderCompTable();
 }
 function receiveDiffResults(s){
   var d;
@@ -3647,7 +3741,7 @@ function closeCompResults(){
   document.getElementById('compResults').classList.remove('active');
 }
 function clearCompareUI(){
-  comparisonResults=null;diffActive=false;diffComputed=false;
+  comparisonResults=null;diffActive=false;diffComputed=false;compFlipped=false;
   document.getElementById('compResults').classList.remove('active');
   updateDiffToggle();
   graphCats={};closeGraph();
@@ -4389,6 +4483,56 @@ function togItemVis(eid){
   call(vis?'hideEntities':'showEntities',''+eid);
   filt();
 }
+function doMovePartCat(partName,newCat){
+  if(!newCat||newCat==='__custom__')return;
+  callJSON('movePartCategory',{name:partName,category:newCat});
+  // Update local data
+  var pid='part_'+partName;
+  for(var i=0;i<D.length;i++){if(D[i].entityId===pid){D[i].category=newCat;break;}}
+  filt();
+}
+function doMovePartSub(partName,newSub){
+  if(newSub==='__custom_sub__')return;
+  callJSON('movePartSubcategory',{name:partName,subcategory:newSub});
+  var pid='part_'+partName;
+  for(var i=0;i<D.length;i++){if(D[i].entityId===pid){D[i].subcategory=newSub;break;}}
+  filt();
+}
+function doRenamePart(oldName){
+  var bg=document.createElement('div');bg.className='ff-modal-bg';
+  bg.innerHTML='<div class="ff-modal"><h2>Rename Part</h2>'
+    +'<label>Part Name</label>'
+    +'<input id="renamePartInput" type="text" value="'+X(oldName)+'" />'
+    +'<div class="ff-btns"><button class="ff-btn ff-cancel" id="renamePartCancel">Cancel</button>'
+    +'<button class="ff-btn ff-ok" id="renamePartOk">Rename</button></div></div>';
+  document.body.appendChild(bg);
+  document.body.style.overflow='visible';
+  var inp=document.getElementById('renamePartInput');
+  inp.focus();inp.select();
+  function submit(){
+    var n=inp.value.trim();
+    document.body.removeChild(bg);document.body.style.overflow='hidden';
+    if(!n||n===oldName)return;
+    callJSON('renamePart',{oldName:oldName,newName:n});
+  }
+  document.getElementById('renamePartOk').onclick=submit;
+  document.getElementById('renamePartCancel').onclick=function(){document.body.removeChild(bg);document.body.style.overflow='hidden';};
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')submit();if(e.key==='Escape'){document.body.removeChild(bg);document.body.style.overflow='hidden';}});
+  bg.addEventListener('click',function(e){if(e.target===bg){document.body.removeChild(bg);document.body.style.overflow='hidden';}});
+}
+function buildPartSubSelect(row){
+  var cat=row.category||'Uncategorized',cur=row.subcategory||'';
+  var subs=ALL_MSUB[cat]||[],h='<select class="cs" onchange="doMovePartSub(\''+X(row.definitionName)+'\',this.value)" style="max-width:90px">';
+  h+='<option value="">--</option>';
+  var inList=false;
+  for(var i=0;i<subs.length;i++){
+    h+='<option value="'+X(subs[i])+'"'+(subs[i]===cur?' selected':'')+'>'+X(subs[i])+'</option>';
+    if(subs[i]===cur)inList=true;
+  }
+  if(cur&&!inList)h+='<option value="'+X(cur)+'" selected>'+X(cur)+'</option>';
+  h+='</select>';
+  return h;
+}
 /* ── Overcount warning ── */
 function renderOvercountWarnings(){
   var el=document.getElementById('overcountBanner');
@@ -4508,8 +4652,9 @@ function showFFModal(opts){
   h+='<button class="'+okCls+'" id="ffm_ok">'+(opts.okLabel||'OK')+'</button>';
   h+='</div>';
   m.innerHTML=h;bg.appendChild(m);document.body.appendChild(bg);
+  document.body.style.overflow='visible';
   var firstInput=m.querySelector('input');if(firstInput){firstInput.focus();firstInput.select();}
-  function close(){document.body.removeChild(bg);}
+  function close(){document.body.removeChild(bg);document.body.style.overflow='hidden';}
   document.getElementById('ffm_cancel').onclick=close;
   bg.addEventListener('click',function(e){if(e.target===bg)close();});
   document.getElementById('ffm_ok').onclick=function(){
@@ -4798,6 +4943,14 @@ function renderMeasPanel(){
         var noteText=it.note||'(empty)';
         var short=noteText.length>40?noteText.substring(0,37)+'...':noteText;
         h+='<span class="mp-desc" ondblclick="editNoteText('+it.eid+',this)" title="'+X(noteText)+'">'+X(prefix+short)+'</span>';
+      } else if(it.partName){
+        var desc=X(it.partName)+' — '+X(cat);
+        h+='<span class="mp-desc" title="'+X(it.partName)+'">'+desc+'</span>';
+      } else if(it.type==='BOX'){
+        var bw=it.width_in||0,bd=it.depth_in||0,bh=it.height_in||0;
+        var dims=fmtDimIn(bw)+'×'+fmtDimIn(bd)+'×'+fmtDimIn(bh);
+        var desc='BOX: '+dims+(it.note?' — '+X(it.note):'');
+        h+='<span class="mp-desc" title="'+X(dims)+'">'+desc+'</span>';
       } else {
         var desc=X(it.type)+': '+(it.note?X(it.note):X(cat));
         h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
@@ -4811,11 +4964,13 @@ function renderMeasPanel(){
   document.getElementById('measBody').innerHTML=h;
   setTimeout(function(){checkScrollFade('measScroll','measFade');},20);
 }
+function fmtDimIn(inches){if(!inches||inches<0.1)return"0'-0\"";var ft=Math.floor(inches/12),ins=Math.floor(inches-ft*12);return ft+"'-"+ins+'"';}
 function fmtMeasVal(val,unit){
   if(unit==='')return'';
   if(!val&&val!==0)return'--';
   if(unit==='SF')return val.toFixed(1)+' SF';
   if(unit==='LF')return val.toFixed(1)+' LF';
+  if(unit==='CF')return val.toFixed(1)+' CF';
   if(unit==='feet'){var ft=Math.floor(val),inc=Math.round(Math.abs(val-ft)*12);if(inc>=12){ft+=(val>=0?1:-1);inc=0;}return ft+"'-"+inc+'"';}
   if(unit==='meters')return val.toFixed(3)+' m';
   if(unit==='inches')return val.toFixed(1)+'"';

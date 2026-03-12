@@ -129,11 +129,10 @@ module TakeoffTool
           else
             adlg = UI::HtmlDialog.new(
               dialog_title: "Create Assembly",
-              preferences_key: "TakeoffCreateAsm",
-              width: 340, height: 200,
+              width: 340, height: 280,
               left: 200, top: 200,
-              resizable: false,
-              style: UI::HtmlDialog::STYLE_DIALOG
+              resizable: true,
+              style: UI::HtmlDialog::STYLE_UTILITY
             )
             adlg.add_action_callback('ok') do |_ctx, json_str|
               adlg.close rescue nil

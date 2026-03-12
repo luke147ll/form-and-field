@@ -1,7 +1,7 @@
 {
   "template_name": "LCR Test",
   "created": "2026-03-09 11:11",
-  "updated": "2026-03-09 20:35",
+  "updated": "2026-03-11 17:20",
   "containers": [
     {
       "name": "Foundation",
@@ -89,6 +89,16 @@
           "name": "Floor Framing/Trusses",
           "code": "",
           "unit": "EA"
+        },
+        {
+          "name": "Ceiling Framing",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Steel Tubes (HSS)",
+          "code": "",
+          "unit": "EA"
         }
       ]
     },
@@ -159,6 +169,76 @@
         },
         {
           "name": "Masonry / Veneer",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Windows & Exterior Glass Doors",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Doors",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Garage Doors",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Shower Doors",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Window Coverings",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Gutters",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Outdoor Kitchen",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Snow Guards",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Fireplace Caps, Doors, Access.",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Wall Finish",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Glass/Glazing",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Stucco",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Masonry",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Metal Roofing",
           "code": "",
           "unit": "EA"
         }
@@ -238,6 +318,31 @@
           "name": "Closet Interiors",
           "code": "",
           "unit": ""
+        },
+        {
+          "name": "Casework",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Cabinets/Vanities",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Custom Stairs",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Wood Walls/Ceilings",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Interior Trim",
+          "code": "",
+          "unit": "EA"
         }
       ]
     },
@@ -268,6 +373,16 @@
         },
         {
           "name": "Electrical Rough In",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Lighting Fixtures",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "Plumbing Fixtures",
           "code": "",
           "unit": "EA"
         }

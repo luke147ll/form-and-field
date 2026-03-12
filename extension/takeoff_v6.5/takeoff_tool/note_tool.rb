@@ -59,9 +59,13 @@ module TakeoffTool
     end
 
     def onKeyDown(key, repeat, flags, view)
-      if key == VK_ESCAPE
+      if key == 27
         Sketchup.active_model.select_tool(nil)
       end
+    end
+
+    def onCancel(reason, view)
+      Sketchup.active_model.select_tool(nil)
     end
 
     def draw(view)

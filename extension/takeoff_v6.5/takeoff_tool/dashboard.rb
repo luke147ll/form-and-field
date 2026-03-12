@@ -154,6 +154,8 @@ module TakeoffTool
               r[:parsed][:measurement_type] = mt
             end
           end
+          # Recalculate SF areas for entities that may not have been computed during scan
+          Scanner.recalculate_sf if %w[sf sf_cy sf_sheets].include?(mt)
           # Resend data so dashboard shows updated measurement types
           send_live_data
         rescue => e
@@ -353,10 +355,14 @@ module TakeoffTool
             e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
             meas_changed = true
           else
-            # Don't hide if this entity contains scan children that should stay visible
-            # (SketchUp cascades hide to all children)
-            if e.respond_to?(:definition) && _has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
-              next
+            # Part groups: hide directly (children are intentionally inside)
+            is_part = (e.get_attribute('FormAndField', 'is_part') rescue nil) == true
+            unless is_part
+              # Don't hide if this entity contains scan children that should stay visible
+              # (SketchUp cascades hide to all children)
+              if e.respond_to?(:definition) && _has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
+                next
+              end
             end
             e.visible = false
           end
@@ -393,6 +399,96 @@ module TakeoffTool
         send_measurement_data if meas_changed
       end
 
+      @dialog.add_action_callback('movePartCategory') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s
+          new_cat = data['category'].to_s
+          next if part_name.empty? || new_cat.empty?
+          parts = TakeoffTool.load_parts rescue {}
+          pdata = parts[part_name]
+          next unless pdata
+          old_cat = pdata['category']
+          pdata['category'] = new_cat
+          TakeoffTool.save_parts(parts)
+          # Update group attribute
+          grp = TakeoffTool.find_part_group(part_name)
+          if grp
+            grp.set_attribute('TakeoffAssignments', 'category', new_cat)
+          end
+          puts "[FF Parts] Moved part '#{part_name}' from #{old_cat} to #{new_cat}"
+          send_live_data
+        rescue => e
+          puts "[FF Parts] movePartCategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('movePartSubcategory') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s
+          new_sub = data['subcategory'].to_s
+          next if part_name.empty?
+          parts = TakeoffTool.load_parts rescue {}
+          pdata = parts[part_name]
+          next unless pdata
+          pdata['subcategory'] = new_sub
+          TakeoffTool.save_parts(parts)
+          grp = TakeoffTool.find_part_group(part_name)
+          if grp
+            grp.set_attribute('TakeoffAssignments', 'subcategory', new_sub)
+          end
+          puts "[FF Parts] Moved part '#{part_name}' to subcategory '#{new_sub}'"
+          send_live_data
+        rescue => e
+          puts "[FF Parts] movePartSubcategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('renamePart') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          old_name = data['oldName'].to_s.strip
+          new_name = data['newName'].to_s.strip
+          next if old_name.empty? || new_name.empty? || old_name == new_name
+          parts = TakeoffTool.load_parts rescue {}
+          next unless parts.key?(old_name)
+          if parts.key?(new_name)
+            puts "[FF Parts] renamePart: '#{new_name}' already exists"
+            next
+          end
+          TakeoffTool.rename_part(old_name, new_name)
+          puts "[FF Parts] Renamed part '#{old_name}' -> '#{new_name}'"
+          send_live_data
+        rescue => e
+          puts "[FF Parts] renamePart error: #{e.message}"
+        end
+      end
+
+      # Part-aware isolate: handles part groups that may not be in scan results
+      @dialog.add_action_callback('isolatePartGroup') do |_ctx, eid_str|
+        begin
+          eid = eid_str.to_s.to_i
+          e = TakeoffTool.find_entity(eid)
+          next unless e && e.valid?
+          m = Sketchup.active_model
+          m.start_operation('Isolate Part', true)
+          # Hide all top-level entities except this part group
+          m.active_entities.each do |ent|
+            next unless ent.respond_to?(:visible=)
+            ent.visible = (ent.entityID == eid)
+          end
+          m.commit_operation
+          m.active_view.zoom(e)
+          puts "[FF Parts] Isolated part group eid=#{eid}"
+        rescue => ex
+          puts "[FF Parts] isolatePartGroup error: #{ex.message}"
+        end
+      end
+
       @dialog.add_action_callback('zoomToEntities') do |_ctx, ids_str|
         m = Sketchup.active_model
         bb = Geom::BoundingBox.new
@@ -411,8 +507,20 @@ module TakeoffTool
         Exporter.export_html(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
       end
 
-      @dialog.add_action_callback('rescan') do |_ctx|
+      @dialog.add_action_callback('rescan') do |_ctx, tpl_str|
+        tpl = tpl_str.to_s.strip
+        if !tpl.empty? && defined?(CategoryTemplates)
+          puts "Takeoff: Applying template '#{tpl}' before scan"
+          CategoryTemplates.apply_template(tpl)
+        end
         TakeoffTool.run_scan
+      end
+
+      @dialog.add_action_callback('listTemplates') do |_ctx|
+        names = defined?(CategoryTemplates) ? CategoryTemplates.list : []
+        require 'json'
+        safe = JSON.generate(names).gsub('</') { '<\\/' }
+        @dialog.execute_script("receiveTemplates(#{safe})")
       end
 
       @dialog.add_action_callback('activateLF') do |_ctx|
@@ -429,6 +537,31 @@ module TakeoffTool
 
       @dialog.add_action_callback('activateSFForCat') do |_ctx, cat_str|
         TakeoffTool.activate_sf_tool_for_category(cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('startNormalSample') do |_ctx, cat_str|
+        TakeoffTool.activate_normal_sample_tool(cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('activateBox') do |_ctx|
+        TakeoffTool.activate_box_tool
+      end
+
+      @dialog.add_action_callback('activateBoxForCat') do |_ctx, cat_str|
+        TakeoffTool.activate_box_tool_for_category(cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('clearNormal') do |_ctx, cat_str|
+        begin
+          cat = cat_str.to_s
+          m = Sketchup.active_model
+          m.set_attribute('TakeoffSFNormals', cat, nil) if m
+          puts "Takeoff: Cleared sampled normal for '#{cat}'"
+          Scanner.recalculate_sf
+          send_live_data
+        rescue => e
+          puts "Takeoff clearNormal error: #{e.message}"
+        end
       end
 
       @dialog.add_action_callback('openHyperParse') do |_ctx|
@@ -1641,6 +1774,16 @@ module TakeoffTool
       @dialog.execute_script("receiveAssemblies('#{esc}')")
     end
 
+    def self.send_parts_data
+      return unless @dialog && @dialog.visible?
+      require 'json'
+      parts = TakeoffTool.load_parts rescue {}
+      return if parts.empty?
+      js = JSON.generate(parts)
+      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @dialog.execute_script("receiveParts('#{esc}')") rescue nil
+    end
+
     def self.send_comparison_results
       return unless @dialog
       require 'json'
@@ -1735,6 +1878,15 @@ module TakeoffTool
         puts "CC load err: #{e.message}"
       end
 
+      # Parts are now SketchUp Groups — scanner already skips children and injects part rows.
+      # Between scans, also inject from registry so parts appear immediately after creation.
+      all_parts = TakeoffTool.load_parts rescue {}
+      part_grp_ids = {}
+      all_parts.each { |_n, pd| part_grp_ids[(pd['group_id'] || 0).to_i] = true }
+
+      # Check if scan results already include parts (post-scan) or need injection (pre-scan)
+      sr_has_parts = sr.any? { |r| r[:entity_type] == 'Part' }
+
       rows = sr.map do |r|
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
         sc = ccm[cat] || []
@@ -1756,10 +1908,9 @@ module TakeoffTool
         has_overlap = sc.length > 1 && !has_assigned && !parser_cc
 
         mt_default = Parser.measurement_for(cat)
-        mt = mt_default
-        # Check for user override stored in model attributes
+        # Default to EA until user explicitly sets a measurement type
         m_override = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
-        mt = m_override if m_override && !m_override.empty?
+        mt = (m_override && !m_override.empty?) ? m_override : 'ea'
 
         # Confidence flag for interactive scanner
         conf_pct = InteractiveScanner.confidence_pct(r) rescue 100
@@ -1787,9 +1938,40 @@ module TakeoffTool
                         custom_colors.dig('categories', cat),
           modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a',
           visible: (TakeoffTool.find_entity(r[:entity_id])&.visible? rescue true),
-          cosmetic: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'cosmetic') rescue nil) == true
+          cosmetic: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'cosmetic') rescue nil) == true,
+          isPart: r[:entity_type] == 'Part',
+          partChildCount: r[:part_child_count] || 0
         }
       end
+
+      # Inject part rows if scan results don't already include them (e.g. before rescan)
+      unless sr_has_parts
+        all_parts.each do |part_name, pdata|
+          pcat = pdata['category'] || 'Uncategorized'
+          psub = pdata['subcategory'] || ''
+          pcc = ccm[pcat] || []
+          auto_cc = pcc.length == 1 ? pcc[0] : ''
+          grp_eid = pdata['group_id']
+          grp = grp_eid ? TakeoffTool.find_entity(grp_eid.to_i) : nil
+          grp_vis = grp && grp.valid? ? grp.visible? : true
+          rows << {
+            entityId: grp_eid || "part_#{part_name}", tag: '', defaultMT: 'ea',
+            definitionName: part_name, rawDefName: part_name,
+            elementType: nil, function: nil, material: nil, thickness: nil,
+            sizeNominal: nil, isSolid: false,
+            volumeFt3: 0.0, volumeBF: 0.0, areaSF: nil, linearFt: nil,
+            bbWidth: 0.0, bbHeight: 0.0, bbDepth: 0.0,
+            category: pcat, measurementType: 'ea', costCode: auto_cc,
+            subcategory: psub, suggestedCodes: pcc, hasOverlap: false,
+            warnings: [], revitId: nil, ifcType: nil,
+            flagged: false, confidencePct: 100,
+            categorySource: 'part', customColor: nil,
+            modelSource: 'model_a', visible: grp_vis, cosmetic: false,
+            isPart: true, partChildCount: pdata['child_count'] || 0
+          }
+        end
+      end
+      puts "[FF send_data] #{all_parts.length} part(s)" if all_parts.any?
 
       cats = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_master_categories : TakeoffTool.master_categories
       all_cats = TakeoffTool.master_categories  # Full list for assignment dropdowns
@@ -1800,8 +1982,13 @@ module TakeoffTool
         next if c == '_IGNORE'
         def_mt = Parser.measurement_for(c)
         ovr = Sketchup.active_model.get_attribute('TakeoffMeasurementTypes', c) rescue nil
-        cur_mt = (ovr && !ovr.empty?) ? ovr : def_mt
+        cur_mt = (ovr && !ovr.empty?) ? ovr : 'ea'
         cat_mt[c] = { 'mt' => cur_mt, 'defaultMT' => def_mt }
+        sn_json = Sketchup.active_model.get_attribute('TakeoffSFNormals', c) rescue nil
+        if sn_json
+          sn = (JSON.parse(sn_json) rescue nil)
+          cat_mt[c]['sampledNormal'] = sn if sn.is_a?(Array) && sn.length == 3
+        end
       end
 
       require 'json'
@@ -1819,6 +2006,7 @@ module TakeoffTool
 
       send_measurement_data
       send_assemblies
+      send_parts_data
       send_multiverse_data
 
       rescue => e
@@ -1845,13 +2033,16 @@ module TakeoffTool
         rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
         color = begin; JSON.parse(rgba_json); rescue; nil; end
 
+        part_name = grp.get_attribute('TakeoffMeasurement', 'part_name') || ''
+
         entry = {
           eid: grp.entityID,
           type: mtype,
           category: cat,
           visible: visible,
           note: note,
-          color: color
+          color: color,
+          partName: part_name
         }
 
         if mtype == 'SF'
@@ -1870,6 +2061,14 @@ module TakeoffTool
           entry[:author] = grp.get_attribute('TakeoffMeasurement', 'author') || ''
           entry[:created] = grp.get_attribute('TakeoffMeasurement', 'timestamp') || ''
           entry[:point] = grp.get_attribute('TakeoffMeasurement', 'point') || ''
+        elsif mtype == 'BOX'
+          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'volume_cf') || 0
+          entry[:unit] = 'CF'
+          entry[:width_in] = grp.get_attribute('TakeoffMeasurement', 'width_in') || 0
+          entry[:depth_in] = grp.get_attribute('TakeoffMeasurement', 'depth_in') || 0
+          entry[:height_in] = grp.get_attribute('TakeoffMeasurement', 'height_in') || 0
+          entry[:total_sf] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+          entry[:net_wall_sf] = grp.get_attribute('TakeoffMeasurement', 'net_wall_sf') || 0
         elsif mtype == 'BENCHMARK'
           next  # Don't show benchmark point in measurement panel
         else
