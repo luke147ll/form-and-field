@@ -34,15 +34,15 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'annotation_tags.rb')
   load File.join(PLUGIN_DIR, 'cad_overlay.rb')
 
-  @scan_results = []
-  @category_assignments = {}
-  @cost_code_assignments = {}
-  @entity_registry = {}
-  @custom_categories = []
-  @master_categories = []
-  @master_subcategories = {}
-  @multiverse_data = nil
-  @master_containers = []
+  @scan_results ||= []
+  @category_assignments ||= {}
+  @cost_code_assignments ||= {}
+  @entity_registry ||= {}
+  @custom_categories ||= []
+  @master_categories ||= []
+  @master_subcategories ||= {}
+  @multiverse_data = nil unless defined?(@multiverse_data)
+  @master_containers ||= []
 
   class << self
     attr_accessor :scan_results, :category_assignments, :cost_code_assignments,

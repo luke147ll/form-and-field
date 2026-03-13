@@ -213,10 +213,13 @@ module TakeoffTool
       # Category-level
       cc = cs.dig('categories', cat)
       return hex_to_rgb(cc['color']) if cc && cc['color']
-      # Container-level
+      # Container-level (custom override)
       if container && !container.empty?
         ctc = cs.dig('containers', container)
         return hex_to_rgb(ctc['color']) if ctc && ctc['color']
+        # Container's own color from master_containers
+        cont_obj = (TakeoffTool.master_containers || []).find { |c| c['name'] == container }
+        return hex_to_rgb(cont_obj['color']) if cont_obj && cont_obj['color']
       end
       # Default
       DEFAULT_COLORS[cat] || DEFAULT_COLORS['Uncategorized']
@@ -258,9 +261,15 @@ module TakeoffTool
         hex = cs.dig('categories', cat, 'color')
         return "FF_CC_#{hex.gsub('#','')}" if hex
       end
-      if container && !container.empty? && cs.dig('containers', container)
-        hex = cs.dig('containers', container, 'color')
-        return "FF_CC_#{hex.gsub('#','')}" if hex
+      if container && !container.empty?
+        if cs.dig('containers', container)
+          hex = cs.dig('containers', container, 'color')
+          return "FF_CC_#{hex.gsub('#','')}" if hex
+        end
+        cont_obj = (TakeoffTool.master_containers || []).find { |c| c['name'] == container }
+        if cont_obj && cont_obj['color']
+          return "FF_CC_#{cont_obj['color'].gsub('#','')}"
+        end
       end
       "FF_HL_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}"
     end
@@ -1127,12 +1136,81 @@ module TakeoffTool
       end
     end
 
+    # Keyword map mirroring dashboard CONT_KW — longest match first
+    CONT_KEYWORDS = [
+      # multi-word specifics
+      ['plumbing fixture','MEP'],['lighting fixture','MEP'],
+      ['ceiling framing','Structure'],['roof framing','Structure'],['wall framing','Structure'],
+      ['floor framing','Structure'],['floor truss','Structure'],['roof truss','Structure'],
+      ['roof sheath','Structure'],['wall sheath','Structure'],['floor sheath','Structure'],
+      ['stud pack','Structure'],['wide flange','Structure'],['w beam','Structure'],
+      ['grade beam','Foundation'],['stem wall','Foundation'],
+      ['exterior door','Full Enclosure'],['garage door','Full Enclosure'],
+      ['glass door','Full Enclosure'],['interior door','Finish'],['int door','Finish'],
+      ['exterior trim','Full Enclosure'],['interior trim','Finish'],
+      ['wall finish','Full Enclosure'],['floor finish','Finish'],
+      ['wood panel','Full Enclosure'],['gyp board','Finish'],
+      ['shower glass','Finish'],['tile wall','Finish'],
+      ['low voltage','MEP'],['retaining wall','Exterior/Site'],['i-joist','Structure'],
+      # single-word
+      ['footing','Foundation'],['foundation','Foundation'],['slab','Foundation'],
+      ['concrete','Foundation'],['gypcrete','Finish'],['cmu','Foundation'],
+      ['pier','Foundation'],['basement','Foundation'],
+      ['steel','Structure'],['lumber','Structure'],['timber','Structure'],
+      ['framing','Structure'],['truss','Structure'],['sheathing','Structure'],
+      ['header','Structure'],['lvl','Structure'],['tji','Structure'],['bci','Structure'],
+      ['joist','Structure'],['rafter','Structure'],['beam','Structure'],
+      ['column','Structure'],['post','Structure'],['blocking','Structure'],
+      ['purlin','Structure'],['ridge','Structure'],['chord','Structure'],
+      ['brace','Structure'],['structural','Structure'],['decking','Structure'],['deck','Structure'],
+      ['roofing','Full Enclosure'],['siding','Full Enclosure'],['soffit','Full Enclosure'],
+      ['fascia','Full Enclosure'],['window','Full Enclosure'],['glazing','Full Enclosure'],
+      ['garage','Full Enclosure'],['railing','Full Enclosure'],['guard','Full Enclosure'],
+      ['masonry','Full Enclosure'],['stone','Full Enclosure'],['brick','Full Enclosure'],
+      ['insulation','Full Enclosure'],['stucco','Full Enclosure'],
+      ['gutter','Full Enclosure'],['downspout','Full Enclosure'],
+      ['flashing','Full Enclosure'],['paneling','Full Enclosure'],
+      ['wrap','Full Enclosure'],['door','Full Enclosure'],
+      ['drywall','Finish'],['trim','Finish'],['flooring','Finish'],['floor','Finish'],
+      ['tile','Finish'],['cabinet','Finish'],['vanity','Finish'],['vanities','Finish'],
+      ['casework','Finish'],['countertop','Finish'],['counter','Finish'],
+      ['stair','Finish'],['shelf','Finish'],['shelving','Finish'],
+      ['mirror','Finish'],['paint','Finish'],['hardware','Finish'],
+      ['millwork','Finish'],['molding','Finish'],['baseboard','Finish'],
+      ['crown','Finish'],['ceiling','Finish'],['wainscot','Finish'],
+      ['electric','MEP'],['conduit','MEP'],['panel','MEP'],['switch','MEP'],
+      ['outlet','MEP'],['receptacle','MEP'],['light','MEP'],['luminaire','MEP'],
+      ['plumb','MEP'],['pipe','MEP'],['sink','MEP'],['toilet','MEP'],
+      ['faucet','MEP'],['tub','MEP'],['shower','MEP'],['fixture','MEP'],
+      ['hvac','MEP'],['mechanical','MEP'],['duct','MEP'],['diffuser','MEP'],
+      ['fire','MEP'],['sprinkler','MEP'],
+      ['landscape','Exterior/Site'],['paving','Exterior/Site'],['asphalt','Exterior/Site'],
+      ['retaining','Exterior/Site'],['fence','Exterior/Site'],['fencing','Exterior/Site'],
+      ['site','Exterior/Site'],['excavat','Exterior/Site'],['backfill','Exterior/Site'],['patio','Exterior/Site'],
+      ['appliance','Specialty'],['washer','Specialty'],['dryer','Specialty'],
+      ['refrigerator','Specialty'],['oven','Specialty'],['range','Specialty'],
+      ['dishwasher','Specialty'],['furniture','Specialty'],
+      ['equipment','Specialty'],['specialty','Specialty'],
+    ].freeze
+
     # Find container name for a category from master_containers
     def self.find_container_for_cat(cat)
+      return nil unless cat && !cat.empty?
       containers = TakeoffTool.master_containers || []
+      # 1. Explicit assignment
       containers.each do |cont|
         cats = cont['categories'] || []
         return cont['name'] if cats.include?(cat)
+      end
+      # 2. Keyword matching (mirrors dashboard CONT_KW)
+      return nil if cat == '_IGNORE'
+      return 'Other' if cat == 'Uncategorized'
+      low = cat.downcase
+      cont_names = containers.map { |c| c['name'] }
+      CONT_KEYWORDS.each do |kw, cont_name|
+        if low.include?(kw) && cont_names.include?(cont_name)
+          return cont_name
+        end
       end
       nil
     end
