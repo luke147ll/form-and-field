@@ -575,6 +575,45 @@ module TakeoffTool
         send_cad_sheets
       end
 
+      @dialog.add_action_callback('zoomCadSheet') do |_ctx, eid_str|
+        model = Sketchup.active_model
+        grp = CadOverlay.find_sheet_group(model, eid_str.to_i)
+        if grp
+          model.selection.clear
+          model.selection.add(grp)
+          model.active_view.zoom(model.selection)
+        end
+      end
+
+      @dialog.add_action_callback('alignCadSheet') do |_ctx, eid_str|
+        model = Sketchup.active_model
+        grp = CadOverlay.find_sheet_group(model, eid_str.to_i)
+        if grp
+          tool = SectionAlignTool.new(grp)
+          model.select_tool(tool)
+        end
+      end
+
+      @dialog.add_action_callback('setCadCategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          CadOverlay.set_sheet_category(data['eid'].to_i, data['category'].to_s)
+          send_cad_sheets
+        rescue => e
+          puts "Dashboard: setCadCategory error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('showAllCad') do |_ctx|
+        model = Sketchup.active_model
+        model.active_entities.grep(Sketchup::Group).each do |grp|
+          next unless grp.valid? && grp.get_attribute('FF_CadOverlay', 'sheet_name')
+          grp.layer.visible = true if grp.layer
+        end
+        send_cad_sheets
+      end
+
       @dialog.add_action_callback('clearNormal') do |_ctx, cat_str|
         begin
           cat = cat_str.to_s

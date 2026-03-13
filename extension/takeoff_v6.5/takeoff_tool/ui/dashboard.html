@@ -813,6 +813,61 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .mv-filter-toggle{font-size:10px;color:#585b70;cursor:pointer;padding:3px 10px;border:1px solid #45475a;border-radius:4px;margin-left:12px;transition:all .12s;user-select:none}
 .mv-filter-toggle:hover{color:#a6adc8;border-color:#a6adc8}
 .mv-filter-toggle.active{color:#cba6f7;border-color:#cba6f7;background:rgba(203,166,247,0.06)}
+/* ── CAD Overlays ── */
+.cad-cat{margin-bottom:4px;border-radius:6px;overflow:hidden;background:#181825;border:1px solid transparent;transition:border-color .25s}
+.cad-cat:hover{border-color:#313244}
+.cad-cat.iso{box-shadow:0 0 0 1px var(--cc),0 0 20px -4px var(--cg)}
+.cad-cat-hdr{display:flex;align-items:center;padding:6px 10px;cursor:pointer;user-select:none;gap:7px;transition:background .15s;position:relative}
+.cad-cat-hdr:hover{background:rgba(255,255,255,0.02)}
+.cad-cat-hdr::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:0 3px 3px 0;background:var(--cc);opacity:.15;transition:opacity .25s,box-shadow .25s}
+.cad-cat.has-vis .cad-cat-hdr::before{opacity:1;box-shadow:0 0 8px var(--cg)}
+.cad-cat.has-vis.col{border-color:rgba(255,255,255,.08)}
+.cad-chev{width:14px;height:14px;display:flex;align-items:center;justify-content:center;transition:transform .2s;color:#585b70;flex-shrink:0}
+.cad-cat.has-vis .cad-chev{color:#7f849c}
+.cad-cat.col .cad-chev{transform:rotate(-90deg)}
+.cad-icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#11111b;transition:opacity .25s}
+.cad-cat:not(.has-vis) .cad-icon{opacity:.4}
+.cad-lbl{flex:1;font-size:11px;font-weight:600;color:#585b70;letter-spacing:.04em;transition:color .25s}
+.cad-cat.has-vis .cad-lbl{color:#bac2de}
+.cad-cnt{font-size:9px;color:#585b70;background:#1e1e2e;padding:1px 6px;border-radius:8px;font-weight:500;transition:color .25s,background .25s}
+.cad-cat.has-vis .cad-cnt{color:#cdd6f4;background:#313244}
+.cad-ctrl{display:flex;gap:2px;align-items:center;opacity:0;transition:opacity .15s}
+.cad-cat-hdr:hover .cad-ctrl{opacity:1}
+.cad-ctrl button{width:24px;height:24px;border-radius:4px;border:none;background:transparent;color:#7f849c;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:12px}
+.cad-ctrl button:hover{background:#313244;color:#cdd6f4}
+.cad-sheets{overflow:hidden;transition:max-height .3s ease}
+.cad-cat.col .cad-sheets{max-height:0!important}
+.cad-sh{display:flex;align-items:center;padding:4px 10px 4px 35px;gap:7px;transition:background .12s,opacity .2s;position:relative;cursor:default}
+.cad-sh:hover{background:rgba(255,255,255,0.02)}
+.cad-sh.off{opacity:.35}
+.cad-sh::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:1px;background:#313244}
+.cad-sh:last-child::before{bottom:50%}
+.cad-sh::after{content:'';position:absolute;left:18px;top:50%;width:8px;height:1px;background:#313244}
+.cad-sh-eye{width:20px;height:20px;border-radius:3px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s;flex-shrink:0;opacity:.7}
+.cad-sh-eye svg{stroke:currentColor;width:14px;height:14px}
+.cad-sh-eye:hover{opacity:1;background:#313244}
+.cad-sh-eye.off{color:#585b70!important;opacity:.5}
+.cad-ctrl button svg{stroke:currentColor;width:14px;height:14px}
+.cad-sh-num{font-size:10px;font-weight:600;min-width:36px;opacity:.85}
+.cad-sh-name{flex:1;font-size:11px;color:#a6adc8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cad-sh-elev{font-size:10px;color:#6c7086;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.cad-sh-acts{display:flex;gap:2px;opacity:0;transition:opacity .12s;flex-shrink:0}
+.cad-sh:hover .cad-sh-acts{opacity:1}
+.cad-sh-btn{width:22px;height:22px;border-radius:3px;border:none;background:transparent;color:#6c7086;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .12s}
+.cad-sh-btn svg{stroke:currentColor;width:12px;height:12px}
+.cad-sh-btn:hover{background:#313244;color:#cdd6f4}
+.cad-sh[draggable]{cursor:grab}
+.cad-sh.dragging{opacity:.3}
+.cad-cat.drag-over{border-color:var(--cc)!important;box-shadow:0 0 0 1px var(--cc),0 0 12px -2px var(--cg)}
+.cad-cat.drag-over .cad-cat-hdr{background:rgba(255,255,255,0.04)}
+.cad-drop-empty{padding:8px 10px 8px 35px;font-size:10px;color:#585b70;font-style:italic}
+.cad-grip{color:#45475a;font-size:10px;flex-shrink:0;margin-right:2px;cursor:grab;display:flex;align-items:center}
+.cad-grip:hover{color:#7f849c}
+.cad-add-cat{display:flex;gap:4px;padding:6px 10px;align-items:center}
+.cad-add-cat input{flex:1;padding:3px 6px;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:3px;font-size:10px;font-family:inherit}
+.cad-add-cat input:focus{outline:none;border-color:#89b4fa}
+.cad-add-cat button{padding:3px 8px;background:#89b4fa;color:#1e1e2e;border:none;border-radius:3px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit}
+.cad-add-cat button:hover{background:#74c7ec}
 </style>
 </head>
 <body>
@@ -1158,9 +1213,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
     <!-- CAD OVERLAYS TAB -->
     <div class="info-content" id="tab_cad">
-      <div class="mp-toolbar" style="justify-content:space-between">
+      <div class="mp-toolbar" style="justify-content:space-between;align-items:center">
         <span style="font-size:11px;font-weight:600;color:#89b4fa">CAD Overlays</span>
-        <button class="hb" onclick="call('importCadSheet')" style="font-size:10px;padding:2px 6px;color:#89b4fa;border-color:#89b4fa">+ Import DWG</button>
+        <div style="display:flex;gap:6px">
+          <button class="hb" onclick="call('showAllCad')" style="font-size:10px;padding:2px 6px;color:#a6adc8;border-color:#45475a">Show All</button>
+          <button class="hb" onclick="call('importCadSheet')" style="font-size:10px;padding:2px 6px;color:#89b4fa;border-color:#89b4fa">+ Import DWG</button>
+        </div>
       </div>
       <div class="sec-scroll" id="cadScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
         <div id="cadBody"></div>
@@ -5001,23 +5059,205 @@ function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be 
 
 /* ═══ CAD OVERLAYS ═══ */
 var CAD_SHEETS=[];
+var CAD_COL={};
+var CAD_ISO=null;
+var CAD_DRAG_EID=null;
+var CAD_CATS={
+  site:      {label:'Site Plans',  icon:'SP',color:'#94e2d5',glow:'rgba(148,226,213,0.15)'},
+  plans:     {label:'Floor Plans', icon:'FP',color:'#89b4fa',glow:'rgba(137,180,250,0.15)'},
+  elevations:{label:'Elevations',  icon:'EL',color:'#a6e3a1',glow:'rgba(166,227,161,0.15)'},
+  sections:  {label:'Sections',    icon:'SC',color:'#fab387',glow:'rgba(250,179,135,0.15)'},
+  details:   {label:'Details',     icon:'DT',color:'#cba6f7',glow:'rgba(203,166,247,0.15)'},
+  structural:{label:'Structural',  icon:'ST',color:'#f9e2af',glow:'rgba(249,226,175,0.15)'}
+};
+var CAD_ORDER=['site','plans','elevations','sections','details','structural'];
+var CAD_SVG_CHEV='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CAD_SVG_ISO='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>';
+var CAD_SVG_ZOOM='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" stroke-width="1.2"/><path d="M8.5 8.5L11 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+var CAD_SVG_ALIGN='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+var CAD_SVG_TRASH='<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 3H9L8.3 9.5C8.25 10 7.85 10.3 7.35 10.3H3.65C3.15 10.3 2.75 10 2.7 9.5L2 3Z" stroke="currentColor" stroke-width="1"/><path d="M1 3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M4 3V1.5C4 1.2 4.2 1 4.5 1H6.5C6.8 1 7 1.2 7 1.5V3" stroke="currentColor" stroke-width="1"/></svg>';
+var CAD_SVG_GRIP='<svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>';
+
 function receiveCadSheets(json){try{CAD_SHEETS=JSON.parse(json);}catch(e){CAD_SHEETS=[];}renderCadPanel();}
+
 function renderCadPanel(){
   var el=document.getElementById('cadBody'),emp=document.getElementById('cadEmpty');
-  if(!CAD_SHEETS.length){el.innerHTML='';emp.style.display='';return;}
-  emp.style.display='none';
-  var h='';
+
+  // Group by category
+  var grouped={};
   for(var i=0;i<CAD_SHEETS.length;i++){
-    var s=CAD_SHEETS[i],vis=!!s.visible;
-    h+='<div class="mp-item" style="flex-wrap:wrap">';
-    h+='<button class="ey'+(vis?'':' off')+'" onclick="togCad('+s.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-    h+='<span class="mp-desc" style="color:#89b4fa;font-weight:600">'+X(s.name)+'</span>';
-    h+='<span class="mp-val" style="color:#6c7086;font-size:11px">EL. '+s.elevation_ft.toFixed(1)+"'</span>";
-    h+='<button class="mp-del" onclick="delCad('+s.eid+',\''+X2(s.name)+'\')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
-    h+='</div>';
+    var s=CAD_SHEETS[i],k=s.category||'plans';
+    if(!grouped[k])grouped[k]=[];
+    grouped[k].push(s);
   }
+
+  // Build render order: all registered cats (including empty), plus any unregistered
+  var renderOrder=CAD_ORDER.slice();
+  for(var k in grouped){if(renderOrder.indexOf(k)<0)renderOrder.push(k);}
+
+  // Check if anything to show (sheets or custom cats beyond defaults)
+  var hasContent=CAD_SHEETS.length>0||CAD_ORDER.length>6;
+  if(!hasContent){el.innerHTML='';emp.style.display='';return;}
+  emp.style.display='none';
+
+  // Save add-cat input value before re-render
+  var addInp=document.getElementById('cadNewCatName');
+  var addVal=addInp?addInp.value:'';
+
+  var h='';
+  for(var ci=0;ci<renderOrder.length;ci++){
+    var k=renderOrder[ci],list=grouped[k]||[];
+    var c=CAD_CATS[k]||{label:k,icon:k.substring(0,2).toUpperCase(),color:'#a6adc8',glow:'rgba(166,173,200,0.15)'};
+    var col=!!CAD_COL[k];
+    var catVis=list.length?list.some(function(s){return s.visible;}):false;
+    var catIso=CAD_ISO&&CAD_ISO.type==='cat'&&CAD_ISO.id===k;
+
+    h+='<div class="cad-cat'+(col?' col':'')+(catIso?' iso':'')+(catVis?' has-vis':'')+'" data-cat="'+X2(k)+'" style="--cc:'+c.color+';--cg:'+c.glow+'"';
+    h+=' ondragover="cadDragOver(event)" ondragleave="cadDragLeave(event)" ondrop="cadDrop(event,\''+X2(k)+'\')">';
+    h+='<div class="cad-cat-hdr" onclick="cadTogCol(\''+X2(k)+'\')">';
+    h+='<div class="cad-chev">'+CAD_SVG_CHEV+'</div>';
+    h+='<div class="cad-icon" style="background:'+c.color+'">'+c.icon+'</div>';
+    h+='<span class="cad-lbl">'+X(c.label)+'</span>';
+    if(list.length)h+='<span class="cad-cnt">'+list.length+'</span>';
+    h+='<div class="cad-ctrl">';
+    if(list.length)h+='<button onclick="event.stopPropagation();cadTogCatVis(\''+X2(k)+'\')" title="Toggle all" style="'+(catVis?'':'color:#585b70')+'">'+(catVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    if(list.length)h+='<button onclick="event.stopPropagation();cadIsoCat(\''+X2(k)+'\')" title="Isolate" style="'+(catIso?'color:'+c.color:'')+'">'+CAD_SVG_ISO+'</button>';
+    h+='</div></div>';
+
+    var sheetH=list.length?list.length*32+4:28;
+    h+='<div class="cad-sheets" style="max-height:'+(col?0:sheetH)+'px">';
+
+    if(!list.length){
+      h+='<div class="cad-drop-empty">Drop sheets here</div>';
+    }
+
+    for(var j=0;j<list.length;j++){
+      var s=list[j],v=s.visible,sIso=CAD_ISO&&CAD_ISO.type==='sheet'&&CAD_ISO.id===s.eid;
+      var isSection=s.sheet_type==='section';
+      h+='<div class="cad-sh'+(!v&&!sIso?' off':'')+'" draggable="true" data-eid="'+s.eid+'"';
+      h+=' ondragstart="cadDragStart(event,'+s.eid+')" ondragend="cadDragEnd(event)">';
+      h+='<span class="cad-grip">'+CAD_SVG_GRIP+'</span>';
+      h+='<button class="cad-sh-eye'+(v?'':' off')+'" onclick="togCad('+s.eid+','+(!v)+')" style="color:'+(v?c.color:'')+'">'+(v?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+      h+='<span class="cad-sh-name">'+X(s.name)+'</span>';
+      if(s.elevation_label)h+='<span class="cad-sh-elev">'+X(s.elevation_label)+'</span>';
+      h+='<div class="cad-sh-acts">';
+      h+='<button class="cad-sh-btn" onclick="cadIsoSheet('+s.eid+')" title="Isolate" style="'+(sIso?'color:'+c.color:'')+'">'+CAD_SVG_ISO+'</button>';
+      h+='<button class="cad-sh-btn" onclick="call(\'zoomCadSheet\',\''+s.eid+'\')" title="Zoom">'+CAD_SVG_ZOOM+'</button>';
+      if(isSection)h+='<button class="cad-sh-btn" onclick="call(\'alignCadSheet\',\''+s.eid+'\')" title="Align" style="color:#fab387">'+CAD_SVG_ALIGN+'</button>';
+      h+='<button class="cad-sh-btn" onclick="delCad('+s.eid+',\''+X2(s.name)+'\')" title="Delete" style="color:#f38ba8">'+CAD_SVG_TRASH+'</button>';
+      h+='</div></div>';
+    }
+    h+='</div></div>';
+  }
+
+  h+='<div class="cad-add-cat">';
+  h+='<input type="text" id="cadNewCatName" placeholder="New category name..." value="'+X2(addVal)+'"';
+  h+=' onkeydown="if(event.key===\'Enter\')cadAddCat()">';
+  h+='<button onclick="cadAddCat()">Add</button>';
+  h+='</div>';
+
   el.innerHTML=h;
 }
+
+/* ── Drag & Drop ── */
+function cadDragStart(e,eid){
+  CAD_DRAG_EID=eid;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',''+eid);
+  var row=e.target.closest('.cad-sh');
+  if(row)setTimeout(function(){row.classList.add('dragging');},0);
+}
+function cadDragEnd(e){
+  CAD_DRAG_EID=null;
+  renderCadPanel();
+}
+function cadDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  var cat=e.target.closest('.cad-cat');
+  if(cat&&!cat.classList.contains('drag-over'))cat.classList.add('drag-over');
+}
+function cadDragLeave(e){
+  var cat=e.target.closest('.cad-cat');
+  if(!cat)return;
+  var related=e.relatedTarget;
+  if(related&&cat.contains(related))return;
+  cat.classList.remove('drag-over');
+}
+function cadDrop(e,targetCat){
+  e.preventDefault();
+  var cat=e.target.closest('.cad-cat');
+  if(cat)cat.classList.remove('drag-over');
+  var eid=parseInt(e.dataTransfer.getData('text/plain'));
+  if(!eid||isNaN(eid))return;
+  cadMoveCat(eid,targetCat);
+}
+
+/* ── Actions ── */
+function cadTogCol(k){CAD_COL[k]=!CAD_COL[k];renderCadPanel();}
+
+function cadTogCatVis(k){
+  var list=CAD_SHEETS.filter(function(s){return(s.category||'plans')===k;});
+  var allOn=list.every(function(s){return s.visible;});
+  for(var i=0;i<list.length;i++){
+    list[i].visible=!allOn;
+    callJSON('toggleCadSheet',{eid:list[i].eid,show:!allOn});
+  }
+  renderCadPanel();
+}
+
+function cadIsoCat(k){
+  if(CAD_ISO&&CAD_ISO.type==='cat'&&CAD_ISO.id===k){
+    CAD_ISO=null;
+    call('showAllCad');
+    for(var i=0;i<CAD_SHEETS.length;i++)CAD_SHEETS[i].visible=true;
+  } else {
+    CAD_ISO={type:'cat',id:k};
+    for(var i=0;i<CAD_SHEETS.length;i++){
+      var inCat=(CAD_SHEETS[i].category||'plans')===k;
+      CAD_SHEETS[i].visible=inCat;
+      callJSON('toggleCadSheet',{eid:CAD_SHEETS[i].eid,show:inCat});
+    }
+  }
+  renderCadPanel();
+}
+
+function cadIsoSheet(eid){
+  if(CAD_ISO&&CAD_ISO.type==='sheet'&&CAD_ISO.id===eid){
+    CAD_ISO=null;
+    call('showAllCad');
+    for(var i=0;i<CAD_SHEETS.length;i++)CAD_SHEETS[i].visible=true;
+  } else {
+    CAD_ISO={type:'sheet',id:eid};
+    for(var i=0;i<CAD_SHEETS.length;i++){
+      var match=CAD_SHEETS[i].eid===eid;
+      CAD_SHEETS[i].visible=match;
+      callJSON('toggleCadSheet',{eid:CAD_SHEETS[i].eid,show:match});
+    }
+  }
+  renderCadPanel();
+}
+
+function cadMoveCat(eid,newCat){
+  callJSON('setCadCategory',{eid:eid,category:newCat});
+  for(var i=0;i<CAD_SHEETS.length;i++){
+    if(CAD_SHEETS[i].eid===eid){CAD_SHEETS[i].category=newCat;break;}
+  }
+  renderCadPanel();
+}
+
+function cadAddCat(){
+  var inp=document.getElementById('cadNewCatName');
+  var name=(inp?inp.value:'').trim();
+  if(!name)return;
+  var key=name.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+  if(!CAD_CATS[key]){
+    CAD_CATS[key]={label:name,icon:name.substring(0,2).toUpperCase(),color:'#a6adc8',glow:'rgba(166,173,200,0.15)'};
+    if(CAD_ORDER.indexOf(key)<0)CAD_ORDER.push(key);
+  }
+  renderCadPanel();
+}
+
 function togCad(eid,show){callJSON('toggleCadSheet',{eid:eid,show:show});for(var i=0;i<CAD_SHEETS.length;i++){if(CAD_SHEETS[i].eid===eid){CAD_SHEETS[i].visible=show;break;}}renderCadPanel();}
 function delCad(eid,name){showConfirmModal('Delete CAD sheet "'+name+'"? This cannot be undone.',function(){call('deleteCadSheet',''+eid);CAD_SHEETS=CAD_SHEETS.filter(function(s){return s.eid!==eid;});renderCadPanel();});}
 

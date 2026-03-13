@@ -2,6 +2,15 @@ module TakeoffTool
   CAD_TAG_PREFIX = 'FF_CAD_' unless defined?(CAD_TAG_PREFIX)
   CAD_DICT = 'FF_CadOverlay' unless defined?(CAD_DICT)
 
+  CAD_CATEGORIES = {
+    'site'       => { label: 'Site Plans',   icon: 'SP', color: '#94e2d5' },
+    'plans'      => { label: 'Floor Plans',  icon: 'FP', color: '#89b4fa' },
+    'elevations' => { label: 'Elevations',   icon: 'EL', color: '#a6e3a1' },
+    'sections'   => { label: 'Sections',     icon: 'SC', color: '#fab387' },
+    'details'    => { label: 'Details',       icon: 'DT', color: '#cba6f7' },
+    'structural' => { label: 'Structural',   icon: 'ST', color: '#f9e2af' }
+  }.freeze unless defined?(CAD_CATEGORIES)
+
   module CadOverlay
 
     # ═══════════════════════════════════════════════════════════════
@@ -161,6 +170,7 @@ module TakeoffTool
       grp.set_attribute(CAD_DICT, 'sheet_name', sheet_name)
       grp.set_attribute(CAD_DICT, 'elevation_ft', elevation_ft)
       grp.set_attribute(CAD_DICT, 'sheet_type', sheet_type)
+      grp.set_attribute(CAD_DICT, 'sheet_category', detect_category(sheet_name, sheet_type))
       grp.set_attribute(CAD_DICT, 'imported_at', Time.now.to_s)
 
       # Clean up empty CAD layer tags
@@ -221,22 +231,67 @@ module TakeoffTool
     end
 
     # ═══════════════════════════════════════════════════════════════
+    # SHEET CATEGORY
+    # ═══════════════════════════════════════════════════════════════
+
+    def self.detect_category(sheet_name, sheet_type)
+      n = sheet_name
+      # Keyword matches (strongest signals)
+      return 'details'    if n =~ /\bdetail/i
+      return 'sections'   if n =~ /\bsection/i
+      return 'elevations' if n =~ /\belevation/i
+      return 'site'       if n =~ /\bsite\b/i
+      return 'structural' if n =~ /\bstruct/i || n =~ /\bfram/i || n =~ /\bfoundation/i
+      # Sheet number prefix (A4-x → sections, A2-x → elevations, etc.)
+      return 'details'    if n =~ /\bA5[\s\-\.]/i
+      return 'sections'   if n =~ /\bA4[\s\-\.]/i
+      return 'elevations' if n =~ /\bA2[\s\-\.]/i
+      return 'site'       if n =~ /\bC\d[\s\-\.]/i
+      return 'structural' if n =~ /\bS\d[\s\-\.]/i
+      # sheet_type fallback
+      return 'sections'   if sheet_type == 'section'
+      return 'plans'  # default
+    end
+
+    def self.set_sheet_category(eid, category)
+      model = Sketchup.active_model
+      return unless model
+      grp = find_sheet_group(model, eid)
+      return unless grp
+      grp.set_attribute(CAD_DICT, 'sheet_category', category)
+    end
+
+    # ═══════════════════════════════════════════════════════════════
     # SHEET MANAGEMENT
     # ═══════════════════════════════════════════════════════════════
 
     def self.list_sheets
       model = Sketchup.active_model
       return [] unless model
+      bmk = TakeoffTool.get_elevation_benchmark
       sheets = []
       model.active_entities.grep(Sketchup::Group).each do |grp|
         next unless grp.valid?
         name = grp.get_attribute(CAD_DICT, 'sheet_name')
         next unless name
+        stype = grp.get_attribute(CAD_DICT, 'sheet_type') || 'plan'
+        cat = grp.get_attribute(CAD_DICT, 'sheet_category')
+        cat = detect_category(name, stype) unless cat && !cat.empty?
+        elev_ft = grp.get_attribute(CAD_DICT, 'elevation_ft') || 0
+        elev_label = ''
+        if cat == 'plans' && bmk && elev_ft != 0
+          z_inches = elev_ft * 12.0
+          pt = Geom::Point3d.new(0, 0, z_inches)
+          elev = TakeoffTool.calculate_elevation(pt)
+          elev_label = TakeoffTool.format_elevation(elev, bmk['unit']) if elev
+        end
         sheets << {
           eid: grp.entityID,
           name: name,
-          sheet_type: grp.get_attribute(CAD_DICT, 'sheet_type') || 'plan',
-          elevation_ft: grp.get_attribute(CAD_DICT, 'elevation_ft') || 0,
+          sheet_type: stype,
+          category: cat,
+          elevation_ft: elev_ft,
+          elevation_label: elev_label,
           imported_at: grp.get_attribute(CAD_DICT, 'imported_at') || '',
           visible: grp.layer ? grp.layer.visible? : true
         }
