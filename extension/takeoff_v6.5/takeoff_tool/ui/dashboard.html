@@ -68,19 +68,136 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 /* MEASUREMENT PANEL */
 /* MEASUREMENT + ASSEMBLY PANEL ITEMS */
 .mp-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--surface0);background:var(--mantle);flex-shrink:0}
-.mp-cat{padding:4px 12px 2px 12px;cursor:pointer;user-select:none}
-.mp-cat-hdr{font-weight:600;font-size:11px;color:#a6e3a1;display:flex;align-items:center;gap:6px}
-.mp-cat-hdr .arr{transition:transform .15s;display:inline-block;color:#a6adc8;font-size:8px;width:10px}
-.mp-cat.closed .arr{transform:rotate(-90deg)}
-.mp-cat.closed .mp-cat-items{display:none}
-.mp-item{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 20px;font-size:11px}
-.mp-item:hover{background:#222236}
-.mp-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0;border:1px solid #45475a}
-.mp-desc{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cdd6f4}
-.mp-val{color:#89b4fa;font-weight:600;white-space:nowrap;min-width:60px;text-align:right}
-.mp-del{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center}
-.mp-del svg{stroke:#f38ba8;width:12px;height:12px}
-.mp-del:hover svg{stroke:#ff6b8a}
+/* ── Meas type chips ── */
+.mtype-chips{display:flex;gap:3px;background:var(--mantle);border-radius:5px;padding:2px;border:1px solid var(--surface0)}
+.mtype-chip{font:600 10px var(--font-mono,monospace);padding:4px 10px;border-radius:3px;border:none;background:transparent;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;user-select:none}
+.mtype-chip .mc-icon{font-size:11px;line-height:1}
+.mtype-chip.lf{color:var(--green)}.mtype-chip.sf{color:var(--blue)}
+.mtype-chip.elev{color:var(--peach)}.mtype-chip.vol{color:var(--mauve)}
+.mtype-chip.active{background:var(--surface0)}
+.mtype-chip.lf.active{box-shadow:inset 0 -2px 0 var(--green)}
+.mtype-chip.sf.active{box-shadow:inset 0 -2px 0 var(--blue)}
+.mtype-chip.elev.active{box-shadow:inset 0 -2px 0 var(--peach)}
+.mtype-chip.vol.active{box-shadow:inset 0 -2px 0 var(--mauve)}
+.mtype-chip:hover{background:rgba(255,255,255,.03)}
+.mc-count{font-size:8px;padding:1px 4px;border-radius:6px;background:var(--surface0);font-weight:500}
+/* ── Meas summary strip ── */
+.ms-strip{display:flex;align-items:center;padding:6px 14px;gap:16px;border-bottom:1px solid var(--surface0);background:var(--mantle);flex-shrink:0;flex-wrap:wrap}
+.ms-item{display:flex;align-items:center;gap:6px;font-size:10px}
+.ms-icon{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+.ms-label{color:var(--overlay1)}.ms-val{font-weight:700;font-size:11px}
+/* ── Meas search ── */
+.ms-search{display:flex;align-items:center;gap:6px;background:var(--mantle);border:1px solid var(--surface0);
+  border-radius:4px;padding:0 8px;height:28px;flex:0 0 140px;transition:border-color .2s}
+.ms-search:focus-within{border-color:var(--green)}
+.ms-search svg{color:var(--overlay0);flex-shrink:0}
+.ms-search input{background:none;border:none;outline:none;color:var(--text);font:11px var(--font-mono,monospace);width:100%}
+.ms-search input::placeholder{color:var(--overlay0)}
+/* ── Meas container header ── */
+.mc-hdr{display:flex;align-items:center;padding:8px 14px;gap:8px;
+  background:var(--crust);border-bottom:1px solid var(--surface0);cursor:pointer;user-select:none;position:relative}
+.mc-hdr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--mc-color)}
+.mc-hdr:hover{background:#161622}
+.mc-chev{width:14px;height:14px;display:flex;align-items:center;justify-content:center;color:var(--overlay1);
+  transition:transform .2s;flex-shrink:0;font-size:10px}
+.mc-hdr.collapsed .mc-chev{transform:rotate(-90deg)}
+.mc-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.mc-name{font-size:12px;font-weight:600;color:var(--text);flex:1;letter-spacing:.03em}
+.mc-cnt{font-size:9px;color:var(--overlay0);background:var(--surface0);padding:1px 6px;border-radius:8px}
+.mc-totals{display:flex;gap:12px;flex-shrink:0}
+.mc-total{font-size:10px;font-weight:600}
+.mc-body{overflow:hidden}
+.mc-hdr.collapsed+.mc-body{display:none}
+/* ── Meas category header ── */
+.mch-hdr{display:flex;align-items:center;padding:6px 14px 6px 28px;gap:8px;
+  background:var(--mantle);border-bottom:1px solid var(--surface0);cursor:pointer;user-select:none;position:relative}
+.mch-hdr:hover{background:#1c1c30}
+.mch-hdr::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:1px;background:var(--surface0)}
+.mch-chev{width:12px;height:12px;display:flex;align-items:center;justify-content:center;color:var(--overlay1);
+  transition:transform .2s;flex-shrink:0;font-size:9px}
+.mch-hdr.collapsed .mch-chev{transform:rotate(-90deg)}
+.mch-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.mch-name{font-size:11px;font-weight:500;color:var(--subtext1);flex:1}
+.mch-badges{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.mch-auto{font-size:9px;padding:1px 6px;border-radius:3px;font-weight:600}
+.mch-manual{font-size:9px;color:var(--overlay0);background:var(--surface0);padding:1px 5px;border-radius:8px}
+.mch-actions{display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.mch-hdr:hover .mch-actions{opacity:1}
+.mch-add-btn{width:22px;height:22px;border-radius:4px;border:none;background:transparent;
+  color:var(--overlay1);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:11px}
+.mch-add-btn:hover{background:var(--surface0);color:var(--text)}
+/* Global fixed-position measurement dropdown */
+.meas-gdd{display:none;position:fixed;z-index:9999;background:var(--mantle);
+  border:1px solid var(--surface1);border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.5);min-width:120px;padding:3px}
+.meas-gdd.open{display:block}
+.meas-gdd-item{display:block;width:100%;padding:4px 10px;border:none;background:transparent;color:var(--subtext0);
+  font:500 10px var(--font-mono,monospace);cursor:pointer;text-align:left;border-radius:2px;white-space:nowrap}
+.meas-gdd-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.meas-gdd-item .dd-dot{display:inline-block;width:6px;height:6px;border-radius:2px;margin-right:6px}
+.meas-gdd-sep{font-size:9px;color:var(--overlay0);padding:3px 10px;display:block;border-top:1px solid var(--surface0);margin-top:2px}
+/* ── Meas row ── */
+.meas-list{transition:max-height .3s ease;overflow:visible}
+.mch-hdr.collapsed+.meas-list{max-height:0!important;overflow:hidden}
+.mrow{display:grid;grid-template-columns:22px 22px 1fr auto auto 60px;align-items:center;
+  padding:0 14px 0 42px;height:34px;gap:8px;transition:background .1s;position:relative;cursor:default}
+.mrow:hover{background:rgba(255,255,255,.015)}
+.mrow::before{content:'';position:absolute;left:32px;top:0;bottom:0;width:1px;background:var(--surface0)}
+.mrow:last-child::before{bottom:50%}
+.mrow::after{content:'';position:absolute;left:32px;top:50%;width:6px;height:1px;background:var(--surface0)}
+.mrow.derived{background:rgba(203,166,247,.02);margin-left:20px}
+.mrow.derived .mr-name{color:var(--mauve)}
+.mrow.scan{background:rgba(166,227,161,.02);grid-template-columns:22px 22px 1fr auto;height:auto;min-height:34px;padding-top:4px;padding-bottom:4px}
+.mrow.scan .mr-name{color:var(--green)}
+.mrow.scan .mr-actions{display:none}
+.mr-inline{display:flex;gap:2px;align-items:center;flex-shrink:0}
+.mr-ibtn{font:500 9px var(--font-mono,monospace);padding:2px 6px;border-radius:3px;border:1px solid var(--surface1);
+  background:transparent;color:var(--subtext0);cursor:pointer;transition:all .12s;white-space:nowrap}
+.mr-ibtn:hover{border-color:var(--overlay0);color:var(--text)}
+.mr-ibtn.drv{border-color:var(--mauve);color:var(--mauve)}
+.mr-ibtn.drv:hover{background:rgba(203,166,247,.08)}
+.mr-eye{width:22px;height:22px;border-radius:3px;border:none;background:transparent;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;opacity:.6}
+.mr-eye svg{stroke:currentColor}
+.mr-eye:hover{opacity:1;background:var(--surface0)}
+.mr-eye.off{color:var(--surface2)!important;opacity:.4}
+.mr-tdot{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:700;flex-shrink:0}
+.mr-narea{display:flex;align-items:center;gap:6px;min-width:0}
+.mr-name{font-size:11px;color:var(--subtext1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
+.mr-note{font-size:9px;color:var(--overlay0);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mr-dbadge{font-size:8px;color:var(--mauve);background:rgba(203,166,247,.1);border:1px solid rgba(203,166,247,.2);
+  border-radius:3px;padding:0 4px;white-space:nowrap;font-weight:600}
+.mr-val{font-size:12px;font-weight:700;text-align:right;white-space:nowrap}
+.mr-unit{font-size:9px;font-weight:500;opacity:.7;text-align:left}
+.mr-actions{position:absolute;right:14px;display:flex;gap:1px;opacity:0;transition:opacity .12s;
+  background:linear-gradient(to right,transparent,var(--base) 6px);padding-left:12px}
+.mrow:hover .mr-actions{opacity:1}
+.mr-btn{width:22px;height:22px;border-radius:3px;border:none;background:transparent;color:var(--overlay0);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.mr-btn:hover{background:var(--surface0);color:var(--text)}
+.mr-btn.danger:hover{color:var(--red)}
+/* ── Add Part form ── */
+.apf{display:none;padding:8px 14px 8px 42px;background:rgba(203,166,247,.03);border-bottom:1px solid var(--surface0)}
+.apf.open{display:block}
+.apf-row{display:flex;gap:6px;align-items:center;margin-bottom:4px}
+.apf-label{font-size:9px;color:var(--overlay1);width:60px;flex-shrink:0}
+.apf-input{background:var(--mantle);border:1px solid var(--surface1);border-radius:3px;padding:3px 6px;
+  color:var(--text);font:10px var(--font-mono,monospace);outline:none;flex:1}
+.apf-input:focus{border-color:var(--mauve)}
+.apf-select{background:var(--mantle);border:1px solid var(--surface1);border-radius:3px;padding:3px 6px;
+  color:var(--text);font:10px var(--font-mono,monospace);outline:none;flex:1;cursor:pointer}
+.apf-btns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+.apf-btn{font:500 10px var(--font-mono,monospace);padding:4px 12px;border-radius:4px;border:none;cursor:pointer;transition:all .15s}
+.apf-btn.save{background:var(--mauve);color:var(--crust)}
+.apf-btn.save:hover{opacity:.85}
+.apf-btn.cancel{background:transparent;border:1px solid var(--surface1);color:var(--subtext0)}
+.apf-btn.cancel:hover{border-color:var(--overlay0);color:var(--text)}
+/* ── Meas empty state ── */
+.meas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 20px;color:var(--overlay0);gap:12px}
+.meas-empty svg{opacity:.25}
+.meas-empty p{font-size:11px;text-align:center;line-height:1.6}
 
 /* FILTER BAR */
 .fbar{padding:6px 14px;background:var(--base);border-bottom:1px solid var(--surface0);display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
@@ -1344,25 +1461,31 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
     <!-- MEASUREMENTS TAB -->
     <div class="info-content" id="tab_measurements">
-      <div class="mp-toolbar">
-        <button class="hb yel" onclick="call('activateLF')" title="Measure Linear Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="5" y1="7" x2="5" y2="9"/><line x1="8" y1="6" x2="8" y2="10"/><line x1="11" y1="7" x2="11" y2="9"/></svg>LF</button>
-        <button class="hb yel" onclick="call('activateSF')" title="Measure Square Feet" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="currentColor" fill-opacity="0.15"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>SF</button>
-        <button class="hb" onclick="call('activateElevation')" title="Place Elevation Tag" style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;color:#cba6f7;border-color:#cba6f7"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="14" x2="14" y2="14"/><line x1="8" y1="14" x2="8" y2="3"/><polyline points="5 6 8 3 11 6"/><line x1="3" y1="10" x2="13" y2="10" stroke-dasharray="2 2"/></svg>Elev</button>
+      <!-- Toolbar -->
+      <div class="mp-toolbar" style="gap:6px;padding:6px 10px;align-items:center">
+        <div class="mtype-chips">
+          <button class="mtype-chip lf active" onclick="togMeasType('lf',this)"><span class="mc-icon">&#10236;</span>LF<span class="mc-count" id="mcLF">0</span></button>
+          <button class="mtype-chip sf active" onclick="togMeasType('sf',this)"><span class="mc-icon">&#11026;</span>SF<span class="mc-count" id="mcSF">0</span></button>
+          <button class="mtype-chip elev active" onclick="togMeasType('elev',this)"><span class="mc-icon">&#8895;</span>Elev<span class="mc-count" id="mcElev">0</span></button>
+          <button class="mtype-chip vol active" onclick="togMeasType('vol',this)"><span class="mc-icon">&#10696;</span>Vol<span class="mc-count" id="mcVol">0</span></button>
+        </div>
+        <div class="ms-search">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M9 9L12 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <input type="text" placeholder="Search..." id="measSearch" oninput="renderMeasPanel()">
+        </div>
+        <div class="filter-toggle" id="measHideEmptyToggle" onclick="toggleMeasHideEmpty()" style="margin-left:4px">
+          <div class="toggle-pill"></div>
+          <span>Hide empty</span>
+        </div>
         <span style="flex:1"></span>
-        <button class="hb" onclick="recalcSF()" title="Recalculate SF for all entities using current category assignments" style="font-size:10px;padding:2px 6px;color:#f9e2af;border-color:#f9e2af">Recalc SF</button>
+        <button class="hb" onclick="recalcSF()" title="Recalculate" style="font-size:10px;padding:2px 6px;color:#f9e2af;border-color:#f9e2af">Recalc</button>
         <button class="hb grn" onclick="showAllMeas()" style="font-size:10px;padding:2px 6px">Show All</button>
         <button class="hb" onclick="hideAllMeas()" style="color:#f38ba8;border-color:#f38ba8;font-size:10px;padding:2px 6px">Hide All</button>
+        <button class="hb" onclick="openMeasGDD(this,null,event)" style="font-size:10px;padding:2px 6px;color:#fab387;border-color:#fab387">+ Measure</button>
       </div>
-      <div class="mp-toolbar" style="border-top:1px solid var(--surface0);gap:6px;padding:4px 8px">
-        <span style="color:var(--overlay0);font-size:10px;font-weight:600">Debug:</span>
-        <select id="debugCatSelect" class="cs-unit" style="max-width:160px;font-size:10px"><option value="">-- category --</option></select>
-        <button class="hb" onclick="var c=document.getElementById('debugCatSelect').value;if(c)call('debugAreaCategory',c);else showToast('Select a category first','warning')" title="Debug all SF in selected category" style="font-size:10px;padding:2px 6px;color:#f9e2af;border-color:#f9e2af">SF?</button>
-        <button class="hb" onclick="var c=document.getElementById('debugCatSelect').value;if(c)call('debugOcclusion',c);else showToast('Select a category first','warning')" title="Occlusion check for selected category" style="font-size:10px;padding:2px 6px;color:#fab387;border-color:#fab387">OCC</button>
-        <button class="hb" onclick="call('clearDebug')" title="Clear debug colors" style="font-size:10px;padding:2px 6px;color:#a6adc8;border-color:#a6adc8">CLR</button>
-        <span style="border-left:1px solid var(--surface1);height:16px"></span>
-        <button class="hb" onclick="var c=document.getElementById('debugCatSelect').value;if(c)call('activateLFForCat',c);else showToast('Select a category first','warning')" title="Measure LF for category" style="font-size:10px;padding:2px 6px;color:#89b4fa;border-color:#89b4fa">Cat LF</button>
-        <button class="hb" onclick="var c=document.getElementById('debugCatSelect').value;if(c)call('activateSFForCat',c);else showToast('Select a category first','warning')" title="Measure SF for category" style="font-size:10px;padding:2px 6px;color:#a6e3a1;border-color:#a6e3a1">Cat SF</button>
-      </div>
+      <!-- Summary strip -->
+      <div class="ms-strip" id="measSummary"></div>
+      <!-- Content -->
       <div class="sec-scroll" id="measScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
         <div id="measBody"></div>
         <div class="sec-scroll-fade" id="measFade"></div>
@@ -2819,18 +2942,8 @@ function renderGroups(){
     else h+='<span class="cname" style="background:var(--surface2);color:var(--text)">'+X(gk)+'</span>';
     var _gc=grpCount(items);
     h+='<span class="cat-stat"><b>'+_gc+'</b>/'+items.length+(items.length!==_gc?' <span style="color:var(--teal)">+'+( items.length-_gc)+'&#9671;</span>':'')+'</span>';
-    // Total
-    h+='<span class="cinfo">'+grpTotal(items)+'</span>';
-    // Unit selector on category header
-    if(gBy==='category'){
-      var cmt=CATMT[gk];
-      var curMT=items.length?items[0].measurementType:(cmt?cmt.mt:'volume');
-      var defMT=items.length?(items[0].defaultMT||curMT):(cmt?cmt.defaultMT:'volume');
-      h+='<select class="cgh-unit" onclick="event.stopPropagation()" onchange="event.stopPropagation();setMT(\''+X2(gk)+'\',this.value)">';
-      var mts=unitOptionsFor(defMT);
-      for(var mi=0;mi<mts.length;mi++) h+='<option value="'+mts[mi][0]+'"'+(curMT===mts[mi][0]?' selected':'')+'>'+mts[mi][1]+'</option>';
-      h+='</select>';
-    }
+    // EA count
+    h+='<span class="cinfo">'+_gc+' EA</span>';
     h+='</div>';
 
     // ── EXPANDED TOOLBAR + TABLE ──
@@ -2906,7 +3019,7 @@ function renderGroups(){
           h+='</span>';
           h+='<span class="sc-spacer"></span>';
           /* EA total */
-          h+='<span class="sc-ea" style="color:'+scColor+'">'+grpTotalSub(subArr)+'</span>';
+          h+='<span class="sc-ea" style="color:'+scColor+'">'+grpCount(subArr)+' EA</span>';
           /* Hover actions */
           h+='<div class="sc-hover-actions">';
           h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\''+X2(curSub)+'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
@@ -2947,7 +3060,7 @@ function renderGroups(){
         h+='<span class="sc-name">Uncategorized</span>';
         h+='<span class="sc-count">('+uCount+')</span>';
         h+='<span class="sc-spacer"></span>';
-        h+='<span class="sc-ea" style="color:'+uColor+'">'+grpTotalSub(unassigned)+'</span>';
+        h+='<span class="sc-ea" style="color:'+uColor+'">'+grpCount(unassigned)+' EA</span>';
         h+='<div class="sc-hover-actions">';
         h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
         h+='<button class="sc-btn" onclick="event.stopPropagation();zoomSub(\''+X2(gk)+'\',\'\')" title="Zoom">'+ICO_ZOOM_SM+'</button>';
@@ -3004,7 +3117,7 @@ function renderGroups(){
       h+='<span class="sc-name">Uncategorized</span>';
       h+='<span class="sc-count">('+nsCount+')</span>';
       h+='<span class="sc-spacer"></span>';
-      h+='<span class="sc-ea" style="color:'+nsColor+'">'+grpTotalSub(items)+'</span>';
+      h+='<span class="sc-ea" style="color:'+nsColor+'">'+grpCount(items)+' EA</span>';
       h+='<div class="sc-hover-actions">';
       h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
       h+='<button class="sc-btn" onclick="event.stopPropagation();zoomSub(\''+X2(gk)+'\',\'\')" title="Zoom">'+ICO_ZOOM_SM+'</button>';
@@ -3131,16 +3244,7 @@ function renderContainerGroups(){
         var _gc2=grpCount(items);
         h+='<span style="color:var(--overlay0);font-size:10px;opacity:'+(isEmpty?'.3':'.6')+'">('+_gc2+')</span>';
         h+='<span style="flex:1"></span>';
-        var _gt2=grpTotal(items);
-        h+='<span class="cinfo" style="color:'+(isEmpty?'var(--surface2)':ccol)+'">'+(_gt2||'—')+'</span>';
-        // Unit selector on container category header
-        var cmt=CATMT[gk];
-        var curMT=items.length?items[0].measurementType:(cmt?cmt.mt:'volume');
-        var defMT=items.length?(items[0].defaultMT||curMT):(cmt?cmt.defaultMT:'volume');
-        h+='<select class="cgh-unit" onclick="event.stopPropagation()" onchange="event.stopPropagation();setMT(\''+X2(gk)+'\',this.value)">';
-        var mts=unitOptionsFor(defMT);
-        for(var mi=0;mi<mts.length;mi++) h+='<option value="'+mts[mi][0]+'"'+(curMT===mts[mi][0]?' selected':'')+'>'+mts[mi][1]+'</option>';
-        h+='</select>';
+        h+='<span class="cinfo" style="color:'+(isEmpty?'var(--surface2)':ccol)+'">'+_gc2+' EA</span>';
         h+='<span class="row-actions">';
         h+='<button class="s-btn" onclick="event.stopPropagation();isoCat(\''+X2(gk)+'\')" title="Isolate">'+ICO_ISO+'</button>';
         h+='<button class="s-btn" onclick="event.stopPropagation();hlCat(\''+X2(gk)+'\')" title="Highlight">'+ICO_HL+'</button>';
@@ -3206,7 +3310,7 @@ function renderContainerGroups(){
               h+=(scCC2||'--');
               h+='</span>';
               h+='<span class="sc-spacer"></span>';
-              h+='<span class="sc-ea" style="color:'+scColor+'">'+grpTotalSub(subArr)+'</span>';
+              h+='<span class="sc-ea" style="color:'+scColor+'">'+grpCount(subArr)+' EA</span>';
               h+='<div class="sc-hover-actions">';
               h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\''+X2(curSub)+'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
               h+='<button class="sc-btn" onclick="event.stopPropagation();zoomSub(\''+X2(gk)+'\',\''+X2(curSub)+'\')" title="Zoom">'+ICO_ZOOM_SM+'</button>';
@@ -3242,7 +3346,7 @@ function renderContainerGroups(){
             h+='<span class="sc-name">Uncategorized</span>';
             h+='<span class="sc-count">('+cuCount+')</span>';
             h+='<span class="sc-spacer"></span>';
-            h+='<span class="sc-ea" style="color:'+cuColor+'">'+grpTotalSub(cUnassigned)+'</span>';
+            h+='<span class="sc-ea" style="color:'+cuColor+'">'+grpCount(cUnassigned)+' EA</span>';
             h+='<div class="sc-hover-actions">';
             h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
             h+='<button class="sc-btn" onclick="event.stopPropagation();zoomSub(\''+X2(gk)+'\',\'\')" title="Zoom">'+ICO_ZOOM_SM+'</button>';
@@ -3299,7 +3403,7 @@ function renderContainerGroups(){
           h+='<span class="sc-name">Uncategorized</span>';
           h+='<span class="sc-count">('+cnsCount+')</span>';
           h+='<span class="sc-spacer"></span>';
-          h+='<span class="sc-ea" style="color:'+cnsColor+'">'+grpTotalSub(items)+'</span>';
+          h+='<span class="sc-ea" style="color:'+cnsColor+'">'+grpCount(items)+' EA</span>';
           h+='<div class="sc-hover-actions">';
           h+='<button class="sc-btn" onclick="event.stopPropagation();isoSub(\''+X2(gk)+'\',\'\')" title="Isolate">'+ICO_ISO_SM+'</button>';
           h+='<button class="sc-btn" onclick="event.stopPropagation();zoomSub(\''+X2(gk)+'\',\'\')" title="Zoom">'+ICO_ZOOM_SM+'</button>';
@@ -4220,7 +4324,7 @@ function renderSplitPanel(panel){
     catH+='<span class="arr">&#9660;</span>';
     catH+=catNameSpan(gk);
     catH+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
-    catH+='<span class="cinfo">'+grpTotal(items)+'</span>';
+    catH+='<span class="cinfo">'+items.length+' EA</span>';
     catH+='</div>';
     catH+='<div class="cgb">';
     if(isOpen2){
@@ -5516,8 +5620,9 @@ function toggleAsmBreakdown(name){
 function buildAsmDD(){
   var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
   var keys=Object.keys(ASMB);
-  if(!keys.length){sel.style.display='none';if(lbl)lbl.style.display='none';sel.value='';return;}
-  sel.style.display='';if(lbl)lbl.style.display='';
+  /* fAsm stays hidden — filtering happens from the assemblies tab, not the main filter bar */
+  sel.style.display='none';if(lbl)lbl.style.display='none';
+  if(!keys.length){sel.value='';return;}
   var prev=sel.value;
   keys.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var h='<option value="">All</option>';
@@ -5643,71 +5748,428 @@ function populateDebugCatSelect(){
   for(var i=0;i<CA.length;i++){if(CA[i]==='_IGNORE')continue;h+='<option value="'+X2(CA[i])+'"'+(CA[i]===prev?' selected':'')+'>'+X(CA[i])+'</option>';}
   sel.innerHTML=h;
 }
-var MEAS=[],openMeasCats={};
+var MEAS=[],openMeasCats={},SCAN_TOTALS={},DERIVED={};
+var measTypeFilter={lf:true,sf:true,elev:true,vol:true};
+var openMeasConts={};
+var MSVG={
+  chev:'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  eyeOn:ICO_EYE_OPEN,eyeOff:ICO_EYE_CLOSED,
+  zoom:'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" stroke-width="1.2"/><path d="M8.5 8.5L11 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  trash:'<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 3H9L8.3 9.5C8.25 10 7.85 10.3 7.35 10.3H3.65C3.15 10.3 2.75 10 2.7 9.5L2 3Z" stroke="currentColor" stroke-width="1"/><path d="M1 3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M4 3V1.5C4 1.2 4.2 1 4.5 1H6.5C6.8 1 7 1.2 7 1.5V3" stroke="currentColor" stroke-width="1"/></svg>',
+  chain:'<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M4.5 6.5L6.5 4.5M3.5 8L2.5 9C1.8 9.7 1.8 10.3 2.5 10.5C3.2 10.7 3.8 10.2 4.5 9.5L5.5 8.5M6.5 3L7.5 2C8.2 1.3 8.8 1.3 9.5 2C10.2 2.7 9.7 3.3 9 4L8 5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>',
+  plus:'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2V10M2 6H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+};
+var MTYPES={
+  lf:  {label:'LF',  color:'#a6e3a1',unit:'LF', icon:'&#10236;'},
+  sf:  {label:'SF',  color:'#89b4fa',unit:'SF', icon:'&#11026;'},
+  elev:{label:'Elev',color:'#fab387',unit:"'",  icon:'&#8895;'},
+  vol: {label:'Vol', color:'#cba6f7',unit:'CF', icon:'&#10696;'}
+};
+function measTypeKey(mtype,unit){
+  if(mtype==='LF')return 'lf';if(mtype==='SF')return 'sf';
+  if(mtype==='ELEV')return 'elev';if(mtype==='BOX'||mtype==='VOL')return 'vol';
+  if(unit==='LF')return 'lf';if(unit==='SF')return 'sf';if(unit==='CF')return 'vol';
+  return 'lf';
+}
 function toggleMeasPanel(){toggleMeasSection();}
 function receiveMeasurements(json){
-  try{MEAS=JSON.parse(json);}catch(e){MEAS=[];log('MEAS parse err: '+e.message,'err');}
+  try{
+    var d=JSON.parse(json);
+    if(Array.isArray(d)){MEAS=d;SCAN_TOTALS={};DERIVED={};}
+    else{MEAS=d.measurements||[];SCAN_TOTALS=d.scanTotals||{};DERIVED=d.derivedParts||{};}
+  }catch(e){MEAS=[];SCAN_TOTALS={};DERIVED={};log('MEAS parse err: '+e.message,'err');}
   updateMeasHdrCnt();
   renderMeasPanel();
   renderNotesPanel();
 }
+
 function renderMeasPanel(){
-  var bycat={},order=[],i,m;
-  for(i=0;i<MEAS.length;i++){
-    m=MEAS[i];
-    if(m.type==='NOTE') continue; // Notes shown in Notes tab
-    var c=m.category||'Custom';
-    if(!bycat[c]){bycat[c]=[];order.push(c);}
-    bycat[c].push(m);
+  var search=(document.getElementById('measSearch')||{}).value||'';
+  search=search.toLowerCase();
+
+  /* Filter measurements by type and search (exclude NOTEs) */
+  var filtered=[];
+  for(var i=0;i<MEAS.length;i++){
+    var m=MEAS[i];
+    if(m.type==='NOTE')continue;
+    var tk=measTypeKey(m.type,m.unit);
+    if(!measTypeFilter[tk])continue;
+    if(search){
+      var hay=((m.partName||'')+(m.category||'')+(m.note||'')).toLowerCase();
+      if(hay.indexOf(search)===-1)continue;
+    }
+    filtered.push(m);
   }
-  order.sort();
-  if(!MEAS.length){document.getElementById('measBody').innerHTML='<div style="padding:12px;color:#6c7086;font-size:11px;font-style:italic">No measurements yet. Use LF/SF tools to create measurements.</div>';return;}
+
+  /* Filter derived parts */
+  var filteredDerived={};
+  for(var id in DERIVED){
+    if(!DERIVED.hasOwnProperty(id))continue;
+    var dp=DERIVED[id],dtk=dp.unit==='LF'?'lf':dp.unit==='CF'?'vol':'sf';
+    if(!measTypeFilter[dtk])continue;
+    if(search){
+      var dHay=((dp.name||'')+(dp.category||'')+(dp.note||'')).toLowerCase();
+      if(dHay.indexOf(search)===-1)continue;
+    }
+    filteredDerived[id]=dp;
+  }
+
+  /* Update type counts */
+  var counts={lf:0,sf:0,elev:0,vol:0};
+  for(var ci=0;ci<MEAS.length;ci++){if(MEAS[ci].type==='NOTE')continue;var tk2=measTypeKey(MEAS[ci].type,MEAS[ci].unit);counts[tk2]++;}
+  var ce=document.getElementById('mcLF');if(ce)ce.textContent=counts.lf;
+  ce=document.getElementById('mcSF');if(ce)ce.textContent=counts.sf;
+  ce=document.getElementById('mcElev');if(ce)ce.textContent=counts.elev;
+  ce=document.getElementById('mcVol');if(ce)ce.textContent=counts.vol;
+
+  /* Summary strip */
+  var sh='';
+  var typeKeys=['lf','sf','elev','vol'];
+  for(var ti=0;ti<typeKeys.length;ti++){
+    var tk3=typeKeys[ti],t=MTYPES[tk3];
+    if(!measTypeFilter[tk3])continue;
+    var total=0;
+    for(var fi=0;fi<filtered.length;fi++){if(measTypeKey(filtered[fi].type,filtered[fi].unit)===tk3)total+=filtered[fi].value||0;}
+    for(var did in filteredDerived){
+      if(!filteredDerived.hasOwnProperty(did))continue;
+      var ddp=filteredDerived[did],ddk=ddp.unit==='LF'?'lf':ddp.unit==='CF'?'vol':'sf';
+      if(ddk===tk3)total+=(ddp.computedValue||0);
+    }
+    if(total===0&&tk3!=='elev')continue;
+    var disp=tk3==='elev'?filtered.filter(function(m2){return measTypeKey(m2.type,m2.unit)==='elev'}).length+' pts':total.toLocaleString(undefined,{maximumFractionDigits:1})+' '+t.unit;
+    sh+='<div class="ms-item"><span class="ms-icon" style="background:'+t.color+'"></span>';
+    sh+='<span class="ms-label">'+t.label+':</span>';
+    sh+='<span class="ms-val" style="color:'+t.color+'">'+disp+'</span></div>';
+  }
+  sh+='<div style="flex:1"></div><span style="font-size:10px;color:var(--overlay0)">'+filtered.length+' measurements</span>';
+  var sumEl=document.getElementById('measSummary');
+  if(sumEl)sumEl.innerHTML=sh;
+
+  /* Group by category */
+  var catMeas={};
+  for(var i2=0;i2<filtered.length;i2++){
+    var c2=filtered[i2].category||'Custom';
+    if(!catMeas[c2])catMeas[c2]=[];
+    catMeas[c2].push(filtered[i2]);
+  }
+  var catDerived={};
+  for(var did2 in filteredDerived){
+    if(!filteredDerived.hasOwnProperty(did2))continue;
+    var dc=filteredDerived[did2].category||'Custom';
+    if(!catDerived[dc])catDerived[dc]=[];
+    catDerived[dc].push({id:did2,data:filteredDerived[did2]});
+  }
+
+  /* Build container → category map (all known categories so user can add to any) */
+  var contBuckets={};
+  var allCats={};
+  for(var c3 in catMeas)allCats[c3]=true;
+  for(var c4 in catDerived)allCats[c4]=true;
+  for(var c6=0;c6<CA.length;c6++){if(CA[c6]&&CA[c6]!=='_IGNORE')allCats[CA[c6]]=true;}
+
+  for(var cat in allCats){
+    if(!allCats.hasOwnProperty(cat)||cat==='_IGNORE')continue;
+    /* Try explicit container assignment first, then keyword fallback */
+    var ci2=null;
+    for(var xi=0;xi<CONTAINERS.length;xi++){
+      var xCats=CONTAINERS[xi].categories||[];
+      for(var xj=0;xj<xCats.length;xj++){if(xCats[xj].name===cat){ci2={name:CONTAINERS[xi].name,color:CONTAINERS[xi].color,order:CONTAINERS[xi].order||xi};break;}}
+      if(ci2)break;
+    }
+    if(!ci2)ci2=matchCatToCont(cat)||{name:'Other',color:'#6c7086',order:999};
+    if(!contBuckets[ci2.name])contBuckets[ci2.name]={name:ci2.name,color:ci2.color,order:ci2.order,cats:[]};
+    if(contBuckets[ci2.name].cats.indexOf(cat)===-1)contBuckets[ci2.name].cats.push(cat);
+  }
+  /* Ensure all master containers appear */
+  for(var xi2=0;xi2<CONTAINERS.length;xi2++){
+    var cn=CONTAINERS[xi2].name;
+    if(!contBuckets[cn])contBuckets[cn]={name:cn,color:CONTAINERS[xi2].color||'#6c7086',order:CONTAINERS[xi2].order||xi2,cats:[]};
+  }
+
+  var contArr=[];
+  for(var bn in contBuckets){if(contBuckets.hasOwnProperty(bn))contArr.push(contBuckets[bn]);}
+  contArr.sort(function(a,b){return(a.order||0)-(b.order||0)});
+
+  /* Render */
   var h='';
-  for(var gi=0;gi<order.length;gi++){
-    var cat=order[gi],items=bycat[cat],isOpen=openMeasCats[cat]!==false;
-    h+='<div class="mp-cat'+(isOpen?'':' closed')+'">';
-    h+='<div class="mp-cat-hdr" onclick="togMeasCat(\''+X2(cat)+'\')">';
-    h+='<span class="arr">&#9660;</span> '+X(cat)+' <span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
-    h+='</div>';
-    h+='<div class="mp-cat-items">';
-    for(var j=0;j<items.length;j++){
-      var it=items[j],vis=!!it.visible;
-      var measCol=(CCOL.measurements||{})[''+it.eid]||'';
-      h+='<div class="mp-item">';
-      h+='<button class="ey'+(vis?'':' off')+'" onclick="togMeasVis('+it.eid+','+(!vis)+')" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-      h+=buildColorDot('measurement',''+it.eid,measCol);
-      if(it.type==='ELEV'){
-        var cl=it.custom_label||'';
-        var elbl=it.label||('EL. '+it.value);
-        var desc=cl?(X(cl)+' '+elbl):elbl;
-        h+='<span class="mp-desc" ondblclick="editElevLabel('+it.eid+',this)" title="Double-click to edit label">'+desc+'</span>';
-      } else if(it.type==='NOTE'){
-        var lt=it.label_type||'';
-        var prefix=lt&&lt!=='None'?(lt+': '):'';
-        var noteText=it.note||'(empty)';
-        var short=noteText.length>40?noteText.substring(0,37)+'...':noteText;
-        h+='<span class="mp-desc" ondblclick="editNoteText('+it.eid+',this)" title="'+X(noteText)+'">'+X(prefix+short)+'</span>';
-      } else if(it.partName){
-        var desc=X(it.partName)+' — '+X(cat);
-        h+='<span class="mp-desc" title="'+X(it.partName)+'">'+desc+'</span>';
-      } else if(it.type==='BOX'){
-        var bw=it.width_in||0,bd=it.depth_in||0,bh=it.height_in||0;
-        var dims=fmtDimIn(bw)+'×'+fmtDimIn(bd)+'×'+fmtDimIn(bh);
-        var desc='BOX: '+dims+(it.note?' — '+X(it.note):'');
-        h+='<span class="mp-desc" title="'+X(dims)+'">'+desc+'</span>';
-      } else {
-        var desc=X(it.type)+': '+(it.note?X(it.note):X(cat));
-        h+='<span class="mp-desc" title="'+X(it.note||'')+'">'+desc+'</span>';
+  var hasAnything=CA.length>0||filtered.length>0||Object.keys(filteredDerived).length>0;
+  if(!hasAnything){
+    h='<div class="meas-empty"><svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="6" stroke="currentColor" stroke-width="2"/><path d="M14 24H34M24 14V34" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    h+='<p>No measurements yet.<br>Use + Measure or scan a model.</p></div>';
+  } else {
+    for(var ci3=0;ci3<contArr.length;ci3++){
+      var cm=contArr[ci3];
+      var cOpen=openMeasConts[cm.name]!==false;
+      /* Count items */
+      var contItemCount=0;
+      for(var ki=0;ki<cm.cats.length;ki++){
+        contItemCount+=(catMeas[cm.cats[ki]]||[]).length;
+        contItemCount+=(catDerived[cm.cats[ki]]||[]).length;
       }
-      h+='<span class="mp-val">'+fmtMeasVal(it.value,it.unit)+'</span>';
-      h+='<button class="mp-del" onclick="delMeas('+it.eid+')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+      /* Container totals (from manual measurements + derived parts only) */
+      var contTotals={lf:0,sf:0,vol:0};
+      for(var ki2=0;ki2<cm.cats.length;ki2++){
+        var cml=catMeas[cm.cats[ki2]]||[];
+        for(var mi=0;mi<cml.length;mi++){
+          var mtk=measTypeKey(cml[mi].type,cml[mi].unit);
+          if(mtk==='lf')contTotals.lf+=(cml[mi].value||0);
+          else if(mtk==='sf')contTotals.sf+=(cml[mi].value||0);
+          else if(mtk==='vol')contTotals.vol+=(cml[mi].value||0);
+        }
+        var cdl=catDerived[cm.cats[ki2]]||[];
+        for(var di=0;di<cdl.length;di++){
+          var dv=cdl[di].data,dvk=dv.unit==='LF'?'lf':dv.unit==='CF'?'vol':'sf';
+          contTotals[dvk]+=(dv.computedValue||0);
+        }
+      }
+      /* Skip containers with no categories assigned */
+      if(cm.cats.length===0)continue;
+
+      h+='<div class="mc-hdr'+(cOpen?'':' collapsed')+'" style="--mc-color:'+cm.color+'" onclick="togMeasCont(\''+X2(cm.name)+'\')">';
+      h+='<div class="mc-chev">'+MSVG.chev+'</div>';
+      h+='<span class="mc-dot" style="background:'+cm.color+'"></span>';
+      h+='<span class="mc-name">'+X(cm.name)+'</span>';
+      if(contItemCount)h+='<span class="mc-cnt">'+contItemCount+'</span>';
+      h+='<div class="mc-totals">';
+      if(contTotals.lf>0&&measTypeFilter.lf)h+='<span class="mc-total" style="color:#a6e3a1">'+contTotals.lf.toLocaleString(undefined,{maximumFractionDigits:1})+' LF</span>';
+      if(contTotals.sf>0&&measTypeFilter.sf)h+='<span class="mc-total" style="color:#89b4fa">'+contTotals.sf.toLocaleString(undefined,{maximumFractionDigits:1})+' SF</span>';
+      if(contTotals.vol>0&&measTypeFilter.vol)h+='<span class="mc-total" style="color:#cba6f7">'+contTotals.vol.toLocaleString(undefined,{maximumFractionDigits:1})+' CF</span>';
+      h+='</div></div>';
+      h+='<div class="mc-body">';
+
+      if(cOpen){
+        cm.cats.sort();
+        for(var ki4=0;ki4<cm.cats.length;ki4++){
+          var cat2=cm.cats[ki4];
+          var items=catMeas[cat2]||[];
+          var dItems=catDerived[cat2]||[];
+          if(measHideEmpty&&items.length===0&&dItems.length===0)continue;
+          var catOpen=openMeasCats[cat2]!==false;
+          var safeCat=cat2.replace(/[^a-zA-Z0-9]/g,'_');
+          var ddId='mcDD_'+safeCat;
+
+          /* Categories always visible so user can add measurements */
+
+          /* Count scans vs parts vs manual + pre-compute beam inventory stats */
+          var scanCount=0,partCount=0,biStats=null,biDpId=null;
+          for(var dc=0;dc<dItems.length;dc++){
+            var dcd=dItems[dc].data;
+            if(dcd.sourceType==='category_scan'){
+              scanCount++;
+              if(dcd.beamInventory&&dcd.beamInventory.length>0){
+                biDpId=dItems[dc].id;
+                biStats={pcs:0,lf:0,bf:0,types:dcd.beamInventory.length};
+                for(var bs0=0;bs0<dcd.beamInventory.length;bs0++){
+                  var bm0=dcd.beamInventory[bs0];biStats.pcs+=bm0.count;biStats.lf+=bm0.totalLF;
+                  var sp0=bm0.section.split('x'),bW0=parseFloat(sp0[0])||0,bH0=parseFloat(sp0[1])||0;
+                  for(var br0=0;br0<bm0.rows.length;br0++){biStats.bf+=bW0*bH0*bm0.rows[br0].l*bm0.rows[br0].qty/12;}
+                }
+              }
+            }else partCount++;
+          }
+
+          /* Category header */
+          var catHid=!!_measHiddenCats[cat2];
+          var catIso=(_measIsoCat===cat2);
+          h+='<div class="mch-hdr'+(catOpen?'':' collapsed')+'" onclick="togMeasCat(\''+X2(cat2)+'\')">';
+          h+='<div class="mch-chev">'+MSVG.chev+'</div>';
+          h+='<button class="ey'+(catHid?' off':'')+'" onclick="event.stopPropagation();measTogCatVis(\''+X2(cat2)+'\')" title="'+(catHid?'Show':'Hide')+' category">'+(catHid?MSVG.eyeOff:MSVG.eyeOn)+'</button>';
+          h+='<button class="cat-iso'+(catIso?' iso-active':'')+'" onclick="event.stopPropagation();measIsoCat(\''+X2(cat2)+'\')" title="'+(catIso?'Un-isolate':'Isolate')+' category">&#8857;</button>';
+          h+='<span class="mch-dot" style="background:'+cm.color+'"></span>';
+          h+='<span class="mch-name">'+X(cat2)+'</span>';
+          h+='<div class="mch-badges">';
+          if(items.length)h+='<span class="mch-manual" title="Manual measurements">'+items.length+' manual</span>';
+          if(biStats){
+            h+='<span class="mch-manual" style="color:var(--peach)" title="Beam types">'+biStats.types+' sizes</span>';
+            h+='<span class="mch-manual" style="color:var(--green)" title="Total pieces">'+biStats.pcs+' pcs</span>';
+            h+='<span class="mch-manual" style="color:var(--sapphire)" title="Total linear feet">'+Math.round(biStats.lf)+'\' LF</span>';
+            h+='<span class="mch-manual" style="color:var(--yellow)" title="Total board feet">'+Math.round(biStats.bf).toLocaleString()+' BF</span>';
+          }else if(scanCount){
+            h+='<span class="mch-manual" style="color:var(--green)" title="Auto-scan measurements">'+scanCount+' auto</span>';
+          }
+          if(partCount)h+='<span class="mch-manual" style="color:var(--mauve)" title="Derived parts">'+partCount+' parts</span>';
+          h+='</div>';
+          /* Hover actions — opens global fixed dropdown */
+          h+='<div class="mch-actions">';
+          h+='<button class="mch-add-btn" onclick="event.stopPropagation();openMeasGDD(this,\''+X2(cat2)+'\',event)" title="Add measurement">'+MSVG.plus+'</button>';
+          h+='</div></div>';
+
+          /* Measurement rows — compute height accounting for beam inventory */
+          var totalRows=items.length+dItems.length;
+          var biExtra=0;
+          for(var bic=0;bic<dItems.length;bic++){
+            var bpd=dItems[bic].data;
+            if(bpd.beamInventory&&bpd.beamInventory.length>0){
+              totalRows--;  /* beam inv replaces the auto-scan row */
+              biExtra+=bpd.beamInventory.length*46+100; /* section headers + header row + total row + container chrome */
+              for(var bsi=0;bsi<bpd.beamInventory.length;bsi++){
+                var bsKey='bi_'+dItems[bic].id+'_'+bsi;
+                if(!!_beamInvOpen[bsKey])biExtra+=bpd.beamInventory[bsi].rows.length*32+8;
+              }
+            }
+          }
+          h+='<div class="meas-list" style="max-height:'+(catOpen?totalRows*36+biExtra+2:0)+'px">';
+
+          for(var mi2=0;mi2<items.length;mi2++){
+            var mm=items[mi2],t2=MTYPES[measTypeKey(mm.type,mm.unit)]||MTYPES.lf;
+            var isVis=mm.visible;
+            var valDisp=mm.type==='ELEV'?mm.value.toFixed(1)+"'":fmtMeasVal(mm.value,mm.unit);
+            var mName=mm.partName||mm.note||mm.category||'Measurement';
+            if(mm.type==='BOX'){
+              var bw=mm.width_in||0,bd=mm.depth_in||0,bh=mm.height_in||0;
+              mName='BOX: '+fmtDimIn(bw)+'\u00d7'+fmtDimIn(bd)+'\u00d7'+fmtDimIn(bh);
+            }
+            if(mm.type==='ELEV'){
+              var cl=mm.custom_label||'';
+              var elbl=mm.label||('EL. '+mm.value);
+              mName=cl?(cl+' '+elbl):elbl;
+            }
+
+            h+='<div class="mrow">';
+            h+='<button class="mr-eye'+(isVis?'':' off')+'" onclick="togMeasVis('+mm.eid+','+(isVis?'false':'true')+')" style="color:'+(isVis?cm.color:'')+'">'+(isVis?MSVG.eyeOn:MSVG.eyeOff)+'</button>';
+            h+='<div class="mr-tdot" style="background:'+t2.color+'20;color:'+t2.color+'"><span style="font-size:9px;font-weight:700">'+t2.label+'</span></div>';
+            h+='<div class="mr-narea"><span class="mr-name">'+X(mName)+'</span>';
+            if(mm.note&&mm.type!=='BOX'&&!mm.partName)h+='<span class="mr-note">&mdash; '+X(mm.note)+'</span>';
+            h+='</div>';
+            h+='<span class="mr-val" style="color:'+t2.color+'">'+valDisp+'</span>';
+            h+='<span class="mr-unit" style="color:'+t2.color+'">'+(mm.type==='ELEV'?'':t2.unit)+'</span>';
+            h+='<div class="mr-actions">';
+            h+='<button class="mr-btn" onclick="zoomMeas('+mm.eid+')" title="Zoom to">'+MSVG.zoom+'</button>';
+            h+='<button class="mr-btn danger" onclick="delMeas('+mm.eid+')" title="Delete">'+MSVG.trash+'</button>';
+            h+='</div></div>';
+          }
+
+          /* Derived part / category scan rows */
+          for(var di2=0;di2<dItems.length;di2++){
+            var dpItem=dItems[di2],dpd=dpItem.data,dId=dpItem.id;
+            var dUnit=dpd.unit||'SF';
+            var dt=dUnit==='LF'?MTYPES.lf:dUnit==='CF'?MTYPES.vol:MTYPES.sf;
+            var dVal=dpd.computedValue||0;
+            var isScan=dpd.sourceType==='category_scan';
+
+            if(isScan){
+              if(dpd.beamInventory && dpd.beamInventory.length>0){
+                /* ── Beam inventory — replaces the auto-scan row ── */
+                var biTotalBF=0,biTotalLF=0,biTotalPcs=0;
+                for(var bsi=0;bsi<dpd.beamInventory.length;bsi++){var bsm=dpd.beamInventory[bsi];biTotalLF+=bsm.totalLF;biTotalPcs+=bsm.count;for(var bri=0;bri<bsm.rows.length;bri++){var brw=bsm.rows[bri];var sp=bsm.section.split('x');biTotalBF+=(parseFloat(sp[0])||0)*(parseFloat(sp[1])||0)*brw.l*brw.qty/12;}}
+                h+='<div style="margin:2px 8px 6px 28px;border:1px solid var(--surface0);border-radius:6px;overflow:hidden;font-family:\'JetBrains Mono\',monospace">';
+                /* Header row with expand/collapse all */
+                var isHL=(_hlScanId===dId);
+                h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 10px;background:var(--crust);border-bottom:1px solid var(--surface0);font-size:10px">';
+                h+='<button class="mr-eye'+(isHL?'':' off')+'" onclick="event.stopPropagation();togScanHL(\''+X2(dId)+'\')" style="color:'+(isHL?'var(--green)':'')+';font-size:10px;padding:2px" title="'+(isHL?'Clear highlight':'Highlight all entities')+'">'+(isHL?MSVG.eyeOn:MSVG.eyeOff)+'</button>';
+                h+='<span style="font-weight:700;color:var(--peach)">Beam Inventory</span>';
+                h+='<span style="color:var(--subtext0)">'+dpd.beamInventory.length+' sizes</span>';
+                h+='<span style="flex:1"></span>';
+                h+='<button onclick="event.stopPropagation();biExpandAll(\''+X2(dId)+'\','+dpd.beamInventory.length+',true)" style="border:none;background:transparent;cursor:pointer;color:var(--overlay1);font-size:9px;padding:2px 6px" title="Expand all sections">&#9660; Expand</button>';
+                h+='<button onclick="event.stopPropagation();biExpandAll(\''+X2(dId)+'\','+dpd.beamInventory.length+',false)" style="border:none;background:transparent;cursor:pointer;color:var(--overlay1);font-size:9px;padding:2px 6px" title="Collapse all sections">&#9654; Collapse</button>';
+                h+='<button class="mr-ibtn drv" onclick="event.stopPropagation();showMeasAddPartFrom(\''+X2(dpd.category||cat2)+'\',\''+X2(dId)+'\')" style="font-size:9px;padding:2px 6px" title="Create derivative">+ Deriv</button>';
+                h+='<button class="mr-btn danger" onclick="event.stopPropagation();delDerived(\''+X2(dId)+'\')" style="font-size:10px;padding:2px" title="Delete">'+MSVG.trash+'</button>';
+                h+='</div>';
+                for(var bi=0;bi<dpd.beamInventory.length;bi++){
+                  var bm=dpd.beamInventory[bi];
+                  var secParts=bm.section.split('x');var bW=parseFloat(secParts[0])||0,bH=parseFloat(secParts[1])||0;
+                  var secBF=0;for(var bfr=0;bfr<bm.rows.length;bfr++){secBF+=bW*bH*bm.rows[bfr].l*bm.rows[bfr].qty/12;}
+                  var secKey='bi_'+dId+'_'+bi;
+                  var secOpen=!!_beamInvOpen[secKey]; /* default collapsed */
+                  /* Section header */
+                  var secEids=JSON.stringify(bm.eids||[]);
+                  h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--mantle);border-bottom:1px solid var(--surface0);cursor:pointer;user-select:none" onclick="event.stopPropagation();_beamInvOpen[\''+secKey+'\']='+(secOpen?'false':'true')+';renderMeasPanel();">';
+                  h+='<span style="font-size:9px;color:var(--overlay0)">'+(secOpen?'&#9660;':'&#9654;')+'</span>';
+                  h+='<span style="font-size:11px;font-weight:700;color:var(--text)">'+bm.section+'"</span>';
+                  h+='<span style="font-size:10px;color:var(--overlay1);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+X(bm.defn)+'</span>';
+                  h+='<button onclick="event.stopPropagation();hlBeamEids('+secEids+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:10px;padding:2px 4px;border-radius:3px" title="Highlight all">&#9678;</button>';
+                  h+='<span style="font-size:10px;font-weight:700;color:var(--green)">'+bm.count+'</span>';
+                  h+='<span style="font-size:10px;font-weight:700;color:var(--sapphire)">'+bm.totalLF.toFixed(1)+'\'</span>';
+                  h+='<span style="font-size:10px;font-weight:600;color:var(--yellow)">'+Math.round(secBF)+' BF</span>';
+                  h+='</div>';
+                  /* Length subgroups */
+                  if(secOpen){
+                    for(var ri=0;ri<bm.rows.length;ri++){
+                      var rw=bm.rows[ri];
+                      var rwBF=bW*bH*rw.l*rw.qty/12;
+                      var rwEids=JSON.stringify(rw.eids||[]);
+                      h+='<div style="display:flex;align-items:center;gap:10px;padding:3px 10px 3px 32px;border-bottom:1px solid rgba(49,50,68,.5);position:relative;cursor:pointer" onclick="hlBeamEids('+rwEids+')">';
+                      h+='<span style="position:absolute;left:22px;top:0;bottom:0;width:1px;background:var(--surface0)"></span>';
+                      h+='<span style="position:absolute;left:22px;top:50%;width:6px;height:1px;background:var(--surface0)"></span>';
+                      h+='<span style="font-size:11px;font-weight:600;color:var(--peach);min-width:70px">'+bm.section+'"</span>';
+                      h+='<span style="color:var(--overlay0)">&times;</span>';
+                      h+='<span style="font-size:11px;font-weight:700;color:var(--sapphire);min-width:70px">'+fmtFtIn(rw.l)+'</span>';
+                      h+='<span style="color:var(--overlay0)">&times;</span>';
+                      h+='<span style="font-size:12px;font-weight:700;color:var(--green);min-width:30px">'+rw.qty+'</span>';
+                      h+='<span style="font-size:9px;color:var(--overlay0)">pcs</span>';
+                      h+='<span style="flex:1"></span>';
+                      h+='<span style="font-size:10px;font-weight:600;color:var(--yellow)">'+Math.round(rwBF)+' BF</span>';
+                      h+='</div>';
+                    }
+                  }
+                }
+                /* Total row — stats only */
+                h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--mantle);border-top:2px solid var(--surface0);font-weight:700;font-size:11px">';
+                h+='<span style="color:var(--subtext1)">TOTAL</span><span style="flex:1"></span>';
+                h+='<span style="color:var(--green)">'+biTotalPcs+' pcs</span>';
+                h+='<span style="color:var(--sapphire)">'+biTotalLF.toFixed(1)+'\'</span>';
+                h+='<span style="color:var(--yellow)">'+Math.round(biTotalBF).toLocaleString()+' BF</span>';
+                h+='</div></div>';
+              } else {
+                /* ── Auto-scan measurement row (no beam inventory) ── */
+                var isHL=(_hlScanId===dId);
+                h+='<div class="mrow scan">';
+                h+='<button class="mr-eye'+(isHL?'':' off')+'" onclick="togScanHL(\''+X2(dId)+'\')" style="color:'+(isHL?dt.color:'')+'" title="'+(isHL?'Clear highlight':'Highlight '+(dpd.entityCount||0)+' entities')+'">'+(isHL?MSVG.eyeOn:MSVG.eyeOff)+'</button>';
+                h+='<div class="mr-tdot" style="background:'+dt.color+'20;color:'+dt.color+'"><span style="font-size:9px;font-weight:700">'+dt.label+'</span></div>';
+                h+='<div class="mr-narea"><span class="mr-name">'+X(dpd.name)+'</span>';
+                h+='<span class="mr-dbadge" style="color:var(--green);background:rgba(166,227,161,.1);border-color:rgba(166,227,161,.2)">'+(dpd.entityCount||0)+' entities</span>';
+                h+='<span class="mr-val" style="color:'+dt.color+';margin-left:auto">'+fmtMeasVal(dVal,dUnit)+'</span>';
+                h+='</div>';
+                h+='<div class="mr-inline">';
+                h+='<button class="mr-ibtn drv" onclick="showMeasAddPartFrom(\''+X2(dpd.category||cat2)+'\',\''+X2(dId)+'\')" title="Create derivative from this measurement">+ Derivative</button>';
+                h+='<button class="mr-btn danger" onclick="delDerived(\''+X2(dId)+'\')" title="Delete">'+MSVG.trash+'</button>';
+                h+='</div>';
+                h+='</div>';
+              }
+            } else {
+              /* ── Regular derived part row ── */
+              h+='<div class="mrow derived">';
+              h+='<div style="width:22px;display:flex;align-items:center;justify-content:center;color:var(--mauve);opacity:.5">'+MSVG.chain+'</div>';
+              h+='<div class="mr-tdot" style="background:'+dt.color+'20;color:'+dt.color+'"><span style="font-size:9px;font-weight:700">'+dt.label+'</span></div>';
+              h+='<div class="mr-narea"><span class="mr-name">'+X(dpd.name)+'</span>';
+              h+='<span class="mr-dbadge">x'+dpd.multiplier+'</span>';
+              if(dpd.note)h+='<span class="mr-note">&mdash; '+X(dpd.note)+'</span>';
+              h+='</div>';
+              h+='<span class="mr-val" style="color:'+dt.color+'">'+fmtMeasVal(dVal,dUnit)+'</span>';
+              h+='<span class="mr-unit" style="color:'+dt.color+'">'+dUnit+'</span>';
+              h+='<div class="mr-actions">';
+              h+='<button class="mr-btn danger" onclick="delDerived(\''+X2(dId)+'\')" title="Delete">'+MSVG.trash+'</button>';
+              h+='</div></div>';
+            }
+          }
+
+          h+='</div>';
+
+          /* Add Part inline form */
+          h+='<div class="apf" id="apf_'+safeCat+'">';
+          h+='<div class="apf-row"><span class="apf-label">Name</span><input class="apf-input" id="apfName_'+safeCat+'" placeholder="e.g. Waterproofing"></div>';
+          h+='<div class="apf-row"><span class="apf-label">Source</span><select class="apf-select" id="apfSrcType_'+safeCat+'"><option value="category_total">Category Total</option><option value="manual">Manual Value</option></select></div>';
+          h+='<div class="apf-row"><span class="apf-label">From Cat</span><select class="apf-select" id="apfSrcCat_'+safeCat+'">';
+          for(var sci=0;sci<CA.length;sci++){if(CA[sci]==='_IGNORE')continue;h+='<option value="'+X2(CA[sci])+'"'+(CA[sci]===cat2?' selected':'')+'>'+X(CA[sci])+'</option>';}
+          h+='</select></div>';
+          h+='<div class="apf-row"><span class="apf-label">Multiplier</span><input class="apf-input" id="apfMult_'+safeCat+'" type="number" step="0.01" value="1.0" style="max-width:80px"></div>';
+          h+='<div class="apf-row"><span class="apf-label">Unit</span><select class="apf-select" id="apfUnit_'+safeCat+'"><option value="SF">SF</option><option value="LF">LF</option><option value="CF">CF</option><option value="EA">EA</option></select></div>';
+          h+='<div class="apf-row"><span class="apf-label">Manual Val</span><input class="apf-input" id="apfManVal_'+safeCat+'" type="number" step="0.1" value="0" style="max-width:80px"></div>';
+          h+='<div class="apf-row"><span class="apf-label">Note</span><input class="apf-input" id="apfNote_'+safeCat+'" placeholder="Optional note"></div>';
+          h+='<div class="apf-btns"><button class="apf-btn cancel" onclick="cancelMeasAddPart(\''+X2(cat2)+'\')">Cancel</button>';
+          h+='<button class="apf-btn save" onclick="submitMeasAddPart(\''+X2(cat2)+'\')">Create Part</button></div>';
+          h+='</div>';
+        }
+      }
       h+='</div>';
     }
-    h+='</div></div>';
   }
+
   document.getElementById('measBody').innerHTML=h;
   setTimeout(function(){checkScrollFade('measScroll','measFade');},20);
 }
+
+/* ── Meas helpers ── */
 function fmtDimIn(inches){if(!inches||inches<0.1)return"0'-0\"";var ft=Math.floor(inches/12),ins=Math.floor(inches-ft*12);return ft+"'-"+ins+'"';}
 function fmtMeasVal(val,unit){
   if(unit==='')return'';
@@ -5720,13 +6182,158 @@ function fmtMeasVal(val,unit){
   if(unit==='inches')return val.toFixed(1)+'"';
   return val.toFixed(1);
 }
+function togMeasType(type,el){measTypeFilter[type]=!measTypeFilter[type];el.classList.toggle('active',measTypeFilter[type]);renderMeasPanel();}
+function togMeasCont(name){openMeasConts[name]=openMeasConts[name]===false?true:false;renderMeasPanel();}
 function togMeasCat(cat){openMeasCats[cat]=openMeasCats[cat]===false?true:false;renderMeasPanel();}
-function togMeasVis(eid,show){callJSON('toggleMeasurement',{eid:eid,show:show});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].visible=show;break;}}renderMeasPanel();}
+function togMeasVis(eid,show){var s=show==='true'||show===true;callJSON('toggleMeasurement',{eid:eid,show:s});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].visible=s;break;}}renderMeasPanel();}
+function zoomMeas(eid){call('zoomToMeasurement',''+eid);}
 function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
 function recalcSF(){call('recalculateSF');}
 function hideMeasurements(){call('hideAllMeasurements');}
-function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});updateMeasHdrCnt();renderMeasPanel();});}
+function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});clrScanHL();updateMeasHdrCnt();renderMeasPanel();});}
+function delDerived(id){showConfirmModal('Delete this derived part?',function(){call('deleteDerivedPart',id);var wasHL=(_hlScanId===id);delete DERIVED[id];if(wasHL)clrScanHL();renderMeasPanel();showToast('Deleted','warning');});}
+function genCatMeas(cat,unit){closeMeasGDD();callJSON('generateCategoryMeasurement',{category:cat,unit:unit});showToast('Scanning '+cat+' for '+unit+'...','success');}
+/* ── Beam helpers ── */
+function fmtFtIn(decFt){
+  var totalIn=Math.round(decFt*48)/4;/* round to 1/4" */
+  var ft=Math.floor(totalIn/12),ins=totalIn-ft*12;
+  var whole=Math.floor(ins),frac=ins-whole,fs='';
+  if(Math.abs(frac-.75)<.01)fs='-3/4';
+  else if(Math.abs(frac-.5)<.01)fs='-1/2';
+  else if(Math.abs(frac-.25)<.01)fs='-1/4';
+  if(whole===0&&!fs)return ft+"'";
+  return ft+"'-"+whole+fs+'"';
+}
+/* ── Beam inventory expand state ── */
+var _beamInvOpen={};
+function biExpandAll(dId,count,expand){
+  for(var i=0;i<count;i++)_beamInvOpen['bi_'+dId+'_'+i]=expand;
+  renderMeasPanel();
+}
+/* ── Measurements hide-empty toggle ── */
+var measHideEmpty=false;
+function toggleMeasHideEmpty(){
+  measHideEmpty=!measHideEmpty;
+  var el=document.getElementById('measHideEmptyToggle');
+  if(el)el.classList.toggle('active',measHideEmpty);
+  renderMeasPanel();
+}
+/* ── Beam highlight ── */
+function hlBeamEids(eids){
+  call('clearHighlights');
+  call('clearDebug');
+  if(eids&&eids.length>0){
+    callJSON('highlightBeamEntities',{eids:eids});
+  }
+}
+/* ── Scan measurement eye toggle ── */
+var _hlScanId=null;
+function togScanHL(id){
+  if(_hlScanId===id){clrScanHL();renderMeasPanel();return;}
+  call('clearDebug');call('clearHighlights');
+  var dp=DERIVED[id];if(!dp){return;}
+  callJSON('highlightCategoryScan',{category:dp.category||'',unit:dp.unit||'SF',entityIds:dp.entityIds||[]});
+  _hlScanId=id;renderMeasPanel();
+}
+function clrScanHL(){call('clearDebug');call('clearHighlights');_hlScanId=null;}
+/* ── Category visibility controls (measurements tab) ── */
+var _measHiddenCats={};
+var _measIsoCat=null;
+function measTogCatVis(cat){
+  _measIsoCat=null;
+  if(_measHiddenCats[cat]){delete _measHiddenCats[cat];call('showCategory',cat);}
+  else{_measHiddenCats[cat]=true;call('hideCategory',cat);}
+  renderMeasPanel();
+}
+function measIsoCat(cat){
+  if(_measIsoCat===cat){_measIsoCat=null;_measHiddenCats={};call('showAll');renderMeasPanel();return;}
+  _measIsoCat=cat;_measHiddenCats={};
+  call('isolateCategory',cat);renderMeasPanel();
+}
+/* ── Global fixed-position measurement dropdown ── */
+var _measGDD=null;
+function _getMeasGDD(){
+  if(_measGDD)return _measGDD;
+  _measGDD=document.createElement('div');
+  _measGDD.className='meas-gdd';
+  document.body.appendChild(_measGDD);
+  return _measGDD;
+}
+function openMeasGDD(btn,cat,ev){
+  ev.stopPropagation();
+  var dd=_getMeasGDD();
+  /* If already open for same button, close */
+  if(dd.classList.contains('open')&&dd._btn===btn){closeMeasGDD();return;}
+  dd._btn=btn;
+  /* Build menu content */
+  var h='';
+  if(cat){
+    /* Category-specific: auto scan + manual + derived */
+    h+='<span class="meas-gdd-sep" style="border:none;margin:0">Auto Scan</span>';
+    h+='<button class="meas-gdd-item" onclick="genCatMeas(\''+X2(cat)+'\',\'LF\')"><span class="dd-dot" style="background:#a6e3a1"></span>Auto LF</button>';
+    h+='<button class="meas-gdd-item" onclick="genCatMeas(\''+X2(cat)+'\',\'SF\')"><span class="dd-dot" style="background:#89b4fa"></span>Auto SF</button>';
+    h+='<button class="meas-gdd-item" onclick="genCatMeas(\''+X2(cat)+'\',\'CF\')"><span class="dd-dot" style="background:#cba6f7"></span>Auto CF</button>';
+    h+='<button class="meas-gdd-item" onclick="genCatMeas(\''+X2(cat)+'\',\'BM\')"><span class="dd-dot" style="background:#fab387"></span>Auto Beam</button>';
+    h+='<span class="meas-gdd-sep">Manual</span>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateLFForCat\',\''+X2(cat)+'\')"><span class="dd-dot" style="background:#a6e3a1"></span>Draw LF</button>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateSFForCat\',\''+X2(cat)+'\')"><span class="dd-dot" style="background:#89b4fa"></span>Draw SF</button>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateBoxForCat\',\''+X2(cat)+'\')"><span class="dd-dot" style="background:#cba6f7"></span>Draw Box</button>';
+    h+='<span class="meas-gdd-sep">Derived</span>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();showMeasAddPart(\''+X2(cat)+'\')"><span class="dd-dot" style="background:#cba6f7"></span>+ Part</button>';
+  } else {
+    /* Global: just manual tools */
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateLF\')"><span class="dd-dot" style="background:#a6e3a1"></span>Linear Feet</button>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateSF\')"><span class="dd-dot" style="background:#89b4fa"></span>Square Feet</button>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateBox\')"><span class="dd-dot" style="background:#cba6f7"></span>Box / Volume</button>';
+    h+='<button class="meas-gdd-item" onclick="closeMeasGDD();call(\'activateElevation\')"><span class="dd-dot" style="background:#fab387"></span>Elevation Tag</button>';
+  }
+  dd.innerHTML=h;
+  /* Position fixed relative to button */
+  var r=btn.getBoundingClientRect();
+  dd.style.top=(r.bottom+2)+'px';
+  dd.style.left='auto';
+  dd.style.right=(window.innerWidth-r.right)+'px';
+  dd.classList.add('open');
+}
+function closeMeasGDD(){var dd=_getMeasGDD();dd.classList.remove('open');dd._btn=null;}
+document.addEventListener('click',function(){closeMeasGDD();});
+/* ── Add Part form ── */
+function showMeasAddPart(cat){var el=document.getElementById('apf_'+cat.replace(/[^a-zA-Z0-9]/g,'_'));if(el)el.classList.toggle('open');}
+function showMeasAddPartFrom(cat,srcId){
+  /* Open the add-part form pre-filled to reference this scan measurement */
+  var safe=cat.replace(/[^a-zA-Z0-9]/g,'_');
+  var el=document.getElementById('apf_'+safe);
+  if(!el)return;
+  el.classList.add('open');
+  var dp=DERIVED[srcId];
+  if(dp){
+    var nameEl=document.getElementById('apfName_'+safe);
+    var srcTypeEl=document.getElementById('apfSrcType_'+safe);
+    var srcCatEl=document.getElementById('apfSrcCat_'+safe);
+    var unitEl=document.getElementById('apfUnit_'+safe);
+    if(nameEl)nameEl.value='';
+    if(srcTypeEl)srcTypeEl.value='category_total';
+    if(srcCatEl)srcCatEl.value=dp.category||cat;
+    if(unitEl)unitEl.value=dp.unit||'SF';
+  }
+}
+function cancelMeasAddPart(cat){var el=document.getElementById('apf_'+cat.replace(/[^a-zA-Z0-9]/g,'_'));if(el)el.classList.remove('open');}
+function submitMeasAddPart(cat){
+  var safe=cat.replace(/[^a-zA-Z0-9]/g,'_');
+  var name=(document.getElementById('apfName_'+safe)||{}).value||'';name=name.trim();
+  var srcType=(document.getElementById('apfSrcType_'+safe)||{}).value||'category_total';
+  var srcCat=(document.getElementById('apfSrcCat_'+safe)||{}).value||cat;
+  var mult=parseFloat((document.getElementById('apfMult_'+safe)||{}).value)||1.0;
+  var unit=(document.getElementById('apfUnit_'+safe)||{}).value||'SF';
+  var note=(document.getElementById('apfNote_'+safe)||{}).value||'';
+  var manVal=parseFloat((document.getElementById('apfManVal_'+safe)||{}).value)||0;
+  if(!name){showToast('Enter a part name','warning');return;}
+  callJSON('createDerivedPart',{name:name,category:cat,sourceType:srcType,sourceCategory:srcCat,
+    multiplier:mult,unit:unit,note:note.trim(),manualValue:manVal,sourceUnit:unit});
+  cancelMeasAddPart(cat);
+  showToast('Part created','success');
+}
 
 /* ═══ CAD OVERLAYS ═══ */
 var CAD_SHEETS=[];
@@ -6202,7 +6809,17 @@ function doUndo(){
   if(needFilt)filt();
   updateUndoBtn();
 }
-document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();doUndo();}});
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();doUndo();}
+  /* Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs */
+  if((e.ctrlKey||e.metaKey)&&e.key==='Tab'){
+    e.preventDefault();
+    var tabs=['takeoff','measurements','notes','assemblies','multiverse','scenes','cad'];
+    var idx=tabs.indexOf(activeInfoTab);if(idx<0)idx=0;
+    idx=e.shiftKey?(idx-1+tabs.length)%tabs.length:(idx+1)%tabs.length;
+    switchInfoTab(tabs[idx]);
+  }
+});
 
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){

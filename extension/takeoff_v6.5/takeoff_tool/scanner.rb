@@ -84,6 +84,12 @@ module TakeoffTool
     ].freeze
     end # unless defined?(CONFIDENCE_SCORES)
 
+    # Beam/structural categories — use longest-edge LF instead of extrusion detection
+    BEAM_RE = /W-Beam|HSS|Steel Tube|Structural Steel|Steel Post|Column|Beam|Purlin|Girder|Structural Framing|Timber/i unless defined?(BEAM_RE)
+
+    # Wall categories — use longest horizontal edge for LF
+    WALL_LF_RE = /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Siding|Stucco|Exterior Finish/i unless defined?(WALL_LF_RE)
+
     # Cache for debug restore: face-level and instance-level originals
     @debug_face_originals = {}
     @debug_inst_originals = {}
@@ -487,8 +493,10 @@ module TakeoffTool
       mtype = parsed[:measurement_type] || Parser.measurement_for(acat)
       geo_lf = nil
       if mtype == 'lf'
-        if acat =~ /Wall Framing|Wall Finish|Wall Structure|Wall Sheathing|Masonry|Siding|Stucco|Exterior Finish/i
+        if acat =~ WALL_LF_RE
           geo_lf = wall_linear_ft(defn, inst.transformation)
+        elsif acat =~ BEAM_RE
+          geo_lf = beam_linear_ft(defn, inst.transformation)
         end
         geo_lf ||= geometry_linear_ft(defn, inst.transformation)
       end
@@ -1093,30 +1101,52 @@ module TakeoffTool
       end
 
       # ── Default: dominant side (largest normal group) ──
-      best_side = 0.0
-      normal_groups.each do |_nkey, grp|
+      # Compute deduped area per normal group
+      side_areas = {}
+      normal_groups.each do |nkey, grp|
         fds = grp[:fds]
         if fds.length == 1
-          layer_area = world_face_area(fds[0][:face], fds[0][:xform])
+          side_areas[nkey] = world_face_area(fds[0][:face], fds[0][:xform])
         else
           wn = grp[:wn]
-          # Sub-group by plane distance (d = normal · point)
           planes = {}
           fds.each do |fd|
             wp = fd[:xform] * fd[:face].vertices.first.position
             d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
-            d_key = d.round(0)  # 1-inch resolution separates compound layers
+            d_key = d.round(0)
             planes[d_key] ||= 0.0
             planes[d_key] += world_face_area(fd[:face], fd[:xform])
           end
-          # Largest single plane = outermost layer only
-          layer_area = planes.values.max || 0.0
+          side_areas[nkey] = planes.values.max || 0.0
         end
-        best_side = layer_area if layer_area > best_side
       end
 
-      sf = best_side / 144.0
-      puts "[FF Measure] '#{dname}': dominant side = #{sf.round(1)} SF (#{face_data.length} faces, #{normal_groups.length} normals)"
+      dom_key = side_areas.max_by { |_k, a| a }&.first
+      dom_area = side_areas[dom_key] || 0.0
+
+      # Prefer top-facing surface for horizontal elements (floors, slabs, roofing, decking).
+      # If an upward-facing group (z > 0.5, i.e. within ~60° of horizontal) has area
+      # >= 70% of the dominant side, pick top over bottom/sides.
+      top_key = nil
+      top_area = 0.0
+      normal_groups.each do |nkey, grp|
+        wn = grp[:wn]
+        wn_len = Math.sqrt(wn.x**2 + wn.y**2 + wn.z**2)
+        next if wn_len < 0.001
+        z_up = wn.z / wn_len
+        if z_up > 0.5 && side_areas[nkey] > top_area
+          top_key = nkey
+          top_area = side_areas[nkey]
+        end
+      end
+
+      if top_key && top_key != dom_key && top_area >= dom_area * 0.7
+        sf = top_area / 144.0
+        puts "[FF Measure] '#{dname}': TOP SURFACE = #{sf.round(1)} SF (preferred over dominant #{(dom_area / 144.0).round(1)} SF)"
+      else
+        sf = (top_key == dom_key && top_key ? top_area : dom_area) / 144.0
+        puts "[FF Measure] '#{dname}': dominant side = #{sf.round(1)} SF (#{face_data.length} faces, #{normal_groups.length} normals)"
+      end
       sf
     end
 
@@ -1237,6 +1267,154 @@ module TakeoffTool
       end
     end
 
+    # ═══════════════════════════════════════════════════════════
+    # beam_linear_ft — Compute LF from the longest edge in entity
+    #
+    # Simple and reliable for beams, columns, structural steel.
+    # The longest edge always runs along the member's length axis.
+    # Returns nil if no edges found.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.beam_linear_ft(defn, xform = nil)
+      xf = xform || Geom::Transformation.new
+      edge_data = []
+      collect_edges_for_beam(defn.entities, xf, edge_data)
+      return nil if edge_data.empty?
+
+      best = edge_data.max_by { |e| e[:length] }
+      return nil unless best && best[:length] > 0.5
+
+      best[:length] / 12.0
+    end
+
+    def self.collect_edges_for_beam(ents, xform, result)
+      ents.grep(Sketchup::Edge).each do |edge|
+        p1 = xform * edge.start.position
+        p2 = xform * edge.end.position
+        result << { edge: edge, p1: p1, p2: p2, length: p1.distance(p2) }
+      end
+      ents.each do |child|
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        collect_edges_for_beam(child_defn.entities, xform * child.transformation, result)
+      end
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # beam_net_section — True cross-section via oriented bounding box
+    #
+    # Finds the leaf component (innermost geometry), then computes
+    # an oriented bounding box aligned to the beam axis (longest
+    # edge). Projects all vertices onto the plane perpendicular
+    # to the beam axis to get the true W×H regardless of angle.
+    #
+    # Returns [w, h] in inches (sorted small to large), or nil.
+    # ═══════════════════════════════════════════════════════════
+
+    def self.beam_net_section(defn, _xform = nil)
+      leaf = leaf_lumber_defn(defn)
+      return nil unless leaf
+
+      # Collect edges from the leaf definition in local space
+      edges = []
+      collect_edges_for_beam(leaf.entities, Geom::Transformation.new, edges)
+      return nil if edges.length < 3
+
+      # Beam axis = longest edge direction
+      best = edges.max_by { |e| e[:length] }
+      return nil unless best && best[:length] > 1.0
+
+      axis = Geom::Vector3d.new(
+        best[:p2].x - best[:p1].x,
+        best[:p2].y - best[:p1].y,
+        best[:p2].z - best[:p1].z
+      )
+      axis.normalize!
+
+      # Find a cross-section edge (perpendicular to beam axis)
+      x_dir = nil
+      edges.each do |e|
+        next if e[:length] < 0.3
+        d = Geom::Vector3d.new(
+          e[:p2].x - e[:p1].x,
+          e[:p2].y - e[:p1].y,
+          e[:p2].z - e[:p1].z
+        )
+        d.normalize!
+        if d.dot(axis).abs < 0.3
+          x_dir = d
+          break
+        end
+      end
+
+      # Fallback: arbitrary perpendicular
+      unless x_dir
+        ref = axis.x.abs < 0.9 ? Geom::Vector3d.new(1, 0, 0) : Geom::Vector3d.new(0, 1, 0)
+        x_dir = axis.cross(ref)
+      end
+
+      # Orthogonalize: remove any axis component from x_dir
+      ax_comp = x_dir.dot(axis)
+      x_dir = Geom::Vector3d.new(
+        x_dir.x - axis.x * ax_comp,
+        x_dir.y - axis.y * ax_comp,
+        x_dir.z - axis.z * ax_comp
+      )
+      return nil if x_dir.length < 0.001
+      x_dir.normalize!
+
+      y_dir = axis.cross(x_dir)
+      return nil if y_dir.length < 0.001
+      y_dir.normalize!
+
+      # Project all edge endpoints onto the cross-section plane
+      x_min = Float::INFINITY;  x_max = -Float::INFINITY
+      y_min = Float::INFINITY;  y_max = -Float::INFINITY
+      edges.each do |e|
+        [e[:p1], e[:p2]].each do |pt|
+          px = pt.x * x_dir.x + pt.y * x_dir.y + pt.z * x_dir.z
+          py = pt.x * y_dir.x + pt.y * y_dir.y + pt.z * y_dir.z
+          x_min = px if px < x_min;  x_max = px if px > x_max
+          y_min = py if py < y_min;  y_max = py if py > y_max
+        end
+      end
+
+      w = x_max - x_min
+      h = y_max - y_min
+      return nil if w < 0.1 || h < 0.1
+
+      [w.round(2), h.round(2)].sort
+    end
+
+    # Walk down nested components to find the deepest definition
+    # that contains only raw geometry (faces/edges, no sub-components).
+    # For box beams with mixed lumber, picks the most common piece.
+    def self.leaf_lumber_defn(defn)
+      children = defn.entities.select { |e|
+        e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+      }
+
+      # No sub-components — this definition IS the leaf
+      return defn if children.empty?
+
+      # Recurse into children, count leaves by definition
+      leaf_counts = {}
+      children.each do |child|
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        leaf = leaf_lumber_defn(child_defn)
+        next unless leaf
+        leaf_counts[leaf] ||= 0
+        leaf_counts[leaf] += 1
+      end
+
+      return nil if leaf_counts.empty?
+
+      # Most common leaf = primary lumber piece
+      leaf_counts.max_by { |_d, c| c }.first
+    end
+
     def self.collect_faces_for_lf(ents, xform, result)
       ents.grep(Sketchup::Face).each do |f|
         area = world_face_area(f, xform)
@@ -1255,6 +1433,28 @@ module TakeoffTool
         child_defn = child.respond_to?(:definition) ? child.definition : nil
         next unless child_defn
         collect_faces_for_lf(child_defn.entities, xform * child.transformation, result)
+      end
+    end
+
+    # Like collect_faces_for_lf but also stores the face reference for debug painting.
+    def self.collect_faces_for_lf_debug(ents, xform, result)
+      ents.grep(Sketchup::Face).each do |f|
+        area = world_face_area(f, xform)
+        perimeter = 0.0
+        f.loops.each do |loop|
+          loop.edges.each do |edge|
+            p1 = xform * edge.start.position
+            p2 = xform * edge.end.position
+            perimeter += p1.distance(p2)
+          end
+        end
+        result << { face: f, area: area, perimeter: perimeter }
+      end
+      ents.each do |child|
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        collect_faces_for_lf_debug(child_defn.entities, xform * child.transformation, result)
       end
     end
 
@@ -1316,9 +1516,17 @@ module TakeoffTool
       end
 
       xform = e.transformation
-      face_data = []
-      collect_faces_for_sf(defn.entities, xform, face_data)
+
+      # ── Collect faces using the SAME strategy as face_area_for_entity ──
+      # Top-level faces first; only recurse if no direct faces exist
       top_faces = defn.entities.grep(Sketchup::Face)
+      all_face_data = []
+      collect_faces_for_sf(defn.entities, xform, all_face_data)
+      if top_faces.empty?
+        face_data = all_face_data
+      else
+        face_data = top_faces.map { |f| { face: f, xform: xform } }
+      end
       if face_data.empty?
         puts "[FF Debug Area] Entity #{eid} '#{defn.name}' has no faces"
         return
@@ -1335,9 +1543,8 @@ module TakeoffTool
       puts "[FF Debug Area] Entity #{eid}: '#{dname}'"
       puts "  Category: #{cat || '(unknown)'}"
       puts "  Transform scale: x=#{Geom::Vector3d.new(xform.xaxis).length.round(4)} y=#{Geom::Vector3d.new(xform.yaxis).length.round(4)} z=#{Geom::Vector3d.new(xform.zaxis).length.round(4)}"
-      puts "  Total faces: #{face_data.length} (#{top_faces.length} top-level, #{face_data.length - top_faces.length} nested)"
-      puts "  Enclosed 3D: #{enclosed_3d_data?(face_data)}"
-      puts "  Sheet good match: #{cat && cat =~ SHEET_GOOD_RE ? 'YES' : 'no'}"
+      puts "  Total faces: #{all_face_data.length} (#{top_faces.length} top-level, #{all_face_data.length - top_faces.length} nested)"
+      puts "  Using: #{top_faces.empty? ? 'ALL (recursed — no top-level faces)' : "#{face_data.length} TOP-LEVEL faces"}"
       puts "───────────────────────────────────────────────"
 
       m = Sketchup.active_model
@@ -1349,48 +1556,117 @@ module TakeoffTool
       mat_excluded = m.materials['FF_DEBUG_EXCLUDED'] || m.materials.add('FF_DEBUG_EXCLUDED')
       mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
 
-      # Determine which faces are measured based on the same logic as face_area_for_entity
+      # ── Classify faces using the SAME logic as face_area_for_entity ──
       measured_fd = []
       excluded_fd = []
 
-      if cat && cat =~ SHEET_GOOD_RE
-        # Sheet goods: dominant normal group (world-space normals)
-        groups = {}
-        face_data.each do |fd|
-          wn = fd[:xform] * fd[:face].normal
-          key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
-          groups[key] ||= { fds: [], area: 0.0 }
-          groups[key][:fds] << fd
-          groups[key][:area] += world_face_area(fd[:face], fd[:xform])
+      # Group by world-space normal
+      normal_groups = {}
+      face_data.each do |fd|
+        wn = fd[:xform] * fd[:face].normal
+        key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+        normal_groups[key] ||= { wn: wn, fds: [] }
+        normal_groups[key][:fds] << fd
+      end
+
+      sampled = load_sampled_normal(cat)
+      if sampled
+        puts "  Mode: SAMPLED NORMAL"
+        normal_groups.each do |_nkey, grp|
+          wn = grp[:wn]
+          wn_n = wn.length > 0.001 ? Geom::Vector3d.new(wn.x, wn.y, wn.z).normalize : wn
+          angle = sampled.angle_between(wn_n)
+          if angle < NORMAL_TOLERANCE_RAD
+            fds = grp[:fds]
+            if fds.length == 1
+              measured_fd << fds[0]
+            else
+              planes = {}
+              fds.each do |fd|
+                wp = fd[:xform] * fd[:face].vertices.first.position
+                d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+                d_key = d.round(0)
+                planes[d_key] ||= []
+                planes[d_key] << fd
+              end
+              best_key = planes.max_by { |_k, pf| pf.sum { |fd| world_face_area(fd[:face], fd[:xform]) } }&.first
+              planes.each do |pk, pf|
+                pf.each { |fd| pk == best_key ? measured_fd << fd : excluded_fd << fd }
+              end
+            end
+          else
+            grp[:fds].each { |fd| excluded_fd << fd }
+          end
         end
-        dominant_key = groups.max_by { |_k, v| v[:area] }&.first
-        puts "  Mode: SHEET GOOD (dominant side)"
-        groups.each do |key, v|
-          is_dom = key == dominant_key
-          sf = v[:area] / 144.0
-          puts "    Normal #{key}: #{v[:fds].length} faces, #{sf.round(2)} SF #{is_dom ? '← MEASURED' : '(excluded)'}"
-          v[:fds].each { |fd| is_dom ? measured_fd << fd : excluded_fd << fd }
-        end
-      elsif enclosed_3d_data?(face_data)
-        # Largest single face
-        fd_areas = face_data.map { |fd| [fd, world_face_area(fd[:face], fd[:xform])] }
-        largest_fd, _largest_area = fd_areas.max_by { |_fd, a| a }
-        puts "  Mode: ENCLOSED 3D (largest face)"
-        fd_areas.sort_by { |_fd, a| -a }.first(10).each_with_index do |(fd, a), i|
-          sf = a / 144.0
-          is_lg = fd.equal?(largest_fd)
-          wn = fd[:xform] * fd[:face].normal
-          puts "    Face #{i+1}: #{sf.round(2)} SF, normal=(#{wn.x.round(2)},#{wn.y.round(2)},#{wn.z.round(2)}) #{is_lg ? '← MEASURED' : ''}"
-        end
-        if fd_areas.length > 10
-          puts "    ... and #{fd_areas.length - 10} more faces"
-        end
-        measured_fd << largest_fd
-        excluded_fd = face_data.reject { |fd| fd.equal?(largest_fd) }
       else
-        # Single-sided: all faces measured
-        puts "  Mode: SINGLE-SIDED (all faces)"
-        measured_fd = face_data
+        puts "  Mode: DOMINANT SIDE (compound-layer dedup)"
+        # Dominant side with compound-layer dedup (mirrors face_area_for_entity)
+        side_data = {}
+        normal_groups.each do |nkey, grp|
+          fds = grp[:fds]
+          wn = grp[:wn]
+          if fds.length == 1
+            side_data[nkey] = {
+              measured: fds, excluded: [],
+              area: world_face_area(fds[0][:face], fds[0][:xform])
+            }
+          else
+            planes = {}
+            fds.each do |fd|
+              wp = fd[:xform] * fd[:face].vertices.first.position
+              d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+              d_key = d.round(0)
+              planes[d_key] ||= []
+              planes[d_key] << fd
+            end
+            best_key = planes.max_by { |_k, pf| pf.sum { |fd| world_face_area(fd[:face], fd[:xform]) } }&.first
+            m_fds = []
+            e_fds = []
+            planes.each do |pk, pf|
+              pf.each { |fd| pk == best_key ? m_fds << fd : e_fds << fd }
+            end
+            side_data[nkey] = {
+              measured: m_fds, excluded: e_fds,
+              area: m_fds.sum { |fd| world_face_area(fd[:face], fd[:xform]) }
+            }
+          end
+        end
+
+        dom_key = side_data.max_by { |_k, v| v[:area] }&.first
+        dom_area = side_data[dom_key] ? side_data[dom_key][:area] : 0.0
+
+        # Prefer top-facing surface for horizontal elements
+        top_key = nil
+        top_area = 0.0
+        normal_groups.each do |nkey, grp|
+          wn = grp[:wn]
+          wn_len = Math.sqrt(wn.x**2 + wn.y**2 + wn.z**2)
+          next if wn_len < 0.001
+          z_up = wn.z / wn_len
+          if z_up > 0.5 && side_data[nkey] && side_data[nkey][:area] > top_area
+            top_key = nkey
+            top_area = side_data[nkey][:area]
+          end
+        end
+
+        pick_key = dom_key
+        if top_key && top_key != dom_key && top_area >= dom_area * 0.7
+          pick_key = top_key
+          puts "  ↑ TOP SURFACE preferred (#{(top_area/144.0).round(2)} SF vs dominant #{(dom_area/144.0).round(2)} SF)"
+        end
+
+        side_data.each do |nkey, v|
+          sf = v[:area] / 144.0
+          is_pick = nkey == pick_key
+          puts "    Normal #{nkey}: #{v[:measured].length} faces, #{sf.round(2)} SF #{is_pick ? '← MEASURED' : '(excluded)'}"
+          if is_pick
+            measured_fd.concat(v[:measured])
+            excluded_fd.concat(v[:excluded])
+          else
+            excluded_fd.concat(v[:measured])
+            excluded_fd.concat(v[:excluded])
+          end
+        end
       end
 
       total_measured_sf = measured_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
@@ -1426,12 +1702,283 @@ module TakeoffTool
       m = Sketchup.active_model
       if m
         m.start_operation('Clear Debug Mats', true)
-        %w[FF_DEBUG_MEASURED FF_DEBUG_EXCLUDED FF_DEBUG_OPEN FF_DEBUG_PARTIAL FF_DEBUG_BLOCKED].each do |name|
+        %w[FF_DEBUG_MEASURED FF_DEBUG_EXCLUDED FF_DEBUG_OPEN FF_DEBUG_PARTIAL FF_DEBUG_BLOCKED FF_DEBUG_LF_SIDE FF_DEBUG_LF_ENDCAP FF_DEBUG_LF_BBOX].each do |name|
           m.materials.remove(m.materials[name]) if m.materials[name]
         end
         m.commit_operation
       end
       puts "[FF Debug] Restored #{count} faces, debug materials cleared"
+    end
+
+    # ═══════════════════════════════════════════════════════════
+    # debug_lf_category — Debug all LF entities in a category
+    #
+    # Three methods based on category type:
+    #   Beams:      longest edge = length. Blue endcaps, green sides.
+    #               Console shows WxHxL x qty inventory.
+    #   Walls:      longest horizontal edge. Green verticals, blue caps.
+    #   Extrusions: side_area / perimeter. Blue endcaps, green sides.
+    #   Fallback:   orange = bounding box (no geometry detection).
+    # ═══════════════════════════════════════════════════════════
+
+    def self.debug_lf_category(category)
+      sr = TakeoffTool.filtered_scan_results
+      ca = TakeoffTool.category_assignments
+      return unless sr
+
+      # Find all entities in this category with LF values
+      # (Don't filter by measurement_type — the user clicked an LF measurement,
+      # so we show all entities in this category that have linear_ft data)
+      entries = sr.select do |r|
+        assigned = ca[r[:entity_id]]
+        cat = assigned || r[:parsed][:auto_category]
+        cat == category && r[:linear_ft] && r[:linear_ft] > 0
+      end
+
+      # IFC compound layer dedup
+      if (IFCParser.ifc_model?(Sketchup.active_model) rescue false)
+        ifc_preferred = {}
+        sr.each do |r2|
+          next if r2[:source] == :manual_lf || r2[:source] == :manual_sf || r2[:source] == :manual_box
+          dname = r2[:definition_name] || r2[:display_name] || ''
+          next if dname.empty?
+          eid2 = r2[:entity_id]
+          has_ca = !!ca[eid2]
+          prev = ifc_preferred[dname]
+          if prev.nil? || (has_ca && !prev[:assigned])
+            ifc_preferred[dname] = { eid: eid2, assigned: has_ca }
+          end
+        end
+        entries = entries.select do |r|
+          dname = r[:definition_name] || r[:display_name] || ''
+          pref = ifc_preferred[dname]
+          !pref || pref[:eid] == r[:entity_id]
+        end
+      end
+
+      if entries.empty?
+        puts "[FF Debug LF] No LF entities found in '#{category}'"
+        return
+      end
+
+      m = Sketchup.active_model
+      return unless m
+
+      # Determine category method
+      is_beam = category =~ BEAM_RE
+      is_wall = category =~ WALL_LF_RE
+
+      # Create debug materials
+      mat_side = m.materials['FF_DEBUG_LF_SIDE'] || m.materials.add('FF_DEBUG_LF_SIDE')
+      mat_side.color = Sketchup::Color.new(0, 200, 0, 180)       # Green = side faces / wall verticals
+      mat_endcap = m.materials['FF_DEBUG_LF_ENDCAP'] || m.materials.add('FF_DEBUG_LF_ENDCAP')
+      mat_endcap.color = Sketchup::Color.new(0, 150, 255, 180)   # Blue = end caps / wall top-bottom
+      mat_bbox = m.materials['FF_DEBUG_LF_BBOX'] || m.materials.add('FF_DEBUG_LF_BBOX')
+      mat_bbox.color = Sketchup::Color.new(255, 165, 0, 160)     # Orange = bounding box fallback
+
+      method_label = is_beam ? 'BEAM (longest edge)' : is_wall ? 'WALL (longest horiz edge)' : 'EXTRUSION'
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "[FF Debug LF] Category: '#{category}' — #{entries.length} entities"
+      puts "[FF Debug LF] Method: #{method_label}"
+      puts "═══════════════════════════════════════════════════════════"
+
+      grand_lf = 0.0
+      grand_stored = 0.0
+      # For beam inventory: group by definition → { lengths: [lf, lf, ...], section: "WxH", method: str }
+      beam_inventory = {}
+
+      m.start_operation('Debug LF Category', true)
+
+      entries.each do |r|
+        eid = r[:entity_id]
+        e = TakeoffTool.find_entity(eid)
+        next unless e && e.valid?
+
+        defn = e.respond_to?(:definition) ? e.definition : nil
+        next unless defn
+
+        xform = e.transformation
+        dname = r[:display_name] || defn.name
+        acat = r[:parsed][:auto_category] || category
+        stored_lf = r[:linear_ft] || 0
+
+        computed_lf = nil
+        method_used = nil
+
+        # ── BEAM: longest edge ──────────────────────────────────
+        if is_beam
+          edge_data = []
+          collect_edges_for_beam(defn.entities, xform, edge_data)
+
+          if edge_data.any?
+            best = edge_data.max_by { |ed| ed[:length] }
+            if best && best[:length] > 0.5
+              computed_lf = best[:length] / 12.0
+              method_used = 'beam'
+
+              # Beam axis = direction of longest edge
+              axis = Geom::Vector3d.new(
+                best[:p2].x - best[:p1].x,
+                best[:p2].y - best[:p1].y,
+                best[:p2].z - best[:p1].z
+              )
+              axis_len = axis.length
+              axis = axis.normalize if axis_len > 0.001
+
+              # Paint faces: endcap (normal ∥ axis) = blue, side (normal ⊥ axis) = green
+              face_data = []
+              collect_faces_for_lf_debug(defn.entities, xform, face_data)
+              side_count = 0
+              cap_count = 0
+              face_data.each do |fd|
+                wn = fd[:face].normal.transform(xform)
+                wn_len = Math.sqrt(wn.x**2 + wn.y**2 + wn.z**2)
+                next if wn_len < 0.001
+                wn_n = Geom::Vector3d.new(wn.x / wn_len, wn.y / wn_len, wn.z / wn_len)
+                dot = (axis.x * wn_n.x + axis.y * wn_n.y + axis.z * wn_n.z).abs
+                if dot > 0.7
+                  debug_paint(fd[:face], mat_endcap)  # endcap
+                  cap_count += 1
+                else
+                  debug_paint(fd[:face], mat_side)    # side
+                  side_count += 1
+                end
+              end
+
+              # Cross-section from BB (two shorter dims)
+              dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
+              section = "#{dims[0].round(1)}x#{dims[1].round(1)}"
+
+              # Build inventory
+              beam_inventory[dname] ||= { lengths: [], section: section }
+              beam_inventory[dname][:lengths] << computed_lf
+
+              puts "  #{dname}: #{computed_lf.round(2)}' (beam, #{side_count} side + #{cap_count} endcap faces)"
+            end
+          end
+        end
+
+        # ── WALL: longest horizontal edge ───────────────────────
+        if computed_lf.nil? && (is_wall || acat =~ WALL_LF_RE)
+          computed_lf = wall_linear_ft(defn, xform)
+          if computed_lf
+            method_used = 'wall'
+
+            # Paint faces by orientation
+            wall_faces = []
+            collect_faces_for_lf_debug(defn.entities, xform, wall_faces)
+            vert_count = 0
+            horiz_count = 0
+            wall_faces.each do |fd|
+              wn = fd[:face].normal.transform(xform)
+              wn_len = Math.sqrt(wn.x**2 + wn.y**2 + wn.z**2)
+              z_ratio = wn_len > 0.001 ? wn.z.abs / wn_len : 0
+              if z_ratio > 0.7
+                debug_paint(fd[:face], mat_endcap)
+                horiz_count += 1
+              else
+                debug_paint(fd[:face], mat_side)
+                vert_count += 1
+              end
+            end
+
+            puts "  #{dname}: #{computed_lf.round(2)}' (wall, #{vert_count} vert + #{horiz_count} horiz faces)"
+          end
+        end
+
+        # ── EXTRUSION: side_area / perimeter ────────────────────
+        if computed_lf.nil?
+          face_data = []
+          collect_faces_for_lf_debug(defn.entities, xform, face_data)
+          face_data.reject! { |fd| fd[:area] < 0.1 }
+
+          if face_data.length >= 3
+            face_data.sort_by! { |fd| fd[:area] }
+            total_area = face_data.sum { |fd| fd[:area] }
+            ef1 = face_data[0]
+            ef2 = nil
+            (1...[face_data.length, 8].min).each do |i|
+              candidate = face_data[i]
+              ratio = candidate[:area] / [ef1[:area], 0.01].max
+              combined = ef1[:area] + candidate[:area]
+              if ratio < 2.0 && combined < total_area * 0.20
+                ef2 = candidate
+                break
+              end
+            end
+
+            if ef2 && ef1[:perimeter] >= 0.5
+              side_area = total_area - ef1[:area] - ef2[:area]
+              if side_area >= 1.0
+                computed_lf = (side_area / ef1[:perimeter]) / 12.0
+                method_used = 'extrusion'
+                endcap_faces = [ef1[:face], ef2[:face]]
+                face_data.each do |fd|
+                  if endcap_faces.include?(fd[:face])
+                    debug_paint(fd[:face], mat_endcap)
+                  else
+                    debug_paint(fd[:face], mat_side)
+                  end
+                end
+                puts "  #{dname}: #{computed_lf.round(2)}' (extrusion, side=#{(side_area/144.0).round(1)} SF / perim=#{(ef1[:perimeter]/12.0).round(2)}')"
+              end
+            end
+          end
+        end
+
+        # ── FALLBACK: bounding box ──────────────────────────────
+        if computed_lf.nil?
+          longest_in = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].max
+          computed_lf = longest_in / 12.0
+          method_used = 'bbox'
+          debug_paint_entity(e, mat_bbox)
+          dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
+          puts "  #{dname}: #{computed_lf.round(2)}' (BBOX FALLBACK — orange) #{dims[0].round(1)}x#{dims[1].round(1)}x#{dims[2].round(1)}\""
+        end
+
+        grand_lf += computed_lf
+        grand_stored += stored_lf
+      end
+
+      m.commit_operation
+
+      # ── Beam inventory: WxH x L' x qty ──────────────────────
+      if is_beam && beam_inventory.any?
+        puts ""
+        puts "── Beam Inventory ──────────────────────────────────────"
+        beam_inventory.sort_by { |_dn, v| -v[:lengths].sum }.each do |dn, v|
+          label = dn.length > 60 ? dn[0..57] + '...' : dn
+          puts "  #{label}"
+          puts "    Section: #{v[:section]}\""
+
+          # Group lengths (round to nearest 3")
+          len_groups = {}
+          v[:lengths].each do |l|
+            rounded = (l * 4).round / 4.0  # round to 0.25 ft (3")
+            len_groups[rounded] ||= 0
+            len_groups[rounded] += 1
+          end
+          len_groups.sort_by { |l, _c| -l }.each do |len, qty|
+            puts "    #{v[:section]}\" x #{len.round(2)}' x #{qty} = #{(len * qty).round(1)} LF"
+          end
+          puts "    Subtotal: #{v[:lengths].sum.round(1)} LF (#{v[:lengths].length} members)"
+        end
+      end
+
+      # ── Summary ──────────────────────────────────────────────
+      puts ""
+      puts "═══════════════════════════════════════════════════════════"
+      puts "  TOTAL COMPUTED:  #{grand_lf.round(1)} LF"
+      puts "  TOTAL STORED:    #{grand_stored.round(1)} LF"
+      puts "  Entity count:    #{entries.length}"
+      puts "═══════════════════════════════════════════════════════════"
+      puts ""
+      puts "[FF Debug LF] Color legend:"
+      puts "  Green  = side faces / vertical wall surfaces"
+      puts "  Blue   = end caps (beam profile) / top-bottom wall caps"
+      puts "  Orange = bounding box fallback (no geometry detection)"
+      puts "[FF Debug LF] Run Scanner.clear_debug to restore."
     end
 
     # ═══════════════════════════════════════════════════════════
@@ -1451,6 +1998,27 @@ module TakeoffTool
         assigned = ca[r[:entity_id]]
         cat = assigned || r[:parsed][:auto_category]
         cat == category && r[:area_sf] && r[:area_sf] > 0
+      end
+
+      # IFC compound layer dedup: two-pass — prefer explicitly assigned instances
+      if (IFCParser.ifc_model?(Sketchup.active_model) rescue false)
+        ifc_preferred = {}
+        sr.each do |r2|
+          next if r2[:source] == :manual_lf || r2[:source] == :manual_sf || r2[:source] == :manual_box
+          dname = r2[:definition_name] || r2[:display_name] || ''
+          next if dname.empty?
+          eid2 = r2[:entity_id]
+          has_ca = !!ca[eid2]
+          prev = ifc_preferred[dname]
+          if prev.nil? || (has_ca && !prev[:assigned])
+            ifc_preferred[dname] = { eid: eid2, assigned: has_ca }
+          end
+        end
+        entries = entries.select do |r|
+          dname = r[:definition_name] || r[:display_name] || ''
+          pref = ifc_preferred[dname]
+          !pref || pref[:eid] == r[:entity_id]
+        end
       end
 
       if entries.empty?
@@ -1501,36 +2069,129 @@ module TakeoffTool
         next unless defn
 
         xform = e.transformation
-        fd_list = []
-        collect_faces_for_sf(defn.entities, xform, fd_list)
+        dname = r[:display_name] || defn.name
+
+        # ── Collect faces using the SAME strategy as face_area_for_entity ──
+        # Top-level faces first; only recurse if no direct faces exist
+        top_faces = defn.entities.grep(Sketchup::Face)
+        if top_faces.empty?
+          fd_list = []
+          collect_faces_for_sf(defn.entities, xform, fd_list)
+        else
+          fd_list = top_faces.map { |f| { face: f, xform: xform } }
+        end
         next if fd_list.empty?
 
-        cat = category
-        dname = r[:display_name] || defn.name
         measured_fd = []
         excluded_fd = []
 
-        if cat =~ SHEET_GOOD_RE
-          # Sheet goods: dominant normal (world-space)
-          groups = {}
-          fd_list.each do |fd|
-            wn = fd[:xform] * fd[:face].normal
-            key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
-            groups[key] ||= { fds: [], area: 0.0 }
-            groups[key][:fds] << fd
-            groups[key][:area] += world_face_area(fd[:face], fd[:xform])
+        # ── Group faces by world-space normal (mirrors face_area_for_entity) ──
+        normal_groups = {}
+        fd_list.each do |fd|
+          wn = fd[:xform] * fd[:face].normal
+          key = "#{wn.x.round(1)},#{wn.y.round(1)},#{wn.z.round(1)}"
+          normal_groups[key] ||= { wn: wn, fds: [] }
+          normal_groups[key][:fds] << fd
+        end
+
+        # ── Sampled normal override (mirrors face_area_for_entity) ──
+        sampled = load_sampled_normal(category)
+        if sampled
+          normal_groups.each do |_nkey, grp|
+            wn = grp[:wn]
+            wn_n = wn.length > 0.001 ? Geom::Vector3d.new(wn.x, wn.y, wn.z).normalize : wn
+            angle = sampled.angle_between(wn_n)
+            if angle < NORMAL_TOLERANCE_RAD
+              fds = grp[:fds]
+              if fds.length == 1
+                measured_fd << fds[0]
+              else
+                # Compound layer dedup: group by plane distance, keep largest plane
+                planes = {}
+                fds.each do |fd|
+                  wp = fd[:xform] * fd[:face].vertices.first.position
+                  d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+                  d_key = d.round(0)
+                  planes[d_key] ||= []
+                  planes[d_key] << fd
+                end
+                best_key = planes.max_by { |_k, pf| pf.sum { |fd| world_face_area(fd[:face], fd[:xform]) } }&.first
+                planes.each do |pk, pf|
+                  pf.each { |fd| pk == best_key ? measured_fd << fd : excluded_fd << fd }
+                end
+              end
+            else
+              grp[:fds].each { |fd| excluded_fd << fd }
+            end
           end
-          dominant_key = groups.max_by { |_k, v| v[:area] }&.first
-          groups.each do |key, v|
-            v[:fds].each { |fd| key == dominant_key ? measured_fd << fd : excluded_fd << fd }
-          end
-        elsif enclosed_3d_data?(fd_list)
-          fd_areas = fd_list.map { |fd| [fd, world_face_area(fd[:face], fd[:xform])] }
-          largest_fd = fd_areas.max_by { |_fd, a| a }&.first
-          measured_fd << largest_fd if largest_fd
-          excluded_fd = fd_list.reject { |fd| fd.equal?(largest_fd) }
         else
-          measured_fd = fd_list
+          # ── Default: dominant side with compound-layer dedup ──
+          # For each normal group, sub-group by plane distance, keep largest plane.
+          # Then pick the normal group with the largest deduped area.
+          side_data = {}
+          normal_groups.each do |nkey, grp|
+            fds = grp[:fds]
+            wn = grp[:wn]
+            if fds.length == 1
+              side_data[nkey] = {
+                measured: fds,
+                excluded: [],
+                area: world_face_area(fds[0][:face], fds[0][:xform])
+              }
+            else
+              planes = {}
+              fds.each do |fd|
+                wp = fd[:xform] * fd[:face].vertices.first.position
+                d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
+                d_key = d.round(0)
+                planes[d_key] ||= []
+                planes[d_key] << fd
+              end
+              best_key = planes.max_by { |_k, pf| pf.sum { |fd| world_face_area(fd[:face], fd[:xform]) } }&.first
+              m_fds = []
+              e_fds = []
+              planes.each do |pk, pf|
+                pf.each { |fd| pk == best_key ? m_fds << fd : e_fds << fd }
+              end
+              side_data[nkey] = {
+                measured: m_fds,
+                excluded: e_fds,
+                area: m_fds.sum { |fd| world_face_area(fd[:face], fd[:xform]) }
+              }
+            end
+          end
+
+          dom_key = side_data.max_by { |_k, v| v[:area] }&.first
+          dom_area = side_data[dom_key] ? side_data[dom_key][:area] : 0.0
+
+          # Prefer top-facing surface for horizontal elements
+          top_key = nil
+          top_area = 0.0
+          normal_groups.each do |nkey, grp|
+            wn = grp[:wn]
+            wn_len = Math.sqrt(wn.x**2 + wn.y**2 + wn.z**2)
+            next if wn_len < 0.001
+            z_up = wn.z / wn_len
+            if z_up > 0.5 && side_data[nkey] && side_data[nkey][:area] > top_area
+              top_key = nkey
+              top_area = side_data[nkey][:area]
+            end
+          end
+
+          pick_key = dom_key
+          if top_key && top_key != dom_key && top_area >= dom_area * 0.7
+            pick_key = top_key
+          end
+
+          side_data.each do |nkey, v|
+            if nkey == pick_key
+              measured_fd.concat(v[:measured])
+              excluded_fd.concat(v[:excluded])
+            else
+              excluded_fd.concat(v[:measured])
+              excluded_fd.concat(v[:excluded])
+            end
+          end
         end
 
         entity_sf = measured_fd.sum { |fd| world_face_area(fd[:face], fd[:xform]) } / 144.0
@@ -1610,6 +2271,27 @@ module TakeoffTool
         assigned = ca[r[:entity_id]]
         cat = assigned || r[:parsed][:auto_category]
         cat == category && r[:area_sf] && r[:area_sf] > 0
+      end
+
+      # IFC compound layer dedup: two-pass — prefer explicitly assigned instances
+      if (IFCParser.ifc_model?(Sketchup.active_model) rescue false)
+        ifc_preferred = {}
+        sr.each do |r2|
+          next if r2[:source] == :manual_lf || r2[:source] == :manual_sf || r2[:source] == :manual_box
+          dname = r2[:definition_name] || r2[:display_name] || ''
+          next if dname.empty?
+          eid2 = r2[:entity_id]
+          has_ca = !!ca[eid2]
+          prev = ifc_preferred[dname]
+          if prev.nil? || (has_ca && !prev[:assigned])
+            ifc_preferred[dname] = { eid: eid2, assigned: has_ca }
+          end
+        end
+        entries = entries.select do |r|
+          dname = r[:definition_name] || r[:display_name] || ''
+          pref = ifc_preferred[dname]
+          !pref || pref[:eid] == r[:entity_id]
+        end
       end
 
       if entries.empty?

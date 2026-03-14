@@ -476,6 +476,33 @@ module TakeoffTool
       m.commit_operation
     end
 
+    def self.hide_category(sr, ca, tc)
+      m = Sketchup.active_model; return unless m
+      m.start_operation('Hide Category', true)
+      sr.each do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless cat == tc
+        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
+        e.visible = false
+      end
+      m.commit_operation
+    end
+
+    def self.show_category(sr, ca, tc)
+      m = Sketchup.active_model; return unless m
+      visible = []
+      m.start_operation('Show Category', true)
+      sr.each do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+        next unless cat == tc
+        e = TakeoffTool.find_entity(r[:entity_id]); next unless e && e.valid?
+        e.visible = true
+        visible << e
+      end
+      ensure_ancestors_visible(visible, m) if visible.any?
+      m.commit_operation
+    end
+
     def self.show_entities_with_ancestors(ids)
       m = Sketchup.active_model; return unless m
       visible = []

@@ -254,7 +254,9 @@ module TakeoffTool
   unless @auto_load_done
     UI.start_timer(1.0, false) do
       if load_scan_from_model
-        puts "Takeoff: Scan data restored - dashboard ready"
+        # Recompute SF using current algorithm (cached values may be stale)
+        updated = (Scanner.recalculate_sf rescue 0)
+        puts "Takeoff: Scan data restored - dashboard ready#{updated > 0 ? " (#{updated} SF values refreshed)" : ''}"
       end
       # Check for backup newer than last save (crash recovery)
       begin
@@ -384,6 +386,22 @@ module TakeoffTool
           progress_dlg.execute_script("if(typeof scanComplete==='function')scanComplete('#{safe}')") rescue nil
         end
         save_scan_to_model
+        # Clear stale category_scan derived parts — fresh scan = fresh measurements
+        begin
+          require 'json'
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          if dp_json && !dp_json.empty?
+            parts = JSON.parse(dp_json)
+            stale = parts.keys.select { |k| (parts[k]['sourceType'] rescue nil) == 'category_scan' }
+            if stale.any?
+              stale.each { |k| parts.delete(k) }
+              m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+              puts "Takeoff: Cleared #{stale.length} stale category_scan measurements (rescan)"
+            end
+          end
+        rescue => cse
+          puts "Takeoff: clear stale derived_parts error: #{cse.message}"
+        end
         trigger_backup
 
         # Run interactive scanner for low-confidence items
@@ -1721,6 +1739,7 @@ module TakeoffTool
         r = UI.messagebox("No scan data. Run scan first?", MB_YESNO)
         return r == IDYES ? run_scan : nil
       end
+      Scanner.recalculate_sf rescue nil
     end
 
     # Ensure containers are loaded (may have been reset by code reload)

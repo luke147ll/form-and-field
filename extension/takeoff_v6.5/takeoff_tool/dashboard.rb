@@ -88,9 +88,28 @@ module TakeoffTool
               _sr.each { |r| if r[:entity_id] == ceid; r[:parsed][:auto_subcategory] = ''; break; end }
             end
           end
+          # IFC: cascade to all instances of the same definition (compound layers)
+          # so the duplicate instance stays in sync
+          if (IFCParser.ifc_model?(Sketchup.active_model) rescue false)
+            match = _sr.find { |r| r[:entity_id] == eid }
+            if match
+              dname = match[:definition_name]
+              _sr.each do |r|
+                next if r[:entity_id] == eid
+                next unless r[:definition_name] == dname
+                ceid = r[:entity_id]
+                next if _ca[ceid] == cat  # already correct
+                _ca[ceid] = cat
+                TakeoffTool.save_assignment(ceid, 'category', cat)
+                TakeoffTool.save_assignment(ceid, 'subcategory', '')
+                r[:parsed][:auto_subcategory] = ''
+              end
+            end
+          end
           # Learning system: capture reclassification
           begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           send_live_data
+          send_measurement_data  # Auto-update category_scan measurements
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff setCategory error: #{e.message}\n  #{e.backtrace.first(3).join("\n  ")}"
@@ -250,6 +269,14 @@ module TakeoffTool
 
       @dialog.add_action_callback('isolateTag') do |_ctx, tag_str|
         Highlighter.isolate_tag(tag_str.to_s)
+      end
+
+      @dialog.add_action_callback('hideCategory') do |_ctx, cat_str|
+        Highlighter.hide_category(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('showCategory') do |_ctx, cat_str|
+        Highlighter.show_category(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
       end
 
       @dialog.add_action_callback('showAll') do |_ctx|
@@ -968,6 +995,230 @@ module TakeoffTool
 
       @dialog.add_action_callback('requestMeasurements') do |_ctx|
         send_measurement_data
+      end
+
+      # ── Derived Parts ──
+      @dialog.add_action_callback('createDerivedPart') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          id = "dp_#{Time.now.to_i}_#{rand(1000)}"
+          parts[id] = data
+          m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          send_measurement_data
+        rescue => e
+          puts "Dashboard createDerivedPart error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('deleteDerivedPart') do |_ctx, id_str|
+        begin
+          require 'json'
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          parts.delete(id_str.to_s)
+          m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          send_measurement_data
+        rescue => e
+          puts "Dashboard deleteDerivedPart error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('editDerivedPart') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          id = data.delete('id')
+          if parts[id]
+            data.each { |k, v| parts[id][k] = v }
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          end
+          send_measurement_data
+        rescue => e
+          puts "Dashboard editDerivedPart error: #{e.message}"
+        end
+      end
+
+      # ── Category Scan Measurement ──
+      # User-initiated: scans all entities in a category, sums the requested
+      # quantity type, and stores the result as a derived part (sourceType=category_scan).
+      @dialog.add_action_callback('generateCategoryMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat  = data['category'].to_s
+          unit = data['unit'].to_s       # LF, SF, CF, or BM (beam → treated as LF)
+          unit = 'LF' if unit == 'BM'    # Beam inventory uses LF computation
+          m = Sketchup.active_model
+
+          sr = TakeoffTool.filtered_scan_results || []
+          ca = TakeoffTool.category_assignments || {}
+          reg = TakeoffTool.instance_variable_get(:@entity_registry) || {}
+          total = 0.0
+          count = 0
+          eids  = []
+          seen_eids = {}
+          mv_active = TakeoffTool.active_mv_view != nil
+          seen_defns = mv_active ? {} : nil
+          is_ifc = (IFCParser.ifc_model?(m) rescue false)
+          skipped_mv = 0
+          skipped_ifc = 0
+
+          # IFC two-pass: find preferred instance per definition
+          # (prefer explicitly assigned instances so recategorized entities count correctly)
+          ifc_preferred = nil
+          if is_ifc
+            ifc_preferred = {}
+            sr.each do |r|
+              next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+              dname = r[:definition_name] || r[:display_name] || ''
+              next if dname.empty?
+              eid2 = r[:entity_id]
+              has_ca = !!ca[eid2]
+              if !has_ca
+                e2 = reg[eid2]
+                has_ca = !!(e2 && e2.valid? && (e2.get_attribute('TakeoffAssignments', 'category') rescue nil))
+              end
+              prev = ifc_preferred[dname]
+              if prev.nil? || (has_ca && !prev[:assigned])
+                ifc_preferred[dname] = { eid: eid2, assigned: has_ca }
+              end
+            end
+          end
+
+          puts ""
+          puts "═══ generateCategoryMeasurement: '#{cat}' #{unit} ═══"
+          puts "  scan_results total: #{sr.length}#{mv_active ? ' (multiverse dedup ON)' : ''}#{is_ifc ? ' (IFC dedup ON)' : ''}"
+
+          sr.each do |r|
+            next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+            eid = r[:entity_id]
+            assigned = ca[eid]
+            auto = (r[:parsed][:auto_category] rescue nil)
+            if assigned.nil?
+              e = reg[eid]
+              assigned = (e && e.valid?) ? (e.get_attribute('TakeoffAssignments', 'category') rescue nil) : nil
+            end
+            rcat = assigned || auto || 'Uncategorized'
+            next unless rcat == cat
+
+            val = case unit
+                  when 'LF' then (r[:linear_ft] || 0).to_f
+                  when 'SF' then (r[:area_sf] || 0).to_f
+                  when 'CF' then (r[:volume_ft3] || 0).to_f
+                  else 0.0
+                  end
+            next if val <= 0
+
+            if seen_eids[eid]
+              next
+            end
+            seen_eids[eid] = true
+
+            # Multiverse dedup only when A/B is active
+            if seen_defns
+              e ||= reg[eid]
+              defn_name = (e && e.valid? && e.respond_to?(:definition)) ? e.definition.name : (r[:definition_name] || r[:display_name])
+              dedup_key = "#{defn_name}|#{val.round(2)}"
+              if seen_defns[dedup_key]
+                skipped_mv += 1
+                next
+              end
+              seen_defns[dedup_key] = true
+            end
+
+            # IFC compound layer dedup: only count the preferred instance per definition
+            if ifc_preferred
+              dname = r[:definition_name] || r[:display_name] || ''
+              pref = ifc_preferred[dname]
+              if pref && pref[:eid] != eid
+                skipped_ifc += 1
+                next
+              end
+            end
+
+            total += val
+            count += 1
+            eids << eid
+            puts "  #{count}. eid=#{eid} '#{r[:display_name]}' = #{val.round(2)} #{unit}"
+          end
+          puts "  Skipped #{skipped_mv} multiverse duplicates" if skipped_mv > 0
+          puts "  Skipped #{skipped_ifc} IFC compound duplicates" if skipped_ifc > 0
+          puts "  TOTAL: #{total.round(2)} #{unit} from #{count} entities"
+          puts "═══════════════════════════════════════════════"
+
+          if total > 0
+            dp_json = m.get_attribute('FormAndField', 'derived_parts')
+            parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+            # Replace existing category_scan for same category+unit (prevent duplicates)
+            existing = parts.find { |_k, v| v['sourceType'] == 'category_scan' && v['category'] == cat && v['unit'] == unit }
+            id = existing ? existing[0] : "csm_#{Time.now.to_i}_#{rand(1000)}"
+            parts[id] = {
+              'name'          => "#{cat} (auto #{unit})",
+              'category'      => cat,
+              'sourceType'    => 'category_scan',
+              'sourceUnit'    => unit,
+              'unit'          => unit,
+              'multiplier'    => 1.0,
+              'computedValue' => total.round(2),
+              'entityCount'   => count,
+              'entityIds'     => eids,
+              'note'          => "Scanned from #{count} entities"
+            }
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+            send_measurement_data
+          else
+            @dialog.execute_script("showToast('No #{unit} data found for #{cat.gsub("'","\\\\'")}','warning')")
+          end
+        rescue => e
+          puts "Dashboard generateCategoryMeasurement error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('highlightCategoryScan') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat  = data['category'].to_s
+          unit = data['unit'].to_s
+
+          if unit == 'SF' && !cat.empty?
+            # Use face-level debug: paints measured faces green, excluded red
+            Scanner.clear_debug
+            Scanner.debug_area_category(cat)
+          elsif unit == 'LF' && !cat.empty?
+            # Use face-level debug: paints end caps blue, side faces green
+            Scanner.clear_debug
+            Scanner.debug_lf_category(cat)
+          else
+            # CF/other: highlight whole entities
+            eids = data['entityIds'] || []
+            ids = eids.map(&:to_i)
+            Highlighter.clear_all
+            Highlighter.highlight_entities(ids) if ids.any?
+          end
+        rescue => e
+          puts "Dashboard highlightCategoryScan error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('highlightBeamEntities') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eids = (data['eids'] || []).map(&:to_i)
+          Highlighter.clear_all
+          Highlighter.highlight_entities(eids) if eids.any?
+        rescue => e
+          puts "Dashboard highlightBeamEntities error: #{e.message}"
+        end
       end
 
       @dialog.add_action_callback('updateElevLabel') do |_ctx, json_str|
@@ -2144,7 +2395,257 @@ module TakeoffTool
         measurements << entry
       end
 
-      js = JSON.generate(measurements)
+      # Compute per-category scan totals (excludes manual measurements)
+      scan_totals = {}
+      sr = TakeoffTool.filtered_scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      reg = TakeoffTool.instance_variable_get(:@entity_registry) || {}
+      mv_active = TakeoffTool.active_mv_view != nil
+      st_seen = {}
+      st_defns = mv_active ? {} : nil
+      # IFC dedup: the IFC importer often creates 2+ instances per element
+      # (compound structure layers sharing the same definition/GlobalId).
+      # Two-pass: first identify the preferred instance per definition
+      # (the one with an explicit category assignment), then count only that one.
+      is_ifc = (IFCParser.ifc_model?(m) rescue false)
+      ifc_preferred = nil
+      if is_ifc
+        ifc_preferred = {}
+        sr.each do |r|
+          next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+          dname = r[:definition_name] || r[:display_name] || ''
+          next if dname.empty?
+          eid = r[:entity_id]
+          has_ca = !!ca[eid]
+          if !has_ca
+            e = reg[eid]
+            has_ca = !!(e && e.valid? && (e.get_attribute('TakeoffAssignments', 'category') rescue nil))
+          end
+          prev = ifc_preferred[dname]
+          if prev.nil? || (has_ca && !prev[:assigned])
+            ifc_preferred[dname] = { eid: eid, assigned: has_ca }
+          end
+        end
+      end
+      net_sec_cache = {}   # cache beam_net_section by definition name
+      sr.each do |r|
+        next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+        eid = r[:entity_id]
+        next if st_seen[eid]
+        st_seen[eid] = true
+        assigned = ca[eid]
+        if assigned.nil?
+          e = reg[eid]
+          assigned = (e && e.valid?) ? (e.get_attribute('TakeoffAssignments', 'category') rescue nil) : nil
+        end
+        cat = assigned || (r[:parsed][:auto_category] rescue nil) || 'Uncategorized'
+        # Multiverse dedup only when A/B is active
+        if st_defns
+          e ||= reg[eid]
+          defn_name = (e && e.valid? && e.respond_to?(:definition)) ? e.definition.name : (r[:definition_name] || r[:display_name])
+          sf_val = (r[:area_sf] || 0).to_f
+          dedup_key = "#{cat}|#{defn_name}|#{sf_val.round(2)}"
+          next if st_defns[dedup_key]
+          st_defns[dedup_key] = true
+        end
+        # IFC compound layer dedup: only count the preferred instance per definition
+        if ifc_preferred
+          dname = r[:definition_name] || r[:display_name] || ''
+          pref = ifc_preferred[dname]
+          next if pref && pref[:eid] != eid
+        end
+        scan_totals[cat] ||= { lf: 0.0, sf: 0.0, vol: 0.0, count: 0 }
+        scan_totals[cat][:count] += 1
+        scan_totals[cat][:lf]  += (r[:linear_ft] || 0).to_f
+        scan_totals[cat][:sf]  += (r[:area_sf] || 0).to_f
+        scan_totals[cat][:vol] += (r[:volume_ft3] || 0).to_f
+
+        # Collect beam inventory data for any category with LF values
+        if (r[:linear_ft] || 0) > 0
+          scan_totals[cat][:beam_items] ||= []
+
+          # Cross-section: oriented BB for beam categories, definition bounds otherwise
+          sec_str = nil
+          ent_for_beam = reg[r[:entity_id]]
+          if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
+            bdefn = ent_for_beam.definition
+            dname = bdefn.name
+            if cat =~ Scanner::BEAM_RE
+              # Full oriented bounding box for beam categories
+              unless net_sec_cache.key?(dname)
+                begin
+                  net_sec_cache[dname] = Scanner.beam_net_section(bdefn)
+                rescue => ex
+                  puts "[FF beam_net_section ERROR] #{dname}: #{ex.message}"
+                  net_sec_cache[dname] = nil
+                end
+              end
+              ns = net_sec_cache[dname]
+              sec_str = "#{ns[0].round(1)}x#{ns[1].round(1)}" if ns
+            end
+            # Fallback: definition bounds (local space, no angle distortion)
+            unless sec_str
+              dbb = bdefn.bounds
+              ddims = [dbb.width, dbb.height, dbb.depth].sort
+              sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
+            end
+          end
+          # Last resort: scan result BB (world-space)
+          unless sec_str
+            dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
+            sec_str = "#{dims[0].round(1)}x#{dims[1].round(1)}"
+          end
+
+          scan_totals[cat][:beam_items] << {
+            defn: r[:display_name] || r[:definition_name] || 'Unknown',
+            lf: (r[:linear_ft] || 0).to_f,
+            section: sec_str,
+            eid: r[:entity_id]
+          }
+        end
+      end
+
+      # Load derived parts (deduplicate category_scan entries)
+      derived = begin
+        dp_json = m.get_attribute('FormAndField', 'derived_parts')
+        dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+      rescue; {} end
+      seen_scans = {}
+      dups = []
+      derived.each do |k, v|
+        next unless v['sourceType'] == 'category_scan'
+        key = "#{v['category']}|#{v['unit']}"
+        if seen_scans[key]
+          dups << k
+        else
+          seen_scans[key] = k
+        end
+      end
+      if dups.any?
+        dups.each { |k| derived.delete(k) }
+        m.set_attribute('FormAndField', 'derived_parts', JSON.generate(derived))
+        puts "[FF] Cleaned #{dups.length} duplicate category_scan entries"
+      end
+
+      # Recompute all derived part values from current scan data + assignments
+      dirty = false
+      derived.each do |_k, v|
+        src = v['sourceType']
+        dunit = v['unit'] || 'SF'
+        mult = (v['multiplier'] || 1.0).to_f
+
+        if src == 'category_scan'
+          # Auto-scan measurement: value = scan_totals for its category
+          dcat = v['category']
+          st = scan_totals[dcat]
+          new_val = if st
+                      case dunit
+                      when 'LF' then st[:lf]
+                      when 'CF' then st[:vol]
+                      else st[:sf]
+                      end
+                    else
+                      0.0
+                    end
+          new_val = new_val.round(2)
+          new_count = st ? st[:count] : 0
+          if v['computedValue'] != new_val || v['entityCount'] != new_count
+            v['computedValue'] = new_val
+            v['entityCount'] = new_count
+            v['note'] = "Scanned from #{new_count} entities"
+            dirty = true
+          end
+
+          # Build beam inventory for LF beam categories
+          if dunit == 'LF' && st && st[:beam_items]
+            inv = {}
+            st[:beam_items].each do |bi|
+              # Key by section so beams with same display name but different
+              # cross-sections are separate groups (e.g. 2.0x13.5 vs 9.5x13.5)
+              inv_key = "#{bi[:defn]}|#{bi[:section]}"
+              inv[inv_key] ||= { defn: bi[:defn], section: bi[:section], items: [] }
+              inv[inv_key][:items] << { lf: bi[:lf].round(2), eid: bi[:eid] }
+            end
+            beam_inv = []
+            inv.sort_by { |_dn, d| -d[:items].sum { |i| i[:lf] } }.each do |dn, d|
+              all_eids = d[:items].map { |i| i[:eid] }
+              # Group lengths (round to nearest 3" = 0.25')
+              len_groups = {}
+              d[:items].each do |item|
+                key = ((item[:lf] * 4).round / 4.0)
+                len_groups[key] ||= { qty: 0, eids: [] }
+                len_groups[key][:qty] += 1
+                len_groups[key][:eids] << item[:eid]
+              end
+              rows = len_groups.sort_by { |l, _g| -l }.map do |len, g|
+                { 'l' => len, 'qty' => g[:qty], 'total' => (len * g[:qty]).round(1), 'eids' => g[:eids] }
+              end
+              beam_inv << {
+                'defn' => d[:defn],
+                'section' => d[:section],
+                'count' => d[:items].length,
+                'totalLF' => d[:items].sum { |i| i[:lf] }.round(1),
+                'eids' => all_eids,
+                'rows' => rows
+              }
+            end
+            v['beamInventory'] = beam_inv if beam_inv.any?
+          else
+            v.delete('beamInventory')
+          end
+
+        elsif src == 'category_total'
+          # Derived from a category's scan total × multiplier
+          src_cat = v['sourceCategory'] || v['category']
+          src_unit = v['sourceUnit'] || dunit
+          st = scan_totals[src_cat]
+          base = if st
+                   case src_unit
+                   when 'LF' then st[:lf]
+                   when 'CF' then st[:vol]
+                   else st[:sf]
+                   end
+                 else
+                   0.0
+                 end
+          new_val = (base * mult).round(2)
+          if v['computedValue'] != new_val
+            v['computedValue'] = new_val
+            dirty = true
+          end
+
+        elsif src == 'manual'
+          # Manual fixed value × multiplier
+          base = (v['manualValue'] || 0).to_f
+          new_val = (base * mult).round(2)
+          if v['computedValue'] != new_val
+            v['computedValue'] = new_val
+            dirty = true
+          end
+        end
+      end
+      # Strip transient beamInventory before persisting (it's computed, not stored)
+      if dirty
+        save_derived = {}
+        derived.each { |k, v| save_derived[k] = v.reject { |fk, _| fk == 'beamInventory' } }
+        m.set_attribute('FormAndField', 'derived_parts', JSON.generate(save_derived))
+      end
+
+      # Log what we're sending
+      puts "[FF send_meas] #{measurements.length} manual, #{derived.length} derived parts"
+      derived.each do |k, v|
+        bi = v['beamInventory']
+        bi_info = bi ? " [beamInventory: #{bi.length} types]" : ""
+        puts "  [#{k}] #{v['name']} = #{v['computedValue']} #{v['unit']} (#{v['sourceType']}, cat=#{v['category']})#{bi_info}"
+      end
+
+      # Strip :beam_items from scan_totals before serializing (used internally only)
+      clean_totals = {}
+      scan_totals.each { |k, v| clean_totals[k] = v.reject { |fk, _| fk == :beam_items } }
+
+      # Payload includes beamInventory (transient, for display only)
+      payload = { measurements: measurements, scanTotals: clean_totals, derivedParts: derived }
+      js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveMeasurements('#{esc}')")
       send_benchmark_data
