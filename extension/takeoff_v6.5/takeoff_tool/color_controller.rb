@@ -416,36 +416,47 @@ module TakeoffTool
       reg = TakeoffTool.entity_registry || {}
       return if reg.empty?
 
-      # Check if already cataloged (from a previous scan save)
+      # Check if already cataloged (v2 first, then v1)
       sample = reg.values.find { |e| e && e.valid? }
       if sample
-        existing = sample.get_attribute('TakeoffScanData', 'original_inst_mat') rescue nil
-        if existing
+        existing_v2 = sample.get_attribute('TakeoffScanData', 'original_mat_v2') rescue nil
+        existing_v1 = sample.get_attribute('TakeoffScanData', 'original_inst_mat') rescue nil
+        if existing_v2 || existing_v1
           @materials_cataloged = true
           return
         end
       end
 
+      require 'json'
       count = 0
       d = 'TakeoffScanData'
       reg.each do |eid, e|
         next unless e && e.valid?
+
+        # Instance material
         mat = e.material
-        next if mat && mat.respond_to?(:name) && mat.name.start_with?('FF_')
+        inst_name = (mat && mat.respond_to?(:name) && !mat.name.start_with?('FF_')) ? mat.display_name : ''
+        e.set_attribute(d, 'original_inst_mat', inst_name)
 
-        e.set_attribute(d, 'original_inst_mat', mat ? mat.display_name : '')
-
+        # Per-face materials (v2): store as JSON array of [index, front_name, back_name]
         defn = e.respond_to?(:definition) ? e.definition : nil
         defn ||= (e.is_a?(Sketchup::Group) ? e.entities.parent : nil)
         if defn
-          fm_tally = {}
-          defn.entities.grep(Sketchup::Face).each do |f|
+          face_data = []
+          defn.entities.grep(Sketchup::Face).each_with_index do |f, idx|
             fn = f.material
-            next if fn && fn.respond_to?(:name) && fn.name.start_with?('FF_')
-            fm_tally[fn.display_name] = (fm_tally[fn.display_name] || 0) + 1 if fn
             bn = f.back_material
-            next if bn && bn.respond_to?(:name) && bn.name.start_with?('FF_')
-            fm_tally[bn.display_name] = (fm_tally[bn.display_name] || 0) + 1 if bn
+            front_name = (fn && fn.respond_to?(:name) && !fn.name.start_with?('FF_')) ? fn.display_name : nil
+            back_name  = (bn && bn.respond_to?(:name) && !bn.name.start_with?('FF_')) ? bn.display_name : nil
+            face_data << [idx, front_name, back_name] if front_name || back_name
+          end
+          e.set_attribute(d, 'original_mat_v2', JSON.generate(face_data)) unless face_data.empty?
+
+          # Also write v1 dominant for backward compat
+          fm_tally = {}
+          face_data.each do |_, fn, bn|
+            fm_tally[fn] = (fm_tally[fn] || 0) + 1 if fn
+            fm_tally[bn] = (fm_tally[bn] || 0) + 1 if bn
           end
           dominant = fm_tally.max_by { |_, c| c }&.first || ''
           e.set_attribute(d, 'original_face_mat', dominant)
@@ -453,7 +464,7 @@ module TakeoffTool
         count += 1
       end
       @materials_cataloged = true
-      puts "CC: Cataloged original materials for #{count} entities"
+      puts "CC: Cataloged original materials (v2) for #{count} entities"
     end
 
     def self.restore_from_catalog
@@ -477,27 +488,56 @@ module TakeoffTool
           fixed += 1
         end
 
-        # Fix face materials in single-instance definitions
+        # Fix face materials — try v2 (per-face indexed) first, fall back to v1 (dominant)
         defn = e.respond_to?(:definition) ? e.definition : nil
         defn ||= (e.is_a?(Sketchup::Group) ? e.entities.parent : nil)
         next unless defn && defn.respond_to?(:instances)
         next if defn.instances.length > 1
 
-        face_mat_name = e.get_attribute(d, 'original_face_mat') rescue nil
-        next unless face_mat_name && !face_mat_name.empty?
-        face_mat = materials[face_mat_name]
-        next unless face_mat
+        v2_json = e.get_attribute(d, 'original_mat_v2') rescue nil
+        if v2_json && !v2_json.to_s.empty?
+          # v2: restore per-face by index
+          begin
+            require 'json'
+            face_data = JSON.parse(v2_json.to_s)
+            faces = defn.entities.grep(Sketchup::Face)
+            face_data.each do |entry|
+              idx, front_name, back_name = entry
+              f = faces[idx]
+              next unless f
 
-        defn.entities.grep(Sketchup::Face).each do |f|
-          fm = f.material
-          if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
-            f.material = face_mat
-            fixed += 1
+              fm = f.material
+              if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
+                f.material = (front_name && !front_name.empty?) ? materials[front_name] : nil
+                fixed += 1
+              end
+              bm = f.back_material
+              if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
+                f.back_material = (back_name && !back_name.empty?) ? materials[back_name] : nil
+                fixed += 1
+              end
+            end
+          rescue => ex
+            puts "CC: v2 restore error eid=#{eid}: #{ex.message}"
           end
-          bm = f.back_material
-          if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
-            f.back_material = face_mat
-            fixed += 1
+        else
+          # v1 fallback: apply dominant material to all FF_ faces
+          face_mat_name = e.get_attribute(d, 'original_face_mat') rescue nil
+          next unless face_mat_name && !face_mat_name.empty?
+          face_mat = materials[face_mat_name]
+          next unless face_mat
+
+          defn.entities.grep(Sketchup::Face).each do |f|
+            fm = f.material
+            if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
+              f.material = face_mat
+              fixed += 1
+            end
+            bm = f.back_material
+            if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
+              f.back_material = face_mat
+              fixed += 1
+            end
           end
         end
       end
