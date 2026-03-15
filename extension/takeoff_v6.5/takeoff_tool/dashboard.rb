@@ -110,6 +110,10 @@ module TakeoffTool
           begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           send_live_data
           send_measurement_data  # Auto-update category_scan measurements
+          if Highlighter.isolated_categories
+            Highlighter.update_entity_isolation(eid, cat)
+            nested.each { |ceid| Highlighter.update_entity_isolation(ceid, cat) } if nested.any?
+          end
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff setCategory error: #{e.message}\n  #{e.backtrace.first(3).join("\n  ")}"
@@ -701,6 +705,9 @@ module TakeoffTool
             begin; LearningSystem.capture(eids.first.to_i, first_old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           end
           send_live_data
+          if Highlighter.isolated_categories
+            all_eids.each { |eid_i| Highlighter.update_entity_isolation(eid_i, cat) }
+          end
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff bulkSetCategory error: #{e.message}"
