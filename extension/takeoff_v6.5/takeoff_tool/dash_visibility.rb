@@ -37,26 +37,32 @@ module TakeoffTool
 
       dialog.add_action_callback('isolateCategory') do |_ctx, cat_str|
         cat = cat_str.to_s
-        fsr = TakeoffTool.filtered_scan_results
-        ca = TakeoffTool.category_assignments
-        puts "Dashboard: isolateCategory cat='#{cat}' fsr=#{fsr.length} ca_keys=#{ca.keys.length} mv_view=#{TakeoffTool.active_mv_view}"
-        Highlighter.isolate_category(fsr, ca, cat)
+        puts "Dashboard: isolateCategory cat='#{cat}' fsr=#{TakeoffTool.filtered_scan_results.length} ca_keys=#{TakeoffTool.category_assignments.keys.length} mv_view=#{TakeoffTool.active_mv_view}"
+        VisibilityManager.isolate_by_category(cat, source: "scan")
       end
 
       dialog.add_action_callback('isolateTag') do |_ctx, tag_str|
-        Highlighter.isolate_tag(tag_str.to_s)
+        fsr = TakeoffTool.filtered_scan_results
+        ids = fsr.select { |r| r[:tag] == tag_str.to_s }.map { |r| r[:entity_id] }
+        VisibilityManager.isolate(ids, source: "scan")
       end
 
       dialog.add_action_callback('hideCategory') do |_ctx, cat_str|
-        Highlighter.hide_category(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
+        fsr = TakeoffTool.filtered_scan_results
+        ca = TakeoffTool.category_assignments
+        ids = fsr.select { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized') == cat_str.to_s }.map { |r| r[:entity_id] }
+        VisibilityManager.hide(ids)
       end
 
       dialog.add_action_callback('showCategory') do |_ctx, cat_str|
-        Highlighter.show_category(TakeoffTool.filtered_scan_results, TakeoffTool.category_assignments, cat_str.to_s)
+        fsr = TakeoffTool.filtered_scan_results
+        ca = TakeoffTool.category_assignments
+        ids = fsr.select { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized') == cat_str.to_s }.map { |r| r[:entity_id] }
+        VisibilityManager.show(ids)
       end
 
       dialog.add_action_callback('showAll') do |_ctx|
-        Highlighter.show_all
+        VisibilityManager.show_all
       end
 
       dialog.add_action_callback('isolateCategoryForModel') do |_ctx, json_str|
@@ -138,68 +144,13 @@ module TakeoffTool
       end
 
       dialog.add_action_callback('hideEntities') do |_ctx, ids_str|
-        m = Sketchup.active_model
-        m.start_operation('Hide', true)
-        meas_changed = false
         eids_to_hide = ids_str.to_s.split(',').map(&:to_i)
-        hide_set = Set.new(eids_to_hide)
-        scan_eid_set = Set.new((TakeoffTool.scan_results || []).map { |r| r[:entity_id] })
-        eids_to_hide.each do |id|
-          e = TakeoffTool.find_entity(id)
-          next unless e && e.valid?
-          # Route measurement entities through highlight hide
-          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
-            mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
-              e.visible = false
-            elsif mtype == 'SF'
-              Highlighter.hide_sf_measurement_faces(m, e)
-            end
-            e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
-            meas_changed = true
-          else
-            # Part groups: hide directly (children are intentionally inside)
-            is_part = (e.get_attribute('FormAndField', 'is_part') rescue nil) == true
-            unless is_part
-              # Don't hide if this entity contains scan children that should stay visible
-              # (SketchUp cascades hide to all children)
-              if e.respond_to?(:definition) && Dashboard._has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
-                next
-              end
-            end
-            e.visible = false
-          end
-        end
-        m.commit_operation
-        Dashboard.send_measurement_data if meas_changed
+        VisibilityManager.hide(eids_to_hide)
       end
 
       dialog.add_action_callback('showEntities') do |_ctx, ids_str|
-        m = Sketchup.active_model
         ids = ids_str.to_s.split(',').map(&:to_i)
-        meas_changed = false
-        m.start_operation('Show', true)
-        regular_ids = []
-        ids.each do |id|
-          e = TakeoffTool.find_entity(id)
-          next unless e && e.valid?
-          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
-            mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
-              e.visible = true
-            elsif mtype == 'SF'
-              Highlighter.show_sf_measurement_faces(m, e)
-            end
-            e.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
-            meas_changed = true
-          else
-            e.visible = true
-            regular_ids << e
-          end
-        end
-        Highlighter.ensure_ancestors_visible(regular_ids, m) if regular_ids.any?
-        m.commit_operation
-        Dashboard.send_measurement_data if meas_changed
+        VisibilityManager.show(ids)
       end
 
       dialog.add_action_callback('isolatePartGroup') do |_ctx, eid_str|
@@ -207,15 +158,8 @@ module TakeoffTool
           eid = eid_str.to_s.to_i
           e = TakeoffTool.find_entity(eid)
           next unless e && e.valid?
-          m = Sketchup.active_model
-          m.start_operation('Isolate Part', true)
-          # Hide all top-level entities except this part group
-          m.active_entities.each do |ent|
-            next unless ent.respond_to?(:visible=)
-            ent.visible = (ent.entityID == eid)
-          end
-          m.commit_operation
-          m.active_view.zoom(e)
+          VisibilityManager.isolate([eid], source: "assembly")
+          Sketchup.active_model&.active_view&.zoom(e)
           puts "[FF Parts] Isolated part group eid=#{eid}"
         rescue => ex
           puts "[FF Parts] isolatePartGroup error: #{ex.message}"
@@ -270,7 +214,7 @@ module TakeoffTool
       dialog.add_action_callback('isolateEntities') do |_ctx, ids_str|
         ids = ids_str.to_s.split(',').map(&:to_i)
         puts "Takeoff: isolateEntities #{ids.length} items"
-        Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, ids)
+        VisibilityManager.isolate(ids, source: "scan")
       end
 
       # NE review isolation: only hides/shows entities in the new entities list,
@@ -281,22 +225,8 @@ module TakeoffTool
           data = JSON.parse(json_str.to_s)
           show_ids = (data['show'] || []).map(&:to_i)
           hide_ids = (data['hide'] || []).map(&:to_i)
-          show_set = show_ids.to_set
-          hide_set = hide_ids.to_set
-          m = Sketchup.active_model; next unless m
-          m.start_operation('NE Isolate', true)
-          visible = []
-          hide_ids.each do |eid|
-            e = TakeoffTool.find_entity(eid); next unless e && e.valid?
-            e.visible = false
-          end
-          show_ids.each do |eid|
-            e = TakeoffTool.find_entity(eid); next unless e && e.valid?
-            e.visible = true
-            visible << e
-          end
-          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
-          m.commit_operation
+          VisibilityManager.hide(hide_ids) if hide_ids.any?
+          VisibilityManager.show(show_ids) if show_ids.any?
           puts "Takeoff: neIsolate show=#{show_ids.length} hide=#{hide_ids.length}"
         rescue => e
           puts "Takeoff: neIsolate error: #{e.message}"

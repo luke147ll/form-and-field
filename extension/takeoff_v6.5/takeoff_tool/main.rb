@@ -22,6 +22,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'exporter.rb')
   load File.join(PLUGIN_DIR, 'color_controller.rb')
   load File.join(PLUGIN_DIR, 'highlighter.rb')
+  load File.join(PLUGIN_DIR, 'visibility_manager.rb')
   load File.join(PLUGIN_DIR, 'measure_lf.rb')
   load File.join(PLUGIN_DIR, 'measure_sf.rb')
   load File.join(PLUGIN_DIR, 'identify_dialog.rb')
