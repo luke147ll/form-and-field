@@ -248,27 +248,27 @@ module TakeoffTool
       cs = @color_settings
       if cs.dig('entities', eid.to_s)
         hex = cs.dig('entities', eid.to_s, 'color')
-        return "FF_CC_#{hex.gsub('#','')}" if hex
+        return "FF_CC_e#{eid}_#{hex.gsub('#','')}" if hex
       end
       if sub && !sub.empty?
         sk = "#{cat}|#{sub}"
         if cs.dig('subcategories', sk)
           hex = cs.dig('subcategories', sk, 'color')
-          return "FF_CC_#{hex.gsub('#','')}" if hex
+          return "FF_CC_s_#{sk.gsub(/[^a-zA-Z0-9]/, '_')}_#{hex.gsub('#','')}" if hex
         end
       end
       if cs.dig('categories', cat)
         hex = cs.dig('categories', cat, 'color')
-        return "FF_CC_#{hex.gsub('#','')}" if hex
+        return "FF_CC_c_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}_#{hex.gsub('#','')}" if hex
       end
       if container && !container.empty?
         if cs.dig('containers', container)
           hex = cs.dig('containers', container, 'color')
-          return "FF_CC_#{hex.gsub('#','')}" if hex
+          return "FF_CC_g_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}_#{container.gsub(/[^a-zA-Z0-9]/, '_')}_#{hex.gsub('#','')}" if hex
         end
         cont_obj = (TakeoffTool.master_containers || []).find { |c| c['name'] == container }
         if cont_obj && cont_obj['color']
-          return "FF_CC_#{cont_obj['color'].gsub('#','')}"
+          return "FF_CC_g_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}_#{container.gsub(/[^a-zA-Z0-9]/, '_')}_#{cont_obj['color'].gsub('#','')}"
         end
       end
       "FF_HL_#{cat.gsub(/[^a-zA-Z0-9]/, '_')}"
@@ -668,8 +668,10 @@ module TakeoffTool
         opacity = cs.dig('containers', container, 'opacity') if container
       end
       opacity ||= DEFAULT_OPACITY
-      k = "FF_CC_#{hex.gsub('#','')}"
+      container = find_container_for_cat(cat_name)
+      k = mat_key_for(nil, cat_name, '', container)
       mat = get_or_create_material(m, k, c, opacity)
+      @level_to_mat_key["categories:#{cat_name}"] = k
 
       # Apply to all entities in this category
       n = 0
