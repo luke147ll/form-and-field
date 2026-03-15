@@ -951,4 +951,9 @@ module TakeoffTool
       HTML
     end
   end
+
+  # Subscribe to event bus — refresh ID dialog category list when categories change
+  subscribe(EVENT_CATEGORIES_CHANGED) do |_payload|
+    IdentifyDialog.send_categories if defined?(IdentifyDialog) && IdentifyDialog.respond_to?(:send_categories)
+  end
 end

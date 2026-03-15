@@ -836,4 +836,9 @@ module TakeoffTool
 
     # hp_mat removed — delegated to ColorController
   end
+
+  # Subscribe to event bus — refresh HP category list when categories change
+  subscribe(EVENT_CATEGORIES_CHANGED) do |_payload|
+    HyperParser.send_categories if defined?(HyperParser) && HyperParser.respond_to?(:send_categories)
+  end
 end

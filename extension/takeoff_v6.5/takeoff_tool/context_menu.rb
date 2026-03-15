@@ -62,6 +62,12 @@ module TakeoffTool
       end
     end
 
+    # Notify subscribers
+    entities.each do |e|
+      next unless e.respond_to?(:entityID)
+      publish(EVENT_ASSIGNMENT_CHANGED, eid: e.entityID, key: 'category', value: category)
+    end
+
     # Refresh dashboard if open
     if Dashboard.visible?
       Dashboard.send_data(filtered_scan_results, @category_assignments, @cost_code_assignments)

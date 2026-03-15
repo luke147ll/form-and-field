@@ -1,5 +1,6 @@
 module TakeoffTool
 
+  load File.join(PLUGIN_DIR, 'event_bus.rb')
   load File.join(PLUGIN_DIR, 'scanner.rb')
   load File.join(PLUGIN_DIR, 'parser.rb')
   load File.join(PLUGIN_DIR, 'cost_code_parser.rb')
@@ -257,6 +258,7 @@ module TakeoffTool
         # Recompute SF using current algorithm (cached values may be stale)
         updated = (Scanner.recalculate_sf rescue 0)
         puts "Takeoff: Scan data restored - dashboard ready#{updated > 0 ? " (#{updated} SF values refreshed)" : ''}"
+        ColorController.strip_baked_ff_materials if defined?(ColorController)
       end
       # Check for backup newer than last save (crash recovery)
       begin
@@ -460,6 +462,7 @@ module TakeoffTool
     if e && e.valid?
       begin
         e.set_attribute('TakeoffAssignments', key, value)
+        publish(EVENT_ASSIGNMENT_CHANGED, eid: eid, key: key, value: value)
       rescue => err
         puts "Takeoff: save_assignment error eid=#{eid} key=#{key}: #{err.message}"
       end
@@ -963,11 +966,7 @@ module TakeoffTool
 
   # Push updated category list to every open dialog
   def self.broadcast_category_update
-    if Dashboard.visible?
-      Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
-    end
-    HyperParser.send_categories if defined?(HyperParser) && HyperParser.respond_to?(:send_categories)
-    IdentifyDialog.send_categories if defined?(IdentifyDialog) && IdentifyDialog.respond_to?(:send_categories)
+    publish(EVENT_CATEGORIES_CHANGED)
   end
 
   # Add any scan-discovered categories not already in master list

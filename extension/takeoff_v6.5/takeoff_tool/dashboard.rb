@@ -2756,4 +2756,11 @@ module TakeoffTool
       @dialog = nil
     end
   end
+
+  # Subscribe to event bus — refresh dashboard when categories change
+  subscribe(EVENT_CATEGORIES_CHANGED) do |_payload|
+    if Dashboard.visible?
+      Dashboard.send_data(scan_results, category_assignments, cost_code_assignments)
+    end
+  end
 end
