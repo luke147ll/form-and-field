@@ -1,0 +1,223 @@
+module TakeoffTool
+  class DashOverlay
+    def self.register_callbacks(dialog)
+
+      # ═══ CAD OVERLAYS ═══
+
+      dialog.add_action_callback('importCadSheet') do |_ctx|
+        CadOverlay.import_sheet
+      end
+
+      dialog.add_action_callback('toggleCadSheet') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          show = data['show']
+          grp = CadOverlay.find_sheet_group(Sketchup.active_model, eid)
+          if grp && grp.layer
+            grp.layer.visible = !!show
+          end
+        rescue => e
+          puts "Dashboard: toggleCadSheet error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('deleteCadSheet') do |_ctx, eid_str|
+        CadOverlay.delete_sheet(eid_str.to_i)
+        Dashboard.send_cad_sheets
+      end
+
+      dialog.add_action_callback('zoomCadSheet') do |_ctx, eid_str|
+        model = Sketchup.active_model
+        grp = CadOverlay.find_sheet_group(model, eid_str.to_i)
+        if grp
+          model.selection.clear
+          model.selection.add(grp)
+          model.active_view.zoom(model.selection)
+        end
+      end
+
+      dialog.add_action_callback('alignCadSheet') do |_ctx, eid_str|
+        model = Sketchup.active_model
+        grp = CadOverlay.find_sheet_group(model, eid_str.to_i)
+        if grp
+          tool = SectionAlignTool.new(grp)
+          model.select_tool(tool)
+        end
+      end
+
+      dialog.add_action_callback('setCadCategory') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          CadOverlay.set_sheet_category(data['eid'].to_i, data['category'].to_s)
+          Dashboard.send_cad_sheets
+        rescue => e
+          puts "Dashboard: setCadCategory error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('showAllCad') do |_ctx|
+        model = Sketchup.active_model
+        model.active_entities.grep(Sketchup::Group).each do |grp|
+          next unless grp.valid? && grp.get_attribute('FF_CadOverlay', 'sheet_name')
+          grp.layer.visible = true if grp.layer
+        end
+        Dashboard.send_cad_sheets
+      end
+
+      # ═══ ELEVATION / NOTE / BENCHMARK ═══
+
+      dialog.add_action_callback('updateElevLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          new_label = data['label'].to_s.strip
+          m = Sketchup.active_model
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'ELEV'
+            m.start_operation('Update Elevation Label', true)
+            grp.set_attribute('TakeoffMeasurement', 'custom_label', new_label)
+            m.commit_operation
+            Dashboard.send_measurement_data
+          end
+        rescue => e
+          puts "Takeoff updateElevLabel error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('updateNoteText') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          new_text = data['text'].to_s.strip
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'NOTE'
+            m = Sketchup.active_model
+            m.start_operation('Update Note Text', true)
+            grp.set_attribute('TakeoffMeasurement', 'note', new_text)
+            m.commit_operation
+            Dashboard.send_measurement_data
+          end
+        rescue => e
+          puts "Takeoff updateNoteText error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('activateNote') do |_ctx|
+        TakeoffTool.activate_note_tool
+      end
+
+      dialog.add_action_callback('requestBenchmark') do |_ctx|
+        Dashboard.send_benchmark_data
+      end
+
+      dialog.add_action_callback('activateBenchmark') do |_ctx|
+        TakeoffTool.activate_benchmark_tool
+      end
+
+      dialog.add_action_callback('activateElevation') do |_ctx|
+        TakeoffTool.activate_elevation_tool
+      end
+
+      # ═══ SECTION CUTS ═══
+
+      dialog.add_action_callback('requestSectionCuts') do |_ctx|
+        Dashboard.send_section_cuts
+      end
+
+      dialog.add_action_callback('activateSectionCut') do |_ctx, name_str|
+        begin
+          name = name_str.to_s
+          puts "Dashboard: activateSectionCut '#{name}'"
+          SectionCuts.activate_cut(name)
+          Dashboard.send_section_cuts
+        rescue => e
+          puts "Dashboard: activateSectionCut error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('deactivateSectionCuts') do |_ctx|
+        begin
+          SectionCuts.deactivate_all
+          Dashboard.send_section_cuts
+        rescue => e
+          puts "Dashboard: deactivateSectionCuts error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('refreshSectionCuts') do |_ctx|
+        begin
+          SectionCuts.remove_all_planes
+          SectionCuts.cuts.clear
+          SectionCuts.build_presets
+          SectionCuts.sync_planes
+          Dashboard.send_section_cuts
+        rescue => e
+          puts "Dashboard: refreshSectionCuts error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeSectionCut') do |_ctx, name_str|
+        SectionCuts.remove_cut(name_str.to_s)
+        Dashboard.send_section_cuts
+      end
+
+      dialog.add_action_callback('addCustomSectionCut') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          label = data['label'].to_s.strip
+          z = data['z'].to_f
+          next if label.empty? || z == 0
+          SectionCuts.add_custom_cut(label, z)
+          Dashboard.send_section_cuts
+        rescue => e
+          puts "Dashboard: addCustomSectionCut error: #{e.message}"
+        end
+      end
+
+      # ═══ SCENES ═══
+
+      dialog.add_action_callback('requestScenes') do |_ctx|
+        begin
+          m = Sketchup.active_model
+          if m
+            require 'json'
+            pages = m.pages
+            scenes = pages.map { |p| { name: p.name, description: p.description.to_s } }
+            active_name = pages.selected_page ? pages.selected_page.name : ''
+            data = { scenes: scenes, active: active_name }
+            dialog.execute_script("receiveScenes(#{JSON.generate(data)})")
+          end
+        rescue => e
+          puts "Dashboard: requestScenes error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('activateScene') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          name = data['name'].to_s
+          m = Sketchup.active_model
+          if m
+            page = m.pages[name]
+            if page
+              m.pages.selected_page = page
+              puts "Dashboard: Activated scene '#{name}'"
+            else
+              puts "Dashboard: Scene '#{name}' not found"
+            end
+          end
+        rescue => e
+          puts "Dashboard: activateScene error: #{e.message}"
+        end
+      end
+
+    end
+  end
+end
