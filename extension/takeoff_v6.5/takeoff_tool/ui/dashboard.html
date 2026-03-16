@@ -1225,6 +1225,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .filter-toggle.active .toggle-pill::after{left:16px;background:var(--green)}
 .filter-spacer{flex:1}
 .item-count{font-size:10px;color:var(--overlay0);font-family:var(--font-num)}
+.ekg-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 4px;border-radius:4px;border:1px solid var(--surface1);background:var(--surface0);height:24px}
+.ekg-badge svg{width:36px;height:16px}
+.ekg-badge-trace{stroke:var(--surface2);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-dasharray:100;animation:ekgIdle 3s linear infinite}
+.ekg-badge .badge-text{font-size:9px;color:var(--green);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ekg-badge.active{border-color:rgba(166,227,161,.3);background:rgba(166,227,161,.06)}
+.ekg-badge.active .ekg-badge-trace{stroke:var(--green);filter:drop-shadow(0 0 2px rgba(166,227,161,.5));animation:ekgBadge 1s linear infinite}
+@keyframes ekgIdle{0%{stroke-dashoffset:100}100%{stroke-dashoffset:0}}
+@keyframes ekgBadge{0%{stroke-dashoffset:100}100%{stroke-dashoffset:0}}
 </style>
 </head>
 <body>
@@ -1234,6 +1242,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <span class="app-logo">&#x2B21; Form and Field</span>
   <span class="app-sub">Takeoff Report</span>
   <span style="flex:1"></span>
+  <div class="ekg-badge" id="ekgBadge">
+    <svg viewBox="0 0 36 16"><path class="ekg-badge-trace" d="M0,8 L6,8 L8,5 L10,8 L12,8 L14,1 L16,15 L18,8 L22,8 L24,5 L26,8 L28,8 L30,1 L32,15 L34,8 L36,8"/></svg>
+    <span class="badge-text" id="ekgText"></span>
+  </div>
+  <div class="sep"></div>
   <button class="t-btn primary" onclick="call('showAll');resetVis()">Show All</button>
   <button class="t-btn accent" onclick="call('highlightAll')">Highlight All</button>
   <button class="t-btn" onclick="call('clearHighlights')">Clear</button>
@@ -1780,6 +1793,18 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 </div>
 
 <script>
+function heartbeatOn(msg){
+  var b=document.getElementById('ekgBadge');
+  var t=document.getElementById('ekgText');
+  if(b)b.classList.add('active');
+  if(t)t.textContent=msg||'working...';
+}
+function heartbeatOff(){
+  var b=document.getElementById('ekgBadge');
+  var t=document.getElementById('ekgText');
+  if(b)b.classList.remove('active');
+  if(t)t.textContent='';
+}
 var D=[],CA=[],ALL_CA=[],CO=[],CAT_CCM={},F=[],MSUB={},ALL_MSUB={},CATMT={},sc='definitionName',sd=1;
 var CC_DIV_COLORS={'1':'#a6e3a1','2':'#94e2d5','3':'#89b4fa','4':'#cba6f7','5':'#fab387','6':'#f9e2af','7':'#a6adc8','8':'#585b70','9':'#f5c2e7'};
 var CC_DIV_NAMES={'1':'Site Work','2':'Foundation','3':'Rough Shell','4':'Full Enclosure','5':'Finish Trades','6':'Completion','7':'Indirect Costs','8':'Contingency','9':'Design Costs','001':'Site Work & Development'};
@@ -3991,6 +4016,7 @@ function receiveMultiverseData(json){
     if(nsEl) nsEl.style.display='none';
     if(sdPanel) sdPanel.style.display='none';
   }
+  heartbeatOff();
 }
 
 function renderMvModels(models){
@@ -5545,6 +5571,7 @@ function receiveAssemblies(json){
   try{ASMB=JSON.parse(json)||{};}catch(e){ASMB={};}
   buildAsmDD();
   renderAsmPanel();
+  heartbeatOff();
 }
 function toggleAsmPanel(){ /* no-op — tabs replaced collapsible sections */ }
 var expandedAssemblies={};
@@ -5781,6 +5808,7 @@ function receiveMeasurements(json){
   updateMeasHdrCnt();
   renderMeasPanel();
   renderNotesPanel();
+  heartbeatOff();
 }
 
 function renderMeasPanel(){
@@ -7482,11 +7510,11 @@ function switchInfoTab(tabName){
   });
   var target=document.getElementById('tab_'+tabName);
   if(target)target.classList.add('active');
-  // Request fresh data for the tab
-  if(tabName==='measurements')call('requestMeasurements');
-  else if(tabName==='assemblies')call('loadAssemblies');
+  // Request fresh data for the tab (heartbeat managed by Ruby callbacks)
+  if(tabName==='measurements'){heartbeatOn('Loading measurements...');call('requestMeasurements');}
+  else if(tabName==='assemblies'){heartbeatOn('Loading assemblies...');call('loadAssemblies');}
   else if(tabName==='notes')renderNotesPanel();
-  else if(tabName==='multiverse')call('requestMultiverseData');
+  else if(tabName==='multiverse'){heartbeatOn('Loading multiverse...');call('requestMultiverseData');}
   else if(tabName==='scenes')refreshScenes();
   else if(tabName==='cad')call('requestCadSheets');
   setTimeout(checkAllScrollFades,50);

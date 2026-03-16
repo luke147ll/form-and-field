@@ -473,6 +473,7 @@ module TakeoffTool
       reg = TakeoffTool.entity_registry || {}
       return 0 if reg.empty?
 
+      Dashboard.heartbeat_start('Restoring materials...') if defined?(Dashboard)
       materials = m.materials
       fixed = 0
       d = 'TakeoffScanData'
@@ -541,6 +542,7 @@ module TakeoffTool
           end
         end
       end
+      Dashboard.heartbeat_stop if defined?(Dashboard)
       puts "CC: Catalog restore fixed #{fixed} materials" if fixed > 0
       fixed
     end
@@ -550,6 +552,7 @@ module TakeoffTool
     def self.highlight_all(sr, ca)
       m = Sketchup.active_model
       return puts("CC: No model") unless m
+      Dashboard.heartbeat_start('Highlighting...') if defined?(Dashboard)
       @highlight_state = { mode: :all, sr: sr, ca: ca, cat: nil }
       catalog_original_materials
       deactivate_internal
@@ -599,6 +602,7 @@ module TakeoffTool
       m.commit_operation
       @highlights_active = true
       @active_mode = :highlight
+      Dashboard.heartbeat_stop if defined?(Dashboard)
       puts "CC: Done. found=#{found} colored=#{colored} missed=#{missed}"
     end
 

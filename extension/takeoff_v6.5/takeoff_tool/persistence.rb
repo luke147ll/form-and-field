@@ -129,6 +129,7 @@ module TakeoffTool
     return false unless m
     return false unless m.get_attribute('FormAndField', 'scan_version')
 
+    Dashboard.heartbeat_start('Restoring scan data...') if defined?(Dashboard)
     puts "Takeoff: Loading saved scan data..."
     @scan_results = []
     @entity_registry = {}
@@ -234,8 +235,10 @@ module TakeoffTool
     end
 
     puts "Takeoff: Loaded #{@scan_results.length} elements from saved scan data"
+    Dashboard.heartbeat_stop if defined?(Dashboard)
     true
   rescue => e
+    Dashboard.heartbeat_stop if defined?(Dashboard)
     puts "Takeoff: load_scan_from_model error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
     false
   end

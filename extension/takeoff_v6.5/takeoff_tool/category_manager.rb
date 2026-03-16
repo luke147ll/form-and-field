@@ -519,6 +519,29 @@ module TakeoffTool
       build_container_lookup
       puts "Takeoff: Auto-assigned #{added} categories to containers"
     end
+
+    # Fallback: any categories not assigned to a container go to "Other"
+    other_cont = (TakeoffTool.master_containers || []).find { |c| c['name'] == 'Other' }
+    if other_cont
+      in_cont = Set.new
+      (TakeoffTool.master_containers || []).each do |cont|
+        (cont['categories'] || []).each { |c| in_cont.add(c['name']) }
+      end
+      fallback_added = 0
+      cat_names.each do |name|
+        unless in_cont.include?(name)
+          other_cont['categories'] ||= []
+          unless other_cont['categories'].any? { |c| c['name'] == name }
+            other_cont['categories'] << { 'name' => name }
+            fallback_added += 1
+          end
+        end
+      end
+      if fallback_added > 0
+        save_master_containers
+        puts "Takeoff: #{fallback_added} orphan categories assigned to 'Other'"
+      end
+    end
   end
 
   # Remove categories with 0 entities unless user-created (custom) or essential
@@ -808,6 +831,107 @@ module TakeoffTool
       save_master_subcategories
       puts "Takeoff: Merged subcategories into master list"
     end
+  end
+
+  # ─── User Cost Codes API ───
+
+  def self.load_user_cost_codes
+    m = Sketchup.active_model
+    return nil unless m
+    json = m.get_attribute('FormAndField', 'user_cost_codes')
+    return nil unless json && !json.empty?
+    require 'json'
+    JSON.parse(json) rescue nil
+  end
+
+  def self.save_user_cost_codes(codes)
+    m = Sketchup.active_model
+    return unless m
+    require 'json'
+    m.set_attribute('FormAndField', 'user_cost_codes', JSON.generate(codes))
+  end
+
+  def self.effective_cost_codes
+    # User codes override bundled defaults
+    user = load_user_cost_codes
+    return user if user && user['codes'] && user['codes'].any?
+    # Fall back to bundled
+    require 'json'
+    path = File.join(PLUGIN_DIR, 'config', 'cost_codes.json')
+    return { 'codes' => [], 'category_to_cost_code' => {} } unless File.exist?(path)
+    JSON.parse(File.read(path))
+  rescue => e
+    puts "FF: Error loading cost codes: #{e.message}"
+    { 'codes' => [], 'category_to_cost_code' => {} }
+  end
+
+  def self.add_cost_code(code, description)
+    data = load_user_cost_codes || effective_cost_codes.dup
+    data['codes'] ||= []
+    # Don't add duplicate codes
+    return false if data['codes'].any? { |c| c['code'] == code }
+    data['codes'] << { 'code' => code, 'description' => description, 'full' => "#{code} #{description}" }
+    data['codes'].sort_by! { |c| c['code'] }
+    save_user_cost_codes(data)
+    publish(EVENT_CATEGORIES_CHANGED)
+    true
+  end
+
+  def self.remove_cost_code(code)
+    data = load_user_cost_codes
+    return false unless data && data['codes']
+    data['codes'].reject! { |c| c['code'] == code }
+    # Also remove from category mappings
+    (data['category_to_cost_code'] || {}).each do |_cat, codes|
+      codes.delete(code) if codes.is_a?(Array)
+    end
+    save_user_cost_codes(data)
+    publish(EVENT_CATEGORIES_CHANGED)
+    true
+  end
+
+  def self.set_category_cost_code(category, code)
+    data = load_user_cost_codes || effective_cost_codes.dup
+    data['category_to_cost_code'] ||= {}
+    data['category_to_cost_code'][category] = [code]
+    save_user_cost_codes(data)
+    # Also update on the container category entry
+    (master_containers || []).each do |cont|
+      (cont['categories'] || []).each do |c|
+        if c['name'] == category
+          c['code'] = code
+        end
+      end
+    end
+    save_master_containers
+    publish(EVENT_CATEGORIES_CHANGED)
+    true
+  end
+
+  def self.import_cost_codes_from_csv(path)
+    require 'csv'
+    codes = []
+    CSV.foreach(path, headers: true) do |row|
+      code = (row['code'] || row['Code'] || row[0]).to_s.strip
+      desc = (row['description'] || row['Description'] || row[1]).to_s.strip
+      next if code.empty?
+      codes << { 'code' => code, 'description' => desc, 'full' => "#{code} #{desc}" }
+    end
+    return 0 if codes.empty?
+    data = load_user_cost_codes || { 'codes' => [], 'category_to_cost_code' => {} }
+    existing = Set.new(data['codes'].map { |c| c['code'] })
+    added = 0
+    codes.each do |c|
+      unless existing.include?(c['code'])
+        data['codes'] << c
+        added += 1
+      end
+    end
+    data['codes'].sort_by! { |c| c['code'] }
+    save_user_cost_codes(data)
+    publish(EVENT_CATEGORIES_CHANGED)
+    puts "FF: Imported #{added} cost codes from CSV (#{codes.length - added} duplicates skipped)"
+    added
   end
 
 end

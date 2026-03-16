@@ -114,11 +114,13 @@ module TakeoffTool
 
       dialog.add_action_callback('showAllMeasurements') do |_ctx|
         Highlighter.show_all_measurement_highlights
+        Dashboard.invalidate_measurement_cache
         Dashboard.send_measurement_data
       end
 
       dialog.add_action_callback('hideAllMeasurements') do |_ctx|
         Highlighter.hide_all_measurement_highlights
+        Dashboard.invalidate_measurement_cache
         Dashboard.send_measurement_data
       end
 
@@ -126,6 +128,7 @@ module TakeoffTool
         begin
           eid = eid_str.to_s.to_i
           Highlighter.delete_measurement(eid)
+          Dashboard.invalidate_measurement_cache
           Dashboard.send_live_data
           Dashboard.send_measurement_data
         rescue => e
@@ -134,7 +137,10 @@ module TakeoffTool
       end
 
       dialog.add_action_callback('requestMeasurements') do |_ctx|
+        Dashboard.heartbeat_start('Loading measurements...')
+        Dashboard.invalidate_measurement_cache
         Dashboard.send_measurement_data
+        Dashboard.heartbeat_stop
       end
 
       # ── Derived Parts ──
@@ -149,6 +155,7 @@ module TakeoffTool
           id = "dp_#{Time.now.to_i}_#{rand(1000)}"
           parts[id] = data
           m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
         rescue => e
           puts "Dashboard createDerivedPart error: #{e.message}"
@@ -163,6 +170,7 @@ module TakeoffTool
           parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
           parts.delete(id_str.to_s)
           m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
         rescue => e
           puts "Dashboard deleteDerivedPart error: #{e.message}"
@@ -181,6 +189,7 @@ module TakeoffTool
             data.each { |k, v| parts[id][k] = v }
             m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
           end
+          Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
         rescue => e
           puts "Dashboard editDerivedPart error: #{e.message}"
@@ -313,6 +322,7 @@ module TakeoffTool
               'note'          => "Scanned from #{count} entities"
             }
             m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+            Dashboard.invalidate_measurement_cache
             Dashboard.send_measurement_data
           else
             dialog.execute_script("showToast('No #{unit} data found for #{cat.gsub("'","\\\\'")}','warning')")

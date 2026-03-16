@@ -112,7 +112,10 @@ module TakeoffTool
         end
         m.commit_operation
 
-        Dashboard.send_measurement_data if meas_changed && defined?(Dashboard)
+        if meas_changed && defined?(Dashboard)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        end
         TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :hide, count: ids.length)
       end
 
@@ -149,7 +152,10 @@ module TakeoffTool
         Highlighter.ensure_ancestors_visible(regular, m) if regular.any?
         m.commit_operation
 
-        Dashboard.send_measurement_data if meas_changed && defined?(Dashboard)
+        if meas_changed && defined?(Dashboard)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        end
         TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :show, count: ids.length)
       end
 

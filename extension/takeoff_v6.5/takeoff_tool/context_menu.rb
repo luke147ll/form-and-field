@@ -203,6 +203,20 @@ module TakeoffTool
 
         sub.add_separator
 
+        sub.add_item('Isolate Selected') do
+          entities = sel.to_a.select { |e| e.respond_to?(:entityID) }
+          unless entities.empty?
+            ids = entities.map(&:entityID)
+            VisibilityManager.isolate(ids, source: "selection")
+          end
+        end
+
+        sub.add_item('Show All') do
+          VisibilityManager.show_all
+        end
+
+        sub.add_separator
+
         # Set Category submenu — grouped by container, sorted alphabetically
         cat_sub = sub.add_submenu('Set Category')
         containers = TakeoffTool.master_containers || []

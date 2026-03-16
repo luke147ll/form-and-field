@@ -293,6 +293,7 @@ module TakeoffTool
     return UI.messagebox("No model open.") unless m
 
     begin
+      Dashboard.heartbeat_start('Scanning model...') if defined?(Dashboard)
       Dashboard.scan_log_start
 
       # Invalidate smart diff cache — model is changing
@@ -451,6 +452,7 @@ module TakeoffTool
           @pending_new_entities_banner = { count: new_ents.length, by_cat: by_cat }
         end
 
+        Dashboard.heartbeat_stop if defined?(Dashboard)
         open_dashboard
         # Send new entities banner after dashboard is fully loaded
         if @pending_new_entities_banner
@@ -462,6 +464,7 @@ module TakeoffTool
         end
       end
     rescue => e
+      Dashboard.heartbeat_stop if defined?(Dashboard)
       Dashboard.scan_log_end("ERROR: #{e.message}")
       puts "Takeoff run_scan error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
       UI.messagebox("Scan error: #{e.message}")

@@ -17,7 +17,9 @@ module TakeoffTool
       end
 
       dialog.add_action_callback('requestMultiverseData') do |_ctx|
+        Dashboard.heartbeat_start('Loading multiverse...')
         Dashboard.send_multiverse_data
+        Dashboard.heartbeat_stop
       end
 
       dialog.add_action_callback('rescanModelB') do |_ctx|

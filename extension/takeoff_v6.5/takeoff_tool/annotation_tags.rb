@@ -335,6 +335,7 @@ module TakeoffTool
       TakeoffTool.entity_registry[grp.entityID] = grp
       model.commit_operation
 
+      Dashboard.invalidate_measurement_cache rescue nil
       Dashboard.send_measurement_data rescue nil
       puts "AnnotationTag: #{label} at Z=#{'%.1f' % point.z}\" (#{elev_label})"
     end

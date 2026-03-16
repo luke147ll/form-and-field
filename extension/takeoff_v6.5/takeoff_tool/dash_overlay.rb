@@ -81,6 +81,7 @@ module TakeoffTool
             m.start_operation('Update Elevation Label', true)
             grp.set_attribute('TakeoffMeasurement', 'custom_label', new_label)
             m.commit_operation
+            Dashboard.invalidate_measurement_cache
             Dashboard.send_measurement_data
           end
         rescue => e
@@ -100,6 +101,7 @@ module TakeoffTool
             m.start_operation('Update Note Text', true)
             grp.set_attribute('TakeoffMeasurement', 'note', new_text)
             m.commit_operation
+            Dashboard.invalidate_measurement_cache
             Dashboard.send_measurement_data
           end
         rescue => e

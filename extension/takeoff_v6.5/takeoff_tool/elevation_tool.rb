@@ -877,6 +877,7 @@ module TakeoffTool
     TakeoffTool.entity_registry[grp.entityID] = grp
     model.commit_operation
 
+    Dashboard.invalidate_measurement_cache rescue nil
     Dashboard.send_measurement_data rescue nil
 
     puts "Takeoff Elevation: #{text} at [#{point.x.round(1)}, #{point.y.round(1)}, #{point.z.round(1)}]"

@@ -2,6 +2,8 @@ module TakeoffTool
   module Dashboard
     @dialog = nil
     @data_dirty = false   # Set true when data changes; checked on close
+    @meas_cache = nil        # cached measurement payload
+    @meas_cache_dirty = true # flag to force recompute
 
     def self.load_custom_colors
       require 'json'
@@ -56,6 +58,8 @@ module TakeoffTool
         begin
           puts "[FF Dashboard] requestData: #{TakeoffTool.scan_results.length} results, mv=#{TakeoffTool.active_mv_view || 'none'}"
           send_live_data
+          invalidate_measurement_cache
+          send_measurement_data
         rescue => e
           puts "Dashboard: requestData error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
         end
@@ -109,7 +113,8 @@ module TakeoffTool
           # Learning system: capture reclassification
           begin; LearningSystem.capture(eid, old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           send_live_data
-          send_measurement_data  # Auto-update category_scan measurements
+          invalidate_measurement_cache
+          send_measurement_data
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff setCategory error: #{e.message}\n  #{e.backtrace.first(3).join("\n  ")}"
@@ -177,6 +182,8 @@ module TakeoffTool
           Scanner.recalculate_sf if %w[sf sf_cy sf_sheets].include?(mt)
           # Resend data so dashboard shows updated measurement types
           send_live_data
+          invalidate_measurement_cache
+          send_measurement_data
         rescue => e
           puts "Takeoff setMeasurementType error: #{e.message}"
         end
@@ -315,6 +322,7 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('rescan') do |_ctx, tpl_str|
+        invalidate_measurement_cache
         tpl = tpl_str.to_s.strip
         if !tpl.empty? && defined?(CategoryTemplates)
           puts "Takeoff: Applying template '#{tpl}' before scan"
@@ -377,6 +385,8 @@ module TakeoffTool
             begin; LearningSystem.capture(eids.first.to_i, first_old_cat, cat); rescue => le; puts "Learning capture error: #{le.message}"; end
           end
           send_live_data
+          invalidate_measurement_cache
+          send_measurement_data
           TakeoffTool.trigger_backup
         rescue => e
           puts "Takeoff bulkSetCategory error: #{e.message}"
@@ -409,6 +419,51 @@ module TakeoffTool
           TakeoffTool.add_custom_category(name)
           send_live_data
           puts "Takeoff: addEmptyCategory '#{name}'"
+        end
+      end
+
+      @dialog.add_action_callback('addCostCode') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.add_cost_code(data['code'].to_s.strip, data['description'].to_s.strip)
+          send_live_data
+        rescue => e
+          puts "Takeoff addCostCode error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('removeCostCode') do |_ctx, code_str|
+        begin
+          TakeoffTool.remove_cost_code(code_str.to_s.strip)
+          send_live_data
+        rescue => e
+          puts "Takeoff removeCostCode error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('importCostCodesCSV') do |_ctx|
+        begin
+          path = UI.openpanel('Import Cost Codes CSV', '', 'CSV Files|*.csv||')
+          if path
+            count = TakeoffTool.import_cost_codes_from_csv(path)
+            send_live_data
+            safe_count = count.to_i
+            @dialog.execute_script("if(typeof showToast==='function')showToast('Imported #{safe_count} cost codes','success')") rescue nil
+          end
+        rescue => e
+          puts "Takeoff importCostCodesCSV error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('setCategoryCostCode') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.set_category_cost_code(data['category'].to_s, data['code'].to_s)
+          send_live_data
+        rescue => e
+          puts "Takeoff setCategoryCostCode error: #{e.message}"
         end
       end
 
@@ -767,6 +822,7 @@ module TakeoffTool
 
     def self.send_data(sr, ca, cca)
       return unless @dialog
+      heartbeat_start('Updating panel...')
       begin
       # Multiverse: filter to active model's entities
       mv_view = TakeoffTool.active_mv_view
@@ -776,13 +832,9 @@ module TakeoffTool
       custom_colors = load_custom_colors_for_view
       cc = []; ccm = {}
       begin
-        p = File.join(PLUGIN_DIR, 'config', 'cost_codes.json')
-        if File.exist?(p)
-          require 'json'
-          d = JSON.parse(File.read(p))
-          cc = d['codes'] || []
-          ccm = d['category_to_cost_code'] || {}
-        end
+        d = TakeoffTool.effective_cost_codes
+        cc = d['codes'] || []
+        ccm = d['category_to_cost_code'] || {}
       rescue => e
         puts "CC load err: #{e.message}"
       end
@@ -913,15 +965,31 @@ module TakeoffTool
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")
 
-      send_measurement_data
       send_assemblies
       send_parts_data
       send_multiverse_data
       send_cad_sheets
+      heartbeat_stop
 
       rescue => e
         puts "[FF Dashboard] send_data error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+        heartbeat_stop
       end
+    end
+
+    def self.invalidate_measurement_cache
+      @meas_cache_dirty = true
+    end
+
+    def self.heartbeat_start(msg = 'working...')
+      return unless @dialog && @dialog.visible?
+      safe_msg = msg.to_s.gsub("'", "\\\\'")
+      @dialog.execute_script("if(typeof heartbeatOn==='function')heartbeatOn('#{safe_msg}')") rescue nil
+    end
+
+    def self.heartbeat_stop
+      return unless @dialog && @dialog.visible?
+      @dialog.execute_script("if(typeof heartbeatOff==='function')heartbeatOff()") rescue nil
     end
 
     def self.send_measurement_data
@@ -929,6 +997,14 @@ module TakeoffTool
       require 'json'
       m = Sketchup.active_model
       return unless m
+
+      # Fast path: reuse cached payload if nothing measurement-relevant changed
+      if !@meas_cache_dirty && @meas_cache
+        @dialog.execute_script("receiveMeasurements('#{@meas_cache}')")
+        send_benchmark_data
+        send_section_cuts
+        return
+      end
 
       measurements = []
       m.entities.grep(Sketchup::Group).each do |grp|
@@ -1242,6 +1318,8 @@ module TakeoffTool
       payload = { measurements: measurements, scanTotals: clean_totals, derivedParts: derived }
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
+      @meas_cache = esc
+      @meas_cache_dirty = false
       @dialog.execute_script("receiveMeasurements('#{esc}')")
       send_benchmark_data
       send_section_cuts

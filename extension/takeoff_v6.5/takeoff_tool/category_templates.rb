@@ -73,7 +73,8 @@ module TakeoffTool
         'created' => Time.now.strftime('%Y-%m-%d %H:%M'),
         'containers' => containers,
         'rules' => rules,
-        'definition_map' => definition_map
+        'definition_map' => definition_map,
+        'cost_codes' => TakeoffTool.effective_cost_codes
       }
       path = File.join(TEMPLATES_DIR, "#{name}.json")
       File.write(path, JSON.pretty_generate(data))
@@ -224,6 +225,13 @@ module TakeoffTool
         defn_map = data['definition_map'] || {}
         @pending_definition_map = defn_map unless defn_map.empty?
         puts "Takeoff: Queued #{defn_map.length} definition mappings for post-scan" unless defn_map.empty?
+
+        # Apply cost codes from template
+        tpl_codes = data['cost_codes']
+        if tpl_codes && tpl_codes['codes'] && tpl_codes['codes'].any?
+          TakeoffTool.save_user_cost_codes(tpl_codes)
+          puts "Takeoff: Applied #{tpl_codes['codes'].length} cost codes from template"
+        end
 
         m.commit_operation
         TakeoffTool.broadcast_category_update

@@ -3,7 +3,9 @@ module TakeoffTool
     def self.register_callbacks(dialog)
 
       dialog.add_action_callback('loadAssemblies') do |_ctx|
+        Dashboard.heartbeat_start('Loading assemblies...')
         Dashboard.send_assemblies
+        Dashboard.heartbeat_stop
       end
 
       dialog.add_action_callback('createAssembly') do |_ctx, json_str|
