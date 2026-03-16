@@ -243,6 +243,13 @@ module TakeoffTool
           end
 
           reg[inst.entityID] = inst
+
+          # Skip CAD overlays and gridlines from scan processing
+          # (they're in the registry for visibility but not in scan results)
+          next if inst.is_a?(Sketchup::Group) && inst.get_attribute('FF_CadOverlay', 'sheet_name')
+          next if inst.is_a?(Sketchup::Group) && inst.get_attribute('TakeoffGridline', 'label')
+          next if inst.is_a?(Sketchup::Group) && (inst.get_attribute('TakeoffMeasurement', 'type') rescue nil) == 'GRID'
+
           prev_len = results.length
           process(inst, defn, results)
           entity_count += 1
@@ -1088,9 +1095,18 @@ module TakeoffTool
             fds.each do |fd|
               wp = fd[:xform] * fd[:face].vertices.first.position
               d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
-              d_key = d.round(0)
-              planes[d_key] ||= 0.0
-              planes[d_key] += world_face_area(fd[:face], fd[:xform])
+              # Cluster faces into planes — merge planes within 1" of each other
+              # This prevents thin elements (0.25" tile, 0.5" drywall) from double-counting
+              matched_plane = nil
+              planes.each_key do |existing_d|
+                if (existing_d - d).abs < 1.0
+                  matched_plane = existing_d
+                  break
+                end
+              end
+              pk = matched_plane || d
+              planes[pk] ||= 0.0
+              planes[pk] += world_face_area(fd[:face], fd[:xform])
             end
             matched_area += planes.values.max || 0.0
           end
@@ -1113,13 +1129,23 @@ module TakeoffTool
           fds.each do |fd|
             wp = fd[:xform] * fd[:face].vertices.first.position
             d = wn.x * wp.x + wn.y * wp.y + wn.z * wp.z
-            d_key = d.round(0)
-            planes[d_key] ||= 0.0
-            planes[d_key] += world_face_area(fd[:face], fd[:xform])
+            # Cluster faces into planes — merge planes within 1" of each other
+            matched_plane = nil
+            planes.each_key do |existing_d|
+              if (existing_d - d).abs < 1.0
+                matched_plane = existing_d
+                break
+              end
+            end
+            pk = matched_plane || d
+            planes[pk] ||= 0.0
+            planes[pk] += world_face_area(fd[:face], fd[:xform])
           end
           side_areas[nkey] = planes.values.max || 0.0
         end
       end
+
+      puts "[FF SF Debug] '#{dname}': #{face_data.length} faces, #{normal_groups.length} normals, sides: #{side_areas.map { |k, a| "#{k}=#{(a / 144.0).round(1)}SF" }.join(', ')}"
 
       dom_key = side_areas.max_by { |_k, a| a }&.first
       dom_area = side_areas[dom_key] || 0.0

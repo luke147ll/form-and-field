@@ -51,6 +51,15 @@ module TakeoffTool
 
       # Plane direction (panel dropdown — sets direction only, no position constraint)
       @plane_dir = nil      # :red, :green, or nil
+
+      # Grid 3-phase placement: :ref_start → :ref_end → :placing
+      @grid_phase     = :ref_start   # current phase
+      @grid_ref_start = nil          # Point3d — first click of reference line
+      @grid_ref_end   = nil          # Point3d — second click of reference line
+      @grid_ref_axis  = nil          # :x or :y — auto-detected perpendicular axis for grid planes
+      @grid_ref_perp  = nil          # { start: Point3d, end_pt: Point3d } — reference line data
+      @grid_z_min     = nil          # Z extent bottom (from reference line)
+      @grid_z_max     = nil          # Z extent top (from reference line)
     end
 
     def activate
@@ -103,9 +112,82 @@ module TakeoffTool
       return unless @ip.valid?
 
       pt = @constrained_pt || @ip.position
+
+      # Grid 3-phase placement
+      if @mode == 'grid_num' || @mode == 'grid_alpha'
+        case @grid_phase
+        when :ref_start
+          # Phase 1: First click — start of reference line
+          @grid_ref_start = pt.clone
+          @grid_phase = :ref_end
+          update_status
+          view.invalidate
+          return
+
+        when :ref_end
+          # Phase 2: Second click — end of reference line
+          @grid_ref_end = pt.clone
+
+          # Auto-detect axis from reference line direction
+          dx = (@grid_ref_end.x - @grid_ref_start.x).abs
+          dy = (@grid_ref_end.y - @grid_ref_start.y).abs
+
+          if dx >= dy
+            # Reference line runs mostly along X → grids perpendicular to Y
+            @grid_ref_axis = :y
+          else
+            # Reference line runs mostly along Y → grids perpendicular to X
+            @grid_ref_axis = :x
+          end
+
+          # Store reference line data for GridlineSystem
+          @grid_ref_perp = { start: @grid_ref_start, end_pt: @grid_ref_end }
+
+          # Z extents from reference line
+          @grid_z_min = [@grid_ref_start.z, @grid_ref_end.z].min
+          @grid_z_max = [@grid_ref_start.z, @grid_ref_end.z].max
+
+          @grid_phase = :placing
+          update_status
+          view.invalidate
+          return
+
+        when :placing
+          # Phase 3: Each click places a circle tag + grid plane
+          # Constrain to perpendicular axis so all labels stay in a straight line
+          if @grid_ref_axis == :x
+            # Grids perpendicular to X — user clicks along X, constrain Y and Z to reference start
+            pt = Geom::Point3d.new(pt.x, @grid_ref_start.y, @grid_ref_start.z)
+          else
+            # Grids perpendicular to Y — user clicks along Y, constrain X and Z to reference start
+            pt = Geom::Point3d.new(@grid_ref_start.x, pt.y, @grid_ref_start.z)
+          end
+
+          position = @grid_ref_axis == :x ? pt.x : pt.y
+          label = display_label
+
+          # Place the circle tag
+          place_tag(pt.clone, view)
+
+          # Create the grid plane
+          if defined?(GridlineSystem) && @grid_ref_perp
+            GridlineSystem.create_grid_plane(@grid_ref_axis, position, label, pt, @grid_ref_perp)
+          end
+
+          @last_placed = pt.clone
+          @lock_origin = pt.clone if @axis_lock
+          @counter += 1
+          @tags_placed += 1
+          update_panel
+          update_status
+          view.invalidate
+          return
+        end
+      end
+
+      # Normal placement (non-grid modes)
       place_tag(pt.clone, view)
       @last_placed = pt.clone
-      # Update lock origin to new position so next tag stays on axis
       @lock_origin = pt.clone if @axis_lock
       @counter += 1
       @tags_placed += 1
@@ -158,30 +240,52 @@ module TakeoffTool
         end
       end
 
-      # Plane direction line — shows the cut/gridline direction
-      eff_dir = @axis_lock || @plane_dir
-      if eff_dir && @ip.valid?
-        pt = @constrained_pt || @ip.position
-        # Plane direction is perpendicular to the lock axis in XY
-        plane_dir = case eff_dir
-                    when :red   then Geom::Vector3d.new(0, 1, 0)  # plane along Y
-                    when :green then Geom::Vector3d.new(1, 0, 0)  # plane along X
-                    else nil
-                    end
-        if plane_dir
-          len = 120  # inches — visible at model scale
-          p1 = pt.offset(plane_dir, -len)
-          p2 = pt.offset(plane_dir,  len)
-          clr = Sketchup::Color.new(249, 226, 175, 120)
-          view.drawing_color = clr
-          view.line_width = 1; view.line_stipple = '-'
-          view.draw(GL_LINES, p1, p2)
-          view.line_stipple = ''
+      # Grid reference line preview during :ref_end phase
+      if grid_mode? && @grid_phase == :ref_end && @grid_ref_start && @ip.valid?
+        cur = @constrained_pt || @ip.position
+        view.drawing_color = Sketchup::Color.new(137, 180, 250, 200)
+        view.line_width = 2
+        view.line_stipple = ''
+        view.draw(GL_LINES, @grid_ref_start, cur)
+        view.draw_points([@grid_ref_start], 10, 2, Sketchup::Color.new(137, 180, 250))
+        view.draw_points([cur], 10, 2, Sketchup::Color.new(137, 180, 250))
+      end
+
+      # Faint reference guide during :placing phase
+      if grid_mode? && @grid_phase == :placing && @grid_ref_start && @grid_ref_end
+        view.drawing_color = Sketchup::Color.new(137, 180, 250, 80)
+        view.line_width = 1
+        view.line_stipple = '-'
+        view.draw(GL_LINES, @grid_ref_start, @grid_ref_end)
+        view.line_stipple = ''
+        view.draw_points([@grid_ref_start, @grid_ref_end], 8, 2, Sketchup::Color.new(137, 180, 250, 80))
+      end
+
+      # Plane direction line — shows the cut/gridline direction (non-grid modes)
+      if !grid_mode?
+        eff_dir = @axis_lock || @plane_dir
+        if eff_dir && @ip.valid?
+          pt = @constrained_pt || @ip.position
+          plane_dir = case eff_dir
+                      when :red   then Geom::Vector3d.new(0, 1, 0)
+                      when :green then Geom::Vector3d.new(1, 0, 0)
+                      else nil
+                      end
+          if plane_dir
+            len = 120
+            p1 = pt.offset(plane_dir, -len)
+            p2 = pt.offset(plane_dir,  len)
+            clr = Sketchup::Color.new(249, 226, 175, 120)
+            view.drawing_color = clr
+            view.line_width = 1; view.line_stipple = '-'
+            view.draw(GL_LINES, p1, p2)
+            view.line_stipple = ''
+          end
         end
       end
 
-      # Label preview at cursor
-      if @ip.valid?
+      # Label preview at cursor (suppress during grid reference line phases)
+      if @ip.valid? && !(grid_mode? && @grid_phase != :placing)
         pt = @constrained_pt || @ip.position
         screen = view.screen_coords(pt)
         screen.y -= 25
@@ -245,6 +349,10 @@ module TakeoffTool
       end
     end
 
+    def grid_mode?
+      @mode == 'grid_num' || @mode == 'grid_alpha'
+    end
+
     def stacked_mode?
       ANNO_TAG_MODES[@mode] && ANNO_TAG_MODES[@mode][:stacked]
     end
@@ -305,8 +413,13 @@ module TakeoffTool
       end
 
       require 'json'
-      grp.set_attribute('TakeoffMeasurement', 'type', 'ELEV')
-      grp.set_attribute('TakeoffMeasurement', 'category', 'Elevation Tags')
+      if grid_mode?
+        grp.set_attribute('TakeoffMeasurement', 'type', 'GRID')
+        grp.set_attribute('TakeoffMeasurement', 'category', 'Gridlines')
+      else
+        grp.set_attribute('TakeoffMeasurement', 'type', 'ELEV')
+        grp.set_attribute('TakeoffMeasurement', 'category', 'Elevation Tags')
+      end
       grp.set_attribute('TakeoffMeasurement', 'elevation', elev || 0)
       grp.set_attribute('TakeoffMeasurement', 'elevation_label', elev_label)
       grp.set_attribute('TakeoffMeasurement', 'custom_label', label)
@@ -316,8 +429,12 @@ module TakeoffTool
       grp.set_attribute('TakeoffMeasurement', 'benchmark_name', @benchmark ? @benchmark['name'] : '')
       grp.set_attribute('TakeoffMeasurement', 'benchmark_unit', @benchmark ? @benchmark['unit'] : 'feet')
       grp.set_attribute('TakeoffMeasurement', 'point', JSON.generate([point.x.to_f, point.y.to_f, point.z.to_f]))
-      # Effective direction: arrow-key axis lock takes priority, then panel dropdown
-      eff_dir = @axis_lock || @plane_dir
+      # Effective direction: for grid modes use auto-detected axis, otherwise arrow-key / panel
+      eff_dir = if grid_mode? && @grid_ref_axis
+                  @grid_ref_axis == :x ? :red : :green
+                else
+                  @axis_lock || @plane_dir
+                end
       grp.set_attribute('TakeoffMeasurement', 'axis_lock', eff_dir ? eff_dir.to_s : '')
       # Plane angle: direction of the cut/gridline in plan view (radians from X axis)
       # Red lock → tags at different X → plane runs along Y → angle = π/2
@@ -548,6 +665,12 @@ module TakeoffTool
         if ANNO_TAG_MODES[mode]
           @mode = mode
           @prefix = ANNO_TAG_MODES[mode][:prefix]
+          # Reset grid phase when switching modes
+          @grid_phase = :ref_start
+          @grid_ref_start = nil
+          @grid_ref_end = nil
+          @grid_ref_axis = nil
+          @grid_ref_perp = nil
           load_existing_counter
           update_panel
           update_status
@@ -625,6 +748,21 @@ module TakeoffTool
     end
 
     def update_status
+      if grid_mode?
+        case @grid_phase
+        when :ref_start
+          Sketchup.status_text = "Click the START of the reference line to define gridline width and direction"
+          return
+        when :ref_end
+          Sketchup.status_text = "Click the END of the reference line to set gridline extent"
+          return
+        when :placing
+          axis_name = @grid_ref_axis == :x ? 'X' : 'Y'
+          placed = @tags_placed > 0 ? " (#{@tags_placed} placed)" : ""
+          Sketchup.status_text = "Placing gridlines perpendicular to #{axis_name}#{placed}: #{display_label} — Click to place. ESC to exit."
+          return
+        end
+      end
       placed = @tags_placed > 0 ? " (#{@tags_placed} placed)" : ""
       bmk = @benchmark ? "#{@benchmark['name']}" : "No benchmark"
       Sketchup.status_text = "Annotation Tag#{placed}: #{display_label} — Click to place. #{bmk}. ESC to exit."
@@ -759,5 +897,11 @@ module TakeoffTool
 
   def self.activate_annotation_tag_tool
     Sketchup.active_model.select_tool(AnnotationTagTool.new)
+  end
+
+  def self.activate_annotation_tag_tool_with_mode(mode)
+    tool = AnnotationTagTool.new
+    tool.instance_variable_set(:@mode, mode)
+    Sketchup.active_model.select_tool(tool)
   end
 end

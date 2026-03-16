@@ -447,7 +447,11 @@ module TakeoffTool
         lyrs.each { |l| keep_layers[l.name] = true }
       end
 
-      m.layers.each { |l| l.visible = !!keep_layers[l.name] }
+      m.layers.each do |l|
+        # Preserve CAD overlay and gridline layer visibility
+        next if l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines'
+        l.visible = !!keep_layers[l.name]
+      end
       m.commit_operation
     end
 
@@ -460,7 +464,11 @@ module TakeoffTool
       m = Sketchup.active_model; return unless m
       m.start_operation('Show All', true)
 
-      TakeoffTool.entity_registry.each_value { |e| e.visible = true if e && e.valid? }
+      TakeoffTool.entity_registry.each_value do |e|
+        next unless e && e.valid?
+        next if cad_or_grid?(e)
+        e.visible = true
+      end
       show_hierarchy(m.entities)
 
       mv_view = TakeoffTool.active_mv_view rescue nil
@@ -469,6 +477,8 @@ module TakeoffTool
           l.visible = false
         elsif mv_view == 'b' && (l.name == 'FF_Model_A')
           l.visible = false
+        elsif l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines'
+          # Leave CAD overlay and gridline layers in their current state
         else
           l.visible = true
         end
@@ -549,6 +559,18 @@ module TakeoffTool
 
     private
 
+    # Returns true for CAD overlay groups, gridline planes, and gridline circle tags.
+    # These have their own visibility controls and should not be touched by show_all/isolate.
+    def self.cad_or_grid?(e)
+      return false unless e.is_a?(Sketchup::Group)
+      return true if e.get_attribute('FF_CadOverlay', 'sheet_name')
+      return true if e.get_attribute('TakeoffGridline', 'label')
+      return true if e.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+      false
+    rescue
+      false
+    end
+
     def self.build_keep_visible_set(visible_entities)
       keep_ids = {}
       keep_layers = { 'Layer0' => true, 'Untagged' => true }
@@ -570,6 +592,7 @@ module TakeoffTool
       ents.each do |e|
         next unless e.valid?
         if e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          next if cad_or_grid?(e)
           e.visible = true unless e.visible?
           defn = e.respond_to?(:definition) ? e.definition : nil
           show_hierarchy(defn.entities) if defn

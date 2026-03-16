@@ -43,6 +43,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'smart_diff.rb')
   load File.join(PLUGIN_DIR, 'category_templates.rb')
   load File.join(PLUGIN_DIR, 'section_cuts.rb')
+  load File.join(PLUGIN_DIR, 'gridline_system.rb')
   load File.join(PLUGIN_DIR, 'flatten_pass.rb')
   load File.join(PLUGIN_DIR, 'annotation_tags.rb')
   load File.join(PLUGIN_DIR, 'cad_overlay.rb')

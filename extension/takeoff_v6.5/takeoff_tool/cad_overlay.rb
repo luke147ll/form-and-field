@@ -235,22 +235,23 @@ module TakeoffTool
     # ═══════════════════════════════════════════════════════════════
 
     def self.detect_category(sheet_name, sheet_type)
+      # User's explicit selection takes priority
+      return 'plans'    if sheet_type == 'plan'
+      return 'sections' if sheet_type == 'section'
+
+      # Fallback: guess from sheet name when no type provided
       n = sheet_name
-      # Keyword matches (strongest signals)
       return 'details'    if n =~ /\bdetail/i
       return 'sections'   if n =~ /\bsection/i
       return 'elevations' if n =~ /\belevation/i
       return 'site'       if n =~ /\bsite\b/i
       return 'structural' if n =~ /\bstruct/i || n =~ /\bfram/i || n =~ /\bfoundation/i
-      # Sheet number prefix (A4-x → sections, A2-x → elevations, etc.)
       return 'details'    if n =~ /\bA5[\s\-\.]/i
       return 'sections'   if n =~ /\bA4[\s\-\.]/i
       return 'elevations' if n =~ /\bA2[\s\-\.]/i
       return 'site'       if n =~ /\bC\d[\s\-\.]/i
       return 'structural' if n =~ /\bS\d[\s\-\.]/i
-      # sheet_type fallback
-      return 'sections'   if sheet_type == 'section'
-      return 'plans'  # default
+      'plans'  # default
     end
 
     def self.set_sheet_category(eid, category)

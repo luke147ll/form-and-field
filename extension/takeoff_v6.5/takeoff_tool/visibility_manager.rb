@@ -161,20 +161,32 @@ module TakeoffTool
 
       # ── show_all ──
       # Clears all isolation/hide state and shows everything.
-      # Respects multiverse layer state.
+      # Respects multiverse layer state. Preserves CAD overlay and gridline visibility.
       def show_all
         m = Sketchup.active_model; return unless m
 
         m.start_operation('Show All', true)
 
-        TakeoffTool.entity_registry.each_value { |e| e.visible = true if e && e.valid? }
-        Highlighter.show_hierarchy(m.entities)
+        # Show all scan entities — skip CAD overlays and gridlines
+        TakeoffTool.entity_registry.each_value do |e|
+          next unless e && e.valid?
+          next if cad_or_grid?(e)
+          e.visible = true
+        end
+
+        # Show hierarchy for scan entities only — skip CAD/grid groups
+        show_scan_hierarchy(m.entities)
 
         mv_view = TakeoffTool.active_mv_view rescue nil
         m.layers.each do |l|
-          if mv_view == 'a' && l.name == 'FF_Model_B'
+          name = l.name
+          # Skip CAD and gridline layers — they manage their own visibility
+          next if name.start_with?('FF_CAD_')
+          next if name == 'FF_Gridlines'
+          next if name == 'FF_Elevation_Tags'
+          if mv_view == 'a' && name == 'FF_Model_B'
             l.visible = false
-          elsif mv_view == 'b' && l.name == 'FF_Model_A'
+          elsif mv_view == 'b' && name == 'FF_Model_A'
             l.visible = false
           else
             l.visible = true
@@ -252,6 +264,32 @@ module TakeoffTool
         @isolated_entity_ids = Set.new
         @hidden_entity_ids = Set.new
         @isolated_categories = nil
+      end
+
+      private
+
+      # Returns true for CAD overlay groups, gridline planes, and gridline circle tags.
+      # These have their own visibility controls and should not be touched by show_all/isolate.
+      def cad_or_grid?(e)
+        return false unless e.is_a?(Sketchup::Group)
+        return true if e.get_attribute('FF_CadOverlay', 'sheet_name')
+        return true if e.get_attribute('TakeoffGridline', 'label')
+        return true if e.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+        false
+      rescue
+        false
+      end
+
+      # Like Highlighter.show_hierarchy but skips CAD/grid groups
+      def show_scan_hierarchy(ents)
+        ents.each do |e|
+          next unless e.valid?
+          next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          next if cad_or_grid?(e)
+          e.visible = true unless e.visible?
+          defn = e.respond_to?(:definition) ? e.definition : nil
+          show_scan_hierarchy(defn.entities) if defn
+        end
       end
     end
   end

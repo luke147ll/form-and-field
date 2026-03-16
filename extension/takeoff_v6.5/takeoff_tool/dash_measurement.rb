@@ -373,6 +373,40 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('editSFFaces') do |_ctx, cat_str|
+        begin
+          cat = cat_str.to_s
+          # Paint debug visualization first so measured faces show green
+          Scanner.debug_area_category(cat) rescue nil
+          # Activate the edit tool
+          TakeoffTool.activate_edit_sf(cat)
+        rescue => e
+          puts "editSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('adjustEntitySF') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          factor = (data['factor'] || 0.5).to_f
+          sr = TakeoffTool.scan_results
+          sr.each do |r|
+            if r[:entity_id] == eid
+              old_sf = r[:area_sf] || 0
+              r[:area_sf] = (old_sf * factor).round(2)
+              puts "FF: Adjusted SF for eid=#{eid}: #{old_sf.round(2)} → #{r[:area_sf]} (x#{factor})"
+              break
+            end
+          end
+          Dashboard.invalidate_measurement_cache rescue nil
+          Dashboard.send_live_data rescue nil
+        rescue => e
+          puts "adjustEntitySF error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
     end
   end
 end

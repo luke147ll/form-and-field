@@ -182,6 +182,69 @@ module TakeoffTool
         end
       end
 
+      # ═══ GRIDLINES ═══
+
+      dialog.add_action_callback('startGridNum') do |_ctx|
+        TakeoffTool.activate_annotation_tag_tool_with_mode('grid_num')
+      end
+
+      dialog.add_action_callback('startGridAlpha') do |_ctx|
+        TakeoffTool.activate_annotation_tag_tool_with_mode('grid_alpha')
+      end
+
+      dialog.add_action_callback('createGridSet') do |_ctx, json_str|
+        require 'json'
+        data = JSON.parse(json_str.to_s)
+        axis = data['axis'] == 'x' ? :x : :y
+        start_in = (data['start'] || 0).to_f * 12.0
+        spacing_in = (data['spacing'] || 10).to_f * 12.0
+        count = (data['count'] || 5).to_i
+        labels = data['labels']
+        Dashboard.heartbeat_start('Creating gridlines...') rescue nil
+        results = TakeoffTool::GridlineSystem.create_grid_set(axis, start_in, spacing_in, count, labels)
+        Dashboard.heartbeat_stop rescue nil
+        safe = JSON.generate(results).gsub('</') { '<\\/' }
+        dialog.execute_script("receiveGridResult(#{safe})") rescue nil
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('createSingleGridline') do |_ctx, json_str|
+        require 'json'
+        data = JSON.parse(json_str.to_s)
+        axis = data['axis'] == 'x' ? :x : :y
+        pos_in = (data['position'] || 0).to_f * 12.0
+        label = data['label'].to_s.strip
+        TakeoffTool::GridlineSystem.create_gridline(axis, pos_in, label) unless label.empty?
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('deleteGridline') do |_ctx, label_str|
+        TakeoffTool::GridlineSystem.delete_gridline(label_str.to_s)
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('clearAllGridlines') do |_ctx|
+        TakeoffTool::GridlineSystem.clear_all
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('listGridlines') do |_ctx|
+        require 'json'
+        grids = TakeoffTool::GridlineSystem.list_gridlines
+        safe = JSON.generate(grids).gsub('</') { '<\\/' }
+        dialog.execute_script("receiveGridlines(#{safe})") rescue nil
+      end
+
+      dialog.add_action_callback('toggleGridline') do |_ctx, eid_str|
+        TakeoffTool::GridlineSystem.toggle_gridline(eid_str.to_i)
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('toggleAllGridlines') do |_ctx|
+        TakeoffTool::GridlineSystem.toggle_all
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
       # ═══ SCENES ═══
 
       dialog.add_action_callback('requestScenes') do |_ctx|

@@ -1011,6 +1011,7 @@ module TakeoffTool
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
+        next if mtype == 'GRID'  # Gridlines are managed in CAD overlay tab, not measurements
 
         cat = grp.get_attribute('TakeoffMeasurement', 'category') || 'Custom'
         visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')

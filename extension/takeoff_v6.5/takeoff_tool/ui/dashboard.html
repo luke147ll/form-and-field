@@ -1599,6 +1599,37 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 
     <!-- CAD OVERLAYS TAB -->
     <div class="info-content" id="tab_cad">
+
+      <!-- GRIDLINE SYSTEM -->
+      <div style="border-bottom:1px solid var(--surface0)">
+        <div id="gridHdr" class="mp-toolbar" style="justify-content:space-between;align-items:center;cursor:pointer;display:none" onclick="toggleGridCol()">
+          <div style="display:flex;align-items:center;gap:6px">
+            <svg id="gridChev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--overlay1);transition:transform .15s"><polyline points="6 9 12 15 18 9"/></svg>
+            <span style="font-size:11px;font-weight:600;color:#89b4fa">Gridlines</span>
+            <span id="gridCount" style="font-size:9px;color:var(--overlay0);background:var(--surface0);padding:1px 6px;border-radius:8px"></span>
+          </div>
+          <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
+            <button id="gridVisBtn" onclick="toggleAllGridVis()" style="background:none;border:none;cursor:pointer;color:#89b4fa;font-size:14px;padding:0 4px" title="Toggle all visibility">&#9673;</button>
+          </div>
+        </div>
+        <div class="mp-toolbar" style="justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:600;color:#89b4fa">&#9783; Gridlines</span>
+          <button class="hb" onclick="showGridCreator()" style="font-size:10px;padding:2px 6px;color:#89b4fa;border-color:#89b4fa">Place Gridlines</button>
+        </div>
+        <div id="gridCreator" style="display:none;padding:8px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0)">
+          <div style="font-size:10px;color:var(--subtext0);margin-bottom:8px;line-height:1.5">
+            Click two points to set width, then click to place each gridline.
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="hb" onclick="call('startGridNum')" style="flex:1;font-size:10px;padding:4px 8px;color:#89b4fa;border-color:#89b4fa">1, 2, 3...</button>
+            <button class="hb" onclick="call('startGridAlpha')" style="flex:1;font-size:10px;padding:4px 8px;color:#a6e3a1;border-color:#a6e3a1">A, B, C...</button>
+            <button class="hb" onclick="hideGridCreator()" style="font-size:10px;padding:4px 8px">Close</button>
+          </div>
+        </div>
+        <div id="gridList" style="max-height:160px;overflow-y:auto"></div>
+        <div id="gridEmpty" style="padding:8px 14px;font-size:10px;color:var(--overlay0)">No gridlines yet.</div>
+      </div>
+
       <div class="mp-toolbar" style="justify-content:space-between;align-items:center">
         <span style="font-size:11px;font-weight:600;color:#89b4fa">CAD Overlays</span>
         <div style="display:flex;gap:6px">
@@ -6149,6 +6180,7 @@ function renderMeasPanel(){
                 h+='<span class="mr-val" style="color:'+dt.color+';margin-left:auto">'+fmtMeasVal(dVal,dUnit)+'</span>';
                 h+='</div>';
                 h+='<div class="mr-inline">';
+                if(dUnit==='SF')h+='<button class="mr-ibtn" onclick="call(\'editSFFaces\',\''+X2(dpd.category||cat2)+'\')" style="color:#89b4fa;border-color:#45475a" title="Click faces to exclude from SF total">Edit Faces</button>';
                 h+='<button class="mr-ibtn drv" onclick="showMeasAddPartFrom(\''+X2(dpd.category||cat2)+'\',\''+X2(dId)+'\')" title="Create derivative from this measurement">+ Derivative</button>';
                 h+='<button class="mr-btn danger" onclick="delDerived(\''+X2(dId)+'\')" title="Delete">'+MSVG.trash+'</button>';
                 h+='</div>';
@@ -7516,8 +7548,89 @@ function switchInfoTab(tabName){
   else if(tabName==='notes')renderNotesPanel();
   else if(tabName==='multiverse'){heartbeatOn('Loading multiverse...');call('requestMultiverseData');}
   else if(tabName==='scenes')refreshScenes();
-  else if(tabName==='cad')call('requestCadSheets');
+  else if(tabName==='cad'){call('requestCadSheets');refreshGridlines();}
   setTimeout(checkAllScrollFades,50);
+}
+
+/* ═══ GRIDLINE SYSTEM ═══ */
+var GRIDLINES=[];
+var GRID_COLLAPSED=false;
+
+function showGridCreator(){document.getElementById('gridCreator').style.display='';}
+function hideGridCreator(){document.getElementById('gridCreator').style.display='none';}
+
+function refreshGridlines(){call('listGridlines');}
+
+function receiveGridlines(json){
+  try{GRIDLINES=typeof json==='string'?JSON.parse(json):json;}catch(e){GRIDLINES=[];}
+  renderGridlines();
+}
+
+function receiveGridResult(json){
+  refreshGridlines();
+}
+
+function renderGridlines(){
+  var el=document.getElementById('gridList'),emp=document.getElementById('gridEmpty');
+  var hdr=document.getElementById('gridHdr');
+  if(!GRIDLINES||!GRIDLINES.length){
+    el.innerHTML='';emp.style.display='';
+    if(hdr)hdr.style.display='none';
+    return;
+  }
+  emp.style.display='none';
+  if(hdr)hdr.style.display='';
+
+  // Update header count
+  var cnt=document.getElementById('gridCount');
+  if(cnt)cnt.textContent=GRIDLINES.length;
+
+  // Update vis toggle state
+  var anyVis=GRIDLINES.some(function(g){return g.visible!==false;});
+  var visBtn=document.getElementById('gridVisBtn');
+  if(visBtn)visBtn.style.color=anyVis?'#89b4fa':'#585b70';
+
+  if(GRID_COLLAPSED){el.innerHTML='';return;}
+
+  var h='';
+  var xGrids=[],yGrids=[];
+  for(var i=0;i<GRIDLINES.length;i++){
+    if(GRIDLINES[i].axis==='x')xGrids.push(GRIDLINES[i]);
+    else yGrids.push(GRIDLINES[i]);
+  }
+  if(xGrids.length){
+    h+='<div style="padding:2px 14px 1px;font-size:9px;color:var(--overlay0);font-weight:600">NUMBERED</div>';
+    for(var i=0;i<xGrids.length;i++)h+=gridRowHtml(xGrids[i]);
+  }
+  if(yGrids.length){
+    h+='<div style="padding:2px 14px 1px;font-size:9px;color:var(--overlay0);font-weight:600">LETTERED</div>';
+    for(var i=0;i<yGrids.length;i++)h+=gridRowHtml(yGrids[i]);
+  }
+  h+='<div style="padding:4px 14px 6px;display:flex;justify-content:flex-end">';
+  h+='<button class="hb" onclick="call(\'clearAllGridlines\');refreshGridlines()" style="font-size:9px;padding:2px 6px;color:#f38ba8;border-color:#45475a">Clear All Gridlines</button>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+function gridRowHtml(g){
+  var vis=g.visible!==false;
+  return '<div style="display:flex;align-items:center;padding:2px 14px;gap:6px;font-size:10px">'
+    +'<button onclick="call(\'toggleGridline\',\''+g.eid+'\')" style="background:none;border:none;cursor:pointer;color:'+(vis?'#89b4fa':'#585b70')+';font-size:12px;width:16px;padding:0" title="Toggle">'+(vis?'\u25C9':'\u25CB')+'</button>'
+    +'<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#89b4fa;color:#1e1e2e;font-size:9px;font-weight:700">'+X(g.label)+'</span>'
+    +'<span style="flex:1;color:var(--subtext0);font-family:var(--font-num)">'+g.position_ft+' ft</span>'
+    +'<button onclick="call(\'deleteGridline\',\''+X2(g.label)+'\')" style="background:none;border:none;cursor:pointer;color:#585b70;font-size:10px;padding:0" title="Delete">\u2715</button>'
+    +'</div>';
+}
+
+function toggleGridCol(){
+  GRID_COLLAPSED=!GRID_COLLAPSED;
+  var chev=document.getElementById('gridChev');
+  if(chev)chev.style.transform=GRID_COLLAPSED?'rotate(-90deg)':'';
+  renderGridlines();
+}
+
+function toggleAllGridVis(){
+  call('toggleAllGridlines');
 }
 
 /* ═══ SCENES PANEL ═══ */

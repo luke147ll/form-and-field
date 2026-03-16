@@ -773,4 +773,153 @@ module TakeoffTool
   def self.activate_normal_sample_tool(cat)
     Sketchup.active_model.select_tool(NormalSampleTool.new(cat))
   end
+
+  # ═══════════════════════════════════════════════════════════
+  #  Edit SF Tool — click green (measured) faces to exclude
+  #  them from an auto SF calculation. Works on the debug
+  #  visualization painted by Scanner.debug_area_category.
+  # ═══════════════════════════════════════════════════════════
+
+  class EditSFTool
+    def initialize(category)
+      @category = category
+      @ip = Sketchup::InputPoint.new
+      @hover_face = nil
+      @hover_xform = nil
+      @excluded = []
+      @original_total = 0.0
+      @removed_sf = 0.0
+    end
+
+    def activate
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      @original_total = 0.0
+      sr.each do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
+        next unless cat == @category
+        @original_total += (r[:area_sf] || 0).to_f
+      end
+      Sketchup.status_text = "Edit SF [#{@category}]: Click green faces to exclude. Total = #{'%.1f' % @original_total} SF. Escape to apply."
+    end
+
+    def deactivate(view)
+      view.invalidate
+    end
+
+    def resume(view)
+      Sketchup.status_text = "Edit SF [#{@category}]: Removed #{'%.1f' % @removed_sf} SF (#{@excluded.length} faces). #{'%.1f' % (@original_total - @removed_sf)} SF remaining. Escape to apply."
+      view.invalidate
+    end
+
+    def onMouseMove(flags, x, y, view)
+      @ip.pick(view, x, y)
+      @hover_face = nil
+      @hover_xform = nil
+      if @ip.valid? && @ip.face
+        face = @ip.face
+        mat = face.material
+        if mat && mat.name == 'FF_DEBUG_MEASURED'
+          @hover_face = face
+          @hover_xform = @ip.transformation
+          sf = face.area / 144.0
+          view.tooltip = "Click to exclude: #{'%.1f' % sf} SF"
+        end
+      end
+      view.invalidate
+    end
+
+    def onLButtonDown(flags, x, y, view)
+      return unless @hover_face && @hover_face.valid?
+
+      face = @hover_face
+      sf = face.area / 144.0
+      model = Sketchup.active_model
+
+      model.start_operation('Exclude SF Face', true)
+
+      mat_name = 'FF_DEBUG_EXCLUDED'
+      mat = model.materials[mat_name] || begin
+        m = model.materials.add(mat_name)
+        m.color = Sketchup::Color.new(200, 0, 0, 120)
+        m
+      end
+      face.material = mat
+      face.back_material = mat
+
+      model.commit_operation
+
+      @removed_sf += sf
+      @excluded << { face: face, sf: sf }
+      remaining = @original_total - @removed_sf
+
+      puts "EditSF: Excluded #{'%.1f' % sf} SF — removed #{'%.1f' % @removed_sf} SF total — remaining #{'%.1f' % remaining} SF"
+      Sketchup.status_text = "Edit SF [#{@category}]: Removed #{'%.1f' % @removed_sf} SF (#{@excluded.length} faces). #{'%.1f' % remaining} SF remaining. Escape to apply."
+
+      @hover_face = nil
+      view.invalidate
+    end
+
+    def onKeyDown(key, repeat, flags, view)
+      if key == 27 # Escape
+        apply_adjustment if @removed_sf > 0
+        Sketchup.active_model.select_tool(nil)
+      end
+      false
+    end
+
+    def onCancel(reason, view)
+      apply_adjustment if @removed_sf > 0
+      Sketchup.active_model.select_tool(nil)
+    end
+
+    def draw(view)
+      return unless @hover_face && @hover_face.valid?
+      begin
+        mesh = @hover_face.mesh(0)
+        pts = []
+        (1..mesh.count_points).each do |i|
+          pt = mesh.point_at(i)
+          pts << (@hover_xform ? @hover_xform * pt : pt)
+        end
+        return if pts.length < 3
+        view.drawing_color = Sketchup::Color.new(249, 226, 175, 100)
+        view.draw(GL_POLYGON, pts)
+      rescue
+      end
+    end
+
+    def getExtents
+      Geom::BoundingBox.new
+    end
+
+    private
+
+    def apply_adjustment
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+
+      entities_in_cat = sr.select do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
+        cat == @category && (r[:area_sf] || 0) > 0
+      end
+
+      if entities_in_cat.any? && @original_total > 0
+        factor = (@original_total - @removed_sf) / @original_total
+        entities_in_cat.each do |r|
+          r[:area_sf] = ((r[:area_sf] || 0) * factor).round(2)
+        end
+        puts "EditSF: Applied #{'%.1f' % @removed_sf} SF reduction to #{@category} (factor=#{'%.4f' % factor})"
+      end
+
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
+      puts "EditSF: #{@category} adjusted from #{'%.1f' % @original_total} to #{'%.1f' % (@original_total - @removed_sf)} SF"
+    end
+  end
+
+  def self.activate_edit_sf(category)
+    Sketchup.active_model.select_tool(EditSFTool.new(category))
+  end
 end
