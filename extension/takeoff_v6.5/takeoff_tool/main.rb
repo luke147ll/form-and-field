@@ -46,6 +46,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'gridline_system.rb')
   load File.join(PLUGIN_DIR, 'flatten_pass.rb')
   load File.join(PLUGIN_DIR, 'annotation_tags.rb')
+  load File.join(PLUGIN_DIR, 'assembly_annotations.rb')
   load File.join(PLUGIN_DIR, 'cad_overlay.rb')
 
   @scan_results ||= []
@@ -453,6 +454,7 @@ module TakeoffTool
           @pending_new_entities_banner = { count: new_ents.length, by_cat: by_cat }
         end
 
+        publish(EVENT_SCAN_COMPLETE) rescue nil
         Dashboard.heartbeat_stop if defined?(Dashboard)
         open_dashboard
         # Send new entities banner after dashboard is fully loaded

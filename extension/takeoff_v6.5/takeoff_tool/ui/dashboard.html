@@ -634,31 +634,100 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 
 /* ASSEMBLY PANEL */
 .asm-toolbar{padding:6px 12px;display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--surface0);background:var(--mantle);align-items:center;flex-shrink:0}
-.asm-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;border-bottom:1px solid #252535;cursor:pointer}
-.asm-item:hover{background:#222236}
-.asm-item.active{background:#2d2040;border-left:3px solid #cba6f7;padding-left:9px}
-.asm-name{font-weight:600;color:#cdd6f4;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.asm-cnt{color:#89b4fa;font-weight:600;font-size:11px;min-width:30px;text-align:right}
-.asm-date{color:#6c7086;font-size:10px;min-width:70px;text-align:right}
-.asm-acts{display:flex;gap:3px;align-items:center}
-.asm-acts button{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:#a6adc8}
-.asm-acts button:hover{color:#cdd6f4}
-.asm-notes{color:#6c7086;font-size:10px;font-style:italic;margin-left:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .asm-empty{padding:12px;color:#6c7086;font-size:11px;text-align:center;font-style:italic}
-/* ASSEMBLY EYE + ISOLATE */
-.asm-item .ey{margin-right:2px;flex-shrink:0}
+/* ASSEMBLY CARD */
+.asm-card{border-bottom:1px solid #252535;transition:background .15s}
+.asm-card-header{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;cursor:pointer;transition:background .15s}
+.asm-card-header:hover{background:#222236}
+.asm-card.active .asm-card-header{background:#2d2040;border-left:3px solid #cba6f7;padding-left:9px}
+.asm-card-header .ey{margin-right:2px;flex-shrink:0}
 .asm-iso{background:none;border:1px solid #45475a;border-radius:3px;cursor:pointer;padding:1px 5px;font-size:9px;color:#a6adc8;font-family:inherit;white-space:nowrap;flex-shrink:0}
 .asm-iso:hover{background:#45475a;color:#cdd6f4;border-color:#89b4fa}
-/* ASSEMBLY EXPAND ARROW + BREAKDOWN */
 .asm-expand-arrow{font-size:8px;color:#585b70;transition:transform .2s ease;flex-shrink:0;width:12px;text-align:center;cursor:pointer}
 .asm-expand-arrow.expanded{transform:rotate(90deg)}
 .asm-expand-arrow:hover{color:#a6adc8}
-.asm-breakdown{padding:4px 8px 8px 40px;border-bottom:1px solid #313244}
-.asm-bd-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.asm-name{font-weight:600;color:#cdd6f4;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asm-room-badge{background:#313244;color:#a6adc8;font-size:9px;padding:1px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.asm-entity-count{color:#89b4fa;font-weight:600;font-size:11px;min-width:30px;text-align:right;white-space:nowrap}
+.asm-part-count{color:#a6e3a1;font-size:10px;min-width:30px;text-align:right;white-space:nowrap}
+.asm-card-actions{display:flex;gap:3px;align-items:center;flex-shrink:0}
+.asm-card-actions button{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:#a6adc8}
+.asm-card-actions button:hover{color:#cdd6f4}
+/* ASSEMBLY TAG TOGGLE */
+.asm-tag-btn{background:none;border:1px solid #45475a;border-radius:3px;cursor:pointer;padding:1px 5px;font-size:9px;color:#a6adc8;font-family:inherit;white-space:nowrap;flex-shrink:0}
+.asm-tag-btn:hover{background:#45475a;color:#cdd6f4}
+.asm-tag-btn.active{border-color:#89b4fa;color:#89b4fa;background:#1e3a5f}
+/* ASSEMBLY CARD BODY */
+.asm-card-body{display:none;padding:4px 8px 8px 12px;border-top:1px solid #313244;background:#181825}
+.asm-card-body.open{display:block}
+/* PARTS TABLE */
+.asm-parts-table{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0}
+.asm-parts-table th{text-align:left;padding:3px 6px;color:#6c7086;font-weight:500;border-bottom:1px solid #313244;font-size:9px;white-space:nowrap}
+.asm-parts-table td{padding:3px 6px;border-bottom:1px solid #252535;vertical-align:middle}
+.asm-parts-table tr:hover{background:#222236}
+.asm-part-num{font-family:'JetBrains Mono',monospace;color:#89b4fa;font-weight:700;font-size:10px;white-space:nowrap}
+.asm-part-row.virtual{border-left:2px dashed #f9e2af}
+.asm-part-row.virtual .asm-part-num{color:#f9e2af}
+.asm-part-row.stale{opacity:0.5}
+.asm-part-row.stale td:first-child::after{content:' (missing)';color:#f38ba8;font-size:9px;font-style:italic}
+.asm-virt-badge{display:inline-block;background:#f9e2af;color:#1e1e2e;font-size:8px;padding:0 4px;border-radius:2px;font-weight:600;margin-left:4px;vertical-align:middle}
+.asm-beam-info{font-family:'JetBrains Mono',monospace;font-size:9px;color:#94e2d5;white-space:nowrap}
+.asm-part-acts{opacity:0;transition:opacity .15s;display:flex;gap:2px}
+.asm-parts-table tr:hover .asm-part-acts{opacity:1}
+.asm-part-acts button{background:none;border:none;cursor:pointer;padding:1px;display:inline-flex;align-items:center;color:#a6adc8;font-size:10px}
+.asm-part-acts button:hover{color:#cdd6f4}
+/* VIRTUAL PART FORM */
+.asm-vform{display:none;background:#1e1e2e;padding:8px;border-radius:4px;margin:6px 0}
+.asm-vform.open{display:block}
+.asm-vform-row{display:flex;gap:6px;margin-bottom:5px;align-items:center}
+.asm-vform input,.asm-vform select{background:#313244;border:1px solid #45475a;color:#cdd6f4;padding:3px 6px;border-radius:3px;font-size:10px;font-family:inherit}
+.asm-vform input:focus,.asm-vform select:focus{border-color:#cba6f7;outline:none}
+.asm-vform input[style*="flex"]{min-width:0}
+/* ADD BUTTONS */
+.asm-add-btn{background:none;border:1px dashed #45475a;border-radius:3px;cursor:pointer;padding:3px 8px;font-size:10px;color:#a6adc8;font-family:inherit;margin:4px 2px}
+.asm-add-btn:hover{border-color:#a6adc8;color:#cdd6f4}
+.asm-add-btn.sel{color:#a6e3a1;border-color:#a6e3a1}
+.asm-add-btn.sel:hover{background:rgba(166,227,161,0.1)}
+.asm-add-btn.virt{color:#cba6f7;border-color:#cba6f7}
+.asm-add-btn.virt:hover{background:rgba(203,166,247,0.1)}
+/* ASSEMBLY SUMMARY LINE */
+.asm-summary{font-size:10px;color:#6c7086;padding:4px 6px;border-top:1px solid #313244;margin-top:4px}
+/* ASSEMBLY BREAKDOWN (legacy, still used in card body) */
+.asm-breakdown{padding:4px 0 4px 0}
+.asm-bd-row{display:flex;align-items:center;gap:8px;padding:2px 0}
 .asm-bd-badge{font-size:10px;padding:1px 8px;border-radius:4px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .asm-bd-count{font-family:'JetBrains Mono',monospace;font-size:10px;color:#a6e3a1;min-width:32px;text-align:right}
 .asm-bd-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:#6c7086;min-width:40px;text-align:right}
 .asm-bd-empty{font-size:10px;color:#585b70;padding:4px 0;font-style:italic}
+/* ═══ PARTS LIST ═══ */
+.pl-hdr{background:#11111b;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #313244}
+.pl-hdr .pl-title{font-size:12px;font-weight:700;color:#cba6f7}
+.pl-hdr .pl-cnt{font-size:10px;color:#6c7086;background:#313244;padding:1px 6px;border-radius:8px}
+.pl-hdr .pl-acts{margin-left:auto;display:flex;gap:6px}
+.pl-cat-label{padding:4px 14px 2px;font-size:9px;font-weight:600;color:#6c7086;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #313244;background:#181825}
+.pl-tbl{width:100%;border-collapse:collapse}
+.pl-tbl th{font-size:9px;font-weight:600;color:#6c7086;text-transform:uppercase;letter-spacing:.3px;padding:3px 8px;text-align:left;border-bottom:1px solid #313244;background:#181825}
+.pl-tbl th.r{text-align:right}
+.pl-tbl td{padding:3px 8px;font-size:10px;border-bottom:1px solid rgba(49,50,68,.5);vertical-align:middle}
+.pl-tbl td.r{text-align:right;font-family:'JetBrains Mono',monospace}
+.pl-tbl tr:hover{background:rgba(137,180,250,.04)}
+.pl-sku{font-family:'JetBrains Mono',monospace;color:#89b4fa;font-size:10px;font-weight:600}
+.pl-sku-add{color:#45475a;font-style:italic;cursor:pointer;font-size:9px}
+.pl-sku-add:hover{color:#89b4fa}
+.pl-mval{font-weight:600;font-family:'JetBrains Mono',monospace}
+.pl-mval.lf{color:#fab387}
+.pl-mval.sf{color:#a6e3a1}
+.pl-mval.bf{color:#f9e2af}
+.pl-mval.cf{color:#cba6f7}
+.pl-dims{color:#7f849c;font-size:9px;font-family:'JetBrains Mono',monospace}
+.pl-totals{background:#181825;border-top:2px solid #45475a;padding:6px 14px;display:flex;gap:16px;font-size:10px}
+.pl-totals .pt{display:flex;gap:4px;align-items:center}
+.pl-totals .pt-l{color:#6c7086}
+.pl-totals .pt-v{font-weight:700;font-family:'JetBrains Mono',monospace}
+.pl-back{background:none;border:none;cursor:pointer;color:#6c7086;font-size:11px;font-family:inherit;padding:2px 4px}
+.pl-back:hover{color:#cdd6f4}
+.pl-virt-row{opacity:.8;font-style:italic}
+.pl-virt-badge{font-size:8px;color:#f9e2af;background:rgba(249,226,175,.1);border-radius:3px;padding:0 4px;margin-left:4px}
 
 /* CATPPUCCIN MODAL */
 .ff-modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center}
@@ -1522,7 +1591,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <!-- ASSEMBLIES TAB -->
     <div class="info-content" id="tab_assemblies">
       <div class="asm-toolbar">
-        <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">Create Assembly</button>
+        <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">From Visible</button>
+        <button class="hb" onclick="createAsmFromSelection()" style="color:#a6e3a1;border-color:#a6e3a1">From Selection</button>
         <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
       </div>
       <div class="sec-scroll" id="asmScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
@@ -1559,9 +1629,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
               <select id="sdCatFilter" onchange="applySmartDiffCatFilter()" style="background:#313244;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:3px 6px;font-size:10px;font-family:inherit;max-width:160px;">
                 <option value="">All Categories</option>
               </select>
-              <button onclick="sdIsolateWithCat('new_b')" style="font-size:10px;padding:2px 8px;background:#313244;color:#89b4fa;border:1px solid #89b4fa;border-radius:4px;cursor:pointer;font-family:inherit;">New in B</button>
-              <button onclick="sdIsolateWithCat('removed_a')" style="font-size:10px;padding:2px 8px;background:#313244;color:#f38ba8;border:1px solid #f38ba8;border-radius:4px;cursor:pointer;font-family:inherit;">Removed</button>
-              <button onclick="sdIsolateWithCat('changed')" style="font-size:10px;padding:2px 8px;background:#313244;color:#f9e2af;border:1px solid #f9e2af;border-radius:4px;cursor:pointer;font-family:inherit;">Changes</button>
+              <button onclick="sdIsolateWithCat('a')" style="font-size:10px;padding:2px 8px;background:#313244;color:#f38ba8;border:1px solid #f38ba8;border-radius:4px;cursor:pointer;font-family:inherit;">Only A</button>
+              <button onclick="sdIsolateWithCat('b')" style="font-size:10px;padding:2px 8px;background:#313244;color:#89b4fa;border:1px solid #89b4fa;border-radius:4px;cursor:pointer;font-family:inherit;">Only B</button>
               <button onclick="sdShowAllWithCat()" style="font-size:10px;padding:2px 8px;background:#313244;color:#a6e3a1;border:1px solid #a6e3a1;border-radius:4px;cursor:pointer;font-family:inherit;">Show All</button>
             </div>
           </div>
@@ -4105,10 +4174,10 @@ function confirmRemoveMv(){
 }
 
 /* ═══ SMART DIFF ═══ */
-var SD_COLORS={matched:'#585b70',changed:'#f9e2af',new_b:'#89b4fa',removed_a:'#f38ba8'};
-var SD_LABELS={matched:'Matched',changed:'Changed',new_b:'New in B',removed_a:'Removed from A'};
-var SD_OPACITY={matched:15,changed:50,new_b:90,removed_a:70};
-var SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
+var SD_COLORS={a:'#f38ba8',b:'#89b4fa'};
+var SD_LABELS={a:'Model A',b:'Model B'};
+var SD_OPACITY={a:70,b:70};
+var SD_VIS={a:true,b:true};
 
 function populateSDCatFilter(){
   var sel=document.getElementById('sdCatFilter');
@@ -4164,14 +4233,14 @@ function applySmartDiffCatFilter(){
   callJSON('smartDiffFilterCategory',{categories:cats});
 }
 
-function sdIsolateWithCat(state){
+function sdIsolateWithCat(key){
   var cats=getSDCatFilter();
-  callJSON('smartDiffIsolateWithCat',{state:state,categories:cats});
+  callJSON('smartDiffIsolateWithCat',{state:key,categories:cats});
 }
 
 function sdShowAllWithCat(){
   var cats=getSDCatFilter();
-  SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
+  SD_VIS={a:true,b:true};
   callJSON('smartDiffShowAllWithCat',{categories:cats});
 }
 
@@ -4186,47 +4255,47 @@ function onSmartDiffComplete(counts){
   var dt=document.getElementById('mvDiffToggle');if(dt)dt.style.display='none';
   var lbl=document.getElementById('mvLabel');if(lbl)lbl.textContent='Smart Diff Analysis';
   var h='';
-  var states=['matched','changed','new_b','removed_a'];
-  for(var i=0;i<states.length;i++){
-    var s=states[i];
-    var cnt=counts[s]||0;
-    var vis=SD_VIS[s];
-    var op=SD_OPACITY[s];
+  var models=['a','b'];
+  for(var i=0;i<models.length;i++){
+    var k=models[i];
+    var cnt=counts[k]||0;
+    var vis=SD_VIS[k];
+    var op=SD_OPACITY[k];
     h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #313244;">';
-    h+='<button class="ey'+(vis?'':' off')+'" onclick="toggleSDVis(\''+s+'\')" style="flex-shrink:0;" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
-    h+='<span style="width:10px;height:10px;border-radius:50%;background:'+SD_COLORS[s]+';flex-shrink:0;"></span>';
-    h+='<span style="color:'+SD_COLORS[s]+';font-size:12px;font-weight:600;min-width:100px;">'+SD_LABELS[s]+'</span>';
+    h+='<button class="ey'+(vis?'':' off')+'" onclick="toggleSDVis(\''+k+'\')" style="flex-shrink:0;" title="'+(vis?'Hide':'Show')+'">'+(vis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    h+='<span style="width:10px;height:10px;border-radius:50%;background:'+SD_COLORS[k]+';flex-shrink:0;"></span>';
+    h+='<span style="color:'+SD_COLORS[k]+';font-size:12px;font-weight:600;min-width:100px;">'+SD_LABELS[k]+'</span>';
     h+='<span style="color:#a6adc8;font-size:11px;min-width:40px;">'+cnt+'</span>';
-    h+='<input type="range" min="0" max="100" value="'+op+'" oninput="setSDOpacity(\''+s+'\',this.value)" style="flex:1;accent-color:'+SD_COLORS[s]+';">';
-    h+='<span id="sdOp_'+s+'" style="color:#6c7086;font-size:10px;min-width:30px;">'+op+'%</span>';
+    h+='<input type="range" min="0" max="100" value="'+op+'" oninput="setSDOpacity(\''+k+'\',this.value)" style="flex:1;accent-color:'+SD_COLORS[k]+';">';
+    h+='<span id="sdOp_'+k+'" style="color:#6c7086;font-size:10px;min-width:30px;">'+op+'%</span>';
     h+='</div>';
   }
   document.getElementById('sdRows').innerHTML=h;
 }
 
-function toggleSDVis(state){
-  SD_VIS[state]=!SD_VIS[state];
+function toggleSDVis(key){
+  SD_VIS[key]=!SD_VIS[key];
   var cats=getSDCatFilter();
-  callJSON('setSmartDiffVisibility',{state:state,visible:SD_VIS[state],categories:cats});
+  callJSON('setSmartDiffVisibility',{state:key,visible:SD_VIS[key],categories:cats});
 }
 
-function setSDOpacity(state,val){
+function setSDOpacity(key,val){
   val=parseInt(val);
-  SD_OPACITY[state]=val;
-  var el=document.getElementById('sdOp_'+state);
+  SD_OPACITY[key]=val;
+  var el=document.getElementById('sdOp_'+key);
   if(el) el.textContent=val+'%';
   var cats=getSDCatFilter();
-  callJSON('setSmartDiffOpacity',{state:state,value:val/100.0,categories:cats});
+  callJSON('setSmartDiffOpacity',{state:key,value:val/100.0,categories:cats});
 }
 
 function onSmartDiffVisUpdate(vis){
   SD_VIS=vis;
-  var states=['matched','changed','new_b','removed_a'];
-  for(var i=0;i<states.length;i++){
-    var s=states[i];
+  var models=['a','b'];
+  for(var i=0;i<models.length;i++){
+    var k=models[i];
     var rows=document.querySelectorAll('#sdRows .ey');
     if(rows[i]){
-      if(SD_VIS[s]){rows[i].classList.remove('off');rows[i].innerHTML=ICO_EYE_OPEN;}
+      if(SD_VIS[k]){rows[i].classList.remove('off');rows[i].innerHTML=ICO_EYE_OPEN;}
       else{rows[i].classList.add('off');rows[i].innerHTML=ICO_EYE_CLOSED;}
     }
   }
@@ -4234,8 +4303,8 @@ function onSmartDiffVisUpdate(vis){
 
 function onSmartDiffRemoved(){
   document.getElementById('sdResults').style.display='none';
-  SD_VIS={matched:true,changed:true,new_b:true,removed_a:true};
-  SD_OPACITY={matched:15,changed:50,new_b:90,removed_a:70};
+  SD_VIS={a:true,b:true};
+  SD_OPACITY={a:70,b:70};
   // Restore normal controls
   document.getElementById('mvToggle').style.display='';
   document.getElementById('mvExitAnalysis').style.display='none';
@@ -5566,84 +5635,187 @@ function showFFModal(opts){
   });
 }
 
-/* ═══ ASSEMBLY VISIBILITY ═══ */
-function togAsmVis(name){
-  var a=ASMB[name];if(!a)return;
+/* ═══ ASSEMBLY SYSTEM ═══ */
+var expandedAssemblies={};
+var ASM_TAGS={};
+var asmVFormOpen={};
+var ASM_PARTS_CAP=50;
+
+function togAsmVis(id){
+  var a=ASMB[id];if(!a)return;
   var ids=a.entity_ids||[];if(!ids.length)return;
   var anyVis=false;
   for(var i=0;i<ids.length;i++){if(VIS[ids[i]]!==false){anyVis=true;break;}}
   for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
   if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
-  ASMVIS[name]=!anyVis;
+  ASMVIS[id]=!anyVis;
   filt();renderAsmPanel();
 }
-function isoAsm(name){
-  var a=ASMB[name];if(!a)return;
+function togAsmPartVis(eid){
+  var vis=VIS[eid]!==false;VIS[eid]=!vis;
+  call(vis?'hideEntities':'showEntities',''+eid);
+  renderAsmPanel();
+}
+function isoAsm(id){
+  var a=ASMB[id];if(!a)return;
+  // Use VisibilityManager on the Ruby side for proper isolation
+  callJSON('isolateAssembly',{asmId:id});
+  // Update local filter state to reflect isolation
   var aIds={};var ids=a.entity_ids||[];
-  for(var k=0;k<ids.length;k++)aIds[ids[k]]=true;
-  // Set VIS: show assembly entities, hide everything else
-  var toHide=[],toShow=[];
+  for(var k=0;k<ids.length;k++){aIds[ids[k]]=true;VIS[ids[k]]=true;}
   for(var i=0;i<D.length;i++){
-    var eid=D[i].entityId,want=!!aIds[eid],cur=VIS[eid]!==false;
-    VIS[eid]=want;
-    if(want&&!cur)toShow.push(eid);
-    else if(!want&&cur)toHide.push(eid);
+    var eid=D[i].entityId;
+    if(!aIds[eid])VIS[eid]=false;
   }
-  if(toHide.length)call('hideEntities',toHide.join(','));
-  if(toShow.length)call('showEntities',toShow.join(','));
-  // Set assembly filter dropdown
   ISO_CATS=null;FISO=false;updateFisoBtn();
-  document.getElementById('fAsm').value=name;
+  document.getElementById('fAsm').value=id;
   filt();renderAsmPanel();
 }
 
-/* ═══ ASSEMBLIES ═══ */
 function receiveAssemblies(json){
   try{ASMB=JSON.parse(json)||{};}catch(e){ASMB={};}
   buildAsmDD();
   renderAsmPanel();
   heartbeatOff();
 }
-function toggleAsmPanel(){ /* no-op — tabs replaced collapsible sections */ }
-var expandedAssemblies={};
+function toggleAsmPanel(){}
+
+/* ═══ ASSEMBLY CARD RENDERING ═══ */
 function renderAsmPanel(){
+  if(PL_VIEW){renderPartsList();return;}
   var body=document.getElementById('asmBody');
-  var keys=Object.keys(ASMB).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var keys=Object.keys(ASMB).sort(function(a,b){
+    var na=(ASMB[a].name||'').toLowerCase(),nb=(ASMB[b].name||'').toLowerCase();
+    return na.localeCompare(nb);
+  });
   document.getElementById('asmCount').textContent=keys.length+' assemblies';
-  // Update tab count
   var atab=document.querySelector('.tab[data-tab="assemblies"]');
   if(atab)atab.textContent='Assemblies'+(keys.length?' ('+keys.length+')':'');
   if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Create Assembly" or right-click in viewport.</div>';return;}
   var h='';
   var fasm=document.getElementById('fAsm').value;
   for(var i=0;i<keys.length;i++){
-    var name=keys[i],a=ASMB[name],active=fasm===name?' active':'';
-    var aCnt=(a.entity_ids||[]).length;
-    var aVis=ASMVIS[name]!==false;
-    var ne=X(name).replace(/'/g,"\\'");
-    var asmCol=(CCOL.assemblies||{})[name]||'';
-    var isExp=!!expandedAssemblies[name];
-    var safeN=X(name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    h+='<div class="asm-item'+active+'" onclick="filterByAssembly(\''+ne+'\')">'+
-      '<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis(\''+ne+'\')" title="'+(aVis?'Hide':'Show')+'">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>'+
-      '<button class="asm-iso" onclick="event.stopPropagation();isoAsm(\''+ne+'\')" title="Isolate — hide everything except this assembly">Isolate</button>'+
-      buildColorDot('assembly',name,asmCol)+
-      '<span class="asm-expand-arrow'+(isExp?' expanded':'')+'" id="asmArrow_'+safeN+'" onclick="event.stopPropagation();toggleAsmBreakdown(\''+ne+'\')">&#9654;</span>'+
-      '<span class="asm-name" title="'+X(name)+'">'+X(name)+'</span>'+
-      (a.notes?'<span class="asm-notes" title="'+X(a.notes)+'">'+X(a.notes)+'</span>':'')+
-      '<span class="asm-cnt">'+aCnt+'</span>'+
-      '<span class="asm-date">'+X(a.created||'')+'</span>'+
-      '<span class="asm-acts">'+
-        '<button onclick="event.stopPropagation();renameAssemblyPrompt(\''+ne+'\');" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
-        '<button onclick="event.stopPropagation();editAssemblyNotes(\''+ne+'\');" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'+
-        '<button onclick="event.stopPropagation();deleteAssemblyConfirm(\''+ne+'\');" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
-      '</span></div>';
-    // Assembly category breakdown (collapsible)
-    h+='<div class="asm-breakdown" id="asmBreakdown_'+safeN+'" style="display:'+(isExp?'block':'none')+'">'+renderAsmBreakdown(a.breakdown)+'</div>';
+    h+=renderAsmCard(keys[i],ASMB[keys[i]],i,fasm);
   }
   body.innerHTML=h;
   setTimeout(function(){checkScrollFade('asmScroll','asmFade');},20);
 }
+
+function renderAsmCard(id,asm,idx,fasm){
+  var active=fasm===id?' active':'';
+  var aVis=ASMVIS[id]!==false;
+  var isExp=!!expandedAssemblies[id];
+  var name=asm.name||id;
+  var zone=asm.zone||'';
+  var eCnt=(asm.entity_ids||[]).length;
+  var pCnt=asm.part_count||0;
+  var tagsOn=asm.tags_visible||false;
+  var si=JSON.stringify(id);
+  var h='<div class="asm-card'+active+'" id="asmCard_'+id+'">';
+  // Header
+  h+='<div class="asm-card-header" onclick="toggleAsmCard('+si+')">';
+  h+='<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis('+si+')" title="'+(aVis?'Hide':'Show')+'">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+  h+='<button class="asm-iso" onclick="event.stopPropagation();isoAsm('+si+')" title="Isolate">Isolate</button>';
+  h+='<span class="asm-expand-arrow'+(isExp?' expanded':'')+'">&#9654;</span>';
+  h+='<span class="asm-name" ondblclick="event.stopPropagation();asmRename('+si+')" title="'+X(name)+'">'+X(name)+'</span>';
+  if(zone)h+='<span class="asm-room-badge" ondblclick="event.stopPropagation();asmSetZone('+si+')" title="Zone: '+X(zone)+'">'+X(zone)+'</span>';
+  h+='<span class="asm-entity-count">'+eCnt+' items</span>';
+  h+='<span class="asm-part-count">'+pCnt+' parts</span>';
+  h+='<div class="asm-card-actions">';
+  var ne=X2(name);
+  h+='<button onclick="event.stopPropagation();showPartsList(\''+ne+'\')" title="View Parts List" style="color:#a6e3a1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>';
+  h+='<button class="asm-tag-btn'+(tagsOn?' active':'')+'" onclick="event.stopPropagation();asmToggleTags('+si+')" title="'+(tagsOn?'Hide':'Show')+' part tags in viewport">Tags</button>';
+  h+='<button onclick="event.stopPropagation();asmExport('+si+')" title="Export CSV"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
+  h+='<button onclick="event.stopPropagation();asmRename('+si+')" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+  h+='<button onclick="event.stopPropagation();editAssemblyNotes('+si+')" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>';
+  if(!zone)h+='<button onclick="event.stopPropagation();asmSetZone('+si+')" title="Set zone/room"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>';
+  h+='<button onclick="event.stopPropagation();deleteAssemblyConfirm('+si+')" title="Delete" style="color:#f38ba8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+  h+='</div></div>';
+  // Body (collapsible)
+  h+='<div class="asm-card-body'+(isExp?' open':'')+'" id="asmBody_'+id+'">';
+  h+=renderAsmPartsTable(id,asm);
+  h+=renderAsmVForm(id);
+  h+=renderAsmSummary(asm);
+  h+='</div>';
+  h+='</div>';
+  return h;
+}
+
+/* ═══ PARTS TABLE ═══ */
+function renderAsmPartsTable(id,asm){
+  var parts=asm.parts||[];
+  if(!parts.length)return'<div class="asm-bd-empty">No parts yet — add from selection or add virtual parts.</div>';
+  var si=JSON.stringify(id);
+  var h='<table class="asm-parts-table"><thead><tr><th>Part#</th><th>Name</th><th>Category</th><th>Qty</th><th>Unit</th><th>Notes</th><th></th></tr></thead><tbody>';
+  var cap=ASM_PARTS_CAP;
+  var showAll=!!expandedAssemblies[id+'_allparts'];
+  var limit=showAll?parts.length:Math.min(parts.length,cap);
+  for(var i=0;i<limit;i++){
+    var p=parts[i];
+    var rowCls='asm-part-row';
+    if(p.is_virtual)rowCls+=' virtual';
+    if(p.stale)rowCls+=' stale';
+    if(p.beam_net_section)rowCls+=' beam';
+    var psi=JSON.stringify(p.part_num);
+    h+='<tr class="'+rowCls+'">';
+    h+='<td class="asm-part-num">'+X(p.part_num)+'</td>';
+    h+='<td>'+X(p.name||'');
+    if(p.is_virtual)h+='<span class="asm-virt-badge">VIRTUAL</span>';
+    if(p.beam_net_section)h+='<br><span class="asm-beam-info">'+X(p.beam_net_section)+(p.beam_linear_ft?' &middot; '+p.beam_linear_ft.toFixed(1)+' LF':'')+'</span>';
+    h+='</td>';
+    h+='<td>'+X(p.category||'')+'</td>';
+    h+='<td>'+p.qty+'</td>';
+    h+='<td>'+X(p.unit||'EA')+'</td>';
+    h+='<td style="color:#6c7086;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+X(p.notes||'')+'">'+X(p.notes||'')+'</td>';
+    h+='<td class="asm-part-acts">';
+    if(p.entity_id&&!p.is_virtual){var pVis=VIS[p.entity_id]!==false;h+='<button onclick="event.stopPropagation();togAsmPartVis('+p.entity_id+')" title="'+(pVis?'Hide':'Show')+' entity" style="color:'+(pVis?'#a6adc8':'#585b70')+'">'+(pVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';h+='<button onclick="event.stopPropagation();asmZoomToPart('+p.entity_id+')" title="Zoom to entity"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>';}
+    h+='<button onclick="event.stopPropagation();asmEditPart('+si+','+psi+')" title="Edit"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+    h+='<button onclick="event.stopPropagation();asmDeletePart('+si+','+psi+')" title="Delete" style="color:#f38ba8"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>';
+    h+='</td></tr>';
+  }
+  if(!showAll&&parts.length>cap){
+    h+='<tr><td colspan="7" style="text-align:center;padding:6px"><button class="asm-add-btn" onclick="event.stopPropagation();expandedAssemblies[\''+id+'_allparts\']=true;renderAsmPanel()">Show all '+parts.length+' parts ('+(parts.length-cap)+' more)</button></td></tr>';
+  }
+  h+='</tbody><tfoot><tr><td colspan="7" style="padding:4px 0">';
+  h+='<button class="asm-add-btn sel" onclick="event.stopPropagation();asmAddFromSelection('+si+')">+ From Selection</button>';
+  h+='<button class="asm-add-btn virt" onclick="event.stopPropagation();asmAddVirtualPart('+si+')">+ Virtual Part</button>';
+  h+='</td></tr></tfoot></table>';
+  return h;
+}
+
+/* ═══ VIRTUAL PART INLINE FORM ═══ */
+function renderAsmVForm(id){
+  var isOpen=!!asmVFormOpen[id];
+  var si=JSON.stringify(id);
+  var catOpts='<option value="">Select...</option>';
+  var cats=(typeof CA!=='undefined'&&CA)?CA:[];
+  for(var i=0;i<cats.length;i++){catOpts+='<option value="'+X(cats[i])+'">'+X(cats[i])+'</option>';}
+  var h='<div class="asm-vform'+(isOpen?' open':'')+'" id="asmVForm_'+id+'">';
+  h+='<div class="asm-vform-row"><input id="asmVF_name_'+id+'" placeholder="Part name..." style="flex:2"><select id="asmVF_cat_'+id+'" style="flex:1">'+catOpts+'</select></div>';
+  h+='<div class="asm-vform-row"><input id="asmVF_qty_'+id+'" type="number" value="1" min="1" style="width:50px">';
+  h+='<select id="asmVF_unit_'+id+'"><option>EA</option><option>LF</option><option>SF</option><option>CF</option><option>LS</option></select>';
+  h+='<input id="asmVF_notes_'+id+'" placeholder="Notes..." style="flex:1"></div>';
+  h+='<div class="asm-vform-row" style="justify-content:flex-end">';
+  h+='<button class="hb" style="font-size:10px;padding:3px 10px" onclick="asmVFormCancel('+si+')">Cancel</button>';
+  h+='<button class="hb" style="font-size:10px;padding:3px 10px;color:#a6e3a1;border-color:#a6e3a1" onclick="asmSaveVirtualPart('+si+')">Save</button>';
+  h+='</div></div>';
+  return h;
+}
+
+/* ═══ ASSEMBLY SUMMARY ═══ */
+function renderAsmSummary(asm){
+  var summary=asm.summary;
+  if(!summary||!Object.keys(summary).length)return'';
+  var parts=[];
+  for(var cat in summary){
+    var s=summary[cat];
+    var txt=cat+': '+s.qty+' '+((s.qty===1)?'item':'items');
+    if(s.lf)txt+=', '+s.lf.toFixed(1)+' LF';
+    parts.push(txt);
+  }
+  return'<div class="asm-summary">'+X(parts.join(' | '))+'</div>';
+}
+
 function renderAsmBreakdown(breakdown){
   if(!breakdown||!breakdown.length)return'<div class="asm-bd-empty">No items</div>';
   var h='';
@@ -5654,43 +5826,218 @@ function renderAsmBreakdown(breakdown){
     h+='<div class="asm-bd-row">'+
       '<span class="asm-bd-badge" style="background:'+bg+';color:#1e1e2e">'+X(cat)+'</span>'+
       '<span class="asm-bd-count">'+b.count+'</span>'+
-      '<span class="asm-bd-pct">'+b.percent+'%</span>'+
-      '</div>';
+      '<span class="asm-bd-pct">'+b.percent+'%</span></div>';
   }
   return h;
 }
 function getBadgeColor(cat){
-  // Use custom color if set, otherwise use category default color
   var custom=(CCOL.categories||{})[cat];
   if(custom)return custom;
   return getDefaultColor(cat);
 }
-function toggleAsmBreakdown(name){
-  var safeN=X(name).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  var bd=document.getElementById('asmBreakdown_'+safeN);
-  var arrow=document.getElementById('asmArrow_'+safeN);
-  if(!bd)return;
-  var isOpen=bd.style.display!=='none';
-  bd.style.display=isOpen?'none':'block';
-  if(arrow)arrow.classList.toggle('expanded',!isOpen);
-  if(isOpen){delete expandedAssemblies[name];}else{expandedAssemblies[name]=true;}
+
+/* ═══ ASSEMBLY INTERACTIONS ═══ */
+function toggleAsmCard(id){
+  var isOpen=!!expandedAssemblies[id];
+  if(isOpen){delete expandedAssemblies[id];}else{expandedAssemblies[id]=true;}
+  renderAsmPanel();
 }
+function asmRename(id){
+  var a=ASMB[id];if(!a)return;
+  showFFModal({
+    title:'Rename Assembly',
+    fields:[{label:'New Name',id:'name',value:a.name||''}],
+    okLabel:'Rename',
+    onOk:function(v){
+      var nv=v.name.trim();
+      if(!nv||nv===(a.name||''))return;
+      callJSON('renameAssembly',{asmId:id,newName:nv});
+    }
+  });
+}
+function asmSetZone(id){
+  var a=ASMB[id];if(!a)return;
+  showFFModal({
+    title:'Set Zone / Room',
+    fields:[{label:'Zone',id:'zone',value:a.zone||'',placeholder:'e.g. Great Room, Kitchen...'}],
+    okLabel:'Save',
+    onOk:function(v){callJSON('setAsmRoomZone',{asmId:id,zone:v.zone||''});}
+  });
+}
+function asmAddFromSelection(id){
+  callJSON('addToAssemblyFromSelection',{asmId:id});
+}
+function asmAddVirtualPart(id){
+  asmVFormOpen[id]=!asmVFormOpen[id];
+  renderAsmPanel();
+}
+function asmVFormCancel(id){
+  asmVFormOpen[id]=false;
+  renderAsmPanel();
+}
+function asmSaveVirtualPart(id){
+  var name=document.getElementById('asmVF_name_'+id);
+  var cat=document.getElementById('asmVF_cat_'+id);
+  var qty=document.getElementById('asmVF_qty_'+id);
+  var unit=document.getElementById('asmVF_unit_'+id);
+  var notes=document.getElementById('asmVF_notes_'+id);
+  if(!name||!name.value.trim()){if(name)name.style.borderColor='#f38ba8';return;}
+  callJSON('addVirtualPart',{
+    asmId:id,
+    name:name.value.trim(),
+    category:(cat?cat.value:''),
+    qty:parseInt(qty?qty.value:'1')||1,
+    unit:(unit?unit.value:'EA'),
+    notes:(notes?notes.value:'')
+  });
+  asmVFormOpen[id]=false;
+}
+function asmEditPart(asmId,partNum){
+  var a=ASMB[asmId];if(!a||!a.parts)return;
+  var part=null;
+  for(var i=0;i<a.parts.length;i++){if(a.parts[i].part_num===partNum){part=a.parts[i];break;}}
+  if(!part)return;
+  showFFModal({
+    title:'Edit Part '+partNum,
+    fields:[
+      {label:'Name',id:'name',value:part.name||''},
+      {label:'Category',id:'category',value:part.category||''},
+      {label:'Quantity',id:'quantity',value:String(part.qty||1)},
+      {label:'Unit (EA/LF/SF/CF/LS)',id:'unit',value:part.unit||'EA'},
+      {label:'Notes',id:'notes',value:part.notes||''}
+    ],
+    okLabel:'Save',
+    onOk:function(v){
+      callJSON('updateAsmPart',{asmId:asmId,partNumber:partNum,fields:{
+        name:v.name,category:v.category,quantity:parseInt(v.quantity)||1,unit:v.unit,notes:v.notes
+      }});
+    }
+  });
+}
+function asmDeletePart(asmId,partNum){
+  showFFModal({
+    title:'Delete Part',
+    message:'Delete part '+partNum+'? This cannot be undone.',
+    okLabel:'Delete',danger:true,
+    onOk:function(){callJSON('deleteAsmPart',{asmId:asmId,partNumber:partNum});}
+  });
+}
+function asmZoomToPart(entityId){
+  call('zoomToEntity',String(entityId));
+}
+function asmToggleTags(id){
+  var a=ASMB[id];if(!a)return;
+  var newState=!a.tags_visible;
+  callJSON('toggleAsmTags',{asmId:id,visible:newState});
+}
+function asmExport(id){
+  callJSON('exportAssembly',{asmId:id});
+}
+
+/* ═══ PARTS LIST VIEW ═══ */
+var PARTS_LIST=null;
+var PL_VIEW=null;
+
+function showPartsList(name){
+  PL_VIEW=name;
+  call('getPartsList',name);
+}
+function hidePartsList(){
+  PL_VIEW=null;
+  PARTS_LIST=null;
+  renderAsmPanel();
+}
+function receivePartsList(data){
+  PARTS_LIST=typeof data==='string'?JSON.parse(data):data;
+  renderPartsList();
+}
+function renderPartsList(){
+  if(!PARTS_LIST)return;
+  var d=PARTS_LIST;
+  var body=document.getElementById('asmBody');
+  var h='<div class="pl-hdr">';
+  h+='<button class="pl-back" onclick="hidePartsList()" title="Back to assemblies">&larr;</button>';
+  h+='<span class="pl-title">'+X(d.assembly)+'</span>';
+  h+='<span class="pl-cnt">'+d.entity_count+' entities &middot; '+d.line_items+' line items</span>';
+  h+='<div class="pl-acts">';
+  h+='<button class="hb" onclick="call(\'exportPartsList\',\''+X2(d.assembly)+'\')" style="font-size:9px;padding:2px 8px;color:#a6e3a1;border-color:#a6e3a1">Export CSV</button>';
+  h+='</div></div>';
+  for(var gi=0;gi<d.groups.length;gi++){
+    var grp=d.groups[gi];
+    var cc=grp.cost_code||'';
+    h+='<div class="pl-cat-label">'+X(grp.category)+(cc?' &mdash; '+X(cc):'')+'</div>';
+    h+='<table class="pl-tbl"><thead><tr>';
+    h+='<th style="width:60px">SKU</th><th>Item</th><th>Material</th><th>Size</th>';
+    h+='<th class="r">Qty</th>';
+    var hasLF=grp.items.some(function(i){return i.lf>0;});
+    var hasSF=grp.items.some(function(i){return i.sf>0;});
+    var hasBF=grp.items.some(function(i){return i.bf>0;});
+    var hasCF=grp.items.some(function(i){return i.cf>0;});
+    if(hasLF)h+='<th class="r">LF</th>';
+    if(hasSF)h+='<th class="r">SF</th>';
+    if(hasBF)h+='<th class="r">BF</th>';
+    if(hasCF)h+='<th class="r">CF</th>';
+    h+='</tr></thead><tbody>';
+    for(var ii=0;ii<grp.items.length;ii++){
+      var it=grp.items[ii];
+      var firstEid=it.eids&&it.eids.length?it.eids[0]:0;
+      var isVirt=it.is_virtual||false;
+      h+='<tr'+(isVirt?' class="pl-virt-row"':'')+'>';
+      if(isVirt){
+        h+='<td></td>';
+      } else if(it.sku){
+        h+='<td><span class="pl-sku">'+X(it.sku)+'</span></td>';
+      } else {
+        h+='<td><span class="pl-sku-add" onclick="promptSku('+firstEid+',\''+X2(d.assembly)+'\')">+ add</span></td>';
+      }
+      h+='<td>'+X(it.name);
+      if(isVirt)h+='<span class="pl-virt-badge">VIRTUAL</span>';
+      h+='</td>';
+      h+='<td style="color:#7f849c;font-size:10px">'+X(it.material)+'</td>';
+      h+='<td class="pl-dims">'+X(it.size||it.dims)+'</td>';
+      h+='<td class="r">'+it.qty+'</td>';
+      if(hasLF)h+='<td class="r">'+(it.lf>0?'<span class="pl-mval lf">'+it.lf.toFixed(1)+'</span>':'')+'</td>';
+      if(hasSF)h+='<td class="r">'+(it.sf>0?'<span class="pl-mval sf">'+it.sf.toFixed(1)+'</span>':'')+'</td>';
+      if(hasBF)h+='<td class="r">'+(it.bf>0?'<span class="pl-mval bf">'+it.bf.toFixed(1)+'</span>':'')+'</td>';
+      if(hasCF)h+='<td class="r">'+(it.cf>0?'<span class="pl-mval cf">'+it.cf.toFixed(2)+'</span>':'')+'</td>';
+      h+='</tr>';
+    }
+    h+='</tbody></table>';
+  }
+  var t=d.totals;
+  h+='<div class="pl-totals">';
+  h+='<div class="pt"><span class="pt-l">Items:</span><span class="pt-v">'+t.qty+'</span></div>';
+  if(t.lf>0)h+='<div class="pt"><span class="pt-l">LF:</span><span class="pt-v" style="color:#fab387">'+t.lf.toFixed(1)+'</span></div>';
+  if(t.sf>0)h+='<div class="pt"><span class="pt-l">SF:</span><span class="pt-v" style="color:#a6e3a1">'+t.sf.toFixed(1)+'</span></div>';
+  if(t.bf>0)h+='<div class="pt"><span class="pt-l">BF:</span><span class="pt-v" style="color:#f9e2af">'+t.bf.toFixed(1)+'</span></div>';
+  if(t.cf>0)h+='<div class="pt"><span class="pt-l">CF:</span><span class="pt-v" style="color:#cba6f7">'+t.cf.toFixed(2)+'</span></div>';
+  h+='</div>';
+  body.innerHTML=h;
+}
+function promptSku(eid,asmName){
+  var sku=prompt('Enter SKU / Part Number:');
+  if(sku!==null&&sku.trim()!==''){
+    callJSON('setDefinitionSku',{eid:eid,sku:sku.trim()});
+    setTimeout(function(){showPartsList(asmName);},300);
+  }
+}
+
+/* ═══ ASSEMBLY DROPDOWN & FILTERING ═══ */
 function buildAsmDD(){
   var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
   var keys=Object.keys(ASMB);
-  /* fAsm stays hidden — filtering happens from the assemblies tab, not the main filter bar */
   sel.style.display='none';if(lbl)lbl.style.display='none';
   if(!keys.length){sel.value='';return;}
   var prev=sel.value;
-  keys.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  keys.sort(function(a,b){return(ASMB[a].name||'').toLowerCase().localeCompare((ASMB[b].name||'').toLowerCase());});
   var h='<option value="">All</option>';
-  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(keys[i])+' ('+(a.entity_ids||[]).length+')</option>';}
+  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(a.name||keys[i])+' ('+(a.entity_ids||[]).length+')</option>';}
   sel.innerHTML=h;
   if(prev)sel.value=prev;
 }
-function filterByAssembly(name){
+function filterByAssembly(id){
   var sel=document.getElementById('fAsm');
-  sel.value=(sel.value===name)?'':name;
+  sel.value=(sel.value===id)?'':id;
   filt();
   renderAsmPanel();
 }
@@ -5699,6 +6046,7 @@ function saveFilteredAsAssembly(){
     title:'Create Assembly',
     fields:[
       {label:'Assembly Name',id:'name',value:'',placeholder:'Enter name...'},
+      {label:'Zone / Room (optional)',id:'zone',value:'',placeholder:'e.g. Great Room'},
       {label:'Notes (optional)',id:'notes',value:'',placeholder:''}
     ],
     message:'Saves all entities currently visible in the viewport',
@@ -5706,37 +6054,44 @@ function saveFilteredAsAssembly(){
     onOk:function(v){
       var nm=v.name.trim();if(!nm)return;
       log('Create Assembly: requesting visible entities from Ruby for "'+nm+'"');
-      callJSON('createAssemblyFromVisible',{name:nm,notes:v.notes||''});
+      callJSON('createAssemblyFromVisible',{name:nm,notes:v.notes||'',zone:v.zone||''});
     }
   });
 }
-function deleteAssemblyConfirm(name){
+function createAsmFromSelection(){
+  showFFModal({
+    title:'Create Assembly from Selection',
+    fields:[
+      {label:'Assembly Name',id:'name',value:'',placeholder:'Enter name...'},
+      {label:'Zone / Room (optional)',id:'zone',value:'',placeholder:'e.g. Great Room'},
+      {label:'Notes (optional)',id:'notes',value:'',placeholder:''}
+    ],
+    message:'Creates an assembly from the entities currently selected in the SketchUp viewport',
+    okLabel:'Create',
+    onOk:function(v){
+      var nm=v.name.trim();if(!nm)return;
+      log('Create Assembly from Selection: "'+nm+'"');
+      callJSON('createAssemblyFromSelection',{name:nm,notes:v.notes||'',zone:v.zone||''});
+    }
+  });
+}
+function deleteAssemblyConfirm(id){
+  var a=ASMB[id];
+  var name=a?a.name:id;
   showFFModal({
     title:'Delete Assembly',
     message:'Delete assembly "'+name+'"? This cannot be undone.',
     okLabel:'Delete',danger:true,
-    onOk:function(){call('deleteAssembly',name);}
+    onOk:function(){call('deleteAssembly',id);}
   });
 }
-function renameAssemblyPrompt(name){
+function editAssemblyNotes(id){
+  var a=ASMB[id];if(!a)return;
   showFFModal({
-    title:'Rename Assembly',
-    fields:[{label:'New Name',id:'name',value:name}],
-    okLabel:'Rename',
-    onOk:function(v){
-      var nv=v.name.trim();
-      if(!nv||nv===name)return;
-      callJSON('renameAssembly',{oldName:name,newName:nv});
-    }
-  });
-}
-function editAssemblyNotes(name){
-  var a=ASMB[name];if(!a)return;
-  showFFModal({
-    title:'Notes for "'+name+'"',
+    title:'Notes for "'+X(a.name||id)+'"',
     fields:[{label:'Notes',id:'notes',value:a.notes||''}],
     okLabel:'Save',
-    onOk:function(v){callJSON('updateAssembly',{name:name,notes:v.notes});}
+    onOk:function(v){callJSON('updateAssembly',{asmId:id,notes:v.notes});}
   });
 }
 

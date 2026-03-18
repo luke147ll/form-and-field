@@ -101,57 +101,110 @@ module TakeoffTool
             ].map{|v| ce(v.to_s)}.join(',')
           end
 
-          # ── ASSEMBLIES ──
+          # ── ASSEMBLIES (UUID-keyed with parts) ──
           assemblies = TakeoffTool.load_assemblies
           unless assemblies.empty?
             f.puts ""
             f.puts ""
             f.puts ce("ASSEMBLIES")
 
-            # Build entity lookup for quick access
-            eid_to_row = {}
-            sr.each { |r| eid_to_row[r[:entity_id]] = r }
+            assemblies.each do |asm_id, asm|
+              asm_name = asm['name'] || asm_id
+              parts = asm['parts'] || []
+              zone = asm['zone'] || ''
+              modeled = parts.count { |p| !p['is_virtual'] }
+              virtual = parts.count { |p| p['is_virtual'] }
 
-            assemblies.each do |name, asm|
               f.puts ""
-              f.puts ce("ASSEMBLY: #{name}")
-              f.puts "#{ce('Items')},#{ce(asm['count'].to_s)},#{ce('Created')},#{ce(asm['created'] || '')},#{ce('Notes')},#{ce(asm['notes'] || '')}"
-              f.puts ['Cost Code','Category','Tag','Name','Type','Function',
-                      'Material','Thickness','Size','Qty',
-                      'BF','Area SF','Linear Ft','Vol ft3','Measurement'
+              f.puts ce("ASSEMBLY: #{asm_name}")
+              zone_info = zone.empty? ? '' : "Zone: #{zone} | "
+              f.puts "#{zone_info}Items: #{modeled} modeled + #{virtual} virtual,Created: #{asm['created'] || ''},Notes: #{asm['notes'] || ''}"
+              f.puts ['Part#','Name','Category','Qty','Unit','Notes','Beam Section','Beam LF'
                      ].map{|h|ce(h)}.join(',')
 
-              asm_rows = (asm['entity_ids'] || []).map { |eid| eid_to_row[eid] }.compact
-              asm_deduped = dedup_rows(asm_rows, ca, cca)
-              asm_deduped.each do |g|
-                r = g[:r]
-                amt = Parser.measurement_for(g[:cat])
+              parts.each do |p|
                 f.puts [
-                  g[:cost_code], g[:cat], r[:tag],
-                  r[:display_name]||r[:definition_name],
-                  r[:parsed][:element_type], r[:parsed][:function],
-                  r[:parsed][:material]||r[:material], r[:parsed][:thickness],
-                  r[:parsed][:size_nominal], g[:total_qty],
-                  g[:total_bf].round(1), g[:total_area_sf].round(1),
-                  g[:total_linear_ft].round(1), g[:total_vol_ft3].round(2),
-                  amt
+                  p['part_number'], p['name'], p['category'],
+                  p['quantity'] || 1, p['unit'] || 'EA', p['notes'] || '',
+                  p['beam_net_section'] || '', p['beam_linear_ft'] ? p['beam_linear_ft'].round(1).to_s : ''
                 ].map{|v| ce(v.to_s)}.join(',')
               end
-
-              # Assembly totals
-              asm_summary = build_summary(asm_rows, ca, cca)
-              asm_summary.each do |s|
-                f.puts [ce(''), ce(s[:category]), ce(''), ce('SUBTOTAL'), ce(''), ce(''),
-                        ce(''), ce(''), ce(''), ce(s[:count].to_s),
-                        ce(''), ce(''), ce(''), ce(''), ce(s[:primary])
-                       ].join(',')
-              end
+              f.puts "SUBTOTAL: #{parts.length} parts (#{modeled} modeled#{virtual > 0 ? ", #{virtual} virtual" : ''})"
             end
           end
         end
         UI.messagebox("CSV exported:\n#{path}")
       rescue => e
         UI.messagebox("Export failed: #{e.message}")
+      end
+    end
+
+    # ─── SINGLE ASSEMBLY EXPORT ───
+
+    def self.export_assembly(asm_id)
+      assemblies = TakeoffTool.load_assemblies
+      asm = assemblies[asm_id.to_s]
+      return UI.messagebox("Assembly not found.") unless asm
+
+      asm_name = asm['name'] || asm_id
+      parts = asm['parts'] || []
+      zone = asm['zone'] || ''
+      model = Sketchup.active_model
+      model_name = model ? File.basename(model.path, '.*') : 'Untitled'
+      model_name = 'Untitled' if model_name.empty?
+      timestamp = Time.now.strftime('%Y-%m-%d_%H%M')
+      safe_name = asm_name.gsub(/[^a-zA-Z0-9_\- ]/, '').strip.gsub(/\s+/, '_')
+      default_name = "#{model_name}_Assembly_#{safe_name}_#{timestamp}.csv"
+
+      path = UI.savepanel("Export Assembly CSV", "", default_name)
+      return unless path
+      path += '.csv' unless path.end_with?('.csv')
+
+      begin
+        modeled = parts.count { |p| !p['is_virtual'] }
+        virtual = parts.count { |p| p['is_virtual'] }
+
+        File.open(path, 'w') do |f|
+          f.puts ce("ASSEMBLY: #{asm_name}")
+          zone_line = zone.empty? ? '' : "Zone: #{zone} | "
+          f.puts "#{zone_line}Items: #{modeled} modeled + #{virtual} virtual | Created: #{asm['created'] || ''}"
+          f.puts "Notes: #{asm['notes'] || ''}" unless (asm['notes'] || '').empty?
+          f.puts ""
+          f.puts ['Part#','Name','Category','Qty','Unit','Notes','Beam Section','Beam LF'
+                 ].map{|h|ce(h)}.join(',')
+
+          parts.each do |p|
+            f.puts [
+              p['part_number'], p['name'], p['category'],
+              p['quantity'] || 1, p['unit'] || 'EA', p['notes'] || '',
+              p['beam_net_section'] || '', p['beam_linear_ft'] ? p['beam_linear_ft'].round(1).to_s : ''
+            ].map{|v| ce(v.to_s)}.join(',')
+          end
+
+          f.puts ""
+          f.puts "SUBTOTAL: #{parts.length} parts (#{modeled} modeled#{virtual > 0 ? ", #{virtual} virtual" : ''})"
+
+          # Category subtotals
+          by_cat = {}
+          parts.each do |p|
+            cat = p['category'] || 'Uncategorized'
+            by_cat[cat] ||= { qty: 0, lf: 0.0 }
+            by_cat[cat][:qty] += (p['quantity'] || 1)
+            by_cat[cat][:lf] += (p['beam_linear_ft'] || 0)
+          end
+          unless by_cat.empty?
+            f.puts ""
+            f.puts "CATEGORY SUBTOTALS"
+            f.puts "Category,Qty,LF"
+            by_cat.sort_by { |_, v| -v[:qty] }.each do |cat, v|
+              lf_str = v[:lf] > 0 ? v[:lf].round(1).to_s : ''
+              f.puts "#{ce(cat)},#{v[:qty]},#{lf_str}"
+            end
+          end
+        end
+        UI.messagebox("Assembly exported:\n#{path}")
+      rescue => e
+        UI.messagebox("Assembly export failed: #{e.message}")
       end
     end
 

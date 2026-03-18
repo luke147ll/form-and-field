@@ -111,6 +111,10 @@ module TakeoffTool
           visible.each { |e| e.visible = true }
           keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
           keep_layers.each_key do |ln|
+            # Skip CAD and gridline layers — they manage their own visibility
+            next if ln.start_with?('FF_CAD_')
+            next if ln == 'FF_Gridlines'
+            next if ln == 'FF_Elevation_Tags'
             l = m.layers[ln]
             l.visible = true if l && !l.visible?
           end
@@ -131,6 +135,10 @@ module TakeoffTool
           TakeoffTool.filtered_scan_results.each do |r|
             e = TakeoffTool.find_entity(r[:entity_id])
             next unless e && e.valid?
+            # Skip CAD overlays and gridlines — they manage their own visibility
+            next if e.is_a?(Sketchup::Group) && (e.get_attribute('FF_CadOverlay', 'sheet_name') rescue false)
+            next if e.is_a?(Sketchup::Group) && (e.get_attribute('TakeoffGridline', 'label') rescue false)
+            next if e.is_a?(Sketchup::Group) && (e.get_attribute('TakeoffMeasurement', 'type') rescue nil) == 'GRID'
             ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
             next unless ms.start_with?(prefix)
             e.visible = true

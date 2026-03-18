@@ -448,8 +448,8 @@ module TakeoffTool
       end
 
       m.layers.each do |l|
-        # Preserve CAD overlay and gridline layer visibility
-        next if l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines'
+        # Preserve CAD overlay, gridline, and elevation tag layer visibility
+        next if l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines' || l.name == 'FF_Elevation_Tags'
         l.visible = !!keep_layers[l.name]
       end
       m.commit_operation
@@ -477,8 +477,8 @@ module TakeoffTool
           l.visible = false
         elsif mv_view == 'b' && (l.name == 'FF_Model_A')
           l.visible = false
-        elsif l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines'
-          # Leave CAD overlay and gridline layers in their current state
+        elsif l.name.start_with?('FF_CAD_') || l.name == 'FF_Gridlines' || l.name == 'FF_Elevation_Tags'
+          # Leave CAD overlay, gridline, and elevation tag layers in their current state
         else
           l.visible = true
         end

@@ -6,6 +6,10 @@ module TakeoffTool
   EVENT_ASSIGNMENT_CHANGED = :assignment_changed
   EVENT_VISIBILITY_CHANGED = :visibility_changed
   EVENT_COLORS_CHANGED     = :colors_changed
+  EVENT_ASSEMBLY_CREATED   = :assembly_created
+  EVENT_ASSEMBLY_CHANGED   = :assembly_changed
+  EVENT_ASSEMBLY_DELETED   = :assembly_deleted
+  EVENT_PARTS_CHANGED      = :parts_changed
 
   @_event_subscribers ||= {}
   @_event_sub_counter ||= 0

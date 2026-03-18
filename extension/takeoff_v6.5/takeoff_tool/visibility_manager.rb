@@ -50,11 +50,14 @@ module TakeoffTool
         # Show ancestors
         keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
 
-        # Force layers visible (respecting multiverse)
+        # Force layers visible (respecting multiverse, preserving CAD/gridline)
         mv_view = TakeoffTool.active_mv_view rescue nil
         keep_layers.each_key do |ln|
           next if mv_view == 'a' && ln == 'FF_Model_B'
           next if mv_view == 'b' && ln == 'FF_Model_A'
+          next if ln.start_with?('FF_CAD_')
+          next if ln == 'FF_Gridlines'
+          next if ln == 'FF_Elevation_Tags'
           l = m.layers[ln]
           l.visible = true if l && !l.visible?
         end

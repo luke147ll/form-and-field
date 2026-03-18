@@ -701,39 +701,84 @@ module TakeoffTool
       sr = (mv_view && mv_view != 'ab') ? TakeoffTool.filtered_scan_results : (TakeoffTool.scan_results || [])
       ca = TakeoffTool.category_assignments || {}
 
-      # Multiverse: filter assemblies to only those with entities in current view
-      if mv_view && mv_view != 'ab'
-        view_eids = {}
-        sr.each { |r| view_eids[r[:entity_id].to_i] = true }
-        assemblies = assemblies.select do |_name, asm|
-          (asm['entity_ids'] || []).any? { |eid| view_eids[eid.to_i] }
-        end.to_h
-        # Filter each assembly's entity_ids to current-view entities
-        assemblies.each do |_name, asm|
-          asm['entity_ids'] = (asm['entity_ids'] || []).select { |eid| view_eids[eid.to_i] }
-        end
-      end
       eid_cat = {}
       sr.each do |r|
         eid_cat[r[:entity_id].to_i] = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
       end
 
-      # Add category breakdown to each assembly
-      assemblies.each do |_name, asm|
-        eids = asm['entity_ids'] || []
-        breakdown = {}
-        eids.each do |eid|
-          cat = eid_cat[eid.to_i] || 'Uncategorized'
-          breakdown[cat] ||= 0
-          breakdown[cat] += 1
+      # Build enhanced payload with parts data
+      payload = {}
+      assemblies.each do |asm_id, asm|
+        parts = asm['parts'] || []
+
+        # Collect entity IDs from non-virtual parts
+        entity_ids = parts.reject { |p| p['is_virtual'] }.map { |p| p['entity_id'] }.compact.map(&:to_i)
+
+        # Multiverse: skip assemblies with no entities in current view
+        if mv_view && mv_view != 'ab'
+          view_eids = {}
+          sr.each { |r| view_eids[r[:entity_id].to_i] = true }
+          next unless entity_ids.any? { |eid| view_eids[eid] } || parts.any? { |p| p['is_virtual'] }
         end
-        total = eids.length.to_f
-        asm['breakdown'] = breakdown.map { |cat, count|
+
+        # Build category breakdown from parts
+        breakdown = {}
+        parts.each do |p|
+          cat = p['category'] || 'Uncategorized'
+          breakdown[cat] ||= 0
+          breakdown[cat] += (p['quantity'] || 1)
+        end
+        total = parts.map { |p| p['quantity'] || 1 }.sum.to_f
+        breakdown_arr = breakdown.map { |cat, count|
           { 'category' => cat, 'count' => count, 'percent' => (total > 0 ? (count / total * 100).round(1) : 0) }
         }.sort_by { |b| -b['count'] }
+
+        # Build summary: qty/lf totals per category
+        summary = {}
+        parts.each do |p|
+          cat = p['category'] || 'Uncategorized'
+          summary[cat] ||= { 'qty' => 0 }
+          summary[cat]['qty'] += (p['quantity'] || 1)
+          if p['beam_linear_ft']
+            summary[cat]['lf'] = (summary[cat]['lf'] || 0) + p['beam_linear_ft']
+          end
+        end
+
+        # Parts payload for JS
+        parts_payload = parts.map do |p|
+          {
+            'part_num'         => p['part_number'],
+            'entity_id'        => p['entity_id'],
+            'name'             => p['name'],
+            'category'         => p['category'],
+            'qty'              => p['quantity'] || 1,
+            'unit'             => p['unit'] || 'EA',
+            'notes'            => p['notes'] || '',
+            'is_virtual'       => p['is_virtual'] || false,
+            'beam_net_section' => p['beam_net_section'],
+            'beam_linear_ft'   => p['beam_linear_ft'],
+            'stale'            => p['stale'] || false
+          }
+        end
+
+        tags_visible = (TakeoffTool.asm_tags_visible || {})[asm_id] || false
+
+        payload[asm_id] = {
+          'name'        => asm['name'],
+          'zone'        => asm['zone'] || '',
+          'entity_ids'  => entity_ids,
+          'count'       => entity_ids.length,
+          'created'     => asm['created'],
+          'notes'       => asm['notes'] || '',
+          'parts'       => parts_payload,
+          'tags_visible' => tags_visible,
+          'part_count'  => parts.length,
+          'breakdown'   => breakdown_arr,
+          'summary'     => summary
+        }
       end
 
-      js = JSON.generate(assemblies)
+      js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveAssemblies('#{esc}')")
     end
@@ -1075,6 +1120,9 @@ module TakeoffTool
       mv_active = TakeoffTool.active_mv_view != nil
       st_seen = {}
       st_defns = mv_active ? {} : nil
+      # Per-model totals for multiverse comparison
+      scan_totals_a = mv_active ? {} : nil
+      scan_totals_b = mv_active ? {} : nil
       # IFC dedup: the IFC importer often creates 2+ instances per element
       # (compound structure layers sharing the same definition/GlobalId).
       # Two-pass: first identify the preferred instance per definition
@@ -1131,6 +1179,18 @@ module TakeoffTool
         scan_totals[cat][:lf]  += (r[:linear_ft] || 0).to_f
         scan_totals[cat][:sf]  += (r[:area_sf] || 0).to_f
         scan_totals[cat][:vol] += (r[:volume_ft3] || 0).to_f
+
+        # Track per-model totals for multiverse comparison
+        if scan_totals_a
+          e_ref = reg[eid]
+          ms = (e_ref && e_ref.valid?) ? (e_ref.get_attribute('FormAndField', 'model_source') || 'model_a') : 'model_a'
+          target = ms == 'model_a' ? scan_totals_a : scan_totals_b
+          target[cat] ||= { lf: 0.0, sf: 0.0, vol: 0.0, count: 0 }
+          target[cat][:count] += 1
+          target[cat][:lf]  += (r[:linear_ft] || 0).to_f
+          target[cat][:sf]  += (r[:area_sf] || 0).to_f
+          target[cat][:vol] += (r[:volume_ft3] || 0).to_f
+        end
 
         # Collect beam inventory data for any category with LF values
         if (r[:linear_ft] || 0) > 0
@@ -1317,6 +1377,12 @@ module TakeoffTool
 
       # Payload includes beamInventory (transient, for display only)
       payload = { measurements: measurements, scanTotals: clean_totals, derivedParts: derived }
+      if scan_totals_a
+        clean_a = {}; scan_totals_a.each { |k, v| clean_a[k] = v.reject { |fk, _| fk == :beam_items } }
+        clean_b = {}; scan_totals_b.each { |k, v| clean_b[k] = v.reject { |fk, _| fk == :beam_items } }
+        payload[:scanTotalsA] = clean_a
+        payload[:scanTotalsB] = clean_b
+      end
       js = JSON.generate(payload)
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @meas_cache = esc

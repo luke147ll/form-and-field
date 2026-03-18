@@ -346,6 +346,22 @@ module TakeoffTool
     end.keys
     b_eids.each { |eid| @entity_registry.delete(eid) }
 
+    # ── Step 1.5: Flatten Model B if needed ──
+    # Model B imports (especially Revit/IFC) may have deeply nested containers
+    # that need to be exploded for the scanner to reach the geometry.
+    Dashboard.scan_log_msg("Checking Model B geometry...")
+    begin
+      flatten_stats = FlattenPass.run(model) do |msg|
+        Dashboard.scan_log_msg(msg)
+      end
+      if flatten_stats[:exploded] > 0
+        puts "Multiverse: Flatten B: #{flatten_stats[:exploded]} removed, #{flatten_stats[:kept]} kept"
+        invalidate_entity_cache
+      end
+    rescue => e
+      puts "Multiverse: Flatten B error: #{e.message}"
+    end
+
     # ── Step 2: Scan Model B entities ──
     b_results, @entity_registry = Scanner.scan_model(
       model,
@@ -552,6 +568,10 @@ module TakeoffTool
   def self.show_model_entities(source_prefix, visible)
     @entity_registry.each do |eid, e|
       next unless e && e.valid?
+      # Skip CAD overlays and gridlines — they manage their own visibility
+      next if e.is_a?(Sketchup::Group) && (e.get_attribute('FF_CadOverlay', 'sheet_name') rescue false)
+      next if e.is_a?(Sketchup::Group) && (e.get_attribute('TakeoffGridline', 'label') rescue false)
+      next if e.is_a?(Sketchup::Group) && (e.get_attribute('TakeoffMeasurement', 'type') rescue nil) == 'GRID'
       ms = e.get_attribute('FormAndField', 'model_source')
       next unless ms
       e.visible = visible if ms.start_with?(source_prefix)

@@ -19,33 +19,27 @@ module TakeoffTool
     CHANGE_THRESHOLD = 0.40   # collision score >= this -> :changed
     BB_MATCH_FLOOR   = 0.30   # BB IoU fallback threshold (when no faces)
 
-    COLORS = {
-      matched:   [88,  91,  112],   # Surface2 — muted gray
-      changed:   [249, 226, 175],   # Yellow/amber
-      new_b:     [137, 180, 250],   # Blue
-      removed_a: [243, 139, 168]    # Red/pink
-    }.freeze
+    # Two-color paint: A = red, B = blue
+    PAINT_COLORS = { a: [243, 139, 168], b: [137, 180, 250] }.freeze
+    DEFAULT_OPACITY = { a: 0.70, b: 0.70 }.freeze
 
-    DEFAULT_OPACITY = {
-      matched:   0.15,
-      changed:   0.50,
-      new_b:     0.90,
-      removed_a: 0.70
-    }.freeze
-
+    # Classification states kept for report/delta computation only
     STATES = [:matched, :changed, :new_b, :removed_a].freeze
+
+    # Legacy alias for any code referencing COLORS
+    COLORS = PAINT_COLORS
 
     # ═══ MODULE STATE ═══
 
     @active         = false
-    @classification = {}    # eid -> :matched | :changed | :new_b | :removed_a
+    @classification = {}    # eid -> :matched | :changed | :new_b | :removed_a (for report)
     @categories     = {}    # eid -> category string
-    @counts         = {}    # state -> count
+    @paint_counts   = {}    # { a: N, b: N }
     @backed_up      = {}    # eid -> { mat:, vis:, faces: }
-    @opacity        = nil   # state -> float
-    @visibility     = nil   # state -> bool
+    @opacity        = nil   # { a: float, b: float }
+    @visibility     = nil   # { a: bool, b: bool }
     @geo_cache      = {}    # eid -> [[v0,v1,v2], ...] world-space triangles
-    @sd_mats        = {}    # state -> Sketchup::Material
+    @sd_mats        = {}    # { a: Material, b: Material }
 
     # ═══ PUBLIC API ═══
 
@@ -67,21 +61,22 @@ module TakeoffTool
       end
 
       @opacity    ||= DEFAULT_OPACITY.dup
-      @visibility = Hash[STATES.map { |s| [s, true] }]
+      @visibility = { a: true, b: true }
       @geo_cache    = {}
       @backed_up    = {}
 
       puts "[SmartDiff] Entering..."
       t0 = Time.now
 
-      # Always reclassify fresh — cache caused stale state issues
+      # Classify for report/delta computation
       classify
 
+      # Paint by model source (simple two-color: A=red, B=blue)
       backup_and_paint(m, category_filter: category_filter)
 
       @active = true
       elapsed = ((Time.now - t0) * 1000).round
-      puts "[SmartDiff] Ready in #{elapsed}ms — #{@counts}"
+      puts "[SmartDiff] Ready in #{elapsed}ms — A=#{@paint_counts[:a]} B=#{@paint_counts[:b]}"
     end
 
     def self.exit
@@ -105,9 +100,12 @@ module TakeoffTool
 
       m.commit_operation if m
 
-      # Restore layer coloring if in A+B view
-      if m && TakeoffTool.active_mv_view == 'ab'
-        m.rendering_options['DisplayColorByLayer'] = true
+      # Restore edge and layer rendering
+      if m
+        m.rendering_options['EdgeColorMode'] = 0
+        if TakeoffTool.active_mv_view == 'ab'
+          m.rendering_options['DisplayColorByLayer'] = true
+        end
       end
 
       clear_state
@@ -122,32 +120,36 @@ module TakeoffTool
 
     # ─── Controls ───
 
-    def self.set_opacity(state, value)
+    def self.set_opacity(key, value)
       @opacity ||= DEFAULT_OPACITY.dup
-      sym = state.to_sym
-      @opacity[sym] = value
+      sym = key.to_s == 'a' ? :a : :b
+      @opacity[sym] = value.to_f
       mat = @sd_mats[sym]
-      mat.alpha = value if mat && mat.valid?
+      mat.alpha = value.to_f if mat && mat.valid?
     end
 
-    def self.set_visibility(state, visible)
-      @visibility ||= Hash[STATES.map { |s| [s, true] }]
-      @visibility[state.to_sym] = visible
+    def self.set_visibility(key, visible)
+      @visibility ||= { a: true, b: true }
+      sym = key.to_s == 'a' ? :a : :b
+      @visibility[sym] = visible
     end
 
-    # Fast visibility toggle — only show/hide entities of one state.
-    # Avoids full restore_all + repaint cycle that freezes SketchUp.
-    def self.toggle_state_fast(state, visible, category_filter: nil)
-      sym = state.to_sym
+    # Fast visibility toggle — show/hide all entities for one model.
+    def self.toggle_state_fast(key, visible, category_filter: nil)
+      sym = key.to_s == 'a' ? :a : :b
       m = Sketchup.active_model
-      return unless m && @active && @classification.any?
+      return unless m && @active
+      reg = TakeoffTool.entity_registry || {}
       cat_set = category_filter ? category_filter.map(&:to_s) : nil
       m.start_operation('Smart Diff Toggle', true)
       count = 0
-      @classification.each do |eid, s|
-        next unless s == sym
-        e = TakeoffTool.find_entity(eid)
+      (TakeoffTool.scan_results || []).each do |r|
+        next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+        eid = r[:entity_id]
+        e = reg[eid]
         next unless e && e.valid?
+        ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+        next unless (sym == :a ? ms == 'model_a' : ms.start_with?('model_b'))
         if cat_set
           ent_cat = (@categories[eid] || '').to_s
           next unless cat_set.include?(ent_cat)
@@ -162,29 +164,29 @@ module TakeoffTool
 
     def self.repaint(category_filter: nil)
       m = Sketchup.active_model
-      return unless m && @active && @classification.any?
+      return unless m && @active
       restore_all
       backup_and_paint(m, category_filter: category_filter)
     end
 
-    def self.isolate_state(state, categories: nil)
-      target = state.to_sym
-      STATES.each { |s| set_visibility(s, s == target) }
+    def self.isolate_state(key, categories: nil)
+      sym = key.to_s == 'a' ? :a : :b
+      @visibility = { a: sym == :a, b: sym == :b }
       repaint(category_filter: categories)
     end
 
     def self.show_all(categories: nil)
-      STATES.each { |s| set_visibility(s, true) }
+      @visibility = { a: true, b: true }
       repaint(category_filter: categories)
     end
 
     # ─── Accessors ───
 
     def self.classification;     @classification;                                          end
-    def self.counts;             @counts;                                                  end
+    def self.counts;             @paint_counts || { a: 0, b: 0 };                         end
     def self.categories;         @categories;                                              end
     def self.opacity_settings;   @opacity    || DEFAULT_OPACITY.dup;                       end
-    def self.visibility_settings; @visibility || Hash[STATES.map { |s| [s, true] }];       end
+    def self.visibility_settings; @visibility || { a: true, b: true };                     end
 
     # ─── Report ───
 
@@ -643,27 +645,32 @@ module TakeoffTool
       model.rendering_options['DisplayColorByLayer'] = false
       model.start_operation('Smart Diff Paint', true)
 
-      # Create/update materials
+      # Create/update two materials: A=red, B=blue
       @sd_mats = {}
-      COLORS.each do |state, rgb|
-        alpha = (@opacity || DEFAULT_OPACITY)[state]
-        key   = "FF_SD_#{state}"
-        mat   = model.materials[key] || model.materials.add(key)
+      PAINT_COLORS.each do |key, rgb|
+        alpha = (@opacity || DEFAULT_OPACITY)[key]
+        mat_name = "FF_SD_#{key}"
+        mat = model.materials[mat_name] || model.materials.add(mat_name)
         mat.color = Sketchup::Color.new(*rgb)
         mat.alpha = alpha
-        @sd_mats[state] = mat
+        @sd_mats[key] = mat
       end
 
+      reg = TakeoffTool.entity_registry || {}
+      ca  = TakeoffTool.category_assignments || {}
       applied = 0
       hidden  = 0
+      @paint_counts = { a: 0, b: 0 }
 
-      @classification.each do |eid, state|
-        e = TakeoffTool.find_entity(eid)
+      (TakeoffTool.scan_results || []).each do |r|
+        next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+        eid = r[:entity_id]
+        e = reg[eid]
         next unless e && e.valid?
 
         # Category filter — hide entities not in selected categories
         if cat_set
-          ent_cat = (@categories[eid] || '').to_s
+          ent_cat = (@categories[eid] || ca[eid] || r[:parsed][:auto_category] || '').to_s
           unless cat_set.include?(ent_cat)
             backup_entity(eid, e)
             e.visible = false
@@ -672,38 +679,49 @@ module TakeoffTool
           end
         end
 
-        # State visibility toggle
+        ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+        model_key = ms == 'model_a' ? :a : :b
+
+        # Visibility toggle
         vis = @visibility || {}
-        unless vis.fetch(state, true)
+        unless vis.fetch(model_key, true)
           backup_entity(eid, e)
           e.visible = false
           hidden += 1
           next
         end
 
-        mat = @sd_mats[state]
+        mat = @sd_mats[model_key]
         next unless mat
         backup_entity(eid, e)
         e.material = mat
         paint_faces(eid, e, mat)
         applied += 1
+        @paint_counts[model_key] += 1
       end
+
+      # Show edges in diff colors instead of global edge color
+      model.rendering_options['EdgeColorMode'] = 1
 
       model.commit_operation
       model.active_view.invalidate
-      puts "[SmartDiff] Painted #{applied}, hidden #{hidden}"
+      puts "[SmartDiff] Painted #{applied} (A=#{@paint_counts[:a]}, B=#{@paint_counts[:b]}), hidden #{hidden}"
     end
 
     def self.backup_entity(eid, entity)
       return if @backed_up.key?(eid)
       face_mats = []
+      edge_mats = []
       defn = entity.respond_to?(:definition) ? entity.definition : nil
       if defn && defn.count_used_instances <= 1
         defn.entities.grep(Sketchup::Face).each do |f|
           face_mats << [f, f.material, f.back_material]
         end
+        defn.entities.grep(Sketchup::Edge).each do |edge|
+          edge_mats << [edge, edge.material]
+        end
       end
-      @backed_up[eid] = { mat: entity.material, vis: entity.visible?, faces: face_mats }
+      @backed_up[eid] = { mat: entity.material, vis: entity.visible?, faces: face_mats, edges: edge_mats }
     end
 
     def self.paint_faces(eid, entity, mat)
@@ -712,6 +730,9 @@ module TakeoffTool
       defn.entities.grep(Sketchup::Face).each do |f|
         f.material = mat
         f.back_material = mat
+      end
+      defn.entities.grep(Sketchup::Edge).each do |edge|
+        edge.material = mat
       end
     end
 
@@ -735,6 +756,10 @@ module TakeoffTool
         f.material      = front
         f.back_material = back
         restored_faces += 1
+      end
+      (info[:edges] || []).each do |edge, orig_mat|
+        next unless edge.valid?
+        edge.material = orig_mat
       end
       if invalid_faces > 0
         puts "[SmartDiff] WARN: eid=#{eid} #{invalid_faces} invalid faces (#{restored_faces} restored)"
@@ -883,7 +908,7 @@ module TakeoffTool
       @active         = false
       @classification = {}
       @categories     = {}
-      @counts         = {}
+      @paint_counts   = {}
       @geo_cache      = {}
       @sd_mats        = {}
       @opacity        = nil

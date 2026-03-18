@@ -138,6 +138,11 @@ module TakeoffTool
         bm = nil if bm && bm.respond_to?(:name) && bm.name.start_with?('FF_')
         list << [face, fm, bm]
       end
+      ents.grep(Sketchup::Edge).each do |edge|
+        em = edge.material
+        em = nil if em && em.respond_to?(:name) && em.name.start_with?('FF_')
+        list << [edge, em]
+      end
       ents.each do |child|
         next unless child.valid?
         next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
@@ -907,6 +912,7 @@ module TakeoffTool
       @diff_active = false
       @active_mode = :none
 
+      m.rendering_options['EdgeColorMode'] = 0
       if TakeoffTool.active_mv_view == 'ab'
         m.rendering_options['DisplayColorByLayer'] = true
       end
@@ -967,23 +973,19 @@ module TakeoffTool
     # ─── Smart Diff Mode ───
 
     SMART_DIFF_COLORS = {
-      matched:   [88, 91, 112],    # Surface2 — muted gray
-      changed:   [249, 226, 175],  # Yellow — amber
-      new_b:     [137, 180, 250],  # Blue — bright
-      removed_a: [243, 139, 168]   # Red/pink
+      a: [243, 139, 168],  # Red — Model A
+      b: [137, 180, 250]   # Blue — Model B
     }
 
     SMART_DIFF_OPACITY = {
-      matched:   0.15,
-      changed:   0.50,
-      new_b:     0.90,
-      removed_a: 0.70
+      a: 0.70,
+      b: 0.70
     }
 
     @smart_diff_settings = nil
     @smart_diff_visibility = nil
 
-    def self.apply_smart_diff(ab_classification, category_filter: nil)
+    def self.apply_smart_diff(ab_classification = nil, category_filter: nil)
       m = Sketchup.active_model
       return unless m
 
@@ -994,73 +996,65 @@ module TakeoffTool
       strip_baked_ff_materials
 
       @active_mode = :smart_diff
-      @smart_diff_settings ||= SMART_DIFF_OPACITY.dup
-      @smart_diff_visibility ||= { matched: true, changed: true, new_b: true, removed_a: true }
+      @smart_diff_settings ||= { a: { opacity: 0.70 }, b: { opacity: 0.70 } }
+      @smart_diff_visibility ||= { a: true, b: true }
 
-      # Category filter: array of allowed category names, or nil for all
-      cat_set = category_filter ? category_filter.map(&:to_s) : nil
-      ab_cats = TakeoffTool.ab_categories || {}
+      a_opacity = (@smart_diff_settings.dig(:a, :opacity) rescue 0.70) || 0.70
+      b_opacity = (@smart_diff_settings.dig(:b, :opacity) rescue 0.70) || 0.70
+
+      mat_a = get_or_create_material(m, 'FF_DIFF_A', SMART_DIFF_COLORS[:a], a_opacity)
+      mat_b = get_or_create_material(m, 'FF_DIFF_B', SMART_DIFF_COLORS[:b], b_opacity)
 
       m.rendering_options['DisplayColorByLayer'] = false
       m.start_operation('Smart Diff', true)
 
-      # Create materials for each state
-      sd_mats = {}
-      SMART_DIFF_COLORS.each do |state, rgb|
-        opacity = @smart_diff_settings[state] || SMART_DIFF_OPACITY[state]
-        key = "FF_SD_#{state}"
-        sd_mats[state] = get_or_create_material(m, key, rgb, opacity)
-      end
+      reg = TakeoffTool.entity_registry || {}
+      sr  = TakeoffTool.scan_results || []
+      painted = { a: 0, b: 0 }
 
-      applied = 0
-      hidden = 0
-      ab_classification.each do |eid, state|
-        e = TakeoffTool.find_entity(eid)
+      sr.each do |r|
+        next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
+        eid = r[:entity_id]
+        e = reg[eid]
         next unless e && e.valid?
 
-        # Category filter check — hide entities not in selected categories
-        if cat_set
-          ent_cat = ab_cats[eid].to_s
-          unless cat_set.include?(ent_cat)
-            backup(eid, e)
-            e.visible = false
-            hidden += 1
-            next
-          end
-        end
+        ms = e.get_attribute('FormAndField', 'model_source') || 'model_a'
+        is_a = (ms == 'model_a')
 
-        # Visibility check (state toggle)
-        unless @smart_diff_visibility[state]
-          backup(eid, e)
-          e.visible = false
-          hidden += 1
-          next
+        if is_a
+          next unless @smart_diff_visibility[:a]
+          apply_paint(e, eid, mat_a)
+          painted[:a] += 1
+        else
+          next unless @smart_diff_visibility[:b]
+          apply_paint(e, eid, mat_b)
+          painted[:b] += 1
         end
-
-        mat = sd_mats[state]
-        next unless mat
-        apply_paint(e, eid, mat)
-        applied += 1
       end
+
+      # Show edges in diff colors instead of global edge color
+      m.rendering_options['EdgeColorMode'] = 1
 
       m.commit_operation
       @highlights_active = true
       m.active_view.invalidate
-      puts "CC: Smart diff applied=#{applied} hidden=#{hidden} cat_filter=#{cat_set ? cat_set.length : 'all'}"
+      puts "CC: Smart Diff — A=#{painted[:a]} (red), B=#{painted[:b]} (blue)"
     end
 
-    def self.set_smart_diff_opacity(state, value)
-      @smart_diff_settings ||= SMART_DIFF_OPACITY.dup
-      @smart_diff_settings[state.to_sym] = value
-      key = "FF_SD_#{state}"
-      if @mats[key]
-        @mats[key].alpha = value
-      end
+    def self.set_smart_diff_opacity(key, value)
+      @smart_diff_settings ||= { a: { opacity: 0.70 }, b: { opacity: 0.70 } }
+      sym = key.to_s == 'a' ? :a : :b
+      @smart_diff_settings[sym] ||= {}
+      @smart_diff_settings[sym][:opacity] = value.to_f
+      mat_key = sym == :a ? 'FF_DIFF_A' : 'FF_DIFF_B'
+      mat = @mats[mat_key]
+      mat.alpha = value.to_f if mat && mat.valid?
     end
 
-    def self.set_smart_diff_visibility(state, visible)
-      @smart_diff_visibility ||= { matched: true, changed: true, new_b: true, removed_a: true }
-      @smart_diff_visibility[state.to_sym] = visible
+    def self.set_smart_diff_visibility(key, visible)
+      @smart_diff_visibility ||= { a: true, b: true }
+      sym = key.to_s == 'a' ? :a : :b
+      @smart_diff_visibility[sym] = visible
     end
 
     def self.smart_diff_settings
@@ -1068,7 +1062,7 @@ module TakeoffTool
     end
 
     def self.smart_diff_visibility
-      @smart_diff_visibility || { matched: true, changed: true, new_b: true, removed_a: true }
+      @smart_diff_visibility || { a: true, b: true }
     end
 
     # Helper: clean up diff state if active before entering smart diff
@@ -1109,6 +1103,8 @@ module TakeoffTool
 
       # Catalog-based safety net: fix anything the @originals restore missed
       restore_from_catalog
+
+      m.rendering_options['EdgeColorMode'] = 0
 
       m.commit_operation
       m.active_view.invalidate
@@ -1154,6 +1150,10 @@ module TakeoffTool
         face.material = mat
         face.back_material = mat
       end
+      ents.grep(Sketchup::Edge).each do |edge|
+        face_list << [edge, edge.material]
+        edge.material = mat
+      end
       ents.each do |child|
         next unless child.valid?
         next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
@@ -1170,6 +1170,9 @@ module TakeoffTool
       ents.grep(Sketchup::Face).each do |face|
         face.material = mat
         face.back_material = mat
+      end
+      ents.grep(Sketchup::Edge).each do |edge|
+        edge.material = mat
       end
       ents.each do |child|
         next unless child.valid?
