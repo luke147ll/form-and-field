@@ -1039,42 +1039,24 @@ module TakeoffTool
 
     def self.build_beam_inventory_for_eids(eid_list)
       sr = TakeoffTool.scan_results || []
-      ca = TakeoffTool.category_assignments || {}
       reg = TakeoffTool.instance_variable_get(:@entity_registry) || {}
       eid_set = Set.new(eid_list.map(&:to_i))
-      net_sec_cache = {}
       beam_items = []
 
       sr.each do |r|
         next unless eid_set.include?(r[:entity_id].to_i)
         next unless (r[:linear_ft] || 0) > 0
         eid = r[:entity_id]
-        cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
 
+        # Cross-section from definition bounding box (local space, rotation-independent)
         sec_str = nil
         ent_for_beam = reg[eid]
         if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
-          bdefn = ent_for_beam.definition
-          dname = bdefn.name
-          if cat =~ Scanner::BEAM_RE
-            cache_key = bdefn.object_id
-            unless net_sec_cache.key?(cache_key)
-              begin
-                net_sec_cache[cache_key] = Scanner.beam_net_section(bdefn)
-              rescue => ex
-                puts "[FF beam_net_section ERROR] #{dname}: #{ex.message}"
-                net_sec_cache[cache_key] = nil
-              end
-            end
-            ns = net_sec_cache[cache_key]
-            sec_str = "#{ns[0].round(1)}x#{ns[1].round(1)}" if ns
-          end
-          unless sec_str
-            dbb = bdefn.bounds
-            ddims = [dbb.width, dbb.height, dbb.depth].sort
-            sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
-          end
+          dbb = ent_for_beam.definition.bounds
+          ddims = [dbb.width, dbb.height, dbb.depth].sort
+          sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
         end
+        # Fallback: scan result BB (world-space, may be inflated for diagonal beams)
         unless sec_str
           dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
           sec_str = "#{dims[0].round(1)}x#{dims[1].round(1)}"

@@ -1342,9 +1342,14 @@ module TakeoffTool
       leaf = leaf_lumber_defn(defn)
       return nil unless leaf
 
-      # Collect edges from the leaf definition in local space
+      # Collect ONLY edges from the leaf definition itself — do NOT recurse
+      # into child components (which may be joinery with offset transforms).
       edges = []
-      collect_edges_for_beam(leaf.entities, Geom::Transformation.new, edges)
+      leaf.entities.grep(Sketchup::Edge).each do |edge|
+        p1 = edge.start.position
+        p2 = edge.end.position
+        edges << { edge: edge, p1: p1, p2: p2, length: p1.distance(p2) }
+      end
       return nil if edges.length < 3
 
       # Beam axis = longest edge direction
@@ -1424,7 +1429,15 @@ module TakeoffTool
       # No sub-components — this definition IS the leaf
       return defn if children.empty?
 
-      # Recurse into children, count leaves by definition
+      # If this definition has substantial raw geometry (faces) alongside
+      # child components, it IS the beam — children are joinery (pegs, mortises).
+      # Treat it as the leaf rather than recursing into joinery pieces.
+      face_count = defn.entities.grep(Sketchup::Face).length
+      if face_count >= 6
+        return defn
+      end
+
+      # Pure wrapper (no raw geometry) — recurse into children
       leaf_counts = {}
       children.each do |child|
         child_defn = child.respond_to?(:definition) ? child.definition : nil

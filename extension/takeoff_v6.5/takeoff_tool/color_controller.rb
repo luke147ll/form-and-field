@@ -138,11 +138,6 @@ module TakeoffTool
         bm = nil if bm && bm.respond_to?(:name) && bm.name.start_with?('FF_')
         list << [face, fm, bm]
       end
-      ents.grep(Sketchup::Edge).each do |edge|
-        em = edge.material
-        em = nil if em && em.respond_to?(:name) && em.name.start_with?('FF_')
-        list << [edge, em]
-      end
       ents.each do |child|
         next unless child.valid?
         next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
@@ -636,6 +631,7 @@ module TakeoffTool
         apply_paint(e, eid, mat)
         n += 1
       end
+
       m.commit_operation
       @highlights_active = true
       @active_mode = :highlight
@@ -651,6 +647,7 @@ module TakeoffTool
       m.start_operation('Highlight', true)
       mat = get_or_create_material(m, 'FF_SEL', SELECTION_COLOR, 0.9)
       apply_paint(e, eid, mat)
+
       m.commit_operation
     end
 
@@ -666,6 +663,7 @@ module TakeoffTool
         apply_paint(e, id.to_i, mat)
         n += 1
       end
+
       m.commit_operation
       puts "CC: highlighted #{n} of #{ids.length}"
     end
@@ -734,6 +732,7 @@ module TakeoffTool
       end
 
       @active_cat_colors[cat_name] = true
+
       m.commit_operation
       puts "CC: Color ON '#{cat_name}' (#{n} entities, #{hex})"
     end
@@ -853,7 +852,6 @@ module TakeoffTool
         e = TakeoffTool.find_entity(eid)
         next unless e && e.valid?
         backup(eid, e) unless backed_up?(eid)
-        e.material = bright
 
         # Paint faces for full visibility
         defn = e.respond_to?(:definition) ? e.definition : nil
@@ -880,7 +878,6 @@ module TakeoffTool
 
       diff_a = get_or_create_material(m, 'FF_DIFF_A', DIFF_COLORS[:a], DIFF_OPACITY)
       diff_b = get_or_create_material(m, 'FF_DIFF_B', DIFF_COLORS[:b], DIFF_OPACITY)
-      m.rendering_options['DisplayColorByLayer'] = false
 
       @diff_orig_mats ||= {}
       work_queue.each do |item|
@@ -912,10 +909,6 @@ module TakeoffTool
       @diff_active = false
       @active_mode = :none
 
-      m.rendering_options['EdgeColorMode'] = 0
-      if TakeoffTool.active_mv_view == 'ab'
-        m.rendering_options['DisplayColorByLayer'] = true
-      end
       m.active_view.invalidate
       puts "CC: Removed diff highlights"
     end
@@ -927,7 +920,7 @@ module TakeoffTool
         m = Sketchup.active_model; return unless m
         diff_a = get_or_create_material(m, 'FF_DIFF_A', DIFF_COLORS[:a], DIFF_OPACITY)
         diff_b = get_or_create_material(m, 'FF_DIFF_B', DIFF_COLORS[:b], DIFF_OPACITY)
-        m.rendering_options['DisplayColorByLayer'] = false
+  
         m.start_operation('Apply Diff', true)
 
         reg = TakeoffTool.entity_registry || {}
@@ -1005,7 +998,6 @@ module TakeoffTool
       mat_a = get_or_create_material(m, 'FF_DIFF_A', SMART_DIFF_COLORS[:a], a_opacity)
       mat_b = get_or_create_material(m, 'FF_DIFF_B', SMART_DIFF_COLORS[:b], b_opacity)
 
-      m.rendering_options['DisplayColorByLayer'] = false
       m.start_operation('Smart Diff', true)
 
       reg = TakeoffTool.entity_registry || {}
@@ -1031,9 +1023,6 @@ module TakeoffTool
           painted[:b] += 1
         end
       end
-
-      # Show edges in diff colors instead of global edge color
-      m.rendering_options['EdgeColorMode'] = 1
 
       m.commit_operation
       @highlights_active = true
@@ -1104,8 +1093,6 @@ module TakeoffTool
       # Catalog-based safety net: fix anything the @originals restore missed
       restore_from_catalog
 
-      m.rendering_options['EdgeColorMode'] = 0
-
       m.commit_operation
       m.active_view.invalidate
 
@@ -1117,7 +1104,6 @@ module TakeoffTool
 
     def self.apply_paint(entity, eid, mat)
       backup(eid, entity)
-      entity.material = mat
 
       defn = nil
       if entity.respond_to?(:definition)
@@ -1157,7 +1143,6 @@ module TakeoffTool
         next unless child_defn
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
         face_list << [child, child.material] if child.respond_to?(:material)
-        child.material = mat
         paint_faces_recursive(child_defn.entities, mat, face_list)
       end
     end
@@ -1173,7 +1158,6 @@ module TakeoffTool
         child_defn = child.respond_to?(:definition) ? child.definition : nil
         next unless child_defn
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
-        child.material = mat
         repaint_faces_recursive(child_defn.entities, mat)
       end
     end
