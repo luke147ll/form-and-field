@@ -653,8 +653,8 @@ module TakeoffTool
       return unless @dialog
       require 'json'
       js = JSON.generate(summary)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("if(typeof receiveScannerBanner==='function')receiveScannerBanner('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("if(typeof receiveScannerBanner==='function')receiveScannerBanner(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_new_entities_banner(count, by_cat)
@@ -675,8 +675,8 @@ module TakeoffTool
       end
       payload = { count: count, categories: cats, entities: entities }
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("if(typeof receiveNewEntitiesBanner==='function')receiveNewEntitiesBanner('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("if(typeof receiveNewEntitiesBanner==='function')receiveNewEntitiesBanner(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_scanner_groups
@@ -687,8 +687,8 @@ module TakeoffTool
       msub = TakeoffTool.master_subcategories
       payload = { groups: groups, categories: cats, subcategories: msub }
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("if(typeof receiveScannerGroups==='function')receiveScannerGroups('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("if(typeof receiveScannerGroups==='function')receiveScannerGroups(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_assemblies
@@ -779,8 +779,10 @@ module TakeoffTool
       end
 
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveAssemblies('#{esc}')")
+      puts "[FF send_asm] payload size: #{js.length} chars, #{payload.length} assemblies"
+      # Base64 encode to eliminate all escaping issues (quotes, backslashes in part names)
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveAssemblies(JSON.parse(atob('#{b64}')))")
     end
 
     def self.send_parts_data
@@ -789,8 +791,8 @@ module TakeoffTool
       parts = TakeoffTool.load_parts rescue {}
       return if parts.empty?
       js = JSON.generate(parts)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveParts('#{esc}')") rescue nil
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveParts(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_comparison_results
@@ -799,8 +801,8 @@ module TakeoffTool
       data = TakeoffTool.serialize_comparison_results
       return unless data
       js = JSON.generate(data)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveComparisonResults('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveComparisonResults(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_diff_results
@@ -810,8 +812,8 @@ module TakeoffTool
       total = diff ? diff.length : 0
       payload = { 'totalEntities' => total, 'diffActive' => TakeoffTool.diff_active? }
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveDiffResults('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveDiffResults(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.scroll_to_entity(eid)
@@ -1045,7 +1047,7 @@ module TakeoffTool
 
       # Fast path: reuse cached payload if nothing measurement-relevant changed
       if !@meas_cache_dirty && @meas_cache
-        @dialog.execute_script("receiveMeasurements('#{@meas_cache}')")
+        @dialog.execute_script("receiveMeasurements(JSON.parse(atob('#{@meas_cache}')))") rescue nil
         send_benchmark_data
         send_section_cuts
         return
@@ -1384,10 +1386,10 @@ module TakeoffTool
         payload[:scanTotalsB] = clean_b
       end
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @meas_cache = esc
+      b64 = [js].pack('m0')
+      @meas_cache = b64
       @meas_cache_dirty = false
-      @dialog.execute_script("receiveMeasurements('#{esc}')")
+      @dialog.execute_script("receiveMeasurements(JSON.parse(atob('#{b64}')))") rescue nil
       send_benchmark_data
       send_section_cuts
     end
@@ -1397,8 +1399,8 @@ module TakeoffTool
       require 'json'
       sheets = CadOverlay.list_sheets
       js = JSON.generate(sheets)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveCadSheets('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveCadSheets(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_multiverse_data
@@ -1417,8 +1419,8 @@ module TakeoffTool
         payload = { models: [], activeView: 'a', comparison: [], needsScan: false }
       end
       js = JSON.generate(payload)
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveMultiverseData('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveMultiverseData(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_benchmark_data
@@ -1426,8 +1428,8 @@ module TakeoffTool
       require 'json'
       bmk = TakeoffTool.get_elevation_benchmark
       js = bmk ? JSON.generate(bmk) : 'null'
-      esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-      @dialog.execute_script("receiveBenchmark('#{esc}')")
+      b64 = [js].pack('m0')
+      @dialog.execute_script("receiveBenchmark(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
     def self.send_section_cuts
@@ -1436,8 +1438,8 @@ module TakeoffTool
         require 'json'
         payload = SectionCuts.build_payload
         js = JSON.generate(payload)
-        esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
-        @dialog.execute_script("receiveSectionCuts('#{esc}')")
+        b64 = [js].pack('m0')
+        @dialog.execute_script("receiveSectionCuts(JSON.parse(atob('#{b64}')))") rescue nil
       rescue => e
         puts "Dashboard: send_section_cuts error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
       end

@@ -2363,7 +2363,7 @@ function filt(){
   if(_prevAsmFilter&&!fasm){call('showAll');VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};ISO_CATS=null;FISO=false;containerIsolate=null;updateFisoBtn();}
   _prevAsmFilter=fasm;
   var asmIds=null;
-  if(fasm&&ASMB[fasm]){asmIds={};var ai=ASMB[fasm].entity_ids||[];for(var ak=0;ak<ai.length;ak++)asmIds[ai[ak]]=true;}
+  if(fasm&&ASMB[fasm]){asmIds={};var ai=getAsmEids(ASMB[fasm]);for(var ak=0;ak<ai.length;ak++)asmIds[ai[ak]]=true;}
   var i,r,x,tot=0;
   F=[];
   for(i=0;i<D.length;i++){
@@ -4064,8 +4064,8 @@ function applySavedVisToSplit(){
   if(hideIds.length) call('hideEntities',hideIds.join(','));
 }
 
-function receiveMultiverseData(json){
-  var d=JSON.parse(json);
+function receiveMultiverseData(data){
+  var d=typeof data==='string'?JSON.parse(data):data;
   var bar=document.getElementById('mvBar');
   var empty=document.getElementById('mvEmpty');
   var active=document.getElementById('mvActive');
@@ -4667,9 +4667,9 @@ function runCompare(){
   call('runCompare');
 }
 var compFlipped=false;
-function receiveComparisonResults(s){
+function receiveComparisonResults(data){
   var d;
-  try{d=JSON.parse(s);}catch(e){console.error('Comparison parse error',e);return;}
+  try{d=typeof data==='string'?JSON.parse(data):data;}catch(e){console.error('Comparison parse error',e);return;}
   if(d.error){hidePortal();showPortalError('Compare Error',d.error);return;}
   comparisonResults=d;
   compFlipped=false;
@@ -4710,9 +4710,9 @@ function flipCompBaseline(){
   compFlipped=!compFlipped;
   renderCompTable();
 }
-function receiveDiffResults(s){
+function receiveDiffResults(data){
   var d;
-  try{d=JSON.parse(s);}catch(e){console.error('Diff parse error',e);return;}
+  try{d=typeof data==='string'?JSON.parse(data):data;}catch(e){console.error('Diff parse error',e);return;}
   diffComputed=true;
   diffActive=d.diffActive;
   updateDiffToggle();
@@ -4907,8 +4907,8 @@ function receiveCommitResult(s){
 
 var esc=function(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';};
 
-function receiveScannerBanner(s){
-  var d=JSON.parse(s);
+function receiveScannerBanner(data){
+  var d=typeof data==='string'?JSON.parse(data):data;
   var el=document.getElementById('scannerBanner');
   var txt=document.getElementById('sbText');
   txt.innerHTML='<b>'+d.low_confidence_groups+' group'+(d.low_confidence_groups!==1?'s':'')+
@@ -4926,8 +4926,8 @@ var NE_ISOLATED=false;
 var NE_ISOLATED_CAT=null;  // track which group is isolated
 var NE_APPROVED={};  // eid → true for manually approved items
 
-function receiveNewEntitiesBanner(s){
-  var d=JSON.parse(s);
+function receiveNewEntitiesBanner(data){
+  var d=typeof data==='string'?JSON.parse(data):data;
   NE_ENTITIES=d.entities||[];
   var el=document.getElementById('newEntitiesBanner');
   var txt=document.getElementById('nebText');
@@ -5213,8 +5213,8 @@ function exitScannerMode(){
   call('exitScannerMode');
 }
 
-function receiveScannerGroups(s){
-  var d=JSON.parse(s);
+function receiveScannerGroups(data){
+  var d=typeof data==='string'?JSON.parse(data):data;
   scGroups=d.groups||[];
   scCategories=d.categories||[];
   scSubcategories=d.subcategories||{};
@@ -5641,9 +5641,21 @@ var ASM_TAGS={};
 var asmVFormOpen={};
 var ASM_PARTS_CAP=50;
 
+function getAsmEids(a){
+  if(a.entity_ids&&a.entity_ids.length)return a.entity_ids;
+  if(a.parts&&a.parts.length){
+    var ids=[];
+    for(var i=0;i<a.parts.length;i++){
+      if(a.parts[i].entity_id&&!a.parts[i].is_virtual)ids.push(a.parts[i].entity_id);
+    }
+    return ids;
+  }
+  return [];
+}
+
 function togAsmVis(id){
   var a=ASMB[id];if(!a)return;
-  var ids=a.entity_ids||[];if(!ids.length)return;
+  var ids=getAsmEids(a);if(!ids.length)return;
   var anyVis=false;
   for(var i=0;i<ids.length;i++){if(VIS[ids[i]]!==false){anyVis=true;break;}}
   for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
@@ -5661,7 +5673,7 @@ function isoAsm(id){
   // Use VisibilityManager on the Ruby side for proper isolation
   callJSON('isolateAssembly',{asmId:id});
   // Update local filter state to reflect isolation
-  var aIds={};var ids=a.entity_ids||[];
+  var aIds={};var ids=getAsmEids(a);
   for(var k=0;k<ids.length;k++){aIds[ids[k]]=true;VIS[ids[k]]=true;}
   for(var i=0;i<D.length;i++){
     var eid=D[i].entityId;
@@ -5672,8 +5684,11 @@ function isoAsm(id){
   filt();renderAsmPanel();
 }
 
-function receiveAssemblies(json){
-  try{ASMB=JSON.parse(json)||{};}catch(e){ASMB={};}
+function receiveAssemblies(data){
+  try{
+    ASMB=typeof data==='string'?JSON.parse(data):data;
+    if(!ASMB)ASMB={};
+  }catch(e){ASMB={};console.error('receiveAssemblies parse error',e);}
   buildAsmDD();
   renderAsmPanel();
   heartbeatOff();
@@ -5707,7 +5722,7 @@ function renderAsmCard(id,asm,idx,fasm){
   var isExp=!!expandedAssemblies[id];
   var name=asm.name||id;
   var zone=asm.zone||'';
-  var eCnt=(asm.entity_ids||[]).length;
+  var eCnt=getAsmEids(asm).length;
   var pCnt=asm.part_count||0;
   var tagsOn=asm.tags_visible||false;
   var si=JSON.stringify(id);
@@ -6031,7 +6046,7 @@ function buildAsmDD(){
   var prev=sel.value;
   keys.sort(function(a,b){return(ASMB[a].name||'').toLowerCase().localeCompare((ASMB[b].name||'').toLowerCase());});
   var h='<option value="">All</option>';
-  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(a.name||keys[i])+' ('+(a.entity_ids||[]).length+')</option>';}
+  for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(a.name||keys[i])+' ('+getAsmEids(a).length+')</option>';}
   sel.innerHTML=h;
   if(prev)sel.value=prev;
 }
@@ -6185,9 +6200,9 @@ function measTypeKey(mtype,unit){
   return 'lf';
 }
 function toggleMeasPanel(){toggleMeasSection();}
-function receiveMeasurements(json){
+function receiveMeasurements(data){
   try{
-    var d=JSON.parse(json);
+    var d=typeof data==='string'?JSON.parse(data):data;
     if(Array.isArray(d)){MEAS=d;SCAN_TOTALS={};DERIVED={};}
     else{MEAS=d.measurements||[];SCAN_TOTALS=d.scanTotals||{};DERIVED=d.derivedParts||{};}
   }catch(e){MEAS=[];SCAN_TOTALS={};DERIVED={};log('MEAS parse err: '+e.message,'err');}
@@ -6771,7 +6786,7 @@ var CAD_SVG_ALIGN='<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><
 var CAD_SVG_TRASH='<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 3H9L8.3 9.5C8.25 10 7.85 10.3 7.35 10.3H3.65C3.15 10.3 2.75 10 2.7 9.5L2 3Z" stroke="currentColor" stroke-width="1"/><path d="M1 3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M4 3V1.5C4 1.2 4.2 1 4.5 1H6.5C6.8 1 7 1.2 7 1.5V3" stroke="currentColor" stroke-width="1"/></svg>';
 var CAD_SVG_GRIP='<svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="2" cy="10" r="1.2"/><circle cx="6" cy="10" r="1.2"/></svg>';
 
-function receiveCadSheets(json){try{CAD_SHEETS=JSON.parse(json);}catch(e){CAD_SHEETS=[];}renderCadPanel();}
+function receiveCadSheets(data){try{CAD_SHEETS=typeof data==='string'?JSON.parse(data):data;if(!CAD_SHEETS)CAD_SHEETS=[];}catch(e){CAD_SHEETS=[];}renderCadPanel();}
 
 function renderCadPanel(){
   var el=document.getElementById('cadBody'),emp=document.getElementById('cadEmpty');
@@ -6999,8 +7014,8 @@ function editNoteText(eid,span){
 
 /* ═══ BENCHMARK INFO ═══ */
 var BMK=null;
-function receiveBenchmark(json){
-  try{BMK=json==='null'||!json?null:JSON.parse(json);}catch(e){BMK=null;}
+function receiveBenchmark(data){
+  try{BMK=(!data||data==='null')?null:(typeof data==='string'?JSON.parse(data):data);}catch(e){BMK=null;}
   renderBenchmark();
 }
 function renderBenchmark(){
@@ -7009,9 +7024,9 @@ function renderBenchmark(){
 
 /* ═══ SECTION CUTS ═══ */
 var SC_PRESETS=[],SC_ACTIVE=null;
-function receiveSectionCuts(json){
+function receiveSectionCuts(data){
   try{
-    var d=JSON.parse(json);
+    var d=typeof data==='string'?JSON.parse(data):data;
     SC_PRESETS=d.presets||[];
     SC_ACTIVE=d.active||null;
   }catch(e){SC_PRESETS=[];SC_ACTIVE=null;}
