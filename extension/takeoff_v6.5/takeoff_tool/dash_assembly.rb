@@ -310,6 +310,33 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('importCadworksCSV') do |_ctx|
+        begin
+          path = UI.openpanel('Import Cadworks CSV', '', 'CSV Files|*.csv||')
+          if path
+            Dashboard.heartbeat_start('Importing Cadworks CSV...')
+            result = TakeoffTool.import_cadworks_csv(path)
+            Dashboard.heartbeat_stop
+            Dashboard.send_assemblies
+            Dashboard.send_live_data
+            dialog.execute_script("alert('Matched #{result[:matched]} of #{result[:total]} rows. SKUs and zones applied.')") rescue nil
+          end
+        rescue => e
+          Dashboard.heartbeat_stop rescue nil
+          puts "Takeoff importCadworksCSV error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('clearAutoAssemblies') do |_ctx|
+        begin
+          count = TakeoffTool.clear_auto_assemblies
+          Dashboard.send_assemblies
+          dialog.execute_script("alert('Cleared #{count} auto-created assemblies')") rescue nil
+        rescue => e
+          puts "Takeoff clearAutoAssemblies error: #{e.message}"
+        end
+      end
+
     end
   end
 end

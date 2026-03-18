@@ -1150,10 +1150,6 @@ module TakeoffTool
         face.material = mat
         face.back_material = mat
       end
-      ents.grep(Sketchup::Edge).each do |edge|
-        face_list << [edge, edge.material]
-        edge.material = mat
-      end
       ents.each do |child|
         next unless child.valid?
         next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
@@ -1170,9 +1166,6 @@ module TakeoffTool
       ents.grep(Sketchup::Face).each do |face|
         face.material = mat
         face.back_material = mat
-      end
-      ents.grep(Sketchup::Edge).each do |edge|
-        edge.material = mat
       end
       ents.each do |child|
         next unless child.valid?

@@ -61,18 +61,15 @@ module TakeoffTool
         r = eid_sr[eid]
         part_name = r ? (r[:display_name] || r[:definition_name] || 'Unknown') : "Entity #{eid}"
         cat = ca[eid] || (r ? (r[:parsed][:auto_category] rescue 'Uncategorized') : 'Uncategorized')
-        beam = detect_beam_data(eid)
         parts << {
           'part_number'      => "#{prefix}-#{seq.to_s.rjust(3, '0')}",
           'entity_id'        => eid,
           'name'             => part_name,
           'category'         => cat,
           'quantity'          => 1,
-          'unit'             => beam.empty? ? 'EA' : 'LF',
+          'unit'             => 'EA',
           'notes'            => '',
-          'is_virtual'       => false,
-          'beam_net_section' => beam[:beam_net_section],
-          'beam_linear_ft'   => beam[:beam_linear_ft]
+          'is_virtual'       => false
         }
         seq += 1
       end
@@ -109,18 +106,15 @@ module TakeoffTool
       r = eid_sr[eid]
       part_name = r ? (r[:display_name] || r[:definition_name] || 'Unknown') : "Entity #{eid}"
       cat = ca[eid] || (r ? (r[:parsed][:auto_category] rescue 'Uncategorized') : 'Uncategorized')
-      beam = detect_beam_data(eid)
       parts << {
         'part_number'      => "#{prefix}-#{seq.to_s.rjust(3, '0')}",
         'entity_id'        => eid,
         'name'             => part_name,
         'category'         => cat,
         'quantity'          => 1,
-        'unit'             => beam.empty? ? 'EA' : 'LF',
+        'unit'             => 'EA',
         'notes'            => '',
-        'is_virtual'       => false,
-        'beam_net_section' => beam[:beam_net_section],
-        'beam_linear_ft'   => beam[:beam_linear_ft]
+        'is_virtual'       => false
       }
       seq += 1
     end
@@ -135,8 +129,6 @@ module TakeoffTool
       'parts'    => parts
     }
     save_assemblies(assemblies)
-    # Tag all modeled entities
-    entity_ids.map(&:to_i).each { |eid| tag_entity_as_assembly_child(eid, asm_id) }
     publish(EVENT_ASSEMBLY_CREATED, asm_id: asm_id)
     asm_id
   end
@@ -145,11 +137,6 @@ module TakeoffTool
     assemblies = load_assemblies
     asm = assemblies.delete(asm_id.to_s)
     return assemblies unless asm
-    # Clear entity tags for all modeled parts
-    (asm['parts'] || []).each do |p|
-      next if p['is_virtual'] || !p['entity_id']
-      untag_entity_if_orphaned(p['entity_id'].to_i)
-    end
     save_assemblies(assemblies)
     # Clean up viewport tags
     AssemblyAnnotations.hide_tags(asm_id) if defined?(AssemblyAnnotations)
@@ -191,7 +178,6 @@ module TakeoffTool
     r = sr.find { |s| s[:entity_id].to_i == eid }
     part_name = r ? (r[:display_name] || r[:definition_name] || 'Unknown') : "Entity #{eid}"
     cat = ca[eid] || (r ? (r[:parsed][:auto_category] rescue 'Uncategorized') : 'Uncategorized')
-    beam = detect_beam_data(eid)
 
     pn = next_part_number(a)
     part = {
@@ -200,15 +186,11 @@ module TakeoffTool
       'name'             => part_name,
       'category'         => cat,
       'quantity'          => 1,
-      'unit'             => beam.empty? ? 'EA' : 'LF',
+      'unit'             => 'EA',
       'notes'            => '',
-      'is_virtual'       => false,
-      'beam_net_section' => beam[:beam_net_section],
-      'beam_linear_ft'   => beam[:beam_linear_ft]
+      'is_virtual'       => false
     }
     a['parts'] << part
-    # Tag the SketchUp entity so it's identifiable as an assembly member
-    tag_entity_as_assembly_child(eid, asm_id)
     save_assemblies(assemblies)
     publish(EVENT_PARTS_CHANGED, asm_id: asm_id)
     pn
@@ -228,9 +210,7 @@ module TakeoffTool
       'quantity'          => [quantity.to_i, 1].max,
       'unit'             => unit.to_s,
       'notes'            => notes.to_s,
-      'is_virtual'       => true,
-      'beam_net_section' => nil,
-      'beam_linear_ft'   => nil
+      'is_virtual'       => true
     }
     a['parts'] << part
     save_assemblies(assemblies)
@@ -246,11 +226,6 @@ module TakeoffTool
     removed = a['parts'].select { |p| p['part_number'] == part_number.to_s }
     a['parts'].reject! { |p| p['part_number'] == part_number.to_s }
     return false if a['parts'].length == before
-    # Clear entity tag if this was a modeled part and entity isn't in other assemblies
-    removed.each do |p|
-      next if p['is_virtual'] || !p['entity_id']
-      untag_entity_if_orphaned(p['entity_id'].to_i)
-    end
     save_assemblies(assemblies)
     publish(EVENT_PARTS_CHANGED, asm_id: asm_id)
     true
@@ -286,56 +261,62 @@ module TakeoffTool
     added
   end
 
-  # ─── Beam Auto-Detection ───
+  # ─── Formatting Helpers ───
 
-  def self.detect_beam_data(entity_id)
-    e = find_entity(entity_id.to_i)
-    return {} unless e && e.valid? && e.respond_to?(:definition)
-    defn = e.definition
-    cat = (@category_assignments || {})[entity_id.to_i]
-    cat ||= (@scan_results || []).find { |r| r[:entity_id].to_i == entity_id.to_i }&.dig(:parsed, :auto_category)
-    cat ||= ''
-    # Only detect beam data for beam/structural categories
-    return {} unless cat =~ Scanner::BEAM_RE || defn.name =~ Scanner::BEAM_RE
-    result = {}
-    begin
-      ns = Scanner.beam_net_section(defn)
-      if ns
-        result[:beam_net_section] = "#{ns[0].round(2)}x#{ns[1].round(2)}"
-      end
-      lf = Scanner.beam_linear_ft(defn, e.transformation)
-      if lf && lf > 0
-        result[:beam_linear_ft] = lf.round(2)
-      end
-    rescue => err
-      puts "[FF Assembly] beam detect error for #{entity_id}: #{err.message}"
+  def self.to_construction_fraction(decimal_inches)
+    # Round to nearest 1/16"
+    sixteenths = (decimal_inches.to_f * 16).round
+    whole = sixteenths / 16
+    remainder = sixteenths % 16
+
+    return whole.to_s if remainder == 0
+
+    # Simplify the fraction
+    num = remainder
+    den = 16
+    while num % 2 == 0 && den % 2 == 0
+      num /= 2
+      den /= 2
     end
-    result
+
+    if whole > 0
+      "#{whole} #{num}/#{den}"
+    else
+      "#{num}/#{den}"
+    end
   end
 
-  def self.refresh_beam_data(asm_id)
-    assemblies = load_assemblies
-    a = assemblies[asm_id.to_s]
-    return unless a
-    changed = false
-    a['parts'].each do |part|
-      next if part['is_virtual'] || !part['entity_id']
-      beam = detect_beam_data(part['entity_id'])
-      if beam[:beam_net_section]
-        part['beam_net_section'] = beam[:beam_net_section]
-        changed = true
-      end
-      if beam[:beam_linear_ft]
-        part['beam_linear_ft'] = beam[:beam_linear_ft]
-        changed = true
-      end
-    end
-    save_assemblies(assemblies) if changed
+  def self.construction_section(dim1, dim2)
+    "#{to_construction_fraction(dim1)}x#{to_construction_fraction(dim2)}"
   end
 
-  def self.refresh_all_beam_data
-    assemblies = load_assemblies
-    assemblies.each_key { |id| refresh_beam_data(id) }
+  # Convert nominal lumber dimension to actual
+  # "8" -> 7.5, "10" -> 9.5, "12" -> 11.5, etc.
+  # Fractional dims like "2 5/8" are already actual, not nominal
+  def self.nominal_to_actual(dim_str)
+    # Check if it's a fraction like "2 5/8"
+    if dim_str =~ /(\d+)\s+(\d+)\/(\d+)/
+      whole = $1.to_f
+      frac = $2.to_f / $3.to_f
+      return whole + frac
+    end
+
+    n = dim_str.to_f
+    return nil if n <= 0
+
+    # Standard nominal-to-actual lumber conversion
+    case n.round
+    when 2 then 1.5
+    when 3 then 2.5
+    when 4 then 3.5
+    when 6 then 5.5
+    when 8 then 7.5
+    when 10 then 9.5
+    when 12 then 11.5
+    when 14 then 13.5
+    when 16 then 15.5
+    else n  # Non-standard — return as-is
+    end
   end
 
   # ─── Validation: mark stale entity references ───
@@ -400,36 +381,6 @@ module TakeoffTool
     pn
   end
 
-  # ─── Entity Tagging ───
-
-  def self.tag_entity_as_assembly_child(entity_id, asm_id)
-    e = find_entity(entity_id.to_i)
-    return unless e && e.valid?
-    e.set_attribute('FormAndField', 'ff_assembly_child', true)
-    # Store which assembly IDs reference this entity
-    existing = (e.get_attribute('FormAndField', 'ff_assembly_ids') || '').split(',').reject(&:empty?)
-    existing << asm_id.to_s unless existing.include?(asm_id.to_s)
-    e.set_attribute('FormAndField', 'ff_assembly_ids', existing.join(','))
-  rescue => err
-    puts "[FF Assembly] tag error for #{entity_id}: #{err.message}"
-  end
-
-  def self.untag_entity_if_orphaned(entity_id)
-    e = find_entity(entity_id.to_i)
-    return unless e && e.valid?
-    # Check if this entity still belongs to any assembly
-    remaining = assemblies_for_entity(entity_id)
-    if remaining.empty?
-      e.delete_attribute('FormAndField', 'ff_assembly_child')
-      e.delete_attribute('FormAndField', 'ff_assembly_ids')
-    else
-      ids = remaining.map { |r| r[:asm_id] }.uniq
-      e.set_attribute('FormAndField', 'ff_assembly_ids', ids.join(','))
-    end
-  rescue => err
-    puts "[FF Assembly] untag error for #{entity_id}: #{err.message}"
-  end
-
   # ─── Parts List Generation ───
 
   def self.generate_parts_list(assembly_name)
@@ -459,6 +410,7 @@ module TakeoffTool
 
       e = find_entity(eid)
       sku = e && e.valid? ? (e.get_attribute('TakeoffAssignments', 'sku') || '') : ''
+      zone = e && e.valid? ? (e.get_attribute('TakeoffAssignments', 'zone') || '') : ''
 
       if groups[key]
         g = groups[key]
@@ -469,6 +421,7 @@ module TakeoffTool
         g[:total_cf] += (r[:volume_ft3] || 0).to_f
         g[:eids] << eid
         g[:sku] = sku unless sku.empty? || !g[:sku].empty?
+        g[:zone] = zone unless zone.empty? || !g[:zone].to_s.empty?
       else
         groups[key] = {
           category: cat,
@@ -484,6 +437,7 @@ module TakeoffTool
           total_cf: (r[:volume_ft3] || 0).to_f,
           bb_dims: "#{(r[:bb_width_in] || 0).round(1)}x#{(r[:bb_height_in] || 0).round(1)}x#{(r[:bb_depth_in] || 0).round(1)}",
           sku: sku,
+          zone: zone,
           eids: [eid]
         }
       end
@@ -519,6 +473,7 @@ module TakeoffTool
         material: item[:material] || '',
         size: item[:size] || '',
         dims: item[:bb_dims] || '',
+        zone: item[:zone] || '',
         qty: item[:qty],
         lf: item[:total_lf].round(1),
         sf: item[:total_sf].round(1),
@@ -590,13 +545,13 @@ module TakeoffTool
       f.puts "Generated: #{Time.now.strftime('%B %d, %Y %I:%M %p')}"
       f.puts "Entities: #{data[:entity_count]}, Line Items: #{data[:line_items]}"
       f.puts ""
-      f.puts "Cost Code,Category,SKU,Item,Material,Size,Qty,LF,SF,BF,CF"
+      f.puts "Cost Code,Category,SKU,Item,Material,Size,Zone,Qty,LF,SF,BF,CF"
       data[:groups].each do |grp|
         grp[:items].each do |item|
           row = [
             grp[:cost_code], grp[:category], item[:sku], item[:name],
-            item[:material], item[:size], item[:qty],
-            item[:lf], item[:sf], item[:bf], item[:cf]
+            item[:material], item[:size], item[:zone],
+            item[:qty], item[:lf], item[:sf], item[:bf], item[:cf]
           ].map { |v| "\"#{v.to_s.gsub('"', '""')}\"" }
           f.puts row.join(',')
         end
@@ -609,12 +564,142 @@ module TakeoffTool
     true
   end
 
+  # ─── Cadworks CSV Import ───
+
+  def self.import_cadworks_csv(path)
+    require 'csv'
+    require 'json'
+
+    m = Sketchup.active_model
+    return { matched: 0, unmatched: 0, error: 'No model' } unless m
+
+    # Read CSV — clean raw text first to handle embedded newlines and null bytes
+    rows = []
+    raw = File.read(path, encoding: 'bom|utf-8')
+    raw.gsub!("\r\n", "\n")
+    raw.gsub!("\r", "\n")
+    raw.gsub!("\x00", '')
+    CSV.parse(raw, headers: true, liberal_parsing: true, skip_blanks: true) do |row|
+      h = {}
+      row.each { |k, v| h[k.to_s.strip.downcase] = (v || '').strip if k }
+
+      name = h['name'] || h['element'] || h['description'] || ''
+      mark = h['mark'] || h['sku'] || h['part number'] || h['part_number'] || h['part#'] || ''
+      group = h['group'] || h['location'] || h['zone'] || h['room'] || ''
+      material = h['material'] || h['species'] || ''
+      color = h['color'] || h['colour'] || ''
+      qty = (h['quantity'] || h['qty'] || h['count'] || '1').to_i
+      steel_asm = h['steel assembly'] || h['assembly'] || ''
+
+      next if name.empty? && mark.empty?
+
+      rows << {
+        name: name,
+        mark: mark,
+        group: group,
+        material: material,
+        color: color,
+        qty: qty,
+        steel_assembly: steel_asm
+      }
+    end
+
+    return { matched: 0, unmatched: 0, error: "No valid rows in CSV" } if rows.empty?
+
+    sr = @scan_results || []
+    reg = @entity_registry || {}
+
+    # Index entities by normalized name + material for matching
+    entity_index = {}
+    sr.each do |r|
+      eid = r[:entity_id]
+      ename = (r[:display_name] || r[:definition_name] || '').strip
+      emat = (r[:material] || r[:parsed][:material] || '').strip
+
+      clean_name = ename.sub(/,\s*[0-9A-Fa-f]{7,}$/, '').strip.downcase
+      clean_mat = emat.downcase
+
+      key = "#{clean_name}|#{clean_mat}"
+      entity_index[key] ||= []
+      entity_index[key] << eid
+
+      key_no_mat = "#{clean_name}|"
+      entity_index[key_no_mat] ||= []
+      entity_index[key_no_mat] << eid
+    end
+
+    m.start_operation('Import Cadworks CSV', true)
+    matched = 0
+    unmatched = 0
+    unmatched_names = []
+
+    rows.each do |row|
+      csv_name = row[:name].downcase
+      csv_mat = row[:material].downcase
+
+      # Try exact name+material match first
+      key = "#{csv_name}|#{csv_mat}"
+      eids = entity_index[key]
+
+      # Fallback: name-only match
+      if !eids || eids.empty?
+        key = "#{csv_name}|"
+        eids = entity_index[key]
+      end
+
+      # Fallback: partial name match
+      if !eids || eids.empty?
+        entity_index.each do |k, v|
+          ename = k.split('|').first
+          if ename.include?(csv_name) || csv_name.include?(ename)
+            eids = v
+            break
+          end
+        end
+      end
+
+      if eids && eids.any?
+        eids.each do |eid|
+          e = reg[eid] || find_entity(eid)
+          next unless e && e.valid?
+
+          e.set_attribute('TakeoffAssignments', 'sku', row[:mark]) unless row[:mark].empty?
+          e.set_attribute('TakeoffAssignments', 'zone', row[:group]) unless row[:group].empty?
+          e.set_attribute('TakeoffAssignments', 'cadworks_color', row[:color]) unless row[:color].empty?
+          e.set_attribute('TakeoffAssignments', 'steel_assembly', row[:steel_assembly]) unless row[:steel_assembly].empty?
+        end
+        matched += 1
+      else
+        unmatched += 1
+        unmatched_names << row[:name] unless unmatched_names.length > 20
+      end
+    end
+
+    m.commit_operation
+
+    puts "FF: Cadworks CSV import: #{matched} matched, #{unmatched} unmatched out of #{rows.length} rows"
+    if unmatched_names.any?
+      puts "FF: Unmatched names (first #{unmatched_names.length}):"
+      unmatched_names.each { |n| puts "  - #{n}" }
+    end
+
+    { matched: matched, unmatched: unmatched, total: rows.length, unmatched_names: unmatched_names }
+  end
+
+  def self.clear_auto_assemblies
+    assemblies = load_assemblies
+    before = assemblies.length
+    assemblies.reject! { |_id, asm| (asm['notes'] || '').include?('Auto-assembled from Cadworks CSV') }
+    save_assemblies(assemblies)
+    puts "FF: Cleared #{before - assemblies.length} auto-created assemblies"
+    before - assemblies.length
+  end
+
   # ─── Event Bus Subscriptions ───
 
   subscribe(EVENT_SCAN_COMPLETE) do |_payload|
     begin
       validate_assembly_references
-      refresh_all_beam_data
       Dashboard.send_assemblies if defined?(Dashboard) && Dashboard.visible?
     rescue => e
       puts "[FF Assembly] scan_complete handler error: #{e.message}"

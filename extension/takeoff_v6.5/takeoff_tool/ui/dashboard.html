@@ -1593,6 +1593,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
       <div class="asm-toolbar">
         <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">From Visible</button>
         <button class="hb" onclick="createAsmFromSelection()" style="color:#a6e3a1;border-color:#a6e3a1">From Selection</button>
+        <button class="hb" onclick="call('importCadworksCSV')" style="color:#fab387;border-color:#fab387">Import CSV</button>
+        <button class="hb" onclick="call('clearAutoAssemblies')" style="color:#f38ba8;border-color:#45475a;font-size:9px">Clear Auto</button>
         <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
       </div>
       <div class="sec-scroll" id="asmScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
@@ -5668,6 +5670,27 @@ function togAsmPartVis(eid){
   call(vis?'hideEntities':'showEntities',''+eid);
   renderAsmPanel();
 }
+function togPartGroupVis(eidsArg){
+  var ids=Array.isArray(eidsArg)?eidsArg:String(eidsArg).split(',').map(Number);
+  var allVis=true;
+  for(var i=0;i<ids.length;i++){if(VIS[ids[i]]===false){allVis=false;break;}}
+  var action=allVis?'hideEntities':'showEntities';
+  for(var i=0;i<ids.length;i++){VIS[ids[i]]=!allVis;}
+  call(action,ids.join(','));
+  renderAsmPanel();
+}
+function isoPartGroup(eidsArg){
+  var ids=Array.isArray(eidsArg)?eidsArg:String(eidsArg).split(',').map(Number);
+  call('isolateEntities',ids.join(','));
+  var idSet={};
+  for(var i=0;i<ids.length;i++){idSet[ids[i]]=true;VIS[ids[i]]=true;}
+  for(var i=0;i<D.length;i++){
+    var eid=D[i].entityId;
+    if(!idSet[eid])VIS[eid]=false;
+  }
+  ISO_CATS=null;FISO=false;updateFisoBtn();
+  filt();renderAsmPanel();
+}
 function isoAsm(id){
   var a=ASMB[id];if(!a)return;
   // Use VisibilityManager on the Ruby side for proper isolation
@@ -5697,7 +5720,6 @@ function toggleAsmPanel(){}
 
 /* ═══ ASSEMBLY CARD RENDERING ═══ */
 function renderAsmPanel(){
-  if(PL_VIEW){renderPartsList();return;}
   var body=document.getElementById('asmBody');
   var keys=Object.keys(ASMB).sort(function(a,b){
     var na=(ASMB[a].name||'').toLowerCase(),nb=(ASMB[b].name||'').toLowerCase();
@@ -5725,7 +5747,7 @@ function renderAsmCard(id,asm,idx,fasm){
   var eCnt=getAsmEids(asm).length;
   var pCnt=asm.part_count||0;
   var tagsOn=asm.tags_visible||false;
-  var si=JSON.stringify(id);
+  var si="'"+id.replace(/'/g,"\\'")+"'";
   var h='<div class="asm-card'+active+'" id="asmCard_'+id+'">';
   // Header
   h+='<div class="asm-card-header" onclick="toggleAsmCard('+si+')">';
@@ -5737,8 +5759,6 @@ function renderAsmCard(id,asm,idx,fasm){
   h+='<span class="asm-entity-count">'+eCnt+' items</span>';
   h+='<span class="asm-part-count">'+pCnt+' parts</span>';
   h+='<div class="asm-card-actions">';
-  var ne=X2(name);
-  h+='<button onclick="event.stopPropagation();showPartsList(\''+ne+'\')" title="View Parts List" style="color:#a6e3a1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>';
   h+='<button class="asm-tag-btn'+(tagsOn?' active':'')+'" onclick="event.stopPropagation();asmToggleTags('+si+')" title="'+(tagsOn?'Hide':'Show')+' part tags in viewport">Tags</button>';
   h+='<button onclick="event.stopPropagation();asmExport('+si+')" title="Export CSV"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
   h+='<button onclick="event.stopPropagation();asmRename('+si+')" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
@@ -5748,10 +5768,169 @@ function renderAsmCard(id,asm,idx,fasm){
   h+='</div></div>';
   // Body (collapsible)
   h+='<div class="asm-card-body'+(isExp?' open':'')+'" id="asmBody_'+id+'">';
-  h+=renderAsmPartsTable(id,asm);
-  h+=renderAsmVForm(id);
-  h+=renderAsmSummary(asm);
+  h+=renderAsmPartsInline(id,asm);
   h+='</div>';
+  h+='</div>';
+  return h;
+}
+
+/* ═══ INLINE GROUPED PARTS VIEW ═══ */
+function renderAsmPartsInline(id,asm){
+  var bi=asm.beamInventory||[];
+  var parts=asm.parts||[];
+  if(!bi.length&&!parts.length)return'<div class="asm-bd-empty">No parts</div>';
+
+  // If no beam inventory, show simple grouped list
+  if(!bi.length){
+    return renderAsmPartsSimple(id,asm);
+  }
+
+  var h='';
+  var totalPcs=0,totalLF=0,totalBF=0;
+
+  for(var i=0;i<bi.length;i++){
+    var bm=bi[i];
+    var sp=bm.section.split('x');var bW=parseFrac(sp[0]),bH=parseFrac(sp[1]);
+    var secBF=0;for(var r=0;r<bm.rows.length;r++){secBF+=bW*bH*bm.rows[r].l*bm.rows[r].qty/12;}
+    totalPcs+=bm.count;totalLF+=bm.totalLF;totalBF+=secBF;
+
+    var secKey='abi_'+id+'_'+i;
+    var secOpen=!!_beamInvOpen[secKey];
+    var secEids=JSON.stringify(bm.eids||[]);
+
+    // Section header
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--mantle);border-bottom:1px solid var(--surface0);cursor:pointer;user-select:none" onclick="event.stopPropagation();_beamInvOpen[\''+secKey+'\']='+(secOpen?'false':'true')+';renderAsmPanel();">';
+    h+='<span style="font-size:9px;color:var(--overlay0)">'+(secOpen?'&#9660;':'&#9654;')+'</span>';
+    h+='<span style="font-size:11px;font-weight:700;color:var(--text)">'+bm.section+'"</span>';
+    h+='<span style="font-size:10px;color:var(--overlay1);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+X(bm.defn)+'</span>';
+    // Visibility toggle for this section
+    var secVis=(bm.eids||[]).some(function(eid){return VIS[eid]!==false;});
+    h+='<button onclick="event.stopPropagation();togPartGroupVis('+secEids+')" style="border:none;background:transparent;cursor:pointer;color:'+(secVis?'var(--blue)':'var(--surface2)')+';font-size:11px;padding:2px" title="Toggle visibility">';
+    h+=(secVis?'\u25C9':'\u25CB')+'</button>';
+    // Isolate
+    h+='<button onclick="event.stopPropagation();isoPartGroup('+secEids+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:2px;font-family:inherit" title="Isolate">iso</button>';
+    h+='<span style="font-size:10px;font-weight:700;color:var(--green)">'+bm.count+'</span>';
+    h+='<span style="font-size:10px;font-weight:700;color:var(--sapphire)">'+bm.totalLF.toFixed(1)+'\'</span>';
+    h+='<span style="font-size:10px;font-weight:600;color:var(--yellow)">'+Math.round(secBF)+' BF</span>';
+    h+='</div>';
+
+    // Length subgroups (when expanded)
+    if(secOpen){
+      for(var ri=0;ri<bm.rows.length;ri++){
+        var rw=bm.rows[ri];
+        var rwBF=bW*bH*rw.l*rw.qty/12;
+        var rwEids=JSON.stringify(rw.eids||[]);
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:3px 10px 3px 32px;border-bottom:1px solid rgba(49,50,68,.5);position:relative;cursor:pointer">';
+        h+='<span style="position:absolute;left:22px;top:0;bottom:0;width:1px;background:var(--surface0)"></span>';
+        h+='<span style="position:absolute;left:22px;top:50%;width:6px;height:1px;background:var(--surface0)"></span>';
+        // Vis toggle per length group
+        var rwVis=(rw.eids||[]).some(function(eid){return VIS[eid]!==false;});
+        h+='<button onclick="event.stopPropagation();togPartGroupVis('+rwEids+')" style="border:none;background:transparent;cursor:pointer;color:'+(rwVis?'var(--blue)':'var(--surface2)')+';font-size:10px;padding:0" title="Toggle">'+(rwVis?'\u25C9':'\u25CB')+'</button>';
+        h+='<button onclick="event.stopPropagation();isoPartGroup('+rwEids+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit" title="Isolate">iso</button>';
+        h+='<span style="font-size:11px;font-weight:600;color:var(--peach);min-width:65px">'+bm.section+'"</span>';
+        h+='<span style="color:var(--overlay0)">&times;</span>';
+        h+='<span style="font-size:11px;font-weight:700;color:var(--sapphire);min-width:65px">'+fmtFtIn(rw.l)+'</span>';
+        h+='<span style="color:var(--overlay0)">&times;</span>';
+        h+='<span style="font-size:12px;font-weight:700;color:var(--green);min-width:28px">'+rw.qty+'</span>';
+        h+='<span style="font-size:9px;color:var(--overlay0)">pcs</span>';
+        h+='<span style="flex:1"></span>';
+        h+='<span style="font-size:10px;font-weight:600;color:var(--yellow)">'+Math.round(rwBF)+' BF</span>';
+        h+='</div>';
+      }
+    }
+  }
+
+  // Non-beam parts (SF items, EA items, virtual, etc)
+  var nonBeam=parts.filter(function(p){return !p.beam_linear_ft||p.beam_linear_ft<=0;});
+  if(nonBeam.length){
+    h+='<div style="padding:4px 10px 2px;font-size:9px;font-weight:600;color:var(--overlay0);border-bottom:1px solid var(--surface0);background:var(--mantle)">OTHER PARTS ('+nonBeam.length+')</div>';
+    // Group non-beam by category+name
+    var nbGroups={};
+    for(var ni=0;ni<nonBeam.length;ni++){
+      var np=nonBeam[ni];
+      var nk=(np.category||'')+'|'+(np.name||'');
+      if(!nbGroups[nk])nbGroups[nk]={name:np.name||'',category:np.category||'',qty:0,eids:[],is_virtual:np.is_virtual||false};
+      nbGroups[nk].qty+=(np.qty||1);
+      if(np.entity_id)nbGroups[nk].eids.push(np.entity_id);
+    }
+    var nbItems=Object.values(nbGroups).sort(function(a,b){return a.category.localeCompare(b.category)||a.name.localeCompare(b.name);});
+    for(var nbi=0;nbi<nbItems.length;nbi++){
+      var nb=nbItems[nbi];
+      var nbEids=JSON.stringify(nb.eids);
+      var nbVis=nb.eids.length?nb.eids.some(function(eid){return VIS[eid]!==false;}):true;
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;border-bottom:1px solid rgba(49,50,68,.5);font-size:10px">';
+      if(nb.eids.length){
+        h+='<button onclick="event.stopPropagation();togPartGroupVis('+nbEids+')" style="border:none;background:transparent;cursor:pointer;color:'+(nbVis?'var(--blue)':'var(--surface2)')+';font-size:10px;padding:0">'+(nbVis?'\u25C9':'\u25CB')+'</button>';
+        h+='<button onclick="event.stopPropagation();isoPartGroup('+nbEids+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit">iso</button>';
+      } else {
+        h+='<span style="width:24px"></span>';
+      }
+      h+='<span style="flex:1;color:var(--text)">'+X(nb.name);
+      if(nb.is_virtual)h+='<span class="asm-virt-badge">VIRTUAL</span>';
+      h+='</span>';
+      h+='<span style="font-size:9px;color:var(--overlay1)">'+X(nb.category)+'</span>';
+      h+='<span style="font-weight:700;color:var(--green);min-width:28px;text-align:right">'+nb.qty+'</span>';
+      h+='</div>';
+    }
+  }
+
+  // Total row
+  h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--mantle);border-top:2px solid var(--surface1);font-weight:700;font-size:11px">';
+  h+='<span style="color:var(--subtext1)">TOTAL</span><span style="flex:1"></span>';
+  h+='<span style="color:var(--green)">'+totalPcs+' pcs</span>';
+  h+='<span style="color:var(--sapphire)">'+totalLF.toFixed(1)+'\'</span>';
+  h+='<span style="color:var(--yellow)">'+Math.round(totalBF).toLocaleString()+' BF</span>';
+  h+='</div>';
+
+  // Export button
+  var ne=X2(asm.name||id);
+  h+='<div style="padding:4px 10px;display:flex;gap:6px;justify-content:flex-end">';
+  h+='<button class="hb" onclick="event.stopPropagation();call(\'exportPartsList\',\''+ne+'\')" style="font-size:9px;padding:2px 8px;color:#a6e3a1;border-color:#a6e3a1">Export CSV</button>';
+  h+='</div>';
+
+  return h;
+}
+
+// Simple grouped list for non-beam assemblies
+function renderAsmPartsSimple(id,asm){
+  var parts=asm.parts||[];
+  var groups={};
+  for(var i=0;i<parts.length;i++){
+    var p=parts[i];
+    var k=(p.category||'')+'|'+(p.name||'');
+    if(!groups[k])groups[k]={name:p.name||'',category:p.category||'',qty:0,eids:[],is_virtual:p.is_virtual||false,sku:''};
+    groups[k].qty+=(p.qty||1);
+    if(p.entity_id)groups[k].eids.push(p.entity_id);
+    if(!groups[k].sku&&p.part_num)groups[k].sku=p.part_num;
+  }
+  var items=Object.values(groups).sort(function(a,b){return a.category.localeCompare(b.category)||a.name.localeCompare(b.name);});
+  var h='';
+  var curCat='';
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    if(it.category!==curCat){
+      curCat=it.category;
+      h+='<div style="padding:4px 10px 2px;font-size:9px;font-weight:600;color:var(--overlay0);border-bottom:1px solid var(--surface0);background:var(--mantle)">'+X(curCat)+'</div>';
+    }
+    var eidsStr=JSON.stringify(it.eids);
+    var vis=it.eids.length?it.eids.some(function(eid){return VIS[eid]!==false;}):true;
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:3px 10px;border-bottom:1px solid rgba(49,50,68,.5);font-size:10px">';
+    if(it.eids.length){
+      h+='<button onclick="event.stopPropagation();togPartGroupVis('+eidsStr+')" style="border:none;background:transparent;cursor:pointer;color:'+(vis?'var(--blue)':'var(--surface2)')+';font-size:10px;padding:0">'+(vis?'\u25C9':'\u25CB')+'</button>';
+      h+='<button onclick="event.stopPropagation();isoPartGroup('+eidsStr+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit">iso</button>';
+    } else {
+      h+='<span style="width:24px"></span>';
+    }
+    if(it.sku)h+='<span style="font-size:9px;color:var(--blue);font-weight:600;min-width:50px">'+X(it.sku)+'</span>';
+    h+='<span style="flex:1;color:var(--text)">'+X(it.name);
+    if(it.is_virtual)h+='<span class="asm-virt-badge">VIRTUAL</span>';
+    h+='</span>';
+    h+='<span style="font-weight:700;color:var(--green);min-width:28px;text-align:right">'+it.qty+'</span>';
+    h+='</div>';
+  }
+  var ne=X2(asm.name||id);
+  h+='<div style="padding:4px 10px;display:flex;gap:6px;justify-content:flex-end">';
+  h+='<button class="hb" onclick="event.stopPropagation();call(\'exportPartsList\',\''+ne+'\')" style="font-size:9px;padding:2px 8px;color:#a6e3a1;border-color:#a6e3a1">Export CSV</button>';
   h+='</div>';
   return h;
 }
@@ -5760,7 +5939,7 @@ function renderAsmCard(id,asm,idx,fasm){
 function renderAsmPartsTable(id,asm){
   var parts=asm.parts||[];
   if(!parts.length)return'<div class="asm-bd-empty">No parts yet — add from selection or add virtual parts.</div>';
-  var si=JSON.stringify(id);
+  var si="'"+id.replace(/'/g,"\\'")+"'";
   var h='<table class="asm-parts-table"><thead><tr><th>Part#</th><th>Name</th><th>Category</th><th>Qty</th><th>Unit</th><th>Notes</th><th></th></tr></thead><tbody>';
   var cap=ASM_PARTS_CAP;
   var showAll=!!expandedAssemblies[id+'_allparts'];
@@ -5771,7 +5950,7 @@ function renderAsmPartsTable(id,asm){
     if(p.is_virtual)rowCls+=' virtual';
     if(p.stale)rowCls+=' stale';
     if(p.beam_net_section)rowCls+=' beam';
-    var psi=JSON.stringify(p.part_num);
+    var psi="'"+p.part_num.replace(/'/g,"\\'")+"'";
     h+='<tr class="'+rowCls+'">';
     h+='<td class="asm-part-num">'+X(p.part_num)+'</td>';
     h+='<td>'+X(p.name||'');
@@ -5801,7 +5980,7 @@ function renderAsmPartsTable(id,asm){
 /* ═══ VIRTUAL PART INLINE FORM ═══ */
 function renderAsmVForm(id){
   var isOpen=!!asmVFormOpen[id];
-  var si=JSON.stringify(id);
+  var si="'"+id.replace(/'/g,"\\'")+"'";
   var catOpts='<option value="">Select...</option>';
   var cats=(typeof CA!=='undefined'&&CA)?CA:[];
   for(var i=0;i<cats.length;i++){catOpts+='<option value="'+X(cats[i])+'">'+X(cats[i])+'</option>';}
@@ -5949,106 +6128,22 @@ function asmExport(id){
   callJSON('exportAssembly',{asmId:id});
 }
 
-/* ═══ PARTS LIST VIEW ═══ */
-var PARTS_LIST=null;
-var PL_VIEW=null;
-
-function showPartsList(name){
-  PL_VIEW=name;
-  call('getPartsList',name);
-}
-function hidePartsList(){
-  PL_VIEW=null;
-  PARTS_LIST=null;
-  renderAsmPanel();
-}
-function receivePartsList(data){
-  PARTS_LIST=typeof data==='string'?JSON.parse(data):data;
-  renderPartsList();
-}
-function renderPartsList(){
-  if(!PARTS_LIST)return;
-  var d=PARTS_LIST;
-  var body=document.getElementById('asmBody');
-  var h='<div class="pl-hdr">';
-  h+='<button class="pl-back" onclick="hidePartsList()" title="Back to assemblies">&larr;</button>';
-  h+='<span class="pl-title">'+X(d.assembly)+'</span>';
-  h+='<span class="pl-cnt">'+d.entity_count+' entities &middot; '+d.line_items+' line items</span>';
-  h+='<div class="pl-acts">';
-  h+='<button class="hb" onclick="call(\'exportPartsList\',\''+X2(d.assembly)+'\')" style="font-size:9px;padding:2px 8px;color:#a6e3a1;border-color:#a6e3a1">Export CSV</button>';
-  h+='</div></div>';
-  for(var gi=0;gi<d.groups.length;gi++){
-    var grp=d.groups[gi];
-    var cc=grp.cost_code||'';
-    h+='<div class="pl-cat-label">'+X(grp.category)+(cc?' &mdash; '+X(cc):'')+'</div>';
-    h+='<table class="pl-tbl"><thead><tr>';
-    h+='<th style="width:60px">SKU</th><th>Item</th><th>Material</th><th>Size</th>';
-    h+='<th class="r">Qty</th>';
-    var hasLF=grp.items.some(function(i){return i.lf>0;});
-    var hasSF=grp.items.some(function(i){return i.sf>0;});
-    var hasBF=grp.items.some(function(i){return i.bf>0;});
-    var hasCF=grp.items.some(function(i){return i.cf>0;});
-    if(hasLF)h+='<th class="r">LF</th>';
-    if(hasSF)h+='<th class="r">SF</th>';
-    if(hasBF)h+='<th class="r">BF</th>';
-    if(hasCF)h+='<th class="r">CF</th>';
-    h+='</tr></thead><tbody>';
-    for(var ii=0;ii<grp.items.length;ii++){
-      var it=grp.items[ii];
-      var firstEid=it.eids&&it.eids.length?it.eids[0]:0;
-      var isVirt=it.is_virtual||false;
-      h+='<tr'+(isVirt?' class="pl-virt-row"':'')+'>';
-      if(isVirt){
-        h+='<td></td>';
-      } else if(it.sku){
-        h+='<td><span class="pl-sku">'+X(it.sku)+'</span></td>';
-      } else {
-        h+='<td><span class="pl-sku-add" onclick="promptSku('+firstEid+',\''+X2(d.assembly)+'\')">+ add</span></td>';
-      }
-      h+='<td>'+X(it.name);
-      if(isVirt)h+='<span class="pl-virt-badge">VIRTUAL</span>';
-      h+='</td>';
-      h+='<td style="color:#7f849c;font-size:10px">'+X(it.material)+'</td>';
-      h+='<td class="pl-dims">'+X(it.size||it.dims)+'</td>';
-      h+='<td class="r">'+it.qty+'</td>';
-      if(hasLF)h+='<td class="r">'+(it.lf>0?'<span class="pl-mval lf">'+it.lf.toFixed(1)+'</span>':'')+'</td>';
-      if(hasSF)h+='<td class="r">'+(it.sf>0?'<span class="pl-mval sf">'+it.sf.toFixed(1)+'</span>':'')+'</td>';
-      if(hasBF)h+='<td class="r">'+(it.bf>0?'<span class="pl-mval bf">'+it.bf.toFixed(1)+'</span>':'')+'</td>';
-      if(hasCF)h+='<td class="r">'+(it.cf>0?'<span class="pl-mval cf">'+it.cf.toFixed(2)+'</span>':'')+'</td>';
-      h+='</tr>';
-    }
-    h+='</tbody></table>';
-  }
-  var t=d.totals;
-  h+='<div class="pl-totals">';
-  h+='<div class="pt"><span class="pt-l">Items:</span><span class="pt-v">'+t.qty+'</span></div>';
-  if(t.lf>0)h+='<div class="pt"><span class="pt-l">LF:</span><span class="pt-v" style="color:#fab387">'+t.lf.toFixed(1)+'</span></div>';
-  if(t.sf>0)h+='<div class="pt"><span class="pt-l">SF:</span><span class="pt-v" style="color:#a6e3a1">'+t.sf.toFixed(1)+'</span></div>';
-  if(t.bf>0)h+='<div class="pt"><span class="pt-l">BF:</span><span class="pt-v" style="color:#f9e2af">'+t.bf.toFixed(1)+'</span></div>';
-  if(t.cf>0)h+='<div class="pt"><span class="pt-l">CF:</span><span class="pt-v" style="color:#cba6f7">'+t.cf.toFixed(2)+'</span></div>';
-  h+='</div>';
-  body.innerHTML=h;
-}
-function promptSku(eid,asmName){
-  var sku=prompt('Enter SKU / Part Number:');
-  if(sku!==null&&sku.trim()!==''){
-    callJSON('setDefinitionSku',{eid:eid,sku:sku.trim()});
-    setTimeout(function(){showPartsList(asmName);},300);
-  }
-}
-
 /* ═══ ASSEMBLY DROPDOWN & FILTERING ═══ */
 function buildAsmDD(){
   var sel=document.getElementById('fAsm'),lbl=document.getElementById('fAsmL');
   var keys=Object.keys(ASMB);
-  sel.style.display='none';if(lbl)lbl.style.display='none';
-  if(!keys.length){sel.value='';return;}
+  if(!keys.length){sel.value='';sel.style.display='none';if(lbl)lbl.style.display='none';return;}
   var prev=sel.value;
+  // Clear stale filter if the selected assembly no longer exists
+  if(prev&&!ASMB[prev]){prev='';sel.value='';}
   keys.sort(function(a,b){return(ASMB[a].name||'').toLowerCase().localeCompare((ASMB[b].name||'').toLowerCase());});
   var h='<option value="">All</option>';
   for(var i=0;i<keys.length;i++){var a=ASMB[keys[i]];h+='<option value="'+X(keys[i])+'">'+X(a.name||keys[i])+' ('+getAsmEids(a).length+')</option>';}
   sel.innerHTML=h;
   if(prev)sel.value=prev;
+  // Assembly filtering is handled from the assembly tab — keep dropdown hidden
+  sel.style.display='none';
+  if(lbl)lbl.style.display='none';
 }
 function filterByAssembly(id){
   var sel=document.getElementById('fAsm');
@@ -6390,7 +6485,7 @@ function renderMeasPanel(){
                 biStats={pcs:0,lf:0,bf:0,types:dcd.beamInventory.length};
                 for(var bs0=0;bs0<dcd.beamInventory.length;bs0++){
                   var bm0=dcd.beamInventory[bs0];biStats.pcs+=bm0.count;biStats.lf+=bm0.totalLF;
-                  var sp0=bm0.section.split('x'),bW0=parseFloat(sp0[0])||0,bH0=parseFloat(sp0[1])||0;
+                  var sp0=bm0.section.split('x'),bW0=parseFrac(sp0[0]),bH0=parseFrac(sp0[1]);
                   for(var br0=0;br0<bm0.rows.length;br0++){biStats.bf+=bW0*bH0*bm0.rows[br0].l*bm0.rows[br0].qty/12;}
                 }
               }
@@ -6480,7 +6575,7 @@ function renderMeasPanel(){
               if(dpd.beamInventory && dpd.beamInventory.length>0){
                 /* ── Beam inventory — replaces the auto-scan row ── */
                 var biTotalBF=0,biTotalLF=0,biTotalPcs=0;
-                for(var bsi=0;bsi<dpd.beamInventory.length;bsi++){var bsm=dpd.beamInventory[bsi];biTotalLF+=bsm.totalLF;biTotalPcs+=bsm.count;for(var bri=0;bri<bsm.rows.length;bri++){var brw=bsm.rows[bri];var sp=bsm.section.split('x');biTotalBF+=(parseFloat(sp[0])||0)*(parseFloat(sp[1])||0)*brw.l*brw.qty/12;}}
+                for(var bsi=0;bsi<dpd.beamInventory.length;bsi++){var bsm=dpd.beamInventory[bsi];biTotalLF+=bsm.totalLF;biTotalPcs+=bsm.count;for(var bri=0;bri<bsm.rows.length;bri++){var brw=bsm.rows[bri];var sp=bsm.section.split('x');biTotalBF+=parseFrac(sp[0])*parseFrac(sp[1])*brw.l*brw.qty/12;}}
                 h+='<div style="margin:2px 8px 6px 28px;border:1px solid var(--surface0);border-radius:6px;overflow:hidden;font-family:\'JetBrains Mono\',monospace">';
                 /* Header row with expand/collapse all */
                 var isHL=(_hlScanId===dId);
@@ -6496,7 +6591,7 @@ function renderMeasPanel(){
                 h+='</div>';
                 for(var bi=0;bi<dpd.beamInventory.length;bi++){
                   var bm=dpd.beamInventory[bi];
-                  var secParts=bm.section.split('x');var bW=parseFloat(secParts[0])||0,bH=parseFloat(secParts[1])||0;
+                  var secParts=bm.section.split('x');var bW=parseFrac(secParts[0]),bH=parseFrac(secParts[1]);
                   var secBF=0;for(var bfr=0;bfr<bm.rows.length;bfr++){secBF+=bW*bH*bm.rows[bfr].l*bm.rows[bfr].qty/12;}
                   var secKey='bi_'+dId+'_'+bi;
                   var secOpen=!!_beamInvOpen[secKey]; /* default collapsed */
@@ -6625,6 +6720,15 @@ function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be 
 function delDerived(id){showConfirmModal('Delete this derived part?',function(){call('deleteDerivedPart',id);var wasHL=(_hlScanId===id);delete DERIVED[id];if(wasHL)clrScanHL();renderMeasPanel();showToast('Deleted','warning');});}
 function genCatMeas(cat,unit){closeMeasGDD();callJSON('generateCategoryMeasurement',{category:cat,unit:unit});showToast('Scanning '+cat+' for '+unit+'...','success');}
 /* ── Beam helpers ── */
+function parseFrac(s){
+  // Parse construction fraction like "7 1/2" or "11 7/8" or "3/4" to decimal
+  s=String(s).trim();
+  var m=s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if(m)return parseInt(m[1])+parseInt(m[2])/parseInt(m[3]);
+  m=s.match(/^(\d+)\/(\d+)$/);
+  if(m)return parseInt(m[1])/parseInt(m[2]);
+  return parseFloat(s)||0;
+}
 function fmtFtIn(decFt){
   var totalIn=Math.round(decFt*48)/4;/* round to 1/4" */
   var ft=Math.floor(totalIn/12),ins=totalIn-ft*12;

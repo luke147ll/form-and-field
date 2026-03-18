@@ -733,15 +733,12 @@ module TakeoffTool
           { 'category' => cat, 'count' => count, 'percent' => (total > 0 ? (count / total * 100).round(1) : 0) }
         }.sort_by { |b| -b['count'] }
 
-        # Build summary: qty/lf totals per category
+        # Build summary: qty totals per category
         summary = {}
         parts.each do |p|
           cat = p['category'] || 'Uncategorized'
           summary[cat] ||= { 'qty' => 0 }
           summary[cat]['qty'] += (p['quantity'] || 1)
-          if p['beam_linear_ft']
-            summary[cat]['lf'] = (summary[cat]['lf'] || 0) + p['beam_linear_ft']
-          end
         end
 
         # Parts payload for JS
@@ -755,11 +752,11 @@ module TakeoffTool
             'unit'             => p['unit'] || 'EA',
             'notes'            => p['notes'] || '',
             'is_virtual'       => p['is_virtual'] || false,
-            'beam_net_section' => p['beam_net_section'],
-            'beam_linear_ft'   => p['beam_linear_ft'],
             'stale'            => p['stale'] || false
           }
         end
+
+        beam_inv = build_beam_inventory_for_eids(entity_ids)
 
         tags_visible = (TakeoffTool.asm_tags_visible || {})[asm_id] || false
 
@@ -774,7 +771,8 @@ module TakeoffTool
           'tags_visible' => tags_visible,
           'part_count'  => parts.length,
           'breakdown'   => breakdown_arr,
-          'summary'     => summary
+          'summary'     => summary,
+          'beamInventory' => beam_inv
         }
       end
 
@@ -1039,6 +1037,91 @@ module TakeoffTool
       @dialog.execute_script("if(typeof heartbeatOff==='function')heartbeatOff()") rescue nil
     end
 
+    def self.build_beam_inventory_for_eids(eid_list)
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      reg = TakeoffTool.instance_variable_get(:@entity_registry) || {}
+      eid_set = Set.new(eid_list.map(&:to_i))
+      net_sec_cache = {}
+      beam_items = []
+
+      sr.each do |r|
+        next unless eid_set.include?(r[:entity_id].to_i)
+        next unless (r[:linear_ft] || 0) > 0
+        eid = r[:entity_id]
+        cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
+
+        sec_str = nil
+        ent_for_beam = reg[eid]
+        if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
+          bdefn = ent_for_beam.definition
+          dname = bdefn.name
+          if cat =~ Scanner::BEAM_RE
+            cache_key = bdefn.object_id
+            unless net_sec_cache.key?(cache_key)
+              begin
+                net_sec_cache[cache_key] = Scanner.beam_net_section(bdefn)
+              rescue => ex
+                puts "[FF beam_net_section ERROR] #{dname}: #{ex.message}"
+                net_sec_cache[cache_key] = nil
+              end
+            end
+            ns = net_sec_cache[cache_key]
+            sec_str = "#{ns[0].round(1)}x#{ns[1].round(1)}" if ns
+          end
+          unless sec_str
+            dbb = bdefn.bounds
+            ddims = [dbb.width, dbb.height, dbb.depth].sort
+            sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
+          end
+        end
+        unless sec_str
+          dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
+          sec_str = "#{dims[0].round(1)}x#{dims[1].round(1)}"
+        end
+
+        beam_items << {
+          defn: r[:display_name] || r[:definition_name] || 'Unknown',
+          lf: (r[:linear_ft] || 0).to_f,
+          section: sec_str,
+          eid: r[:entity_id]
+        }
+      end
+
+      return [] if beam_items.empty?
+
+      inv = {}
+      beam_items.each do |bi|
+        inv_key = "#{bi[:defn]}|#{bi[:section]}"
+        inv[inv_key] ||= { defn: bi[:defn], section: bi[:section], items: [] }
+        inv[inv_key][:items] << { lf: bi[:lf].round(2), eid: bi[:eid] }
+      end
+
+      result = []
+      inv.sort_by { |_dn, d| -d[:items].sum { |i| i[:lf] } }.each do |_dn, d|
+        all_eids = d[:items].map { |i| i[:eid] }
+        len_groups = {}
+        d[:items].each do |item|
+          key = ((item[:lf] * 4).round / 4.0)
+          len_groups[key] ||= { qty: 0, eids: [] }
+          len_groups[key][:qty] += 1
+          len_groups[key][:eids] << item[:eid]
+        end
+        rows = len_groups.sort_by { |l, _g| -l }.map do |len, g|
+          { 'l' => len, 'qty' => g[:qty], 'total' => (len * g[:qty]).round(1), 'eids' => g[:eids] }
+        end
+        result << {
+          'defn' => d[:defn],
+          'section' => d[:section],
+          'count' => d[:items].length,
+          'totalLF' => d[:items].sum { |i| i[:lf] }.round(1),
+          'eids' => all_eids,
+          'rows' => rows
+        }
+      end
+      result
+    end
+
     def self.send_measurement_data
       return unless @dialog && @dialog.visible?
       require 'json'
@@ -1198,36 +1281,56 @@ module TakeoffTool
         if (r[:linear_ft] || 0) > 0
           scan_totals[cat][:beam_items] ||= []
 
-          # Cross-section: oriented BB for beam categories, definition bounds otherwise
+          # Cross-section: parse from display name first (parser has correct nominal dims)
           sec_str = nil
-          ent_for_beam = reg[r[:entity_id]]
-          if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
-            bdefn = ent_for_beam.definition
-            dname = bdefn.name
-            if cat =~ Scanner::BEAM_RE
-              # Full oriented bounding box for beam categories
-              unless net_sec_cache.key?(dname)
-                begin
-                  net_sec_cache[dname] = Scanner.beam_net_section(bdefn)
-                rescue => ex
-                  puts "[FF beam_net_section ERROR] #{dname}: #{ex.message}"
-                  net_sec_cache[dname] = nil
-                end
-              end
-              ns = net_sec_cache[dname]
-              sec_str = "#{ns[0].round(1)}x#{ns[1].round(1)}" if ns
-            end
-            # Fallback: definition bounds (local space, no angle distortion)
-            unless sec_str
-              dbb = bdefn.bounds
-              ddims = [dbb.width, dbb.height, dbb.depth].sort
-              sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
+          dname = r[:display_name] || r[:definition_name] || ''
+          if dname =~ /^(\d+(?:\s+\d+\/\d+)?)\s*"?\s*[tx]?\s*x\s*(\d+(?:\s+\d+\/\d+)?)/i
+            raw_w = $1.strip
+            raw_h = $2.strip
+            w_actual = TakeoffTool.nominal_to_actual(raw_w)
+            h_actual = TakeoffTool.nominal_to_actual(raw_h)
+            if w_actual && h_actual
+              dims = [w_actual, h_actual].sort
+              sec_str = TakeoffTool.construction_section(dims[0], dims[1])
             end
           end
+
+          # Fallback: oriented bounding box for beam categories
+          unless sec_str
+            ent_for_beam = reg[r[:entity_id]]
+            if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
+              bdefn = ent_for_beam.definition
+              dn = bdefn.name
+              if cat =~ Scanner::BEAM_RE
+                cache_key = bdefn.object_id
+                unless net_sec_cache.key?(cache_key)
+                  begin
+                    net_sec_cache[cache_key] = Scanner.beam_net_section(bdefn)
+                  rescue => ex
+                    puts "[FF beam_net_section ERROR] #{dn}: #{ex.message}"
+                    net_sec_cache[cache_key] = nil
+                  end
+                end
+                ns = net_sec_cache[cache_key]
+                sec_str = TakeoffTool.construction_section(ns[0], ns[1]) if ns
+              end
+            end
+          end
+
+          # Fallback: definition bounds (local space, no angle distortion)
+          unless sec_str
+            ent_for_beam ||= reg[r[:entity_id]]
+            if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
+              dbb = ent_for_beam.definition.bounds
+              ddims = [dbb.width, dbb.height, dbb.depth].sort
+              sec_str = TakeoffTool.construction_section(ddims[0], ddims[1])
+            end
+          end
+
           # Last resort: scan result BB (world-space)
           unless sec_str
             dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
-            sec_str = "#{dims[0].round(1)}x#{dims[1].round(1)}"
+            sec_str = TakeoffTool.construction_section(dims[0], dims[1])
           end
 
           scan_totals[cat][:beam_items] << {
