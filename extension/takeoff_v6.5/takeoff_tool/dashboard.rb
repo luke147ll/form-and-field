@@ -1232,7 +1232,6 @@ module TakeoffTool
           end
         end
       end
-      net_sec_cache = {}   # cache beam_net_section by definition name
       sr.each do |r|
         next if r[:source] == :manual_lf || r[:source] == :manual_sf || r[:source] == :manual_box
         eid = r[:entity_id]
@@ -1277,69 +1276,6 @@ module TakeoffTool
           target[cat][:vol] += (r[:volume_ft3] || 0).to_f
         end
 
-        # Collect beam inventory data for any category with LF values
-        if (r[:linear_ft] || 0) > 0
-          scan_totals[cat][:beam_items] ||= []
-
-          # Cross-section: parse from display name first (parser has correct nominal dims)
-          sec_str = nil
-          dname = r[:display_name] || r[:definition_name] || ''
-          if dname =~ /^(\d+(?:\s+\d+\/\d+)?)\s*"?\s*[tx]?\s*x\s*(\d+(?:\s+\d+\/\d+)?)/i
-            raw_w = $1.strip
-            raw_h = $2.strip
-            w_actual = TakeoffTool.nominal_to_actual(raw_w)
-            h_actual = TakeoffTool.nominal_to_actual(raw_h)
-            if w_actual && h_actual
-              dims = [w_actual, h_actual].sort
-              sec_str = TakeoffTool.construction_section(dims[0], dims[1])
-            end
-          end
-
-          # Fallback: oriented bounding box for beam categories
-          unless sec_str
-            ent_for_beam = reg[r[:entity_id]]
-            if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
-              bdefn = ent_for_beam.definition
-              dn = bdefn.name
-              if cat =~ Scanner::BEAM_RE
-                cache_key = bdefn.object_id
-                unless net_sec_cache.key?(cache_key)
-                  begin
-                    net_sec_cache[cache_key] = Scanner.beam_net_section(bdefn)
-                  rescue => ex
-                    puts "[FF beam_net_section ERROR] #{dn}: #{ex.message}"
-                    net_sec_cache[cache_key] = nil
-                  end
-                end
-                ns = net_sec_cache[cache_key]
-                sec_str = TakeoffTool.construction_section(ns[0], ns[1]) if ns
-              end
-            end
-          end
-
-          # Fallback: definition bounds (local space, no angle distortion)
-          unless sec_str
-            ent_for_beam ||= reg[r[:entity_id]]
-            if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
-              dbb = ent_for_beam.definition.bounds
-              ddims = [dbb.width, dbb.height, dbb.depth].sort
-              sec_str = TakeoffTool.construction_section(ddims[0], ddims[1])
-            end
-          end
-
-          # Last resort: scan result BB (world-space)
-          unless sec_str
-            dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
-            sec_str = TakeoffTool.construction_section(dims[0], dims[1])
-          end
-
-          scan_totals[cat][:beam_items] << {
-            defn: r[:display_name] || r[:definition_name] || 'Unknown',
-            lf: (r[:linear_ft] || 0).to_f,
-            section: sec_str,
-            eid: r[:entity_id]
-          }
-        end
       end
 
       # Load derived parts (deduplicate category_scan entries)
@@ -1394,38 +1330,12 @@ module TakeoffTool
           end
 
           # Build beam inventory for LF beam categories
-          if dunit == 'LF' && st && st[:beam_items]
-            inv = {}
-            st[:beam_items].each do |bi|
-              # Key by section so beams with same display name but different
-              # cross-sections are separate groups (e.g. 2.0x13.5 vs 9.5x13.5)
-              inv_key = "#{bi[:defn]}|#{bi[:section]}"
-              inv[inv_key] ||= { defn: bi[:defn], section: bi[:section], items: [] }
-              inv[inv_key][:items] << { lf: bi[:lf].round(2), eid: bi[:eid] }
-            end
-            beam_inv = []
-            inv.sort_by { |_dn, d| -d[:items].sum { |i| i[:lf] } }.each do |dn, d|
-              all_eids = d[:items].map { |i| i[:eid] }
-              # Group lengths (round to nearest 3" = 0.25')
-              len_groups = {}
-              d[:items].each do |item|
-                key = ((item[:lf] * 4).round / 4.0)
-                len_groups[key] ||= { qty: 0, eids: [] }
-                len_groups[key][:qty] += 1
-                len_groups[key][:eids] << item[:eid]
-              end
-              rows = len_groups.sort_by { |l, _g| -l }.map do |len, g|
-                { 'l' => len, 'qty' => g[:qty], 'total' => (len * g[:qty]).round(1), 'eids' => g[:eids] }
-              end
-              beam_inv << {
-                'defn' => d[:defn],
-                'section' => d[:section],
-                'count' => d[:items].length,
-                'totalLF' => d[:items].sum { |i| i[:lf] }.round(1),
-                'eids' => all_eids,
-                'rows' => rows
-              }
-            end
+          if dunit == 'LF' && st
+            cat_eids = sr.select { |r|
+              rcat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+              rcat == dcat && (r[:linear_ft] || 0) > 0
+            }.map { |r| r[:entity_id] }
+            beam_inv = build_beam_inventory_for_eids(cat_eids)
             v['beamInventory'] = beam_inv if beam_inv.any?
           else
             v.delete('beamInventory')
@@ -1476,17 +1386,10 @@ module TakeoffTool
         puts "  [#{k}] #{v['name']} = #{v['computedValue']} #{v['unit']} (#{v['sourceType']}, cat=#{v['category']})#{bi_info}"
       end
 
-      # Strip :beam_items from scan_totals before serializing (used internally only)
-      clean_totals = {}
-      scan_totals.each { |k, v| clean_totals[k] = v.reject { |fk, _| fk == :beam_items } }
-
-      # Payload includes beamInventory (transient, for display only)
-      payload = { measurements: measurements, scanTotals: clean_totals, derivedParts: derived }
+      payload = { measurements: measurements, scanTotals: scan_totals, derivedParts: derived }
       if scan_totals_a
-        clean_a = {}; scan_totals_a.each { |k, v| clean_a[k] = v.reject { |fk, _| fk == :beam_items } }
-        clean_b = {}; scan_totals_b.each { |k, v| clean_b[k] = v.reject { |fk, _| fk == :beam_items } }
-        payload[:scanTotalsA] = clean_a
-        payload[:scanTotalsB] = clean_b
+        payload[:scanTotalsA] = scan_totals_a
+        payload[:scanTotalsB] = scan_totals_b
       end
       js = JSON.generate(payload)
       b64 = [js].pack('m0')
