@@ -37,6 +37,31 @@ module TakeoffTool
       @observer = nil
     end
 
+    def self.send_vis_state
+      return unless @dialog && @dialog.visible?
+      return if @current_entities.empty?
+
+      vm = VisibilityManager
+      vis_map = {}
+      @current_entities.each do |e|
+        next unless e.valid?
+        eid = e.entityID
+        if vm.isolation_active
+          vis_map[eid] = vm.isolated_entity_ids.include?(eid)
+        else
+          vis_map[eid] = !vm.hidden_entity_ids.include?(eid)
+        end
+      end
+
+      isolated = vm.isolation_active
+
+      require 'json'
+      b64 = [JSON.generate({ vis: vis_map, isolated: isolated })].pack('m0')
+      @dialog.execute_script("receiveVisState(JSON.parse(atob('#{b64}')))")
+    rescue => e
+      puts "[FF IdentifyDialog send_vis_state] error: #{e.message}"
+    end
+
     def self.show(selection)
       @dialog.close if @dialog && @dialog.visible? rescue nil
       detach_observer
@@ -224,6 +249,37 @@ module TakeoffTool
         end
       end
 
+      @dialog.add_action_callback('idIsolateEntity') do |_ctx|
+        eids = @current_entities.select { |e| e.valid? }.map(&:entityID)
+        next if eids.empty?
+        VisibilityManager.isolate(eids, source: "identify")
+        Dashboard.send_vis_state if Dashboard.respond_to?(:send_vis_state)
+      end
+
+      @dialog.add_action_callback('idIsolateCategory') do |_ctx, cat_str|
+        cat = cat_str.to_s
+        next if cat.empty?
+        VisibilityManager.isolate_by_category(cat, source: "identify")
+        Dashboard.send_vis_state if Dashboard.respond_to?(:send_vis_state)
+      end
+
+      @dialog.add_action_callback('idIsolateAssembly') do |_ctx, asm_id_str|
+        asm_id = asm_id_str.to_s.strip
+        next if asm_id.empty?
+        assemblies = TakeoffTool.load_assemblies rescue {}
+        asm = assemblies[asm_id]
+        next unless asm
+        eids = (asm['parts'] || []).reject { |p| p['is_virtual'] }.map { |p| p['entity_id'] }.compact.map(&:to_i)
+        next if eids.empty?
+        VisibilityManager.isolate(eids, source: "identify:assembly")
+        Dashboard.send_vis_state if Dashboard.respond_to?(:send_vis_state)
+      end
+
+      @dialog.add_action_callback('idShowAll') do |_ctx|
+        VisibilityManager.show_all
+        Dashboard.send_vis_state if Dashboard.respond_to?(:send_vis_state)
+      end
+
       html = @current_entities.length == 1 ? build_single(@current_entities.first) : build_multi(@current_entities)
       @dialog.set_html(html)
       @dialog.set_on_closed { detach_observer }
@@ -327,6 +383,29 @@ module TakeoffTool
       ms_raw = (e.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a'
       model_label = ms_raw == 'model_a' ? 'A' : 'B'
 
+      # SKU & Zone
+      sku = (e.get_attribute('TakeoffAssignments', 'sku') rescue nil) || ''
+      zone = (e.get_attribute('TakeoffAssignments', 'zone') rescue nil) || ''
+
+      # Cost code
+      cca = TakeoffTool.cost_code_assignments || {}
+      cost_code = cca[eid] || ''
+
+      # Assembly membership
+      assemblies = TakeoffTool.assemblies_for_entity(eid) rescue []
+      all_asms = TakeoffTool.load_assemblies rescue {}
+      assemblies = assemblies.map do |a|
+        asm_data = all_asms[a[:asm_id]] || {}
+        a.merge(zone: asm_data['zone'] || '')
+      end
+
+      # Scan result quantities
+      sr = (TakeoffTool.filtered_scan_results rescue []).find { |r| r[:entity_id] == eid }
+      linear_ft = sr ? (sr[:linear_ft] || 0).to_f : 0.0
+      volume_bf = sr ? (sr[:volume_bf] || 0).to_f : 0.0
+      volume_ft3 = sr ? (sr[:volume_ft3] || 0).to_f : 0.0
+      area_sf = sr ? (sr[:area_sf] || 0).to_f : 0.0
+
       {
         name: clean_name(iname || dname),
         definition: dname,
@@ -335,7 +414,11 @@ module TakeoffTool
         w: w, h: h_val, d: d,
         is_solid: is_solid, volume: vol,
         instance_count: inst_count,
-        model_source: model_label
+        model_source: model_label,
+        sku: sku, zone: zone, cost_code: cost_code,
+        assemblies: assemblies,
+        linear_ft: linear_ft, volume_bf: volume_bf,
+        volume_ft3: volume_ft3, area_sf: area_sf
       }
     end
 
@@ -419,7 +502,8 @@ module TakeoffTool
       @dialog.execute_script("receiveApplyResult('#{esc}')") rescue nil
     end
 
-    MOCHA_CSS = <<~CSS.freeze unless defined?(MOCHA_CSS)
+    remove_const(:MOCHA_CSS) if const_defined?(:MOCHA_CSS, false)
+    MOCHA_CSS = <<~CSS.freeze
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         font-family: 'Segoe UI', system-ui, sans-serif;
@@ -552,9 +636,61 @@ module TakeoffTool
         color: #6c7086;
         margin-bottom: 6px;
       }
+      .id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 14px; }
+      .id-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+        letter-spacing: 0.3px; cursor: pointer; transition: all .15s; position: relative;
+      }
+      .id-badge:hover { filter: brightness(1.2); }
+      .id-badge-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+      .id-badge-cat { color: #a6e3a1; background: rgba(166,227,161,.1); border: 1px solid rgba(166,227,161,.25); }
+      .id-badge-sub { color: #94e2d5; background: rgba(148,226,213,.08); border: 1px solid rgba(148,226,213,.2); }
+      .id-badge-cc { color: #f9e2af; background: rgba(249,226,175,.08); border: 1px solid rgba(249,226,175,.2); }
+      .id-badge-sku { color: #89b4fa; background: rgba(137,180,250,.1); border: 1px solid rgba(137,180,250,.2); }
+      .id-badge-zone { color: #a6adc8; background: #313244; border: 1px solid #45475a; }
+      .id-badge-tag { color: #7f849c; background: rgba(127,132,156,.1); border: 1px solid rgba(127,132,156,.2); }
+      .id-badge-mat { color: #fab387; background: rgba(250,179,135,.08); border: 1px solid rgba(250,179,135,.2); }
+      .id-badge-iso { font-size: 8px; margin-left: 2px; opacity: 0.5; }
+      .id-badge:hover .id-badge-iso { opacity: 1; }
+      .id-asm-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+      .id-asm-card {
+        display: flex; align-items: center; gap: 8px;
+        padding: 5px 10px; border-radius: 5px;
+        background: #181825; border: 1px solid #313244;
+        cursor: pointer; transition: all .15s;
+      }
+      .id-asm-card:hover { border-color: #cba6f7; background: #1f1f33; }
+      .id-asm-dot { width: 8px; height: 8px; border-radius: 50%; background: #cba6f7; flex-shrink: 0; }
+      .id-asm-name { font-size: 11px; font-weight: 600; color: #cdd6f4; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .id-asm-zone { font-size: 9px; color: #a6adc8; background: #313244; padding: 1px 6px; border-radius: 3px; }
+      .id-asm-iso { font-size: 8px; color: #cba6f7; opacity: 0.5; }
+      .id-asm-card:hover .id-asm-iso { opacity: 1; }
+      .id-qty-row { display: flex; gap: 8px; padding: 8px 0; }
+      .id-qty-card {
+        flex: 1; text-align: center; padding: 8px 4px;
+        background: #181825; border-radius: 6px; border: 1px solid #313244;
+      }
+      .id-qty-val { font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+      .id-qty-lbl { font-size: 8px; color: #6c7086; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .id-iso-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+        color: #89b4fa; background: rgba(137,180,250,.08); border: 1px solid rgba(137,180,250,.2);
+        cursor: pointer; transition: all .15s; margin-bottom: 10px;
+      }
+      .id-iso-btn:hover { background: rgba(137,180,250,.15); border-color: #89b4fa; }
+      .id-showall-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+        color: #a6e3a1; background: rgba(166,227,161,.08); border: 1px solid rgba(166,227,161,.2);
+        cursor: pointer; transition: all .15s; margin-left: 6px;
+      }
+      .id-showall-btn:hover { background: rgba(166,227,161,.15); border-color: #a6e3a1; }
     CSS
 
-    MODAL_CSS = <<~CSS.freeze unless defined?(MODAL_CSS)
+    remove_const(:MODAL_CSS) if const_defined?(:MODAL_CSS, false)
+    MODAL_CSS = <<~CSS.freeze
       .modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200}
       .modal-bg.show{display:block}
       .modal-card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;z-index:201;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
@@ -567,7 +703,8 @@ module TakeoffTool
       .modal-btns button:hover{opacity:0.85}
     CSS
 
-    MODAL_HTML = <<~HTML.freeze unless defined?(MODAL_HTML)
+    remove_const(:MODAL_HTML) if const_defined?(:MODAL_HTML, false)
+    MODAL_HTML = <<~HTML.freeze
       <div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
         <div class="modal-card">
           <h3 id="modalTitle">New category name</h3>
@@ -580,7 +717,8 @@ module TakeoffTool
       </div>
     HTML
 
-    IDENTIFY_JS = <<~JS.freeze unless defined?(IDENTIFY_JS)
+    remove_const(:IDENTIFY_JS) if const_defined?(:IDENTIFY_JS, false)
+    IDENTIFY_JS = <<~JS.freeze
       var _modalCb=null;
       function updateContent(html){
         var container=document.getElementById('idContent');
@@ -790,48 +928,112 @@ module TakeoffTool
         if(sub==='__custom_sub__')sub='';
         sketchup.createPart(JSON.stringify({name:name,category:cat,subcategory:sub}));
       }
+      function receiveVisState(data){
+        var isolated=data.isolated||false;
+        var isoBtn=document.querySelector('.id-iso-btn');
+        if(isoBtn){
+          if(isolated){
+            isoBtn.innerHTML='&#8857; Isolated';
+            isoBtn.style.color='#a6e3a1';
+            isoBtn.style.borderColor='rgba(166,227,161,.3)';
+            isoBtn.style.background='rgba(166,227,161,.1)';
+          }else{
+            isoBtn.innerHTML='&#8857; Isolate';
+            isoBtn.style.color='#89b4fa';
+            isoBtn.style.borderColor='rgba(137,180,250,.2)';
+            isoBtn.style.background='rgba(137,180,250,.08)';
+          }
+        }
+        var showAllBtn=document.querySelector('.id-showall-btn');
+        if(showAllBtn){
+          showAllBtn.style.display=isolated?'inline-flex':'none';
+        }
+      }
     JS
 
     def self.build_single_body(entity)
       i = entity_info(entity)
       dim = "#{fmt_dim(i[:w])} &times; #{fmt_dim(i[:h])} &times; #{fmt_dim(i[:d])}"
 
-      cat_class = i[:category] ? 'cat-assigned' : 'cat-unassigned'
-      cat_text = i[:category] || 'Unassigned'
-
       vol_str = (i[:is_solid] && i[:volume]) ? fmt_vol(i[:volume]) : 'N/A'
       solid = i[:is_solid] ? '<span class="badge badge-yes">Yes</span>' : '<span class="badge badge-no">No</span>'
-
-      sub_row = (i[:subcategory] && !i[:subcategory].empty?) ?
-        "<div class=\"row\"><span class=\"label\">Subcategory</span><span class=\"value\">#{h(i[:subcategory])}</span></div>" : ''
-      ifc_row = i[:ifc] ?
-        "<div class=\"row\"><span class=\"label\">IFC Type</span><span class=\"value\">#{h(i[:ifc])}</span></div>" : ''
 
       defn_line = ''
       if i[:definition] && !i[:definition].empty? && clean_name(i[:definition]) != i[:name]
         defn_line = "<div class=\"def-name-sub\">Definition: #{h(i[:definition])}</div>"
       end
 
-      model_row = ''
+      # Model badge in header
+      model_badge = ''
       if TakeoffTool.active_mv_view
         mc = i[:model_source] == 'A' ? '#a6e3a1' : '#89b4fa'
-        model_row = "<div class=\"row\"><span class=\"label\">Model</span><span class=\"value\" style=\"color:#{mc};font-weight:700\">Model #{i[:model_source]}</span></div>"
+        model_badge = "<span style=\"font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;color:#11111b;background:#{mc};margin-left:8px\">Model #{i[:model_source]}</span>"
       end
 
+      # Badge row — category + subcategory only
+      badges = ''
+      cat_text = i[:category] || 'Unassigned'
+      cat_class = i[:category] ? 'id-badge-cat' : ''
+      cat_style = i[:category] ? '' : 'color:#f38ba8;background:rgba(243,139,168,.1);border:1px solid rgba(243,139,168,.25);'
+      badges += "<span class=\"id-badge #{cat_class}\" style=\"#{cat_style}\" onclick=\"sketchup.idIsolateCategory('#{h(cat_text)}')\" title=\"Isolate category\"><span class=\"id-badge-dot\" style=\"background:#{i[:category] ? '#a6e3a1' : '#f38ba8'}\"></span>#{h(cat_text)}<span class=\"id-badge-iso\">&#8857;</span></span>"
+
+      if i[:subcategory] && !i[:subcategory].empty?
+        badges += "<span class=\"id-badge id-badge-sub\"><span class=\"id-badge-dot\" style=\"background:#94e2d5\"></span>#{h(i[:subcategory])}</span>"
+      end
+
+      # Assembly cards
+      asm_html = ''
+      if i[:assemblies] && i[:assemblies].any?
+        asm_html = '<div class="sect-label">Assemblies</div><div class="id-asm-list">'
+        i[:assemblies].each do |a|
+          asm_zone = a[:zone] && !a[:zone].empty? ? "<span class=\"id-asm-zone\">#{h(a[:zone])}</span>" : ''
+          asm_html += "<div class=\"id-asm-card\" onclick=\"sketchup.idIsolateAssembly('#{h(a[:asm_id])}')\" title=\"Isolate assembly\"><span class=\"id-asm-dot\"></span><span class=\"id-asm-name\">#{h(a[:name])}</span>#{asm_zone}<span class=\"id-asm-iso\">&#8857;</span></div>"
+        end
+        asm_html += '</div>'
+      end
+
+      # Quantity cards
+      qty_html = ''
+      has_qty = i[:linear_ft] > 0 || i[:volume_bf] > 0 || i[:volume_ft3] > 0 || i[:area_sf] > 0
+      if has_qty
+        qty_html = '<div class="sect-label">Quantities</div><div class="id-qty-row">'
+        if i[:linear_ft] > 0
+          qty_html += "<div class=\"id-qty-card\"><div class=\"id-qty-val\" style=\"color:#74c7ec\">#{i[:linear_ft].round(1)}'</div><div class=\"id-qty-lbl\">Linear Ft</div></div>"
+        end
+        if i[:volume_bf] > 0
+          qty_html += "<div class=\"id-qty-card\"><div class=\"id-qty-val\" style=\"color:#f9e2af\">#{i[:volume_bf].round(0).to_i}</div><div class=\"id-qty-lbl\">Board Ft</div></div>"
+        end
+        if i[:area_sf] > 0
+          qty_html += "<div class=\"id-qty-card\"><div class=\"id-qty-val\" style=\"color:#a6e3a1\">#{i[:area_sf].round(1)}</div><div class=\"id-qty-lbl\">Sq Ft</div></div>"
+        end
+        if i[:volume_ft3] > 0
+          qty_html += "<div class=\"id-qty-card\"><div class=\"id-qty-val\" style=\"color:#fab387\">#{i[:volume_ft3].round(1)}</div><div class=\"id-qty-lbl\">Cubic Ft</div></div>"
+        end
+        qty_html += '</div>'
+      end
+
+      ifc_row = i[:ifc] ? "<div class=\"row\"><span class=\"label\">IFC Type</span><span class=\"value\">#{h(i[:ifc])}</span></div>" : ''
+
       <<~HTML
-        <h1>Identify</h1>
+        <div style="display:flex;align-items:center;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #313244">
+          <span style="font-size:13px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1.5px">Identify</span>
+          #{model_badge}
+        </div>
         <div class="entity-name">#{h(i[:name])}</div>
         #{defn_line}
-        #{model_row}
-        <div class="row"><span class="label">Category</span><span class="value #{cat_class}">#{h(cat_text)}</span></div>
-        #{sub_row}
-        <div class="row"><span class="label">Layer/Tag</span><span class="value">#{h(i[:tag])}</span></div>
-        #{ifc_row}
-        <div class="row"><span class="label">Material</span><span class="value">#{h(i[:material] || '(none)')}</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <span class="id-iso-btn" onclick="sketchup.idIsolateEntity()" title="Isolate this entity">&#8857; Isolate</span>
+          <span class="id-showall-btn" onclick="sketchup.idShowAll()" title="Show all entities">Show All</span>
+        </div>
+        <div class="id-badges">#{badges}</div>
+        #{asm_html}
+        #{qty_html}
+        <div class="sect-label" style="margin-top:6px">Properties</div>
         <div class="row"><span class="label">Size</span><span class="value dim">#{dim}</span></div>
         <div class="row"><span class="label">Solid</span><span class="value">#{solid}</span></div>
         <div class="row"><span class="label">Volume</span><span class="value">#{vol_str}</span></div>
         <div class="row"><span class="label">Instances</span><span class="value">#{i[:instance_count]}</span></div>
+        #{ifc_row}
         <hr>
         <div class="sect-label">Set Category</div>
         <select id="catSel" onchange="onCatChange(this)">
@@ -879,6 +1081,10 @@ module TakeoffTool
       <<~HTML
         <h1>Identify &mdash; #{count} entities selected</h1>
         #{model_summary}
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <span class="id-iso-btn" onclick="sketchup.idIsolateEntity()" title="Isolate selected entities">&#8857; Isolate</span>
+          <span class="id-showall-btn" onclick="sketchup.idShowAll()" title="Show all entities">Show All</span>
+        </div>
         <div class="sect-label">Definitions</div>
         <ul class="def-list">
           #{list_items}

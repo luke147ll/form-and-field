@@ -231,6 +231,20 @@ module TakeoffTool
     true
   end
 
+  def self.remove_parts_by_eids(asm_id, eids_to_remove)
+    assemblies = load_assemblies
+    a = assemblies[asm_id.to_s]
+    return 0 unless a
+    eid_set = Set.new(eids_to_remove.map(&:to_i))
+    before = a['parts'].length
+    a['parts'].reject! { |p| !p['is_virtual'] && eid_set.include?(p['entity_id'].to_i) }
+    removed = before - a['parts'].length
+    return 0 if removed == 0
+    save_assemblies(assemblies)
+    publish(EVENT_PARTS_CHANGED, asm_id: asm_id)
+    removed
+  end
+
   def self.update_part(asm_id, part_number, fields)
     assemblies = load_assemblies
     a = assemblies[asm_id.to_s]

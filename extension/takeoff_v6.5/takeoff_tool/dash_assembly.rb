@@ -187,6 +187,21 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('removePartsFromAssembly') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          asm_id = data['asmId'].to_s.strip
+          eids = (data['eids'] || []).map(&:to_i)
+          next if asm_id.empty? || eids.empty?
+          count = TakeoffTool.remove_parts_by_eids(asm_id, eids)
+          puts "Takeoff: Removed #{count} parts from #{asm_id}"
+          Dashboard.send_assemblies
+        rescue => e
+          puts "Takeoff removePartsFromAssembly error: #{e.message}"
+        end
+      end
+
       dialog.add_action_callback('updateAsmPart') do |_ctx, json_str|
         begin
           require 'json'

@@ -699,6 +699,52 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .asm-bd-count{font-family:'JetBrains Mono',monospace;font-size:10px;color:#a6e3a1;min-width:32px;text-align:right}
 .asm-bd-pct{font-family:'JetBrains Mono',monospace;font-size:9px;color:#6c7086;min-width:40px;text-align:right}
 .asm-bd-empty{font-size:10px;color:#585b70;padding:4px 0;font-style:italic}
+/* ═══ ASSEMBLY CARD VIEW V2 ═══ */
+.ac2-card{background:var(--base);border:1px solid var(--surface0);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:border-color .2s,opacity .2s}
+.ac2-card.ac2-hidden{opacity:.45}
+.ac2-card.ac2-isolated{border-color:var(--mauve)}
+.ac2-hdr{padding:10px 12px;cursor:pointer;transition:background .15s}
+.ac2-hdr:hover{background:#222236}
+.ac2-hdr-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.ac2-name{font-size:13px;font-weight:700;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac2-zone{background:var(--surface0);color:var(--subtext0);font-size:9px;padding:2px 8px;border-radius:3px;font-weight:500}
+.ac2-item-count{font-size:10px;color:var(--blue);font-weight:600;font-family:var(--font-num)}
+.ac2-stats{display:flex;gap:0;margin-left:64px}
+.ac2-stat{display:flex;flex-direction:column;align-items:center;padding:6px 0;flex:1;min-width:55px}
+.ac2-stat-val{font-size:17px;font-weight:800;font-family:var(--font-num);line-height:1}
+.ac2-stat-lbl{font-size:8px;color:var(--overlay0);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.ac2-bar{display:flex;height:4px;border-radius:2px;overflow:hidden;background:var(--surface0);margin-left:64px;margin-right:4px;margin-top:2px}
+.ac2-bar-seg{transition:width .3s ease}
+.ac2-tabs{display:flex;background:var(--mantle);border-bottom:1px solid var(--surface0);border-top:1px solid var(--surface0)}
+.ac2-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--overlay0);font-size:10px;font-weight:600;padding:7px 14px;cursor:pointer;font-family:inherit;transition:all .15s}
+.ac2-tab.active{background:var(--base);border-bottom-color:var(--mauve);color:var(--text)}
+.ac2-tab-count{margin-left:5px;font-size:9px;font-family:var(--font-num)}
+.ac2-tab.active .ac2-tab-count{color:var(--mauve)}
+.ac2-content{max-height:340px;overflow-y:auto}
+.ac2-col-hdr{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--crust);border-bottom:1px solid var(--surface0);font-size:9px;color:var(--overlay0);text-transform:uppercase;letter-spacing:.5px}
+.ac2-beam-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #252535;font-size:11px;cursor:pointer;transition:background .1s}
+.ac2-beam-row:hover{background:#222236}
+.ac2-beam-sub{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 56px;border-top:1px solid rgba(49,50,68,.4);font-size:10px;position:relative}
+.ac2-beam-sub .ac2-tree-line{position:absolute;left:44px;top:0;bottom:0;width:1px;background:var(--surface0)}
+.ac2-beam-sub .ac2-tree-branch{position:absolute;left:44px;top:50%;width:6px;height:1px;background:var(--surface0)}
+.ac2-part-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #252535;font-size:10px;transition:background .1s}
+.ac2-part-row:hover{background:#222236}
+.ac2-part-row.virtual{border-left:2px dashed var(--yellow)}
+.ac2-sku{font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--blue);background:rgba(137,180,250,.1);padding:1px 6px;border-radius:3px;min-width:52px;text-align:center;flex-shrink:0;letter-spacing:.3px;border:1px solid rgba(137,180,250,.2)}
+.ac2-sku-empty{font-size:9px;color:var(--surface1);min-width:52px;text-align:center;font-family:var(--font-mono);flex-shrink:0}
+.ac2-total{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--mantle);border-top:2px solid var(--surface1);font-size:11px;font-weight:700}
+.ac2-actions{display:flex;gap:6px;padding:6px 10px;background:var(--mantle);border-top:1px solid var(--surface0)}
+.ac2-actions button{background:none;border:1px solid var(--surface1);border-radius:3px;color:var(--subtext0);font-size:9px;padding:3px 10px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s}
+.ac2-actions button:hover{background:var(--surface0);border-color:var(--blue)}
+.ac2-actions button.danger{border-color:rgba(243,139,168,.3);color:var(--red)}
+.ac2-actions button.danger:hover{background:rgba(243,139,168,.1)}
+.ac2-rm{border:none;background:transparent;cursor:pointer;color:var(--red);opacity:0;padding:0 2px;flex-shrink:0;transition:opacity .15s}
+.ac2-beam-row:hover .ac2-rm,.ac2-part-row:hover .ac2-rm{opacity:1}
+.ac2-rm:hover{opacity:1 !important;color:#f38ba8}
+.ac2-notes{font-size:9px;color:var(--overlay0);padding:7px 10px;font-style:italic;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac2-view-toggle{display:flex;gap:0;border:1px solid var(--surface1);border-radius:3px;overflow:hidden;margin-left:8px}
+.ac2-view-toggle button{background:none;border:none;color:var(--overlay0);font-size:9px;padding:2px 8px;cursor:pointer;font-family:inherit;transition:all .12s}
+.ac2-view-toggle button.active{background:var(--surface0);color:var(--text)}
 /* ═══ PARTS LIST ═══ */
 .pl-hdr{background:#11111b;padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #313244}
 .pl-hdr .pl-title{font-size:12px;font-weight:700;color:#cba6f7}
@@ -1595,6 +1641,10 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <button class="hb" onclick="createAsmFromSelection()" style="color:#a6e3a1;border-color:#a6e3a1">From Selection</button>
         <button class="hb" onclick="call('importCadworksCSV')" style="color:#fab387;border-color:#fab387">Import CSV</button>
         <button class="hb" onclick="call('clearAutoAssemblies')" style="color:#f38ba8;border-color:#45475a;font-size:9px">Clear Auto</button>
+        <div class="ac2-view-toggle">
+          <button onclick="_asmViewMode='list';this.classList.add('active');this.nextElementSibling.classList.remove('active');renderAsmPanel()" class="">List</button>
+          <button onclick="_asmViewMode='cards';this.previousElementSibling.classList.remove('active');this.classList.add('active');renderAsmPanel()" class="active">Cards</button>
+        </div>
         <span style="margin-left:auto;color:#6c7086;font-size:10px" id="asmCount"></span>
       </div>
       <div class="sec-scroll" id="asmScroll" style="flex:1;overflow-y:auto;min-height:0;position:relative">
@@ -1920,6 +1970,9 @@ var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
 var ASMVIS={};
+var _asmViewMode='cards';
+var _ac2Tab={};
+var _ac2OpenSections={};
 var _prevAsmFilter='';
 var mvState={};
 var currentMvView=null;
@@ -3992,6 +4045,7 @@ function setMvView(mode){
     var s=mvState[mode];VIS={};for(var k in s.vis)if(s.vis.hasOwnProperty(k))VIS[k]=s.vis[k];
     ISO_CATS=s.isoCats;FISO=s.fiso;openCats=JSON.parse(JSON.stringify(s.openCats));openSubs=JSON.parse(JSON.stringify(s.openSubs));ASMVIS=JSON.parse(JSON.stringify(s.asmvis||{}));
   } else {
+    if(ISO_CATS){call('clearIsolation');}
     VIS={};ISO_CATS=null;FISO=false;containerIsolate=null;openCats={};openSubs={};ASMVIS={};
   }
   currentMvView=mode;
@@ -5432,18 +5486,48 @@ document.addEventListener('scroll',function(e){
 
 /* ═══ VISIBILITY ═══ */
 function togCatVis(gk){
-  ISO_CATS=null;FISO=false;updateFisoBtn();
   var gBy=document.getElementById('gBy').value||'category';
-  var anyVis=false,ids=[];
+  var ids=[];
   for(var i=0;i<D.length;i++){
-    if(grpKey(D[i],gBy)===gk){ids.push(D[i].entityId);if(VIS[D[i].entityId]!==false)anyVis=true;}
+    if(grpKey(D[i],gBy)===gk) ids.push(D[i].entityId);
   }
-  for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
-  if(anyVis)HIDDEN_CATS[gk]=true; else delete HIDDEN_CATS[gk];
-  if(ids.length) call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  if(!ids.length) return;
+  var anyVis=false;
+  for(var j=0;j<ids.length;j++){if(VIS[ids[j]]!==false){anyVis=true;break;}}
+
+  if(ISO_CATS){
+    // In isolation mode: modify the isolation set, don't use incremental show/hide
+    if(anyVis){
+      delete ISO_CATS[gk];
+      HIDDEN_CATS[gk]=true;
+    } else {
+      ISO_CATS[gk]=true;
+      delete HIDDEN_CATS[gk];
+    }
+    // Rebuild VIS from ISO_CATS
+    for(var k=0;k<D.length;k++){
+      VIS[D[k].entityId]=!!ISO_CATS[D[k].category];
+    }
+    // If nothing left isolated, exit isolation entirely
+    if(Object.keys(ISO_CATS).length===0){
+      call('showAll');
+      ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};
+    } else {
+      // Re-isolate with the updated category set
+      callJSON('isolateCategories',{categories:Object.keys(ISO_CATS)});
+    }
+  } else {
+    // Not in isolation mode: simple incremental show/hide
+    // First clear any stale Ruby isolation state
+    for(var j2=0;j2<ids.length;j2++) VIS[ids[j2]]=!anyVis;
+    if(anyVis) HIDDEN_CATS[gk]=true; else delete HIDDEN_CATS[gk];
+    if(ids.length) call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  }
+  FISO=false;updateFisoBtn();
   filt();
 }
 function togItemVis(eid){
+  if(ISO_CATS){call('clearIsolation');}
   ISO_CATS=null;FISO=false;updateFisoBtn();
   var vis=VIS[eid]!==false; VIS[eid]=!vis;
   call(vis?'hideEntities':'showEntities',''+eid);
@@ -5561,7 +5645,15 @@ function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
 }
-function resetVis(){ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};FISO=false;containerIsolate=null;updateFisoBtn();filt();}
+function resetVis(){if(ISO_CATS){call('clearIsolation');}ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};FISO=false;containerIsolate=null;updateFisoBtn();document.getElementById('fAsm').value='';filt();}
+function receiveVisState(hidden){
+  VIS={};
+  for(var eid in hidden){
+    if(hidden.hasOwnProperty(eid))VIS[parseInt(eid)]=false;
+  }
+  ISO_CATS=null;FISO=false;containerIsolate=null;updateFisoBtn();
+  filt();renderAsmPanel();
+}
 function syncIsolation(){
   if(FISO){applyFilterIsolation();return;}
   if(!ISO_CATS)return;
@@ -5720,6 +5812,7 @@ function toggleAsmPanel(){}
 
 /* ═══ ASSEMBLY CARD RENDERING ═══ */
 function renderAsmPanel(){
+  if(_asmViewMode==='cards'){renderAsmPanelV2();return;}
   var body=document.getElementById('asmBody');
   var keys=Object.keys(ASMB).sort(function(a,b){
     var na=(ASMB[a].name||'').toLowerCase(),nb=(ASMB[b].name||'').toLowerCase();
@@ -5840,8 +5933,14 @@ function renderAsmPartsInline(id,asm){
     }
   }
 
-  // Non-beam parts (SF items, EA items, virtual, etc)
-  var nonBeam=parts.filter(function(p){return !p.beam_linear_ft||p.beam_linear_ft<=0;});
+  // Build set of eids already in beam inventory
+  var beamEids={};
+  for(var bei=0;bei<bi.length;bei++){
+    var beids=bi[bei].eids||[];
+    for(var bej=0;bej<beids.length;bej++) beamEids[beids[bej]]=true;
+  }
+  // Non-beam parts: exclude anything already in beam inventory
+  var nonBeam=parts.filter(function(p){return !p.entity_id||!beamEids[p.entity_id];});
   if(nonBeam.length){
     h+='<div style="padding:4px 10px 2px;font-size:9px;font-weight:600;color:var(--overlay0);border-bottom:1px solid var(--surface0);background:var(--mantle)">OTHER PARTS ('+nonBeam.length+')</div>';
     // Group non-beam by category+name
@@ -5933,6 +6032,304 @@ function renderAsmPartsSimple(id,asm){
   h+='<button class="hb" onclick="event.stopPropagation();call(\'exportPartsList\',\''+ne+'\')" style="font-size:9px;padding:2px 8px;color:#a6e3a1;border-color:#a6e3a1">Export CSV</button>';
   h+='</div>';
   return h;
+}
+
+/* ═══ ASSEMBLY CARD VIEW V2 ═══ */
+function renderAsmPanelV2(){
+  var body=document.getElementById('asmBody');
+  var keys=Object.keys(ASMB).sort(function(a,b){
+    var na=(ASMB[a].name||'').toLowerCase(),nb=(ASMB[b].name||'').toLowerCase();
+    return na.localeCompare(nb);
+  });
+  document.getElementById('asmCount').textContent=keys.length+' assemblies';
+  var atab=document.querySelector('.tab[data-tab="assemblies"]');
+  if(atab)atab.textContent='Assemblies'+(keys.length?' ('+keys.length+')':'');
+  if(!keys.length){body.innerHTML='<div class="asm-empty">No assemblies yet. Use "Create Assembly" or right-click in viewport.</div>';return;}
+
+  var h='';
+  for(var ki=0;ki<keys.length;ki++){
+    var id=keys[ki],asm=ASMB[id];
+    var si="'"+id.replace(/'/g,"\\'")+"'";
+    var eids=getAsmEids(asm);
+    var aVis=ASMVIS[id]!==false;
+    var isExp=!!expandedAssemblies[id];
+    var name=asm.name||id;
+    var zone=asm.zone||'';
+    var bi=asm.beamInventory||[];
+    var parts=asm.parts||[];
+    var breakdown=asm.breakdown||[];
+    var tabKey=_ac2Tab[id]||'beams';
+
+    // Compute stats from beam inventory
+    var totalPcs=0,totalLF=0,totalBF=0;
+    for(var si2=0;si2<bi.length;si2++){
+      var bm=bi[si2];
+      totalPcs+=bm.count||0;
+      totalLF+=bm.totalLF||0;
+      var sp=bm.section?bm.section.split('x'):[0,0];
+      var bW=parseFloat(sp[0])||0,bH=parseFloat(sp[1])||0;
+      var rows=bm.rows||[];
+      for(var ri=0;ri<rows.length;ri++){
+        totalBF+=bW*bH*(rows[ri].l||0)*(rows[ri].qty||0)/12;
+      }
+    }
+
+    // Build beam eid set for parts dedup
+    var beamEids={};
+    for(var bei=0;bei<bi.length;bei++){
+      var beids=bi[bei].eids||[];
+      for(var bej=0;bej<beids.length;bej++)beamEids[beids[bej]]=true;
+    }
+    var otherParts=parts.filter(function(p){return !p.entity_id||!beamEids[p.entity_id];});
+
+    // Card
+    var cardCls='ac2-card';
+    if(!aVis)cardCls+=' ac2-hidden';
+    h+='<div class="'+cardCls+'" id="ac2Card_'+id+'">';
+
+    // ── Header ──
+    h+='<div class="ac2-hdr" onclick="toggleAsmCard('+si+')">';
+    // Top row
+    h+='<div class="ac2-hdr-top">';
+    h+='<button class="ey'+(aVis?'':' off')+'" onclick="event.stopPropagation();togAsmVis('+si+')" title="'+(aVis?'Hide':'Show')+'" style="flex-shrink:0">'+(aVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+    h+='<button class="asm-iso" onclick="event.stopPropagation();isoAsm('+si+')" title="Isolate" style="flex-shrink:0">iso</button>';
+    h+='<span style="font-size:8px;color:#585b70;width:12px;text-align:center;transition:transform .2s ease;'+(isExp?'transform:rotate(90deg)':'')+'">&#9654;</span>';
+    h+='<span class="ac2-name" ondblclick="event.stopPropagation();asmRename('+si+')" title="'+X(name)+'">'+X(name)+'</span>';
+    if(zone)h+='<span class="ac2-zone" ondblclick="event.stopPropagation();asmSetZone('+si+')" title="Zone: '+X(zone)+'">'+X(zone)+'</span>';
+    h+='<span class="ac2-item-count">'+eids.length+'</span>';
+    h+='</div>';
+
+    // Stats row
+    h+='<div class="ac2-stats">';
+    h+='<div class="ac2-stat"><span class="ac2-stat-val" style="color:var(--green)">'+totalPcs+'</span><span class="ac2-stat-lbl">pieces</span></div>';
+    h+='<div class="ac2-stat"><span class="ac2-stat-val" style="color:var(--peach)">'+bi.length+'</span><span class="ac2-stat-lbl">sizes</span></div>';
+    h+='<div class="ac2-stat"><span class="ac2-stat-val" style="color:var(--sapphire)">'+Math.round(totalLF).toLocaleString()+'</span><span class="ac2-stat-lbl">linear ft</span></div>';
+    h+='<div class="ac2-stat"><span class="ac2-stat-val" style="color:var(--yellow)">'+Math.round(totalBF).toLocaleString()+'</span><span class="ac2-stat-lbl">board ft</span></div>';
+    h+='</div>';
+
+    // Breakdown bar
+    if(breakdown.length){
+      h+='<div class="ac2-bar" style="margin-left:64px;margin-right:4px;margin-top:2px">';
+      for(var bdi=0;bdi<breakdown.length;bdi++){
+        var bd=breakdown[bdi];
+        var bColor=getCatColor(bd.category);
+        h+='<div class="ac2-bar-seg" style="width:'+bd.percent+'%;background:'+bColor+'"></div>';
+      }
+      h+='</div>';
+    }
+    h+='</div>'; // end ac2-hdr
+
+    // ── Expanded Body ──
+    if(isExp){
+      h+='<div>';
+
+      // Tab bar
+      h+='<div class="ac2-tabs">';
+      var tabs=[{key:'beams',label:'Inventory',count:bi.length},{key:'parts',label:'Parts',count:otherParts.length},{key:'breakdown',label:'Breakdown',count:breakdown.length}];
+      for(var ti=0;ti<tabs.length;ti++){
+        var t=tabs[ti];
+        var tActive=tabKey===t.key?' active':'';
+        h+='<button class="ac2-tab'+tActive+'" onclick="event.stopPropagation();_ac2Tab[\''+id+'\']=\''+t.key+'\';renderAsmPanel()">'+t.label+'<span class="ac2-tab-count">'+t.count+'</span></button>';
+      }
+      h+='<span style="flex:1"></span>';
+      if(asm.notes)h+='<span class="ac2-notes" title="'+X(asm.notes)+'">'+X(asm.notes)+'</span>';
+      h+='</div>';
+
+      // Tab content
+      h+='<div class="ac2-content">';
+
+      if(tabKey==='beams'){
+        // Column header
+        h+='<div class="ac2-col-hdr">';
+        h+='<span style="width:50px"></span><span style="width:10px"></span>';
+        h+='<span style="min-width:68px">Section</span>';
+        h+='<span style="flex:1">Name</span>';
+        h+='<span style="min-width:22px;text-align:right">Qty</span>';
+        h+='<span style="min-width:38px;text-align:right">Length</span>';
+        h+='<span style="min-width:46px;text-align:right">Board Ft</span>';
+        h+='</div>';
+
+        // Beam section rows
+        for(var bi2=0;bi2<bi.length;bi2++){
+          var bm=bi[bi2];
+          var secKey=id+'_s'+bi2;
+          var secOpen=!!_ac2OpenSections[secKey];
+          var bmEids=bm.eids||[];
+          var bmEidsStr=JSON.stringify(bmEids);
+          var bmVis=bmEids.length?bmEids.some(function(eid){return VIS[eid]!==false;}):true;
+          var sp=bm.section?bm.section.split('x'):[0,0];
+          var bW=parseFloat(sp[0])||0,bH=parseFloat(sp[1])||0;
+          var secBF=0;
+          var bmRows=bm.rows||[];
+          for(var ri=0;ri<bmRows.length;ri++){secBF+=bW*bH*(bmRows[ri].l||0)*(bmRows[ri].qty||0)/12;}
+
+          h+='<div style="border-bottom:1px solid #252535">';
+          // Section header row
+          h+='<div class="ac2-beam-row" onclick="event.stopPropagation();_ac2OpenSections[\''+secKey+'\']=!_ac2OpenSections[\''+secKey+'\'];renderAsmPanel()">';
+          h+='<button class="ey'+(bmVis?'':' off')+'" onclick="event.stopPropagation();togPartGroupVis('+bmEidsStr+')" title="'+(bmVis?'Hide':'Show')+'" style="flex-shrink:0">'+(bmVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+          h+='<button onclick="event.stopPropagation();isoPartGroup('+bmEidsStr+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit;flex-shrink:0">iso</button>';
+          h+='<span style="font-size:8px;color:#585b70;width:10px;text-align:center;transition:transform .2s;'+(secOpen?'transform:rotate(90deg)':'')+'">&#9654;</span>';
+          h+='<span style="font-weight:700;color:var(--peach);font-family:var(--font-mono);min-width:68px;font-size:11px">'+X(bm.section)+'"</span>';
+          h+='<span style="color:var(--subtext0);flex:1;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+X(bm.defn)+'</span>';
+          h+='<span style="font-weight:700;color:var(--green);min-width:22px;text-align:right;font-size:11px">'+bm.count+'</span>';
+          h+='<span style="font-weight:600;color:var(--sapphire);min-width:38px;text-align:right;font-size:10px">'+(bm.totalLF||0).toFixed(1)+'\'</span>';
+          h+='<span style="font-weight:600;color:var(--yellow);min-width:46px;text-align:right;font-size:10px">'+Math.round(secBF)+' BF</span>';
+          h+='<button class="ac2-rm" onclick="event.stopPropagation();if(confirm(\'Remove '+bm.count+' '+X(bm.defn)+' from assembly?\')){callJSON(\'removePartsFromAssembly\',{asmId:'+si+',eids:'+bmEidsStr+'})}" title="Remove from assembly"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+          h+='</div>';
+
+          // Expanded subrows
+          if(secOpen){
+            for(var ri=0;ri<bmRows.length;ri++){
+              var rw=bmRows[ri];
+              var rwEids=rw.eids||[];
+              var rwEidsStr=JSON.stringify(rwEids);
+              var rwVis=rwEids.length?rwEids.some(function(eid){return VIS[eid]!==false;}):true;
+              var rwBF=bW*bH*(rw.l||0)*(rw.qty||0)/12;
+              h+='<div class="ac2-beam-sub">';
+              h+='<span class="ac2-tree-line"></span><span class="ac2-tree-branch"></span>';
+              h+='<button class="ey'+(rwVis?'':' off')+'" onclick="event.stopPropagation();togPartGroupVis('+rwEidsStr+')" title="'+(rwVis?'Hide':'Show')+'" style="flex-shrink:0">'+(rwVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+              h+='<button onclick="event.stopPropagation();isoPartGroup('+rwEidsStr+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit;flex-shrink:0">iso</button>';
+              h+='<span style="font-weight:600;color:var(--peach);font-family:var(--font-mono);min-width:68px">'+X(bm.section)+'"</span>';
+              h+='<span style="color:#6c7086">&times;</span>';
+              h+='<span style="font-weight:700;color:var(--sapphire);min-width:48px">'+fmtFtIn(rw.l)+'</span>';
+              h+='<span style="color:#6c7086">&times;</span>';
+              h+='<span style="font-weight:700;color:var(--green);min-width:22px">'+rw.qty+'</span>';
+              h+='<span style="font-size:9px;color:#6c7086">pcs</span>';
+              h+='<span style="flex:1"></span>';
+              h+='<span style="font-weight:600;color:var(--yellow)">'+Math.round(rwBF)+' BF</span>';
+              h+='</div>';
+            }
+          }
+          h+='</div>';
+        }
+
+        // Total row
+        h+='<div class="ac2-total">';
+        h+='<span style="color:var(--subtext0)">TOTAL</span><span style="flex:1"></span>';
+        h+='<span style="color:var(--green);min-width:22px;text-align:right">'+totalPcs+'</span>';
+        h+='<span style="color:var(--sapphire);min-width:38px;text-align:right">'+totalLF.toFixed(1)+'\'</span>';
+        h+='<span style="color:var(--yellow);min-width:46px;text-align:right">'+Math.round(totalBF).toLocaleString()+' BF</span>';
+        h+='</div>';
+
+      } else if(tabKey==='parts'){
+        // Column header
+        h+='<div class="ac2-col-hdr">';
+        h+='<span style="width:50px"></span>';
+        h+='<span style="min-width:52px;text-align:center">SKU</span>';
+        h+='<span style="width:6px"></span>';
+        h+='<span style="flex:1">Name</span>';
+        h+='<span style="flex-shrink:0">Category</span>';
+        h+='<span style="min-width:28px;text-align:right">Qty</span>';
+        h+='</div>';
+
+        if(!otherParts.length){
+          h+='<div style="padding:16px 12px;text-align:center;color:#45475a;font-size:10px">All parts are in the beam inventory</div>';
+        } else {
+          for(var pi=0;pi<otherParts.length;pi++){
+            var p=otherParts[pi];
+            var pEid=p.entity_id;
+            var pVis=pEid?VIS[pEid]!==false:true;
+            var pCls='ac2-part-row';
+            if(p.is_virtual)pCls+=' virtual';
+            h+='<div class="'+pCls+'" style="opacity:'+(pVis?'1':'0.4')+'">';
+            if(pEid){
+              h+='<button class="ey'+(pVis?'':' off')+'" onclick="event.stopPropagation();togAsmPartVis('+pEid+')" title="'+(pVis?'Hide':'Show')+'" style="flex-shrink:0">'+(pVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
+              h+='<button onclick="event.stopPropagation();isoPartGroup(['+pEid+'])" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit;flex-shrink:0">iso</button>';
+            } else {
+              h+='<span style="width:50px"></span>';
+            }
+            // SKU
+            var hasSku=p.sku&&p.sku.trim();
+            if(hasSku){
+              h+='<span class="ac2-sku">'+X(p.sku)+'</span>';
+            } else {
+              h+='<span class="ac2-sku-empty">&mdash;</span>';
+            }
+            // Color dot
+            var pColor=getCatColor(p.category||'');
+            h+='<span style="width:6px;height:6px;border-radius:2px;flex-shrink:0;background:'+pColor+'"></span>';
+            // Name
+            h+='<span style="color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+X(p.name||'');
+            if(p.is_virtual)h+='<span style="display:inline-block;background:var(--yellow);color:var(--base);font-size:7px;padding:0 4px;border-radius:2px;font-weight:700;margin-left:5px;vertical-align:middle">VIRTUAL</span>';
+            h+='</span>';
+            // Category
+            h+='<span style="color:#6c7086;font-size:9px;flex-shrink:0">'+X(p.category||'')+'</span>';
+            // Qty
+            h+='<span style="font-weight:700;color:var(--green);min-width:28px;text-align:right;font-family:var(--font-num)">'+(p.qty||1)+'</span>';
+            // Remove button
+            if(pEid){
+              h+='<button class="ac2-rm" onclick="event.stopPropagation();callJSON(\'removePartsFromAssembly\',{asmId:'+si+',eids:['+pEid+']})" title="Remove from assembly"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+            } else if(p.part_num){
+              var pnEsc=p.part_num.replace(/'/g,"\\'");
+              h+='<button class="ac2-rm" onclick="event.stopPropagation();callJSON(\'deleteAsmPart\',{asmId:'+si+',partNumber:\''+pnEsc+'\'})" title="Remove virtual part"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+            }
+            h+='</div>';
+          }
+        }
+
+      } else if(tabKey==='breakdown'){
+        h+='<div style="padding:14px">';
+        // Category rows
+        for(var bdi=0;bdi<breakdown.length;bdi++){
+          var bd=breakdown[bdi];
+          var bColor=getCatColor(bd.category);
+          h+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:2px 0">';
+          h+='<span style="width:6px;height:6px;border-radius:2px;flex-shrink:0;background:'+bColor+'"></span>';
+          h+='<span style="color:var(--subtext0);flex:1">'+X(bd.category)+'</span>';
+          h+='<span style="font-family:var(--font-num);font-weight:600;color:var(--text);min-width:24px;text-align:right">'+bd.count+'</span>';
+          h+='<span style="font-family:var(--font-num);color:#585b70;font-size:9px;min-width:32px;text-align:right">'+bd.percent+'%</span>';
+          h+='</div>';
+        }
+        // Bar
+        h+='<div class="ac2-bar" style="margin:12px 0 8px">';
+        for(var bdi=0;bdi<breakdown.length;bdi++){
+          var bd=breakdown[bdi];
+          var bColor=getCatColor(bd.category);
+          h+='<div class="ac2-bar-seg" style="width:'+bd.percent+'%;background:'+bColor+'"></div>';
+        }
+        h+='</div>';
+        // Legend
+        h+='<div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:9px;color:#6c7086">';
+        for(var bdi=0;bdi<breakdown.length;bdi++){
+          var bd=breakdown[bdi];
+          var bColor=getCatColor(bd.category);
+          h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+bColor+'"></span>'+X(bd.category)+'</span>';
+        }
+        h+='</div>';
+        h+='</div>';
+      }
+
+      h+='</div>'; // end ac2-content
+
+      // Action bar
+      h+='<div class="ac2-actions">';
+      h+='<button style="color:var(--green);border-color:var(--green)" onclick="event.stopPropagation();callJSON(\'addToAssemblyFromSelection\',{asmId:'+si+'})">Add Selected</button>';
+      h+='<button onclick="event.stopPropagation();asmToggleTags('+si+')">Tags</button>';
+      h+='<button onclick="event.stopPropagation();asmExport('+si+')">Export</button>';
+      h+='<button onclick="event.stopPropagation();asmRename('+si+')">Rename</button>';
+      h+='<button onclick="event.stopPropagation();editAssemblyNotes('+si+')">Notes</button>';
+      if(!zone)h+='<button onclick="event.stopPropagation();asmSetZone('+si+')">Zone</button>';
+      h+='<span style="flex:1"></span>';
+      h+='<button class="danger" onclick="event.stopPropagation();deleteAssemblyConfirm('+si+')">Delete</button>';
+      h+='</div>';
+
+      h+='</div>'; // end expanded body
+    }
+
+    h+='</div>'; // end ac2-card
+  }
+  body.innerHTML=h;
+  setTimeout(function(){checkScrollFade('asmScroll','asmFade');},20);
+}
+
+function getCatColor(cat){
+  cat=cat||'';
+  // Check CCOL for user-assigned color, else use hash-based fallback
+  if(CCOL&&CCOL.categories&&CCOL.categories[cat])return CCOL.categories[cat];
+  var palette=['#fab387','#89b4fa','#a6e3a1','#94e2d5','#f9e2af','#cba6f7','#f38ba8','#74c7ec','#b4befe','#89dceb'];
+  var hash=0;
+  for(var i=0;i<cat.length;i++){hash=((hash<<5)-hash)+cat.charCodeAt(i);hash|=0;}
+  return palette[Math.abs(hash)%palette.length];
 }
 
 /* ═══ PARTS TABLE ═══ */

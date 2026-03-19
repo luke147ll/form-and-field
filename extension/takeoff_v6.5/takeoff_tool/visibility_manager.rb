@@ -207,6 +207,17 @@ module TakeoffTool
         TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :show_all)
       end
 
+      # ── clear_isolation_state ──
+      # Clears isolation tracking WITHOUT changing any entity visibility.
+      # Used when JS exits isolation mode via incremental hide/show.
+      def clear_isolation_state
+        @isolation_active = false
+        @isolation_source = nil
+        @isolated_entity_ids = Set.new
+        @isolated_categories = nil
+        puts "VisibilityManager: isolation state cleared (entities unchanged)"
+      end
+
       # ── on_category_changed ──
       # When an entity is recategorized during active isolation,
       # determine whether it should be visible or hidden.
@@ -267,6 +278,26 @@ module TakeoffTool
         @isolated_entity_ids = Set.new
         @hidden_entity_ids = Set.new
         @isolated_categories = nil
+      end
+
+      # Clear isolation tracking without changing entity visibility.
+      # Called when the dashboard exits isolation mode via eye toggles.
+      def clear_isolation_tracking
+        was_active = @isolation_active
+        @isolation_active = false
+        @isolation_source = nil
+        @isolated_entity_ids = Set.new
+        @isolated_categories = nil
+        # Rebuild hidden_entity_ids from actual entity visibility
+        if was_active
+          reg = TakeoffTool.entity_registry || {}
+          @hidden_entity_ids = Set.new
+          reg.each do |eid, e|
+            next unless e && e.valid?
+            @hidden_entity_ids.add(eid) unless e.visible?
+          end
+        end
+        puts "VisibilityManager: isolation tracking cleared, #{@hidden_entity_ids.length} hidden"
       end
 
       private

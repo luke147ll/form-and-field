@@ -743,16 +743,20 @@ module TakeoffTool
 
         # Parts payload for JS
         parts_payload = parts.map do |p|
+          eid = p['entity_id']
+          e = eid ? TakeoffTool.find_entity(eid.to_i) : nil
+          sku = e && e.valid? ? (e.get_attribute('TakeoffAssignments', 'sku') || '') : ''
           {
             'part_num'         => p['part_number'],
-            'entity_id'        => p['entity_id'],
+            'entity_id'        => eid,
             'name'             => p['name'],
             'category'         => p['category'],
             'qty'              => p['quantity'] || 1,
             'unit'             => p['unit'] || 'EA',
             'notes'            => p['notes'] || '',
             'is_virtual'       => p['is_virtual'] || false,
-            'stale'            => p['stale'] || false
+            'stale'            => p['stale'] || false,
+            'sku'              => sku
           }
         end
 
@@ -863,6 +867,27 @@ module TakeoffTool
     def self.send_live_data
       @data_dirty = true
       send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
+    end
+
+    def self.send_vis_state
+      return unless @dialog && @dialog.visible?
+      vm = VisibilityManager
+      reg = TakeoffTool.entity_registry || {}
+
+      hidden = {}
+      if vm.isolation_active
+        reg.each_key do |eid|
+          hidden[eid] = true unless vm.isolated_entity_ids.include?(eid)
+        end
+      else
+        vm.hidden_entity_ids.each { |eid| hidden[eid] = true }
+      end
+
+      require 'json'
+      b64 = [JSON.generate(hidden)].pack('m0')
+      @dialog.execute_script("receiveVisState(JSON.parse(atob('#{b64}')))")
+    rescue => e
+      puts "[FF send_vis_state] error: #{e.message}"
     end
 
     def self.send_data(sr, ca, cca)
@@ -1485,5 +1510,10 @@ module TakeoffTool
     if Dashboard.visible?
       Dashboard.send_data(scan_results, category_assignments, cost_code_assignments)
     end
+  end
+
+  subscribe(EVENT_VISIBILITY_CHANGED) do |_payload|
+    Dashboard.send_vis_state
+    IdentifyDialog.send_vis_state rescue nil
   end
 end

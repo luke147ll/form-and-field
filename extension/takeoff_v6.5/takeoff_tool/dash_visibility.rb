@@ -65,6 +65,27 @@ module TakeoffTool
         VisibilityManager.show_all
       end
 
+      dialog.add_action_callback('clearIsolationTracking') do |_ctx|
+        VisibilityManager.clear_isolation_tracking
+      end
+
+      dialog.add_action_callback('clearIsolation') do |_ctx|
+        VisibilityManager.clear_isolation_state
+      end
+
+      dialog.add_action_callback('isolateCategories') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          categories = data['categories'] || []
+          next if categories.empty?
+          cat_hash = categories.each_with_object({}) { |c, h| h[c] = true }
+          VisibilityManager.isolate_by_category(cat_hash, source: "scan")
+        rescue => e
+          puts "Dashboard: isolateCategories error: #{e.message}"
+        end
+      end
+
       dialog.add_action_callback('isolateCategoryForModel') do |_ctx, json_str|
         begin
           require 'json'
