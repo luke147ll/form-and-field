@@ -269,11 +269,6 @@ module TakeoffTool
       faces = resolve_face_refs(m, grp)
       faces.each do |face|
         begin
-          # Skip faces manually edited by Edit SF tool
-          was_edited = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
-          was_new = face.get_attribute('FF_EditSF', 'was_new') rescue nil
-          next if was_edited || was_new
-
           # Save original material if not already saved
           unless face.get_attribute('FF_Original', 'material')
             orig_name = face.material ? face.material.display_name : ''
@@ -290,11 +285,6 @@ module TakeoffTool
       faces = resolve_face_refs(m, grp)
       faces.each do |face|
         begin
-          # Skip faces manually edited by Edit SF tool
-          was_edited = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
-          was_new = face.get_attribute('FF_EditSF', 'was_new') rescue nil
-          next if was_edited || was_new
-
           orig_name = face.get_attribute('FF_Original', 'material')
           next unless orig_name
           face.material = orig_name.empty? ? nil : m.materials[orig_name]

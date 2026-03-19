@@ -148,6 +148,9 @@ module TakeoffTool
       @debug_face_originals.each_value do |entry|
         face = entry[:face]
         next unless face && face.valid?
+        # Skip faces manually edited by Edit SF tool — preserve user's choices
+        next if (face.get_attribute('FF_EditSF', 'original_mat') rescue nil)
+        next if (face.get_attribute('FF_EditSF', 'was_new') rescue nil)
         face.material = entry[:front]
         face.back_material = entry[:back]
         restored += 1
@@ -1748,7 +1751,8 @@ module TakeoffTool
       m = Sketchup.active_model
       if m
         m.start_operation('Clear Debug Mats', true)
-        %w[FF_DEBUG_MEASURED FF_DEBUG_EXCLUDED FF_DEBUG_OPEN FF_DEBUG_PARTIAL FF_DEBUG_BLOCKED FF_DEBUG_LF_SIDE FF_DEBUG_LF_ENDCAP FF_DEBUG_LF_BBOX].each do |name|
+        # Don't remove FF_DEBUG_MEASURED or FF_DEBUG_EXCLUDED — edited faces may still use them
+        %w[FF_DEBUG_OPEN FF_DEBUG_PARTIAL FF_DEBUG_BLOCKED FF_DEBUG_LF_SIDE FF_DEBUG_LF_ENDCAP FF_DEBUG_LF_BBOX].each do |name|
           m.materials.remove(m.materials[name]) if m.materials[name]
         end
         m.commit_operation
