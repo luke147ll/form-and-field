@@ -1,29 +1,7 @@
 module TakeoffTool
   unless defined?(SF_COLORS)
-  SF_COLORS = {
-    'Drywall'         => [249, 226, 175, 140],
-    'Roofing'         => [150, 170, 210, 140],
-    'Metal Roofing'   => [140, 180, 220, 140],
-    'Shingle Roofing' => [160, 140, 180, 140],
-    'Roof Sheathing'  => [230, 200, 150, 140],
-    'Wall Sheathing'  => [210, 200, 160, 140],
-    'Flooring'        => [190, 180, 150, 140],
-    'Concrete'        => [170, 170, 170, 140],
-    'Ceilings'        => [160, 200, 230, 140],
-    'Masonry / Veneer'=> [210, 180, 140, 140],
-    'Siding'          => [140, 200, 140, 140],
-    'Soffit'          => [200, 180, 220, 140],
-    'Insulation'      => [255, 180, 220, 140],
-    'Membrane'        => [200, 200, 255, 140],
-    'Wall Framing'    => [250, 180, 135, 140],
-    'Wall Finish'     => [240, 220, 160, 140],
-    'Exterior Finish' => [120, 190, 120, 140],
-    'Tile'            => [180, 220, 220, 140],
-    'Backsplash'      => [200, 180, 200, 140],
-    'Shower Walls'    => [160, 210, 210, 140],
-    'Custom'          => [200, 200, 100, 140]
-  }
-  SF_DEFAULT_COLOR = [255, 100, 255, 140]
+  SF_COLORS = {}
+  SF_DEFAULT_COLOR = [166, 227, 161, 255]
 
   SF_CATEGORIES = ['Drywall','Roofing','Metal Roofing','Shingle Roofing',
     'Roof Sheathing','Wall Sheathing','Flooring','Concrete','Ceilings',
@@ -31,6 +9,36 @@ module TakeoffTool
     'Wall Framing','Wall Finish','Exterior Finish',
     'Tile','Backsplash','Shower Walls','Custom']
   end # unless defined?(SF_COLORS)
+
+  def self.refresh_sf_material_colors
+    m = Sketchup.active_model
+    return unless m
+    green = Sketchup::Color.new(166, 227, 161)
+    m.materials.each do |mat|
+      if mat.name.start_with?('TO_SF_')
+        mat.color = green
+        mat.alpha = 1.0
+      end
+    end
+    # Also fix debug materials
+    measured = m.materials['FF_DEBUG_MEASURED']
+    if measured
+      measured.color = green
+      measured.alpha = 1.0
+    end
+    excluded = m.materials['FF_DEBUG_EXCLUDED']
+    if excluded
+      excluded.color = Sketchup::Color.new(243, 139, 168)
+      excluded.alpha = 1.0
+    end
+    # Also update stored color_rgba on measurement groups
+    require 'json'
+    m.entities.grep(Sketchup::Group).each do |grp|
+      next unless grp.valid?
+      next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
+      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([166, 227, 161, 255]))
+    end
+  end
 
   class MeasureSFTool
 
@@ -510,12 +518,9 @@ module TakeoffTool
 
       rgba = SF_COLORS[cat] || SF_DEFAULT_COLOR
       mat_name = "TO_SF_#{cat.gsub(/[\s\/]+/,'_')}"
-      mat = model.materials[mat_name]
-      unless mat
-        mat = model.materials.add(mat_name)
-        mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
-        mat.alpha = (rgba[3] || 140) / 255.0
-      end
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(166, 227, 161)
+      mat.alpha = 1.0
 
       @picked_faces.each do |pf|
         begin
@@ -636,7 +641,9 @@ module TakeoffTool
 
       d = Dashboard.instance_variable_get(:@dialog)
       if d && d.visible?
+        Dashboard.invalidate_measurement_cache
         Dashboard.send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
+        Dashboard.send_measurement_data
       end
 
       puts "Takeoff SF: Added #{cat} #{'%.1f' % @total_sf} SF #{face_count} faces (entity #{eid})"
@@ -781,26 +788,20 @@ module TakeoffTool
   # ═══════════════════════════════════════════════════════════
 
   class EditSFTool
+
     def initialize(category)
       @category = category
       @ip = Sketchup::InputPoint.new
       @hover_face = nil
       @hover_xform = nil
-      @excluded = []
-      @original_total = 0.0
-      @removed_sf = 0.0
+      @hover_is_excluded = false
+      @hover_is_new = false
+      @edit_count = 0
     end
 
     def activate
-      sr = TakeoffTool.scan_results || []
-      ca = TakeoffTool.category_assignments || {}
-      @original_total = 0.0
-      sr.each do |r|
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-        next unless cat == @category
-        @original_total += (r[:area_sf] || 0).to_f
-      end
-      Sketchup.status_text = "Edit SF [#{@category}]: Click green faces to exclude. Total = #{'%.1f' % @original_total} SF. Escape to apply."
+      @current_total = compute_category_total
+      Sketchup.status_text = "Edit SF [#{@category}]: Click green to exclude, red to re-include, bare to add. Total = #{'%.1f' % @current_total} SF. Escape to finish."
     end
 
     def deactivate(view)
@@ -808,7 +809,8 @@ module TakeoffTool
     end
 
     def resume(view)
-      Sketchup.status_text = "Edit SF [#{@category}]: Removed #{'%.1f' % @removed_sf} SF (#{@excluded.length} faces). #{'%.1f' % (@original_total - @removed_sf)} SF remaining. Escape to apply."
+      @current_total = compute_category_total
+      Sketchup.status_text = "Edit SF [#{@category}]: #{'%.1f' % @current_total} SF (#{@edit_count} edits). Escape to finish."
       view.invalidate
     end
 
@@ -816,14 +818,28 @@ module TakeoffTool
       @ip.pick(view, x, y)
       @hover_face = nil
       @hover_xform = nil
+      @hover_is_excluded = false
+      @hover_is_new = false
       if @ip.valid? && @ip.face
         face = @ip.face
         mat = face.material
-        if mat && mat.name == 'FF_DEBUG_MEASURED'
+        if mat && mat.name == 'FF_DEBUG_EXCLUDED'
+          @hover_face = face
+          @hover_xform = @ip.transformation
+          @hover_is_excluded = true
+          sf = face.area / 144.0
+          view.tooltip = "Click to re-include: +#{'%.1f' % sf} SF"
+        elsif mat && sf_face?(mat)
           @hover_face = face
           @hover_xform = @ip.transformation
           sf = face.area / 144.0
-          view.tooltip = "Click to exclude: #{'%.1f' % sf} SF"
+          view.tooltip = "Click to exclude: -#{'%.1f' % sf} SF"
+        elsif face.is_a?(Sketchup::Face)
+          @hover_face = face
+          @hover_xform = @ip.transformation
+          @hover_is_new = true
+          sf = face.area / 144.0
+          view.tooltip = "Click to add: +#{'%.1f' % sf} SF"
         end
       end
       view.invalidate
@@ -836,40 +852,61 @@ module TakeoffTool
       sf = face.area / 144.0
       model = Sketchup.active_model
 
-      model.start_operation('Exclude SF Face', true)
+      if @hover_is_excluded
+        # RE-INCLUDE: red → green, ADD sf back to total
+        model.start_operation('Include SF Face', true)
+        orig_name = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
+        if orig_name && !orig_name.empty? && model.materials[orig_name]
+          restore_mat = model.materials[orig_name]
+        else
+          restore_mat = get_measured_mat(model)
+        end
+        face.material = restore_mat
+        face.back_material = restore_mat
+        model.commit_operation
+        adjust_total(sf)
 
-      mat_name = 'FF_DEBUG_EXCLUDED'
-      mat = model.materials[mat_name] || begin
-        m = model.materials.add(mat_name)
-        m.color = Sketchup::Color.new(200, 0, 0, 120)
-        m
+      elsif @hover_is_new
+        # ADD: bare face → green, ADD sf to total
+        model.start_operation('Add SF Face', true)
+        orig_mat_name = face.material ? face.material.name : ''
+        face.set_attribute('FF_EditSF', 'original_mat', orig_mat_name)
+        face.set_attribute('FF_EditSF', 'was_new', true)
+        face.material = get_measured_mat(model)
+        face.back_material = get_measured_mat(model)
+        model.commit_operation
+        adjust_total(sf)
+
+      else
+        # EXCLUDE: green → red, SUBTRACT sf from total
+        model.start_operation('Exclude SF Face', true)
+        face.set_attribute('FF_EditSF', 'original_mat', face.material ? face.material.name : '')
+        face.material = get_excluded_mat(model)
+        face.back_material = get_excluded_mat(model)
+        model.commit_operation
+        adjust_total(-sf)
       end
-      face.material = mat
-      face.back_material = mat
 
-      model.commit_operation
-
-      @removed_sf += sf
-      @excluded << { face: face, sf: sf }
-      remaining = @original_total - @removed_sf
-
-      puts "EditSF: Excluded #{'%.1f' % sf} SF — removed #{'%.1f' % @removed_sf} SF total — remaining #{'%.1f' % remaining} SF"
-      Sketchup.status_text = "Edit SF [#{@category}]: Removed #{'%.1f' % @removed_sf} SF (#{@excluded.length} faces). #{'%.1f' % remaining} SF remaining. Escape to apply."
+      @edit_count += 1
+      @current_total = compute_category_total
+      Sketchup.status_text = "Edit SF [#{@category}]: #{'%.1f' % @current_total} SF (#{@edit_count} edits). Escape to finish."
 
       @hover_face = nil
+      @hover_is_excluded = false
+      @hover_is_new = false
       view.invalidate
     end
 
     def onKeyDown(key, repeat, flags, view)
       if key == 27 # Escape
-        apply_adjustment if @removed_sf > 0
+        refresh_panel
         Sketchup.active_model.select_tool(nil)
       end
       false
     end
 
     def onCancel(reason, view)
-      apply_adjustment if @removed_sf > 0
+      refresh_panel
       Sketchup.active_model.select_tool(nil)
     end
 
@@ -883,7 +920,13 @@ module TakeoffTool
           pts << (@hover_xform ? @hover_xform * pt : pt)
         end
         return if pts.length < 3
-        view.drawing_color = Sketchup::Color.new(249, 226, 175, 100)
+        if @hover_is_excluded
+          view.drawing_color = Sketchup::Color.new(166, 227, 161, 100)
+        elsif @hover_is_new
+          view.drawing_color = Sketchup::Color.new(137, 180, 250, 100)
+        else
+          view.drawing_color = Sketchup::Color.new(243, 139, 168, 100)
+        end
         view.draw(GL_POLYGON, pts)
       rescue
       end
@@ -895,27 +938,141 @@ module TakeoffTool
 
     private
 
-    def apply_adjustment
+    def sf_face?(mat)
+      return false unless mat
+      name = mat.name
+      name == 'FF_DEBUG_MEASURED' || name.start_with?('TO_SF_')
+    end
+
+    def get_measured_mat(model)
+      mat = model.materials['FF_DEBUG_MEASURED'] || model.materials.add('FF_DEBUG_MEASURED')
+      mat.color = Sketchup::Color.new(166, 227, 161)
+      mat.alpha = 1.0
+      mat
+    end
+
+    def get_excluded_mat(model)
+      mat = model.materials['FF_DEBUG_EXCLUDED'] || model.materials.add('FF_DEBUG_EXCLUDED')
+      mat.color = Sketchup::Color.new(243, 139, 168)
+      mat.alpha = 1.0
+      mat
+    end
+
+    # Directly adjust area_sf on scan results for this category
+    # AND update the total_sf attribute on any manual SF measurement groups
+    def adjust_total(delta_sf)
       sr = TakeoffTool.scan_results || []
       ca = TakeoffTool.category_assignments || {}
 
-      entities_in_cat = sr.select do |r|
+      # Find scan results in this category
+      cat_results = sr.select do |r|
         cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-        cat == @category && (r[:area_sf] || 0) > 0
+        cat == @category
       end
 
-      if entities_in_cat.any? && @original_total > 0
-        factor = (@original_total - @removed_sf) / @original_total
-        entities_in_cat.each do |r|
-          r[:area_sf] = ((r[:area_sf] || 0) * factor).round(2)
+      if cat_results.any?
+        # Distribute the delta proportionally across entities
+        total = cat_results.sum { |r| (r[:area_sf] || 0).to_f }
+        if total > 0 && delta_sf.abs > 0.01
+          factor = (total + delta_sf) / total
+          cat_results.each do |r|
+            r[:area_sf] = ((r[:area_sf] || 0) * factor).round(2)
+          end
+        elsif delta_sf > 0 && total == 0
+          # Adding to a zero-total category — put it all on the first result
+          cat_results.first[:area_sf] = delta_sf.round(2) if cat_results.first
         end
-        puts "EditSF: Applied #{'%.1f' % @removed_sf} SF reduction to #{@category} (factor=#{'%.4f' % factor})"
       end
 
+      # Also update total_sf on any manual SF measurement groups for this category
+      m = Sketchup.active_model
+      return unless m
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
+        next unless grp.get_attribute('TakeoffMeasurement', 'category') == @category
+        old_total = (grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0).to_f
+        new_total = [old_total + delta_sf, 0.0].max
+        grp.set_attribute('TakeoffMeasurement', 'total_sf', new_total.round(2))
+        # Only adjust one group per click — the delta applies once
+        break
+      end
+    end
+
+    def compute_category_total
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      total = 0.0
+      sr.each do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
+        next unless cat == @category
+        total += (r[:area_sf] || 0).to_f
+      end
+      total
+    end
+
+    def refresh_panel
+      rebuild_face_refs_for_category
       Dashboard.invalidate_measurement_cache rescue nil
       Dashboard.send_measurement_data rescue nil
       Dashboard.send_live_data rescue nil
-      puts "EditSF: #{@category} adjusted from #{'%.1f' % @original_total} to #{'%.1f' % (@original_total - @removed_sf)} SF"
+    end
+
+    def rebuild_face_refs_for_category
+      m = Sketchup.active_model
+      return unless m
+
+      # Collect all currently-measured faces (green) in entities belonging to this category
+      sr = TakeoffTool.scan_results || []
+      ca = TakeoffTool.category_assignments || {}
+      measured_faces = []
+
+      sr.each do |r|
+        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
+        next unless cat == @category
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid? && e.respond_to?(:definition)
+        e.definition.entities.grep(Sketchup::Face).each do |f|
+          fm = f.material
+          next unless fm
+          if fm.name == 'FF_DEBUG_MEASURED' || fm.name.start_with?('TO_SF_')
+            measured_faces << f
+          end
+        end
+      end
+
+      # Find manual SF measurement groups for this category and rebuild their face_refs
+      require 'json'
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
+        next unless grp.get_attribute('TakeoffMeasurement', 'category') == @category
+
+        # Rebuild refs from currently measured faces
+        refs = measured_faces.map do |f|
+          pid = f.respond_to?(:persistent_id) ? f.persistent_id : nil
+          parent = f.parent
+          defn_name = if parent.is_a?(Sketchup::ComponentDefinition)
+                        parent.name
+                      else
+                        '__model__'
+                      end
+          fidx = begin
+            parent_ents = parent.is_a?(Sketchup::ComponentDefinition) ? parent.entities : m.entities
+            parent_ents.grep(Sketchup::Face).index(f) || -1
+          rescue
+            -1
+          end
+          { 'pid' => pid, 'defn' => defn_name, 'fidx' => fidx }
+        end
+
+        new_total = measured_faces.sum { |f| f.area / 144.0 }.round(2)
+
+        grp.set_attribute('TakeoffMeasurement', 'face_refs', JSON.generate(refs))
+        grp.set_attribute('TakeoffMeasurement', 'face_count', measured_faces.length)
+        grp.set_attribute('TakeoffMeasurement', 'total_sf', new_total)
+        puts "EditSF: Rebuilt face_refs for #{@category}: #{measured_faces.length} faces, #{'%.1f' % new_total} SF"
+      end
     end
   end
 

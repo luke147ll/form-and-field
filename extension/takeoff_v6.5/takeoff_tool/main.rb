@@ -273,6 +273,7 @@ module TakeoffTool
         updated = (Scanner.recalculate_sf rescue 0)
         puts "Takeoff: Scan data restored - dashboard ready#{updated > 0 ? " (#{updated} SF values refreshed)" : ''}"
         ColorController.strip_baked_ff_materials if defined?(ColorController)
+        TakeoffTool.refresh_sf_material_colors rescue nil
       end
       # Check for backup newer than last save (crash recovery)
       begin

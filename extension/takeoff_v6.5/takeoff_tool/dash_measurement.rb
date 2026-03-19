@@ -376,12 +376,77 @@ module TakeoffTool
       dialog.add_action_callback('editSFFaces') do |_ctx, cat_str|
         begin
           cat = cat_str.to_s
-          # Paint debug visualization first so measured faces show green
-          Scanner.debug_area_category(cat) rescue nil
-          # Activate the edit tool
+          # Check if any faces have been manually edited (FF_EditSF attributes)
+          has_edits = false
+          sr = TakeoffTool.filtered_scan_results || []
+          ca = TakeoffTool.category_assignments || {}
+          sr.each do |r|
+            rcat = ca[r[:entity_id]] || r[:parsed][:auto_category]
+            next unless rcat == cat
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid? && e.respond_to?(:definition)
+            e.definition.entities.grep(Sketchup::Face).each do |f|
+              if (f.get_attribute('FF_EditSF', 'original_mat') rescue nil) || (f.get_attribute('FF_EditSF', 'was_new') rescue nil)
+                has_edits = true
+                break
+              end
+            end
+            break if has_edits
+          end
+          # Only run debug visualization if no manual edits exist
+          Scanner.debug_area_category(cat) unless has_edits
           TakeoffTool.activate_edit_sf(cat)
         rescue => e
           puts "editSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('reverseSFNormal') do |_ctx, cat_str|
+        begin
+          cat = cat_str.to_s
+          require 'json'
+          m = Sketchup.active_model
+          next unless m
+
+          # Load current sampled normal (or compute dominant normal)
+          existing_json = m.get_attribute('TakeoffSFNormals', cat) rescue nil
+          if existing_json
+            arr = JSON.parse(existing_json)
+            # Flip it
+            reversed = [-arr[0], -arr[1], -arr[2]]
+          else
+            # No sampled normal yet — compute the current dominant from debug data
+            # Default: flip the Z axis (up → down or down → up)
+            reversed = [0.0, 0.0, -1.0]
+            # Check if current dominant is already down-facing
+            sr = TakeoffTool.filtered_scan_results || []
+            ca = TakeoffTool.category_assignments || {}
+            entries = sr.select { |r| (ca[r[:entity_id]] || r[:parsed][:auto_category]) == cat && (r[:area_sf] || 0) > 0 }
+            if entries.any?
+              e = TakeoffTool.find_entity(entries.first[:entity_id])
+              if e && e.valid? && e.respond_to?(:definition)
+                top_face = e.definition.entities.grep(Sketchup::Face).first
+                if top_face
+                  wn = e.transformation * top_face.normal
+                  # If dominant is pointing up, reverse to down; and vice versa
+                  reversed = wn.z > 0 ? [0.0, 0.0, -1.0] : [0.0, 0.0, 1.0]
+                end
+              end
+            end
+          end
+
+          m.set_attribute('TakeoffSFNormals', cat,
+            JSON.generate(reversed.map { |v| v.round(6) }))
+          puts "[FF ReverseSF] Reversed normal for '#{cat}': [#{reversed.map { |v| v.round(3) }.join(', ')}]"
+
+          # Recalculate SF and repaint
+          Scanner.recalculate_sf
+          Scanner.debug_area_category(cat) rescue nil
+          Dashboard.invalidate_measurement_cache rescue nil
+          Dashboard.send_measurement_data rescue nil
+          Dashboard.send_live_data rescue nil
+        rescue => e
+          puts "reverseSFNormal error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 

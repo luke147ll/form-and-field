@@ -102,6 +102,11 @@ module TakeoffTool
     end
 
     def self.debug_paint(face, mat)
+      begin
+        return if face.get_attribute('FF_EditSF', 'original_mat')
+        return if face.get_attribute('FF_EditSF', 'was_new')
+      rescue
+      end
       debug_save_face(face)
       face.material = mat
       face.back_material = mat
@@ -1591,9 +1596,11 @@ module TakeoffTool
 
       # Create debug materials
       mat_measured = m.materials['FF_DEBUG_MEASURED'] || m.materials.add('FF_DEBUG_MEASURED')
-      mat_measured.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_measured.color = Sketchup::Color.new(166, 227, 161)
+      mat_measured.alpha = 1.0
       mat_excluded = m.materials['FF_DEBUG_EXCLUDED'] || m.materials.add('FF_DEBUG_EXCLUDED')
-      mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
+      mat_excluded.color = Sketchup::Color.new(243, 139, 168)
+      mat_excluded.alpha = 1.0
 
       # ── Classify faces using the SAME logic as face_area_for_entity ──
       measured_fd = []
@@ -2081,9 +2088,11 @@ module TakeoffTool
 
       # Create debug materials
       mat_measured = m.materials['FF_DEBUG_MEASURED'] || m.materials.add('FF_DEBUG_MEASURED')
-      mat_measured.color = Sketchup::Color.new(0, 200, 0, 180)
+      mat_measured.color = Sketchup::Color.new(166, 227, 161)
+      mat_measured.alpha = 1.0
       mat_excluded = m.materials['FF_DEBUG_EXCLUDED'] || m.materials.add('FF_DEBUG_EXCLUDED')
-      mat_excluded.color = Sketchup::Color.new(200, 0, 0, 120)
+      mat_excluded.color = Sketchup::Color.new(243, 139, 168)
+      mat_excluded.alpha = 1.0
 
       puts ""
       puts "═══════════════════════════════════════════════════════════"

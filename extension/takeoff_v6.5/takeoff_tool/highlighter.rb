@@ -111,6 +111,7 @@ module TakeoffTool
 
     def self.show_all_measurement_highlights
       m = Sketchup.active_model; return unless m
+      TakeoffTool.refresh_sf_material_colors rescue nil
       m.start_operation('Show All Measurements', true)
       m.entities.grep(Sketchup::Group).each do |grp|
         next unless grp.valid?
@@ -260,18 +261,19 @@ module TakeoffTool
       rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
       return unless mat_name
 
-      # Get or create the material
-      mat = m.materials[mat_name]
-      unless mat
-        rgba = begin; JSON.parse(rgba_json); rescue; [255, 100, 255, 140]; end
-        mat = m.materials.add(mat_name)
-        mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
-        mat.alpha = (rgba[3] || 140) / 255.0
-      end
+      # Get or create the material — always force solid green
+      mat = m.materials[mat_name] || m.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(166, 227, 161)
+      mat.alpha = 1.0
 
       faces = resolve_face_refs(m, grp)
       faces.each do |face|
         begin
+          # Skip faces manually edited by Edit SF tool
+          was_edited = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
+          was_new = face.get_attribute('FF_EditSF', 'was_new') rescue nil
+          next if was_edited || was_new
+
           # Save original material if not already saved
           unless face.get_attribute('FF_Original', 'material')
             orig_name = face.material ? face.material.display_name : ''
@@ -288,6 +290,11 @@ module TakeoffTool
       faces = resolve_face_refs(m, grp)
       faces.each do |face|
         begin
+          # Skip faces manually edited by Edit SF tool
+          was_edited = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
+          was_new = face.get_attribute('FF_EditSF', 'was_new') rescue nil
+          next if was_edited || was_new
+
           orig_name = face.get_attribute('FF_Original', 'material')
           next unless orig_name
           face.material = orig_name.empty? ? nil : m.materials[orig_name]

@@ -5651,7 +5651,15 @@ function receiveVisState(hidden){
   for(var eid in hidden){
     if(hidden.hasOwnProperty(eid))VIS[parseInt(eid)]=false;
   }
-  ISO_CATS=null;FISO=false;containerIsolate=null;updateFisoBtn();
+  // Do NOT clear ISO_CATS, FISO, or containerIsolate here.
+  // Those are managed by the JS functions that initiated the action.
+  // This function only syncs VIS from Ruby's authoritative state.
+  // Rebuild ASMVIS from entity VIS state
+  for(var asmId in ASMB){
+    if(!ASMB.hasOwnProperty(asmId))continue;
+    var eids=getAsmEids(ASMB[asmId]);
+    ASMVIS[asmId]=eids.length?eids.some(function(eid){return VIS[eid]!==false;}):true;
+  }
   filt();renderAsmPanel();
 }
 function syncIsolation(){
@@ -5833,7 +5841,8 @@ function renderAsmPanel(){
 
 function renderAsmCard(id,asm,idx,fasm){
   var active=fasm===id?' active':'';
-  var aVis=ASMVIS[id]!==false;
+  var eids=getAsmEids(asm);
+  var aVis=eids.length?eids.some(function(eid){return VIS[eid]!==false;}):true;
   var isExp=!!expandedAssemblies[id];
   var name=asm.name||id;
   var zone=asm.zone||'';
@@ -6051,7 +6060,7 @@ function renderAsmPanelV2(){
     var id=keys[ki],asm=ASMB[id];
     var si="'"+id.replace(/'/g,"\\'")+"'";
     var eids=getAsmEids(asm);
-    var aVis=ASMVIS[id]!==false;
+    var aVis=eids.length?eids.some(function(eid){return VIS[eid]!==false;}):true;
     var isExp=!!expandedAssemblies[id];
     var name=asm.name||id;
     var zone=asm.zone||'';
@@ -6681,9 +6690,9 @@ var MSVG={
 };
 var MTYPES={
   lf:  {label:'LF',  color:'#a6e3a1',unit:'LF', icon:'&#10236;'},
-  sf:  {label:'SF',  color:'#89b4fa',unit:'SF', icon:'&#11026;'},
-  elev:{label:'Elev',color:'#fab387',unit:"'",  icon:'&#8895;'},
-  vol: {label:'Vol', color:'#cba6f7',unit:'CF', icon:'&#10696;'}
+  sf:  {label:'SF',  color:'#a6e3a1',unit:'SF', icon:'&#11026;'},
+  elev:{label:'Elev',color:'#a6e3a1',unit:"'",  icon:'&#8895;'},
+  vol: {label:'Vol', color:'#a6e3a1',unit:'CF', icon:'&#10696;'}
 };
 function measTypeKey(mtype,unit){
   if(mtype==='LF')return 'lf';if(mtype==='SF')return 'sf';
@@ -6955,6 +6964,7 @@ function renderMeasPanel(){
             h+='<span class="mr-val" style="color:'+t2.color+'">'+valDisp+'</span>';
             h+='<span class="mr-unit" style="color:'+t2.color+'">'+(mm.type==='ELEV'?'':t2.unit)+'</span>';
             h+='<div class="mr-actions">';
+            if(mm.type==='SF'){h+='<button class="mr-btn" onclick="call(\'editSFFaces\',\''+X2(mm.category||cat2)+'\')" title="Edit faces — click to include/exclude" style="color:var(--blue);font-size:9px;font-family:inherit;padding:2px 6px">Edit</button>';h+='<button class="mr-btn" onclick="call(\'reverseSFNormal\',\''+X2(mm.category||cat2)+'\')" title="Flip face normal direction" style="color:#fab387;font-size:9px;font-family:inherit;padding:2px 6px">Reverse</button>';}
             h+='<button class="mr-btn" onclick="zoomMeas('+mm.eid+')" title="Zoom to">'+MSVG.zoom+'</button>';
             h+='<button class="mr-btn danger" onclick="delMeas('+mm.eid+')" title="Delete">'+MSVG.trash+'</button>';
             h+='</div></div>';
@@ -7042,7 +7052,10 @@ function renderMeasPanel(){
                 h+='<span class="mr-val" style="color:'+dt.color+';margin-left:auto">'+fmtMeasVal(dVal,dUnit)+'</span>';
                 h+='</div>';
                 h+='<div class="mr-inline">';
-                if(dUnit==='SF')h+='<button class="mr-ibtn" onclick="call(\'editSFFaces\',\''+X2(dpd.category||cat2)+'\')" style="color:#89b4fa;border-color:#45475a" title="Click faces to exclude from SF total">Edit Faces</button>';
+                if(dUnit==='SF'){
+                  h+='<button class="mr-ibtn" onclick="call(\'editSFFaces\',\''+X2(dpd.category||cat2)+'\')" style="color:#89b4fa;border-color:#45475a" title="Click faces to include/exclude">Edit</button>';
+                  h+='<button class="mr-ibtn" onclick="call(\'reverseSFNormal\',\''+X2(dpd.category||cat2)+'\')" style="color:#fab387;border-color:#45475a" title="Flip face normal direction (swap top/bottom selection)">Reverse</button>';
+                }
                 h+='<button class="mr-ibtn drv" onclick="showMeasAddPartFrom(\''+X2(dpd.category||cat2)+'\',\''+X2(dId)+'\')" title="Create derivative from this measurement">+ Derivative</button>';
                 h+='<button class="mr-btn danger" onclick="delDerived(\''+X2(dId)+'\')" title="Delete">'+MSVG.trash+'</button>';
                 h+='</div>';
