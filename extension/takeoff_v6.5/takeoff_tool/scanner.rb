@@ -105,6 +105,9 @@ module TakeoffTool
       begin
         return if face.get_attribute('FF_EditSF', 'original_mat')
         return if face.get_attribute('FF_EditSF', 'was_new')
+        # Also protect by edit material name — survives even if attributes are lost
+        fm = face.material
+        return if fm && (fm.name == 'FF_EDIT_MEASURED' || fm.name == 'FF_EDIT_EXCLUDED')
       rescue
       end
       debug_save_face(face)
@@ -151,6 +154,9 @@ module TakeoffTool
         # Skip faces manually edited by Edit SF tool — preserve user's choices
         next if (face.get_attribute('FF_EditSF', 'original_mat') rescue nil)
         next if (face.get_attribute('FF_EditSF', 'was_new') rescue nil)
+        # Also protect by edit material name
+        fm = face.material
+        next if fm && (fm.name == 'FF_EDIT_MEASURED' || fm.name == 'FF_EDIT_EXCLUDED')
         face.material = entry[:front]
         face.back_material = entry[:back]
         restored += 1
@@ -2260,9 +2266,19 @@ module TakeoffTool
         by_defn[dname][:sf] += entity_sf
         by_defn[dname][:stored] += stored_sf
 
-        # Paint faces (save originals first)
-        measured_fd.each { |fd| debug_paint(fd[:face], mat_measured) }
-        excluded_fd.each { |fd| debug_paint(fd[:face], mat_excluded) }
+        # Paint faces (respect edit overrides)
+        measured_fd.each do |fd|
+          f = fd[:face]
+          next if (f.get_attribute('FF_EditSF', 'original_mat') rescue nil)
+          next if (f.get_attribute('FF_EditSF', 'was_new') rescue nil)
+          debug_paint(f, mat_measured)
+        end
+        excluded_fd.each do |fd|
+          f = fd[:face]
+          next if (f.get_attribute('FF_EditSF', 'original_mat') rescue nil)
+          next if (f.get_attribute('FF_EditSF', 'was_new') rescue nil)
+          debug_paint(f, mat_excluded)
+        end
 
         all_measured_faces.concat(measured_fd.map { |fd| fd[:face] })
         all_excluded_faces.concat(excluded_fd.map { |fd| fd[:face] })

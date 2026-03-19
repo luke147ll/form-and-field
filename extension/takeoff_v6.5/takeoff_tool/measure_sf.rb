@@ -801,7 +801,7 @@ module TakeoffTool
 
     def activate
       @current_total = compute_category_total
-      Sketchup.status_text = "Edit SF [#{@category}]: Click green to exclude, red to re-include, bare to add. Total = #{'%.1f' % @current_total} SF. Escape to finish."
+      Sketchup.status_text = "Edit SF [#{@category}]: Click green/blue to exclude (→ orange), orange/red to re-include (→ blue), bare to add (→ blue). Escape to finish."
     end
 
     def deactivate(view)
@@ -823,7 +823,7 @@ module TakeoffTool
       if @ip.valid? && @ip.face
         face = @ip.face
         mat = face.material
-        if mat && mat.name == 'FF_DEBUG_EXCLUDED'
+        if mat && (mat.name == 'FF_DEBUG_EXCLUDED' || mat.name == 'FF_EDIT_EXCLUDED')
           @hover_face = face
           @hover_xform = @ip.transformation
           @hover_is_excluded = true
@@ -853,36 +853,30 @@ module TakeoffTool
       model = Sketchup.active_model
 
       if @hover_is_excluded
-        # RE-INCLUDE: red → green, ADD sf back to total
+        # RE-INCLUDE: orange → blue, ADD sf back to total
         model.start_operation('Include SF Face', true)
-        orig_name = face.get_attribute('FF_EditSF', 'original_mat') rescue nil
-        if orig_name && !orig_name.empty? && model.materials[orig_name]
-          restore_mat = model.materials[orig_name]
-        else
-          restore_mat = get_measured_mat(model)
-        end
-        face.material = restore_mat
-        face.back_material = restore_mat
+        face.material = get_edit_measured_mat(model)
+        face.back_material = get_edit_measured_mat(model)
         model.commit_operation
         adjust_total(sf)
 
       elsif @hover_is_new
-        # ADD: bare face → green, ADD sf to total
+        # ADD: bare face → blue, ADD sf to total
         model.start_operation('Add SF Face', true)
         orig_mat_name = face.material ? face.material.name : ''
         face.set_attribute('FF_EditSF', 'original_mat', orig_mat_name)
         face.set_attribute('FF_EditSF', 'was_new', true)
-        face.material = get_measured_mat(model)
-        face.back_material = get_measured_mat(model)
+        face.material = get_edit_measured_mat(model)
+        face.back_material = get_edit_measured_mat(model)
         model.commit_operation
         adjust_total(sf)
 
       else
-        # EXCLUDE: green → red, SUBTRACT sf from total
+        # EXCLUDE: green/blue → red, SUBTRACT sf from total
         model.start_operation('Exclude SF Face', true)
         face.set_attribute('FF_EditSF', 'original_mat', face.material ? face.material.name : '')
-        face.material = get_excluded_mat(model)
-        face.back_material = get_excluded_mat(model)
+        face.material = get_edit_excluded_mat(model)
+        face.back_material = get_edit_excluded_mat(model)
         model.commit_operation
         adjust_total(-sf)
       end
@@ -941,19 +935,19 @@ module TakeoffTool
     def sf_face?(mat)
       return false unless mat
       name = mat.name
-      name == 'FF_DEBUG_MEASURED' || name.start_with?('TO_SF_')
+      name == 'FF_DEBUG_MEASURED' || name == 'FF_EDIT_MEASURED' || name.start_with?('TO_SF_')
     end
 
-    def get_measured_mat(model)
-      mat = model.materials['FF_DEBUG_MEASURED'] || model.materials.add('FF_DEBUG_MEASURED')
-      mat.color = Sketchup::Color.new(166, 227, 161)
+    def get_edit_measured_mat(model)
+      mat = model.materials['FF_EDIT_MEASURED'] || model.materials.add('FF_EDIT_MEASURED')
+      mat.color = Sketchup::Color.new(116, 199, 236)  # Blue to distinguish from auto green
       mat.alpha = 1.0
       mat
     end
 
-    def get_excluded_mat(model)
-      mat = model.materials['FF_DEBUG_EXCLUDED'] || model.materials.add('FF_DEBUG_EXCLUDED')
-      mat.color = Sketchup::Color.new(243, 139, 168)
+    def get_edit_excluded_mat(model)
+      mat = model.materials['FF_EDIT_EXCLUDED'] || model.materials.add('FF_EDIT_EXCLUDED')
+      mat.color = Sketchup::Color.new(250, 179, 135)  # Orange — distinct from auto red
       mat.alpha = 1.0
       mat
     end
@@ -1035,7 +1029,7 @@ module TakeoffTool
         e.definition.entities.grep(Sketchup::Face).each do |f|
           fm = f.material
           next unless fm
-          if fm.name == 'FF_DEBUG_MEASURED' || fm.name.start_with?('TO_SF_')
+          if fm.name == 'FF_DEBUG_MEASURED' || fm.name == 'FF_EDIT_MEASURED' || fm.name.start_with?('TO_SF_')
             measured_faces << f
           end
         end
