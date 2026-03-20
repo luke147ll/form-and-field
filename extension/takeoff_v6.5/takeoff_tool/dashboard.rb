@@ -1159,6 +1159,14 @@ module TakeoffTool
         color = begin; JSON.parse(rgba_json); rescue; nil; end
 
         part_name = grp.get_attribute('TakeoffMeasurement', 'part_name') || ''
+        cost_code = grp.get_attribute('TakeoffMeasurement', 'cost_code') || ''
+
+        # Also check category-level cost code assignment
+        if cost_code.empty?
+          ccm = (TakeoffTool.effective_cost_codes['category_to_cost_code'] rescue {}) || {}
+          cc_arr = ccm[cat]
+          cost_code = cc_arr.first if cc_arr && cc_arr.length == 1
+        end
 
         entry = {
           eid: grp.entityID,
@@ -1167,7 +1175,8 @@ module TakeoffTool
           visible: visible,
           note: note,
           color: color,
-          partName: part_name
+          partName: part_name,
+          costCode: cost_code || ''
         }
 
         if mtype == 'SF'
@@ -1396,21 +1405,29 @@ module TakeoffTool
             dirty = true
           end
 
-        elsif src == 'tool_sf' || src == 'tool_lf'
-          # Measured with SF/LF tool — read value from linked child group
+        elsif src == 'tool_sf' || src == 'tool_lf' || src == 'linked'
+          # Read value from linked child/adopted measurement group
           src_eid = (v['sourceEid'] || 0).to_i
           base = 0.0
+          vis = false
+          grp_type = nil
           if src_eid > 0
             grp = TakeoffTool.find_entity(src_eid)
             if grp && grp.valid?
-              if src == 'tool_sf'
+              vis = grp.get_attribute('TakeoffMeasurement', 'highlights_visible') != false
+              grp_type = grp.get_attribute('TakeoffMeasurement', 'type')
+              if grp_type == 'SF' || src == 'tool_sf'
                 geo_faces = grp.entities.grep(Sketchup::Face)
                 base = geo_faces.any? ? (geo_faces.sum { |f| f.area } / 144.0).round(2) : 0.0
-              else
+              elsif grp_type == 'LF' || src == 'tool_lf'
                 base = (grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0).to_f
+              elsif grp_type == 'BOX'
+                base = (grp.get_attribute('TakeoffMeasurement', 'volume_cf') || 0).to_f
               end
             end
           end
+          v['visible'] = vis
+          v['grpType'] = grp_type
           new_val = (base * mult).round(2)
           if v['computedValue'] != new_val
             v['computedValue'] = new_val

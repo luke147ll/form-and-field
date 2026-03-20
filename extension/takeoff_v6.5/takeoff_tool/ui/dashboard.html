@@ -225,9 +225,16 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .mcard-part-val{font:600 10px var(--font-num);color:var(--subtext0);white-space:nowrap}
 .mcard-part-waste{font-size:8px;color:var(--overlay0)}
 .mcard-part-unit{font:500 8px var(--font-mono);color:var(--overlay0);text-transform:uppercase;width:20px}
-.mcard-part-add{width:16px;height:16px;border:none;background:transparent;cursor:pointer;color:var(--sapphire);display:flex;align-items:center;justify-content:center;opacity:0;transition:all .12s;border-radius:2px;font-size:11px;font-weight:700}
-.mcard-part-add:hover{color:var(--blue);background:rgba(137,180,250,.1)}
-.mcard-part:hover .mcard-part-add{opacity:1}
+.mcard-part-off{opacity:.45}
+.mcard-part-eye{width:14px;height:14px;border:none;background:transparent;cursor:pointer;color:var(--overlay0);display:flex;align-items:center;justify-content:center;transition:all .12s;border-radius:2px;flex-shrink:0}
+.mcard-part-eye.on{color:var(--sapphire)}
+.mcard-part-eye:hover{color:var(--blue)}
+.mcard-part-add,.mcard-part-sub{width:16px;height:16px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:all .12s;border-radius:2px;font-size:11px;font-weight:700}
+.mcard-part-add{color:var(--green)}
+.mcard-part-add:hover{color:var(--green);background:rgba(166,227,161,.1)}
+.mcard-part-sub{color:var(--peach)}
+.mcard-part-sub:hover{color:var(--red);background:rgba(243,139,168,.08)}
+.mcard-part:hover .mcard-part-add,.mcard-part:hover .mcard-part-sub{opacity:1}
 .mcard-part-del{width:16px;height:16px;border:none;background:transparent;cursor:pointer;color:var(--overlay0);display:flex;align-items:center;justify-content:center;opacity:0;transition:all .12s;border-radius:2px;font-size:10px}
 .mcard-part-del:hover{color:var(--red);background:rgba(243,139,168,.08)}
 .mcard-noparts{font-size:9px;color:var(--surface2);font-style:italic;padding:4px 0}
@@ -6917,7 +6924,9 @@ function renderMeasPanel(){
   // Visible count
   var visCount=0;
   for(var vi=0;vi<filtered.length;vi++){if(filtered[vi].visible)visCount++;}
-  sh+='<div style="flex:1"></div><span style="font-size:10px;color:var(--overlay0)">'+visCount+'/'+filtered.length+' visible</span>';
+  sh+='<div style="flex:1"></div>';
+  sh+='<button onclick="exportAllMeasCSV()" style="background:none;border:1px solid var(--surface1);border-radius:3px;color:var(--green);font:500 9px var(--font-mono);padding:2px 8px;cursor:pointer;margin-right:6px" title="Export all measurements + parts to CSV">\u2193 Export All</button>';
+  sh+='<span style="font-size:10px;color:var(--overlay0)">'+visCount+'/'+filtered.length+' visible</span>';
   var sumEl=document.getElementById('measSummary');
   if(sumEl)sumEl.innerHTML=sh;
 
@@ -7058,14 +7067,28 @@ function renderMeasPanel(){
             h+='</div>';
           } else {
             var isTool=ppd.sourceType==='tool_sf'||ppd.sourceType==='tool_lf';
-            var toolColor=isTool?' style="color:var(--sapphire)"':'';
-            h+='<div class="mcard-part">';
-            h+='<span class="mcard-part-name"'+(isScan?' style="color:var(--green)"':toolColor)+'>'+X(ppd.name||'Part')+'</span>';
+            var isLinked=ppd.sourceType==='linked';
+            var hasGeo=isTool||isLinked;
+            var pVis=ppd.visible!==false;
+            var nameStyle='';
+            if(isScan)nameStyle=' style="color:var(--green)"';
+            else if(isLinked && ppd.linkedColor && ppd.linkedColor.length>=3)nameStyle=' style="color:rgb('+ppd.linkedColor[0]+','+ppd.linkedColor[1]+','+ppd.linkedColor[2]+')"';
+            else if(isTool)nameStyle=' style="color:var(--sapphire)"';
+            h+='<div class="mcard-part'+(hasGeo&&!pVis?' mcard-part-off':'')+'">';
+            if(hasGeo && ppd.sourceEid){
+              var eyeColor=isLinked&&ppd.linkedColor?'color:rgb('+ppd.linkedColor[0]+','+ppd.linkedColor[1]+','+ppd.linkedColor[2]+')':'';
+              h+='<button class="mcard-part-eye'+(pVis?' on':'')+'" onclick="togPartVis('+ppd.sourceEid+','+(pVis?'false':'true')+')" title="'+(pVis?'Hide':'Show')+'"'+(pVis&&eyeColor?' style="'+eyeColor+'"':'')+'>'+ICO_EYE_SM+'</button>';
+            }
+            h+='<span class="mcard-part-name"'+nameStyle+'>'+X(ppd.name||'Part')+'</span>';
             h+='<span class="mcard-part-val">'+pVal.toLocaleString(undefined,{maximumFractionDigits:1})+'</span>';
             if(pWaste)h+='<span class="mcard-part-waste">'+pWaste+'</span>';
             h+='<span class="mcard-part-unit">'+pUnit+'</span>';
-            if(ppd.sourceType==='tool_sf' && ppd.sourceEid){
-              h+='<button class="mcard-part-add" onclick="addPartToolFaces('+ppd.sourceEid+',\'tool_sf\',\''+X2(ppd.category||'')+'\')" title="Add more faces">+</button>';
+            if(hasGeo && ppd.sourceEid){
+              var gt=ppd.grpType||'SF';
+              var addCbP=gt==='LF'?'addLFFaces':'addSFFaces';
+              var rmCbP=gt==='LF'?'removeLFFaces':'removeSFFaces';
+              h+='<button class="mcard-part-add" onclick="call(\''+addCbP+'\',JSON.stringify({eid:'+ppd.sourceEid+',category:\''+X2(ppd.category||'')+'\'}))" title="Add faces">+</button>';
+              h+='<button class="mcard-part-sub" onclick="call(\''+rmCbP+'\',\''+ppd.sourceEid+'\')" title="Remove faces">&minus;</button>';
             }
             h+='<button class="mcard-part-del" onclick="delDerived(\''+X2(pp.id)+'\')" title="Delete">\u00d7</button>';
             h+='</div>';
@@ -7079,8 +7102,10 @@ function renderMeasPanel(){
       h+='<option value="measurement">From this measurement</option>';
       h+='<option value="tool_sf">Measure SF</option>';
       h+='<option value="tool_lf">Measure LF</option>';
+      h+='<option value="linked">Link existing card</option>';
       h+='<option value="manual">Manual value</option>';
       h+='</select></div>';
+      h+='<div class="apf-row" id="apfLinkRow_'+mm.eid+'" style="display:none"><span class="apf-label">Card</span><select class="apf-select" id="apfLink_'+mm.eid+'" onchange="apfLinkChange('+mm.eid+')"></select></div>';
       h+='<div class="apf-row" id="apfMultRow_'+mm.eid+'"><span class="apf-label">Waste %</span><input class="apf-input" id="apfMult_'+mm.eid+'" type="number" step="1" value="0" style="width:60px;flex:none" oninput="apfWastePreview('+mm.eid+','+mm.value+')" />';
       h+='<span id="apfPrev_'+mm.eid+'" style="font-size:9px;color:var(--overlay0);margin-left:4px">= '+fmtMeasVal(mm.value,mm.unit)+'</span></div>';
       h+='<div class="apf-row" id="apfManRow_'+mm.eid+'" style="display:none"><span class="apf-label">Value</span><input class="apf-input" id="apfManVal_'+mm.eid+'" type="number" step="0.1" value="0" style="width:90px;flex:none" /></div>';
@@ -7162,6 +7187,7 @@ function togMeasType(type,el){measTypeFilter[type]=!measTypeFilter[type];el.clas
 function togMeasCont(name){openMeasConts[name]=openMeasConts[name]===false?true:false;renderMeasPanel();}
 function togMeasCat(cat){openMeasCats[cat]=openMeasCats[cat]===false?true:false;renderMeasPanel();}
 function togMeasVis(eid,show){var s=show==='true'||show===true;callJSON('toggleMeasurement',{eid:eid,show:s});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].visible=s;break;}}renderMeasPanel();}
+function togPartVis(srcEid,show){var s=show==='true'||show===true;callJSON('toggleMeasurement',{eid:srcEid,show:s});for(var k in DERIVED){if(DERIVED.hasOwnProperty(k)&&DERIVED[k].sourceEid===srcEid){DERIVED[k].visible=s;}}renderMeasPanel();}
 function zoomMeas(eid){call('zoomToMeasurement',''+eid);}
 function showAllMeas(){call('showAllMeasurements');}
 function hideAllMeas(){call('hideAllMeasurements');}
@@ -7176,25 +7202,36 @@ function exportMeasCSV(eid){
   var label=mm.label||mm.partName||mm.category||'measurement';
   var unit=mm.type==='SF'?'SF':mm.type==='LF'?'LF':mm.unit||'';
   var count=mm.type==='SF'?(mm.faceCount||0):mm.type==='LF'?(mm.segments||0):1;
-  var csv='Measurement,Value,Unit,Category,Count\n';
-  csv+='"'+label.replace(/"/g,'""')+'",'+mm.value+','+unit+',"'+(mm.category||'').replace(/"/g,'""')+'",'+count+'\n';
-  // Find parts
+  var cc=mm.costCode||'';
+
+  var csv='Item,Type,Base Qty,Waste %,Total Qty,Unit,Cost Code,Category\n';
+  csv+=Q(label)+',Measurement,'+mm.value+',,'+mm.value+','+unit+','+Q(cc)+','+Q(mm.category||'')+'\n';
+
+  // Find parts — match by sourceEid, parentMeasEid, or category for scan parts
   var parts=[];
   for(var id in DERIVED){
     if(!DERIVED.hasOwnProperty(id))continue;
     var dp=DERIVED[id];
-    if((dp.sourceEid&&dp.sourceEid===eid)||(dp.category===mm.category&&(dp.sourceType==='category_total'||dp.sourceType==='category_scan'))){
-      parts.push(dp);
-    }
+    if(dp.sourceEid&&dp.sourceEid===eid){parts.push(dp);continue;}
+    if(dp.parentMeasEid&&dp.parentMeasEid===eid){parts.push(dp);continue;}
+    if(dp.category===mm.category&&(dp.sourceType==='category_total'||dp.sourceType==='category_scan')){parts.push(dp);continue;}
   }
-  if(parts.length>0){
-    csv+='\nDerived Parts,Base Qty,Waste %,Total Qty,Unit\n';
-    for(var pi=0;pi<parts.length;pi++){
-      var pp=parts[pi];
-      var waste=pp.multiplier?Math.round((pp.multiplier-1)*100):0;
-      csv+='"'+(pp.name||'Part').replace(/"/g,'""')+'",'+(pp.computedValue||0)+','+waste+'%,'+(pp.computedValue||0)+','+(pp.unit||'SF')+'\n';
-    }
+  for(var pi=0;pi<parts.length;pi++){
+    var pp=parts[pi];
+    var waste=pp.multiplier?Math.round((pp.multiplier-1)*100):0;
+    var baseQty=pp.multiplier&&pp.multiplier>0?(pp.computedValue/pp.multiplier):pp.computedValue||0;
+    baseQty=Math.round(baseQty*100)/100;
+    var totalQty=pp.computedValue||0;
+    var srcLabel='Part';
+    if(pp.sourceType==='category_scan')srcLabel='Auto Scan';
+    else if(pp.sourceType==='measurement')srcLabel='Derived';
+    else if(pp.sourceType==='tool_sf')srcLabel='Measured SF';
+    else if(pp.sourceType==='tool_lf')srcLabel='Measured LF';
+    else if(pp.sourceType==='linked')srcLabel='Linked';
+    else if(pp.sourceType==='manual')srcLabel='Manual';
+    csv+=Q(pp.name||'Part')+','+srcLabel+','+baseQty+','+(waste>0?waste+'%':'')+','+totalQty+','+(pp.unit||'SF')+','+Q(cc)+','+Q(mm.category||'')+'\n';
   }
+
   var slug=label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/_+$/,'');
   var blob=new Blob([csv],{type:'text/csv'});
   var a=document.createElement('a');
@@ -7203,6 +7240,57 @@ function exportMeasCSV(eid){
   a.click();
   URL.revokeObjectURL(a.href);
   showToast('Exported '+label+' to CSV','success');
+}
+function Q(s){return '"'+(s||'').toString().replace(/"/g,'""')+'"';}
+function exportAllMeasCSV(){
+  if(MEAS.length===0){showToast('No measurements to export','warning');return;}
+  var csv='Item,Type,Base Qty,Waste %,Total Qty,Unit,Cost Code,Category\n';
+  var usedDp={};
+  for(var mi=0;mi<MEAS.length;mi++){
+    var mm=MEAS[mi];
+    if(mm.type==='NOTE'||mm.type==='BENCHMARK')continue;
+    var label=mm.label||mm.partName||mm.category||'Measurement';
+    var unit=mm.type==='SF'?'SF':mm.type==='LF'?'LF':mm.unit||'';
+    var cc=mm.costCode||'';
+    csv+=Q(label)+',Measurement,'+mm.value+',,'+mm.value+','+unit+','+Q(cc)+','+Q(mm.category||'')+'\n';
+    // Parts for this card
+    for(var id in DERIVED){
+      if(!DERIVED.hasOwnProperty(id)||usedDp[id])continue;
+      var dp=DERIVED[id];
+      var match=false;
+      if(dp.sourceEid&&dp.sourceEid===mm.eid)match=true;
+      else if(dp.parentMeasEid&&dp.parentMeasEid===mm.eid)match=true;
+      else if(dp.category===mm.category&&(dp.sourceType==='category_total'||dp.sourceType==='category_scan'))match=true;
+      if(!match)continue;
+      usedDp[id]=true;
+      var waste=dp.multiplier?Math.round((dp.multiplier-1)*100):0;
+      var baseQty=dp.multiplier&&dp.multiplier>0?(dp.computedValue/dp.multiplier):dp.computedValue||0;
+      baseQty=Math.round(baseQty*100)/100;
+      var srcLabel='Part';
+      if(dp.sourceType==='category_scan')srcLabel='Auto Scan';
+      else if(dp.sourceType==='measurement')srcLabel='Derived';
+      else if(dp.sourceType==='tool_sf')srcLabel='Measured SF';
+      else if(dp.sourceType==='tool_lf')srcLabel='Measured LF';
+      else if(dp.sourceType==='linked')srcLabel='Linked';
+      else if(dp.sourceType==='manual')srcLabel='Manual';
+      csv+=Q(dp.name||'Part')+','+srcLabel+','+baseQty+','+(waste>0?waste+'%':'')+','+(dp.computedValue||0)+','+(dp.unit||'SF')+','+Q(cc)+','+Q(mm.category||'')+'\n';
+    }
+  }
+  // Orphan derived parts
+  for(var oid in DERIVED){
+    if(!DERIVED.hasOwnProperty(oid)||usedDp[oid])continue;
+    var odp=DERIVED[oid];
+    var owaste=odp.multiplier?Math.round((odp.multiplier-1)*100):0;
+    var obase=odp.multiplier&&odp.multiplier>0?(odp.computedValue/odp.multiplier):odp.computedValue||0;
+    csv+=Q(odp.name||'Part')+',Standalone,'+Math.round(obase*100)/100+','+(owaste>0?owaste+'%':'')+','+(odp.computedValue||0)+','+(odp.unit||'SF')+',,'+Q(odp.category||'')+'\n';
+  }
+  var blob=new Blob([csv],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='measurements_takeoff.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Exported all measurements to CSV','success');
 }
 /* ── Measurement card expand/collapse ── */
 var _openMeasCards={};
@@ -7433,14 +7521,42 @@ function apfSrcChange(eid){
   var src=(document.getElementById('apfSrc_'+eid)||{}).value||'measurement';
   var multRow=document.getElementById('apfMultRow_'+eid);
   var manRow=document.getElementById('apfManRow_'+eid);
+  var linkRow=document.getElementById('apfLinkRow_'+eid);
+  var unitRow=document.getElementById('apfUnitRow_'+eid);
   var isTool=src==='tool_sf'||src==='tool_lf';
-  if(multRow)multRow.style.display=src==='manual'?'none':'flex';
+  var isLink=src==='linked';
+  if(multRow)multRow.style.display=(src==='manual'||isLink)?'none':'flex';
   if(manRow)manRow.style.display=src==='manual'?'flex':'none';
+  if(linkRow)linkRow.style.display=isLink?'flex':'none';
+  if(unitRow)unitRow.style.display=isLink?'none':'flex';
   // Auto-set unit for tool sources
   if(isTool){
     var unitSel=document.getElementById('apfUnit_'+eid);
     if(unitSel)unitSel.value=src==='tool_sf'?'SF':'LF';
   }
+  // Populate card picker for linked
+  if(isLink){
+    var linkSel=document.getElementById('apfLink_'+eid);
+    if(linkSel){
+      var opts='';
+      for(var i=0;i<MEAS.length;i++){
+        var m=MEAS[i];
+        if(m.eid===eid)continue;
+        if(m.type==='BENCHMARK'||m.type==='NOTE')continue;
+        var lbl=(m.label||m.category||'Measurement')+' \u2014 '+fmtMeasVal(m.value,m.unit)+' '+(m.type||'');
+        opts+='<option value="'+m.eid+'" data-label="'+X2(m.label||m.category||'')+'" data-unit="'+(m.unit||m.type||'SF')+'">'+X(lbl)+'</option>';
+      }
+      linkSel.innerHTML=opts;
+      apfLinkChange(eid);
+    }
+  }
+}
+function apfLinkChange(eid){
+  var linkSel=document.getElementById('apfLink_'+eid);
+  if(!linkSel||!linkSel.selectedOptions.length)return;
+  var opt=linkSel.selectedOptions[0];
+  var nameInp=document.getElementById('apfN_'+eid);
+  if(nameInp&&!nameInp.value.trim())nameInp.value=opt.getAttribute('data-label')||'';
 }
 function apfWastePreview(eid,baseVal){
   var pct=parseFloat((document.getElementById('apfMult_'+eid)||{}).value)||0;
@@ -7462,6 +7578,17 @@ function submitAddPart(eid,cat){
     callJSON('createPartAndMeasure',payload);
     hideAddPartForm(eid);
     showToast('Measuring "'+name+'"... Click faces, then Escape to finish.','info');
+  } else if(srcType==='linked'){
+    var linkSel=document.getElementById('apfLink_'+eid);
+    var linkedEid=linkSel?parseInt(linkSel.value):0;
+    if(!linkedEid){showToast('Select a card to link','warning');return;}
+    var linkedOpt=linkSel.selectedOptions[0];
+    var linkedUnit=linkedOpt?linkedOpt.getAttribute('data-unit')||'SF':'SF';
+    var payload={name:name,category:cat,sourceType:'linked',sourceEid:linkedEid,
+                 parentMeasEid:eid,unit:linkedUnit,multiplier:1.0};
+    callJSON('linkCardAsPart',payload);
+    hideAddPartForm(eid);
+    showToast('Linked "'+name+'" into card','success');
   } else if(srcType==='measurement'){
     var payload={name:name,category:cat,sourceType:'measurement',sourceEid:eid,
                  unit:unit,multiplier:mult,wastePct:wastePct};
@@ -7474,13 +7601,6 @@ function submitAddPart(eid,cat){
     callJSON('createDerivedPart',payload);
     hideAddPartForm(eid);
     showToast('Part "'+name+'" created','success');
-  }
-}
-function addPartToolFaces(measEid,srcType,cat){
-  if(srcType==='tool_sf'){
-    callJSON('addSFFaces',JSON.stringify({eid:measEid,category:cat}));
-  } else {
-    callJSON('addLFFaces',JSON.stringify({eid:measEid,category:cat}));
   }
 }
 
@@ -7570,7 +7690,7 @@ function renderCadPanel(){
       h+='<div class="cad-sh-acts">';
       h+='<button class="cad-sh-btn" onclick="cadIsoSheet('+s.eid+')" title="Isolate" style="'+(sIso?'color:'+c.color:'')+'">'+CAD_SVG_ISO+'</button>';
       h+='<button class="cad-sh-btn" onclick="call(\'zoomCadSheet\',\''+s.eid+'\')" title="Zoom">'+CAD_SVG_ZOOM+'</button>';
-      if(isSection)h+='<button class="cad-sh-btn" onclick="call(\'alignCadSheet\',\''+s.eid+'\')" title="Align" style="color:#fab387">'+CAD_SVG_ALIGN+'</button>';
+      h+='<button class="cad-sh-btn" onclick="call(\'alignCadSheet\',\''+s.eid+'\')" title="Align" style="color:'+(isSection?'#fab387':'#89b4fa')+'">'+CAD_SVG_ALIGN+'</button>';
       h+='<button class="cad-sh-btn" onclick="delCad('+s.eid+',\''+X2(s.name)+'\')" title="Delete" style="color:#f38ba8">'+CAD_SVG_TRASH+'</button>';
       h+='</div></div>';
     }

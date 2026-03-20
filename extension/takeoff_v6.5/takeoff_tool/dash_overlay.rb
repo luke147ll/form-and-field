@@ -42,7 +42,8 @@ module TakeoffTool
         model = Sketchup.active_model
         grp = CadOverlay.find_sheet_group(model, eid_str.to_i)
         if grp
-          tool = SectionAlignTool.new(grp)
+          stype = grp.get_attribute(CAD_DICT, 'sheet_type') || 'plan'
+          tool = (stype == 'section') ? SectionAlignTool.new(grp) : PlanAlignTool.new(grp)
           model.select_tool(tool)
         end
       end

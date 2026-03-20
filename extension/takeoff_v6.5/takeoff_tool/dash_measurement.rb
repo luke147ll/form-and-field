@@ -162,6 +162,41 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('linkCardAsPart') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          m = Sketchup.active_model
+          linked_eid = (data['sourceEid'] || 0).to_i
+
+          # Mark the linked group as a child (hides it from card list)
+          grp = TakeoffTool.find_entity(linked_eid)
+          if grp && grp.valid?
+            m.start_operation('Link Card as Part', true)
+            dp_json = m.get_attribute('FormAndField', 'derived_parts')
+            parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+            id = "dp_#{Time.now.to_i}_#{rand(1000)}"
+
+            # Read the group's color for the part
+            rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
+            data['linkedColor'] = (JSON.parse(rgba_json) rescue nil) if rgba_json
+
+            data['computedValue'] = 0.0  # Will be recomputed
+            parts[id] = data
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+            grp.set_attribute('TakeoffMeasurement', 'part_link', id)
+            m.commit_operation
+
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+          else
+            puts "Dashboard linkCardAsPart: group #{linked_eid} not found"
+          end
+        rescue => e
+          puts "Dashboard linkCardAsPart error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       dialog.add_action_callback('createPartAndMeasure') do |_ctx, json_str|
         begin
           require 'json'
@@ -210,15 +245,27 @@ module TakeoffTool
           dp_json = m.get_attribute('FormAndField', 'derived_parts')
           parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
           part = parts[id_str.to_s]
-          # If tool part, also delete the linked child measurement group
-          if part && (part['sourceType'] == 'tool_sf' || part['sourceType'] == 'tool_lf')
+          if part
             src_eid = (part['sourceEid'] || 0).to_i
-            if src_eid > 0
-              grp = TakeoffTool.find_entity(src_eid)
-              if grp && grp.valid?
-                m.start_operation('Delete Part Measurement', true)
-                grp.erase!
-                m.commit_operation
+            if part['sourceType'] == 'tool_sf' || part['sourceType'] == 'tool_lf'
+              # Tool part: delete the child measurement group
+              if src_eid > 0
+                grp = TakeoffTool.find_entity(src_eid)
+                if grp && grp.valid?
+                  m.start_operation('Delete Part Measurement', true)
+                  grp.erase!
+                  m.commit_operation
+                end
+              end
+            elsif part['sourceType'] == 'linked'
+              # Linked part: un-mark the group so it reappears as a standalone card
+              if src_eid > 0
+                grp = TakeoffTool.find_entity(src_eid)
+                if grp && grp.valid?
+                  m.start_operation('Unlink Card', true)
+                  grp.delete_attribute('TakeoffMeasurement', 'part_link')
+                  m.commit_operation
+                end
               end
             end
           end

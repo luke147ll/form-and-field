@@ -189,9 +189,12 @@ module TakeoffTool
 
       puts "CadOverlay: Imported '#{sheet_name}' (#{sheet_type}) at EL #{elevation_ft}' (#{valid_entities.length} entities)"
 
-      # Activate alignment tool for sections
+      # Activate alignment tool
       if sheet_type == 'section'
         tool = SectionAlignTool.new(grp)
+        model.select_tool(tool)
+      elsif sheet_type == 'plan'
+        tool = PlanAlignTool.new(grp)
         model.select_tool(tool)
       end
     end
@@ -1305,6 +1308,652 @@ module TakeoffTool
 
           if(d.click_mode==='depth_sec'){es.textContent='Tune Depth — click point on section';ce.className='card waiting';}
           if(d.click_mode==='depth_mod'){es.textContent='Tune Depth — click matching point on model';ce.className='card waiting';}
+        }
+        </script>
+        </body></html>
+      HTML
+    end
+  end
+
+  # ═══════════════════════════════════════════════════════════════
+  # PLAN ALIGN TOOL — alignment for flat floor plan overlays
+  # ═══════════════════════════════════════════════════════════════
+
+  class PlanAlignTool
+
+    def initialize(plan_group)
+      @group = plan_group
+      @ip = Sketchup::InputPoint.new
+
+      # Annotation tags & elevation presets
+      @anno_tags = []
+      @elev_presets = []
+
+      # 3 independent alignment stages
+      @orient_snapped = false   # rotation done?
+      @grid_tag = nil           # selected gridline tag
+      @grid_snapped = false
+      @grid2_tag = nil          # second gridline (other axis)
+      @grid2_snapped = false
+      @elev_z = nil             # target elevation in inches
+      @elev_label = ''
+      @elev_snapped = false
+
+      # Click mode: what the next click does
+      @click_mode = nil   # :manual_orient, :grid, :grid2, :elev
+      @manual_pt1 = nil   # first point for 2-point orientation
+
+      @panel = nil
+    end
+
+    # ── lifecycle ──
+
+    def activate
+      load_elevation_presets
+      load_annotation_tags
+      open_panel
+      update_status
+      Sketchup.active_model.active_view.invalidate
+    end
+
+    def deactivate(view)
+      close_panel
+      view.invalidate
+    end
+
+    def resume(view)
+      update_status
+      view.invalidate
+    end
+
+    # ── input ──
+
+    def onMouseMove(flags, x, y, view)
+      @ip.pick(view, x, y)
+
+      if @ip.valid?
+        pt = @ip.position
+        case @click_mode
+        when :manual_orient
+          if @manual_pt1
+            view.tooltip = "Click second point to define grid direction"
+          else
+            view.tooltip = "Click first point along a gridline on the plan"
+          end
+        when :grid
+          if @grid_tag
+            axis = grid_axis(@grid_tag)
+            if axis == :x
+              view.tooltip = "Click gridline #{@grid_tag[:label]} on the plan (X snap)"
+            else
+              view.tooltip = "Click gridline #{@grid_tag[:label]} on the plan (Y snap)"
+            end
+          end
+        when :grid2
+          if @grid2_tag
+            axis = grid_axis(@grid2_tag)
+            if axis == :x
+              view.tooltip = "Click gridline #{@grid2_tag[:label]} on the plan (X snap)"
+            else
+              view.tooltip = "Click gridline #{@grid2_tag[:label]} on the plan (Y snap)"
+            end
+          end
+        else
+          view.tooltip = "#{'%.1f' % pt.x}\", #{'%.1f' % pt.y}\""
+        end
+      end
+      view.invalidate
+    end
+
+    def onLButtonDown(flags, x, y, view)
+      @ip.pick(view, x, y)
+      return unless @ip.valid?
+
+      case @click_mode
+      when :manual_orient
+        if @manual_pt1.nil?
+          @manual_pt1 = @ip.position.clone
+        else
+          snap_manual_orient(@manual_pt1, @ip.position)
+          @orient_snapped = true
+          @manual_pt1 = nil
+          @click_mode = nil
+        end
+
+      when :grid
+        snap_grid(@ip.position, @grid_tag)
+        @grid_snapped = true
+        @click_mode = nil
+
+      when :grid2
+        snap_grid(@ip.position, @grid2_tag)
+        @grid2_snapped = true
+        @click_mode = nil
+      end
+
+      update_panel
+      update_status
+      view.invalidate
+    end
+
+    def onCancel(reason, view)
+      case @click_mode
+      when :manual_orient
+        @click_mode = nil; @manual_pt1 = nil
+      when :grid, :grid2
+        @click_mode = nil
+      else
+        Sketchup.active_model.select_tool(nil); return
+      end
+      update_panel; update_status; view.invalidate
+    end
+
+    def getMenu(menu, flags, x, y, view)
+      menu.add_item('Flip 90° CW')  { flip_90;  view.invalidate }
+      menu.add_item('Flip 180°')     { flip_180; view.invalidate }
+      menu.add_item('Skip / Exit')   { Sketchup.active_model.select_tool(nil) }
+    end
+
+    # ── drawing ──
+
+    def draw(view)
+      @ip.draw(view) if @ip.valid?
+      return unless @group.valid?
+      bounds = @group.bounds
+
+      # Manual orientation line preview
+      if @click_mode == :manual_orient && @manual_pt1 && @ip.valid?
+        view.drawing_color = Sketchup::Color.new(249, 226, 175, 200)
+        view.line_width = 2; view.line_stipple = '-'
+        view.draw(GL_LINES, @manual_pt1, @ip.position)
+        view.line_stipple = ''
+        view.draw_points([@manual_pt1], 10, 4, Sketchup::Color.new(249, 226, 175))
+      end
+
+      # Gridline target during grid pick
+      tag = nil
+      tag = @grid_tag  if @click_mode == :grid
+      tag = @grid2_tag if @click_mode == :grid2
+      if tag
+        axis = grid_axis(tag)
+        z = bounds.center.z
+        if axis == :x
+          gx = tag[:point].x
+          view.drawing_color = Sketchup::Color.new(243, 139, 168, 180)
+          view.line_width = 2; view.line_stipple = '-'
+          view.draw(GL_LINES,
+            Geom::Point3d.new(gx, bounds.min.y - 48, z),
+            Geom::Point3d.new(gx, bounds.max.y + 48, z))
+          sp = view.screen_coords(Geom::Point3d.new(gx, bounds.max.y + 60, z))
+          view.draw_text(sp, tag[:label], size: 11, color: Sketchup::Color.new(243, 139, 168))
+        else
+          gy = tag[:point].y
+          view.drawing_color = Sketchup::Color.new(166, 227, 161, 180)
+          view.line_width = 2; view.line_stipple = '-'
+          view.draw(GL_LINES,
+            Geom::Point3d.new(bounds.min.x - 48, gy, z),
+            Geom::Point3d.new(bounds.max.x + 48, gy, z))
+          sp = view.screen_coords(Geom::Point3d.new(bounds.max.x + 60, gy, z))
+          view.draw_text(sp, tag[:label], size: 11, color: Sketchup::Color.new(166, 227, 161))
+        end
+      end
+    end
+
+    def getExtents
+      bb = Geom::BoundingBox.new
+      bb.add(@group.bounds.min, @group.bounds.max) if @group.valid?
+      bb.add(@grid_tag[:point]) if @grid_tag
+      bb.add(@grid2_tag[:point]) if @grid2_tag
+      bb
+    end
+
+    private
+
+    # ── tag loading (shared pattern with SectionAlignTool) ──
+
+    def load_annotation_tags
+      @anno_tags = []
+      model = Sketchup.active_model
+      return unless model
+      require 'json'
+      scan_for_tags(model.entities)
+      @anno_tags.sort_by! { |t| t[:label] }
+      puts "PlanAlignTool: Found #{@anno_tags.length} annotation tags"
+    rescue => e
+      puts "PlanAlignTool: could not load annotation tags: #{e.message}"
+      @anno_tags = []
+    end
+
+    def scan_for_tags(entities)
+      require 'json'
+      entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        mode = grp.get_attribute('TakeoffMeasurement', 'tag_mode')
+        if mode
+          label = grp.get_attribute('TakeoffMeasurement', 'custom_label').to_s
+          pt_json = grp.get_attribute('TakeoffMeasurement', 'point')
+          axis_lock = grp.get_attribute('TakeoffMeasurement', 'axis_lock').to_s
+          if !label.empty? && pt_json
+            coords = JSON.parse(pt_json) rescue nil
+            if coords && coords.length == 3
+              plane_angle = grp.get_attribute('TakeoffMeasurement', 'plane_angle')
+              @anno_tags << {
+                label: label, mode: mode, axis_lock: axis_lock,
+                plane_angle: plane_angle ? plane_angle.to_f : nil,
+                point: Geom::Point3d.new(coords[0].to_f, coords[1].to_f, coords[2].to_f)
+              }
+            end
+          end
+        end
+      end
+    end
+
+    def load_elevation_presets
+      presets = SectionCuts.build_presets
+      @elev_presets = presets.map { |p|
+        { label: p[:source_label], z_inches: p[:source_z],
+          z_feet: (p[:source_z] / 12.0).round(2) }
+      }
+    rescue => e
+      puts "PlanAlignTool: could not load presets: #{e.message}"
+      @elev_presets = []
+    end
+
+    def grid_axis(tag)
+      case tag[:axis_lock]
+      when 'red'   then :x
+      when 'green' then :y
+      else :x
+      end
+    end
+
+    # ── snap operations ──
+
+    def snap_manual_orient(pt1, pt2)
+      return unless @group.valid?
+      dx = pt2.x - pt1.x
+      dy = pt2.y - pt1.y
+      return if dx.abs < 0.1 && dy.abs < 0.1
+
+      # Angle of the clicked line
+      line_angle = Math.atan2(dy, dx)
+
+      # Snap to nearest 90° axis (0, 90, 180, 270)
+      # The clicked line should become axis-aligned
+      nearest_axis = (line_angle / (Math::PI / 2.0)).round * (Math::PI / 2.0)
+      delta = nearest_axis - line_angle
+
+      return if delta.abs < 0.001
+
+      model = Sketchup.active_model
+      model.start_operation('Orient Plan', true)
+      center = @group.bounds.center
+      @group.transform!(Geom::Transformation.rotation(center, Z_AXIS, delta))
+      @group.set_attribute(CAD_DICT, 'plan_ref_angle', nearest_axis)
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+      puts "PlanAlignTool: Manual orient #{'%.1f' % (delta * 180.0 / Math::PI)}°"
+    end
+
+    def snap_orient_to_grid(tag)
+      return unless @group.valid?
+      # Gridlines are axis-aligned: red = along Y (constrains X), green = along X (constrains Y)
+      # The plan's grid direction should match. Use the plane_angle from the tag if available.
+      target_angle = tag[:plane_angle] || 0
+      stored_angle = @group.get_attribute(CAD_DICT, 'plan_ref_angle') || 0
+      delta = target_angle - stored_angle
+
+      model = Sketchup.active_model
+      model.start_operation('Orient Plan to Grid', true)
+      if delta.abs > 0.001
+        center = @group.bounds.center
+        @group.transform!(Geom::Transformation.rotation(center, Z_AXIS, delta))
+        @group.set_attribute(CAD_DICT, 'plan_ref_angle', target_angle)
+        puts "PlanAlignTool: Oriented to #{tag[:label]} (#{'%.1f' % (delta * 180.0 / Math::PI)}°)"
+      end
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+    end
+
+    def snap_grid(click_pt, tag)
+      return unless @group.valid? && tag
+      axis = grid_axis(tag)
+      model = Sketchup.active_model
+      model.start_operation('Snap Plan Gridline', true)
+      if axis == :x
+        dx = tag[:point].x - click_pt.x
+        @group.transform!(Geom::Transformation.translation(Geom::Vector3d.new(dx, 0, 0)))
+        puts "PlanAlignTool: Grid snap X → #{tag[:label]} (dx=#{'%.1f' % dx}\")"
+      else
+        dy = tag[:point].y - click_pt.y
+        @group.transform!(Geom::Transformation.translation(Geom::Vector3d.new(0, dy, 0)))
+        puts "PlanAlignTool: Grid snap Y → #{tag[:label]} (dy=#{'%.1f' % dy}\")"
+      end
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+    end
+
+    def snap_elev
+      return unless @group.valid? && @elev_z
+      current_z = @group.bounds.center.z
+      dz = @elev_z - current_z
+      model = Sketchup.active_model
+      model.start_operation('Snap Plan Elevation', true)
+      @group.transform!(Geom::Transformation.translation(Geom::Vector3d.new(0, 0, dz)))
+      @group.set_attribute(CAD_DICT, 'elevation_ft', (@elev_z / 12.0).round(2))
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+      puts "PlanAlignTool: Elev snap dz=#{'%.1f' % dz}\" → #{@elev_label}"
+    end
+
+    def flip_90
+      return unless @group.valid?
+      model = Sketchup.active_model
+      model.start_operation('Rotate Plan 90°', true)
+      center = @group.bounds.center
+      @group.transform!(Geom::Transformation.rotation(center, Z_AXIS, Math::PI / 2.0))
+      stored = @group.get_attribute(CAD_DICT, 'plan_ref_angle') || 0
+      @group.set_attribute(CAD_DICT, 'plan_ref_angle', stored + Math::PI / 2.0)
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+      puts "PlanAlignTool: Rotated 90° CW"
+    end
+
+    def flip_180
+      return unless @group.valid?
+      model = Sketchup.active_model
+      model.start_operation('Rotate Plan 180°', true)
+      center = @group.bounds.center
+      @group.transform!(Geom::Transformation.rotation(center, Z_AXIS, Math::PI))
+      stored = @group.get_attribute(CAD_DICT, 'plan_ref_angle') || 0
+      @group.set_attribute(CAD_DICT, 'plan_ref_angle', stored + Math::PI)
+      model.commit_operation
+      Dashboard.send_cad_sheets rescue nil
+      puts "PlanAlignTool: Rotated 180°"
+    end
+
+    # ── panel ──
+
+    def open_panel
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "Align Floor Plan",
+        width: 280, height: 500,
+        left: 100, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+
+      @panel.add_action_callback('manualOrient') do |_ctx|
+        @manual_pt1 = nil
+        @click_mode = :manual_orient
+        update_panel; update_status
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('orientToGrid') do |_ctx, label|
+        tag = @anno_tags.find { |t| t[:label] == label.to_s }
+        if tag
+          snap_orient_to_grid(tag)
+          @orient_snapped = true
+          update_panel; update_status
+          Sketchup.active_model.active_view.invalidate
+        end
+      end
+
+      @panel.add_action_callback('setGridline') do |_ctx, label|
+        tag = @anno_tags.find { |t| t[:label] == label.to_s }
+        @grid_tag = tag
+        @grid_snapped = false
+        @click_mode = tag ? :grid : nil
+        update_panel; update_status
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('setGridline2') do |_ctx, label|
+        tag = @anno_tags.find { |t| t[:label] == label.to_s }
+        @grid2_tag = tag
+        @grid2_snapped = false
+        @click_mode = tag ? :grid2 : nil
+        update_panel; update_status
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('setElevation') do |_ctx, z_str|
+        z = z_str.to_f
+        preset = @elev_presets.find { |p| (p[:z_inches] - z).abs < 0.5 }
+        @elev_z = z
+        @elev_label = preset ? preset[:label] : "EL. #{'%.2f' % (z / 12.0)}'"
+        # Plans snap immediately — no click needed (plan is flat, no edge to pick)
+        snap_elev
+        @elev_snapped = true
+        @click_mode = nil
+        update_panel; update_status
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('refreshTags') do |_ctx|
+        load_annotation_tags
+        send_tag_options
+        @grid_tag = nil; @grid_snapped = false
+        @grid2_tag = nil; @grid2_snapped = false
+        @orient_snapped = false
+        @click_mode = nil
+        update_panel
+      end
+
+      @panel.add_action_callback('flip90') do |_ctx|
+        flip_90
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('flip180') do |_ctx|
+        flip_180
+        Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('skip') do |_ctx|
+        Sketchup.active_model.select_tool(nil)
+      end
+
+      @panel.set_on_closed {
+        @panel = nil
+        Sketchup.active_model.select_tool(nil)
+      }
+
+      @panel.set_html(plan_panel_html)
+      @panel.show
+    end
+
+    def close_panel
+      if @panel
+        @panel.set_on_closed {}
+        @panel.close rescue nil
+        @panel = nil
+      end
+    end
+
+    def send_tag_options
+      return unless @panel && @panel.visible?
+      require 'json'
+      grid_opts = @anno_tags.select { |t| t[:mode] == 'grid_num' || t[:mode] == 'grid_alpha' }.map { |t|
+        axis = case t[:axis_lock]; when 'red' then 'X'; when 'green' then 'Y'; else '' end
+        { value: t[:label], text: "#{t[:label]}#{axis.empty? ? '' : " (#{axis})"}" }
+      }
+      @panel.execute_script("refreshGridDropdowns(#{JSON.generate(grid_opts)})") rescue nil
+    end
+
+    def update_panel
+      return unless @panel && @panel.visible?
+      require 'json'
+      @panel.execute_script("updateState(#{JSON.generate({
+        orient_snapped: @orient_snapped,
+        grid_snapped: @grid_snapped,
+        grid_label: @grid_tag ? @grid_tag[:label] : nil,
+        grid_selected: @grid_tag ? true : false,
+        grid2_snapped: @grid2_snapped,
+        grid2_label: @grid2_tag ? @grid2_tag[:label] : nil,
+        grid2_selected: @grid2_tag ? true : false,
+        elev_snapped: @elev_snapped,
+        elev_label: @elev_label,
+        elev_selected: @elev_z ? true : false,
+        click_mode: @click_mode ? @click_mode.to_s : nil,
+        manual_pt1: @manual_pt1 ? true : false
+      })})") rescue nil
+    end
+
+    def update_status
+      Sketchup.status_text = case @click_mode
+      when :manual_orient
+        if @manual_pt1
+          "Click second point to define grid direction"
+        else
+          "Click first point along a gridline on the plan"
+        end
+      when :grid  then "Click gridline #{@grid_tag[:label]} on the plan"
+      when :grid2 then "Click gridline #{@grid2_tag[:label]} on the plan"
+      when :elev  then "Select elevation — plan moves to #{@elev_label}"
+      else
+        done = [@orient_snapped, @grid_snapped || @grid2_snapped, @elev_snapped].count(true)
+        done == 3 ? "Aligned — right-click to adjust or Exit" : "Select references from the panel"
+      end
+    end
+
+    def plan_panel_html
+      require 'json'
+      elev_opts = @elev_presets.map { |p|
+        "<option value=\"#{p[:z_inches]}\">#{p[:label]} (#{p[:z_feet]}&#39;)</option>"
+      }.join
+
+      grid_opts = @anno_tags.select { |t| t[:mode] == 'grid_num' || t[:mode] == 'grid_alpha' }.map { |t|
+        axis = case t[:axis_lock]; when 'red' then ' (X)'; when 'green' then ' (Y)'; else '' end
+        escaped = t[:label].gsub('"', '&quot;')
+        "<option value=\"#{escaped}\">#{t[:label]}#{axis}</option>"
+      }.join
+
+      has_tags = !@anno_tags.empty?
+      sheet_name = @group.get_attribute(CAD_DICT, 'sheet_name') rescue 'Floor Plan'
+
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow-y:auto}
+        .hdr{font-size:11px;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
+        .sub{font-size:10px;color:#6c7086;text-align:center;margin-bottom:12px}
+        .refresh{display:flex;justify-content:flex-end;margin-bottom:8px}
+        .refresh span{cursor:pointer;font-size:14px;color:#89b4fa}.refresh span:hover{color:#74c7ec}
+        .card{background:#313244;border-radius:6px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #585b70}
+        .card.done{border-left-color:#a6e3a1}
+        .card.waiting{border-left-color:#89b4fa}
+        .card-title{font-size:10px;font-weight:700;color:#a6adc8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .card.done .card-title{color:#a6e3a1}
+        .card.waiting .card-title{color:#89b4fa}
+        select{width:100%;padding:7px 9px;background:#45475a;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
+        select:focus{outline:none;border-color:#89b4fa}
+        .card-status{font-size:10px;margin-top:5px;color:#6c7086}
+        .card.done .card-status{color:#a6e3a1}
+        .card.waiting .card-status{color:#89b4fa}
+        .btns{display:flex;gap:8px;margin-top:12px}
+        .btn{flex:1;padding:7px 0;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
+        .btn-skip{background:#45475a;color:#cdd6f4}.btn-skip:hover{background:#585b70}
+        .btn-flip{background:#f9e2af;color:#1e1e2e}.btn-flip:hover{background:#f5c2e7}
+        .btn-manual{width:100%;padding:6px 0;margin-top:6px;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;background:#f9e2af;color:#1e1e2e}.btn-manual:hover{background:#f5c2e7}
+        .btn-manual.active{background:#89b4fa;color:#1e1e2e}
+        .or-divider{text-align:center;color:#6c7086;font-size:10px;margin:6px 0;text-transform:uppercase;letter-spacing:1px}
+        .empty{font-size:10px;color:#f38ba8;font-style:italic;margin-bottom:8px}
+        </style></head><body>
+        <div class="hdr">Align Floor Plan</div>
+        <div class="sub">#{sheet_name.gsub('"', '&quot;').gsub('<', '&lt;')}</div>
+        <div class="refresh"><span onclick="sketchup.refreshTags()" title="Reload tags">&#x21bb; Refresh Tags</span></div>
+        #{has_tags ? '' : '<div class="empty">No annotation tags found — place tags then refresh</div>'}
+
+        <div class="card" id="cardOrient">
+          <div class="card-title">1 — Orientation</div>
+          <select id="orientDrop" onchange="if(this.value)sketchup.orientToGrid(this.value)">
+            <option value="">— Auto-rotate to gridline —</option>
+            #{grid_opts}
+          </select>
+          <div class="or-divider">— or —</div>
+          <button class="btn-manual" id="btnManual" onclick="sketchup.manualOrient()">Click 2 Points on a Grid Line</button>
+          <div class="card-status" id="orientStatus">Rotate the plan to match the building grid</div>
+        </div>
+
+        <div class="card" id="cardGrid">
+          <div class="card-title">2 — Gridline (axis 1)</div>
+          <select id="gridDrop" onchange="if(this.value)sketchup.setGridline(this.value)">
+            <option value="">— Select gridline —</option>
+            #{grid_opts}
+          </select>
+          <div class="card-status" id="gridStatus">Snap plan position to a gridline</div>
+        </div>
+
+        <div class="card" id="cardGrid2">
+          <div class="card-title">3 — Gridline (axis 2)</div>
+          <select id="grid2Drop" onchange="if(this.value)sketchup.setGridline2(this.value)">
+            <option value="">— Select gridline —</option>
+            #{grid_opts}
+          </select>
+          <div class="card-status" id="grid2Status">Snap plan position on the other axis</div>
+        </div>
+
+        <div class="card" id="cardElev">
+          <div class="card-title">4 — Elevation</div>
+          <select id="elevDrop" onchange="if(this.value)sketchup.setElevation(this.value)">
+            <option value="">— Select elevation —</option>
+            #{elev_opts}
+          </select>
+          <div class="card-status" id="elevStatus">Set floor plan elevation</div>
+        </div>
+
+        <div class="btns">
+          <button class="btn btn-flip" onclick="sketchup.flip90()">90&deg;</button>
+          <button class="btn btn-flip" onclick="sketchup.flip180()">180&deg;</button>
+          <button class="btn btn-skip" onclick="sketchup.skip()">Skip</button>
+        </div>
+        <script>
+        function refreshGridDropdowns(grids){
+          var h1='<option value="">— Select gridline —</option>';
+          grids.forEach(function(t){h1+='<option value="'+t.value+'">'+t.text+'</option>';});
+          document.getElementById('gridDrop').innerHTML=h1;
+          document.getElementById('grid2Drop').innerHTML=h1;
+          var h2='<option value="">— Auto-rotate to gridline —</option>';
+          grids.forEach(function(t){h2+='<option value="'+t.value+'">'+t.text+'</option>';});
+          document.getElementById('orientDrop').innerHTML=h2;
+        }
+        function updateState(d){
+          var co=document.getElementById('cardOrient');
+          var os=document.getElementById('orientStatus');
+          var bm=document.getElementById('btnManual');
+          if(d.orient_snapped){
+            co.className='card done';
+            os.textContent='Orientation set';
+            bm.className='btn-manual';
+          } else if(d.click_mode==='manual_orient'){
+            co.className='card waiting';
+            os.textContent=d.manual_pt1?'Click second point to define direction':'Click first point along a gridline';
+            bm.className='btn-manual active';
+          } else {
+            co.className='card';
+            os.textContent='Rotate the plan to match the building grid';
+            bm.className='btn-manual';
+          }
+
+          var cg=document.getElementById('cardGrid');
+          var gs=document.getElementById('gridStatus');
+          if(d.grid_snapped){cg.className='card done';gs.textContent='Snapped to '+d.grid_label;}
+          else if(d.grid_selected){cg.className='card waiting';gs.textContent='Click gridline '+d.grid_label+' on the plan';}
+          else{cg.className='card';gs.textContent='Snap plan position to a gridline';}
+
+          var cg2=document.getElementById('cardGrid2');
+          var g2s=document.getElementById('grid2Status');
+          if(d.grid2_snapped){cg2.className='card done';g2s.textContent='Snapped to '+d.grid2_label;}
+          else if(d.grid2_selected){cg2.className='card waiting';g2s.textContent='Click gridline '+d.grid2_label+' on the plan';}
+          else{cg2.className='card';g2s.textContent='Snap plan position on the other axis';}
+
+          var ce=document.getElementById('cardElev');
+          var es=document.getElementById('elevStatus');
+          if(d.elev_snapped){ce.className='card done';es.textContent='Set to '+d.elev_label;}
+          else if(d.elev_selected){ce.className='card waiting';es.textContent='Click to snap elevation to '+d.elev_label;}
+          else{ce.className='card';es.textContent='Set floor plan elevation';}
         }
         </script>
         </body></html>

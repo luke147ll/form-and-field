@@ -115,6 +115,10 @@ module TakeoffTool
     def deactivate(view)
       close_panel
       reset_full
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
+      MeasurementsPanel.send_data rescue nil
       view.invalidate
     end
 
@@ -899,6 +903,7 @@ module TakeoffTool
       Dashboard.invalidate_measurement_cache rescue nil
       Dashboard.send_measurement_data rescue nil
       Dashboard.send_live_data rescue nil
+      MeasurementsPanel.send_data rescue nil
       view.invalidate
     end
 

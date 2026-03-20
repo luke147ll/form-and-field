@@ -375,6 +375,7 @@ module TakeoffTool
       m.start_operation('CC Pre-strip', true)
       reg.each do |eid, e|
         next unless e && e.valid?
+        next if e.get_attribute('TakeoffMeasurement', 'type')  # Skip measurement groups
 
         # Instance-level
         mat = e.material
@@ -432,6 +433,7 @@ module TakeoffTool
       d = 'TakeoffScanData'
       reg.each do |eid, e|
         next unless e && e.valid?
+        next if e.get_attribute('TakeoffMeasurement', 'type')  # Skip measurement groups
 
         # Instance material
         mat = e.material
@@ -480,6 +482,7 @@ module TakeoffTool
 
       reg.each do |eid, e|
         next unless e && e.valid?
+        next if e.get_attribute('TakeoffMeasurement', 'type')  # Skip measurement groups
 
         # Fix instance material
         imat = e.material
@@ -1108,6 +1111,7 @@ module TakeoffTool
 
     def self.apply_paint(entity, eid, mat)
       backup(eid, entity)
+      entity.material = mat
 
       defn = nil
       if entity.respond_to?(:definition)
