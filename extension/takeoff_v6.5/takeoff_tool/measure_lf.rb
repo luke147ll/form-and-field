@@ -89,7 +89,7 @@ module TakeoffTool
 
   class MeasureLFTool
 
-    def initialize(preset_category = nil)
+    def initialize(preset_category = nil, opts = {})
       @segments = [[]]
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
@@ -101,6 +101,9 @@ module TakeoffTool
       @lock_mode = :free
       @lock_z = nil
       @lock_xy = nil
+      @part_link_id = opts[:part_link_id]  # derived part ID to link on save
+      @part_link_label = opts[:label]      # label override for part-linked measurements
+      @part_link_color = opts[:color]      # color override [r,g,b]
     end
 
     def activate
@@ -326,6 +329,12 @@ module TakeoffTool
 
       @panel.set_html(lf_panel_html(cat_opts))
       @panel.show
+
+      # Pre-fill name when launched from a derived part
+      if @part_link_label && !@part_link_label.empty?
+        safe = @part_link_label.gsub("'", "\\\\'")
+        UI.start_timer(0.1) { @panel.execute_script("document.getElementById('name').value='#{safe}'") if @panel }
+      end
     end
 
     def close_panel
@@ -605,10 +614,30 @@ module TakeoffTool
       require 'json'
       grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
 
+      # Mark as child measurement if linked to a derived part
+      if @part_link_id
+        grp.set_attribute('TakeoffMeasurement', 'part_link', @part_link_id)
+      end
+
       TakeoffTool.entity_registry[grp.entityID] = grp
 
       model.commit_operation
       @last_grp_eid = grp.entityID
+
+      # Link measurement group to derived part
+      if @part_link_id
+        begin
+          dp_json = model.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          if parts[@part_link_id]
+            parts[@part_link_id]['sourceEid'] = grp.entityID
+            model.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          end
+        rescue => e
+          puts "Takeoff: LF poly part link error: #{e.message}"
+        end
+      end
+
       grp
     end
 
@@ -831,6 +860,7 @@ module TakeoffTool
       @group_eid = opts[:group_eid]
       @label = opts[:label] || category
       @color_rgb = opts[:color] || [166, 227, 161]
+      @part_link_id = opts[:part_link_id] # derived part ID to link on deactivate
       @hover_face = nil
       @hover_xform = nil
       @hover_cluster = nil
@@ -851,6 +881,21 @@ module TakeoffTool
     end
 
     def deactivate(view)
+      # Link measurement group to derived part if this was a tool measurement
+      if @part_link_id && @measurement_group && @measurement_group.valid?
+        begin
+          require 'json'
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          if parts[@part_link_id]
+            parts[@part_link_id]['sourceEid'] = @measurement_group.entityID
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          end
+        rescue => e
+          puts "Takeoff: LF part link error: #{e.message}"
+        end
+      end
       Dashboard.invalidate_measurement_cache rescue nil
       Dashboard.send_measurement_data rescue nil
       Dashboard.send_live_data rescue nil
@@ -1347,6 +1392,11 @@ module TakeoffTool
       @measurement_group.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([r, g, b, 179]))
       @measurement_group.set_attribute('TakeoffMeasurement', 'material_name', "FF_LF_#{@measurement_group.entityID}")
+
+      # Mark as child measurement if linked to a derived part
+      if @part_link_id
+        @measurement_group.set_attribute('TakeoffMeasurement', 'part_link', @part_link_id)
+      end
 
       TakeoffTool.entity_registry[@measurement_group.entityID] = @measurement_group
       TakeoffTool.invalidate_entity_cache

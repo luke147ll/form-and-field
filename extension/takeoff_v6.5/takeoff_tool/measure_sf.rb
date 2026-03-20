@@ -88,6 +88,7 @@ module TakeoffTool
       @group_eid = opts[:group_eid]    # target specific group, or nil for new
       @label = opts[:label] || category # sub-label (e.g., "Tile", "Wood")
       @color_rgb = opts[:color]         # [r,g,b] or nil for default green
+      @part_link_id = opts[:part_link_id] # derived part ID to link on deactivate
       @hover_face = nil
       @hover_xform = nil
       @hover_cluster = nil
@@ -106,6 +107,21 @@ module TakeoffTool
     end
 
     def deactivate(view)
+      # Link measurement group to derived part if this was a tool measurement
+      if @part_link_id && @measurement_group && @measurement_group.valid?
+        begin
+          require 'json'
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          if parts[@part_link_id]
+            parts[@part_link_id]['sourceEid'] = @measurement_group.entityID
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          end
+        rescue => e
+          puts "Takeoff: SF part link error: #{e.message}"
+        end
+      end
       Dashboard.invalidate_measurement_cache rescue nil
       Dashboard.send_measurement_data rescue nil
       Dashboard.send_live_data rescue nil
@@ -492,6 +508,11 @@ module TakeoffTool
       @measurement_group.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([r, g, b, 153]))
       @measurement_group.set_attribute('TakeoffMeasurement', 'material_name', "FF_SF_#{@measurement_group.entityID}")
+
+      # Mark as child measurement if linked to a derived part
+      if @part_link_id
+        @measurement_group.set_attribute('TakeoffMeasurement', 'part_link', @part_link_id)
+      end
 
       # Register in entity cache so find_entity can locate this group
       TakeoffTool.entity_registry[@measurement_group.entityID] = @measurement_group

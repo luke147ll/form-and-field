@@ -162,12 +162,66 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('createPartAndMeasure') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          m = Sketchup.active_model
+
+          # Create derived part record (sourceEid will be set when tool finishes)
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          id = "dp_#{Time.now.to_i}_#{rand(1000)}"
+          data['sourceEid'] = 0
+          data['computedValue'] = 0.0
+          parts[id] = data
+          m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+
+          # Resolve color from parent measurement group
+          src_type = data['sourceType']
+          cat = data['category'] || ''
+          label = data['name'] || cat
+          parent_eid = (data['parentMeasEid'] || 0).to_i
+          color = nil
+          if parent_eid > 0
+            parent_grp = TakeoffTool.find_entity(parent_eid)
+            if parent_grp && parent_grp.valid?
+              rgba_json = parent_grp.get_attribute('TakeoffMeasurement', 'color_rgba')
+              arr = rgba_json ? (JSON.parse(rgba_json) rescue nil) : nil
+              color = arr[0..2] if arr && arr.length >= 3
+            end
+          end
+
+          # Activate the appropriate measurement tool with part_link_id
+          if src_type == 'tool_sf'
+            m.select_tool(MeasureSFTool.new(cat, label: label, color: color, part_link_id: id))
+          elsif src_type == 'tool_lf'
+            m.select_tool(MeasureLFTool.new(cat, label: label, color: color, part_link_id: id))
+          end
+        rescue => e
+          puts "Dashboard createPartAndMeasure error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       dialog.add_action_callback('deleteDerivedPart') do |_ctx, id_str|
         begin
           require 'json'
           m = Sketchup.active_model
           dp_json = m.get_attribute('FormAndField', 'derived_parts')
           parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          part = parts[id_str.to_s]
+          # If tool part, also delete the linked child measurement group
+          if part && (part['sourceType'] == 'tool_sf' || part['sourceType'] == 'tool_lf')
+            src_eid = (part['sourceEid'] || 0).to_i
+            if src_eid > 0
+              grp = TakeoffTool.find_entity(src_eid)
+              if grp && grp.valid?
+                m.start_operation('Delete Part Measurement', true)
+                grp.erase!
+                m.commit_operation
+              end
+            end
+          end
           parts.delete(id_str.to_s)
           m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
           Dashboard.invalidate_measurement_cache

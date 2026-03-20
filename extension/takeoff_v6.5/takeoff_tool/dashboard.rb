@@ -1149,6 +1149,7 @@ module TakeoffTool
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
         next if mtype == 'GRID'  # Gridlines are managed in CAD overlay tab, not measurements
+        next if grp.get_attribute('TakeoffMeasurement', 'part_link')  # Child groups shown as parts, not cards
 
         cat = grp.get_attribute('TakeoffMeasurement', 'category') || 'Custom'
         visible = grp.get_attribute('TakeoffMeasurement', 'highlights_visible')
@@ -1373,6 +1374,43 @@ module TakeoffTool
                  else
                    0.0
                  end
+          new_val = (base * mult).round(2)
+          if v['computedValue'] != new_val
+            v['computedValue'] = new_val
+            dirty = true
+          end
+
+        elsif src == 'measurement'
+          # Derived from a specific measurement group (by sourceEid)
+          src_eid = (v['sourceEid'] || 0).to_i
+          base = 0.0
+          measurements.each do |mm|
+            if mm[:eid] == src_eid
+              base = (mm[:value] || 0).to_f
+              break
+            end
+          end
+          new_val = (base * mult).round(2)
+          if v['computedValue'] != new_val
+            v['computedValue'] = new_val
+            dirty = true
+          end
+
+        elsif src == 'tool_sf' || src == 'tool_lf'
+          # Measured with SF/LF tool — read value from linked child group
+          src_eid = (v['sourceEid'] || 0).to_i
+          base = 0.0
+          if src_eid > 0
+            grp = TakeoffTool.find_entity(src_eid)
+            if grp && grp.valid?
+              if src == 'tool_sf'
+                geo_faces = grp.entities.grep(Sketchup::Face)
+                base = geo_faces.any? ? (geo_faces.sum { |f| f.area } / 144.0).round(2) : 0.0
+              else
+                base = (grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0).to_f
+              end
+            end
+          end
           new_val = (base * mult).round(2)
           if v['computedValue'] != new_val
             v['computedValue'] = new_val
