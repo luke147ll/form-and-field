@@ -68,6 +68,15 @@ module TakeoffTool
         Dashboard.send_cad_sheets
       end
 
+      dialog.add_action_callback('hideAllCad') do |_ctx|
+        model = Sketchup.active_model
+        model.active_entities.grep(Sketchup::Group).each do |grp|
+          next unless grp.valid? && grp.get_attribute('FF_CadOverlay', 'sheet_name')
+          grp.layer.visible = false if grp.layer
+        end
+        Dashboard.send_cad_sheets
+      end
+
       # ═══ ELEVATION / NOTE / BENCHMARK ═══
 
       dialog.add_action_callback('updateElevLabel') do |_ctx, json_str|
@@ -243,6 +252,26 @@ module TakeoffTool
 
       dialog.add_action_callback('toggleAllGridlines') do |_ctx|
         TakeoffTool::GridlineSystem.toggle_all
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('showAllGridlines') do |_ctx|
+        model = Sketchup.active_model
+        return unless model
+        model.active_entities.grep(Sketchup::Group).each do |g|
+          next unless g.valid? && g.get_attribute('TakeoffGridline', 'label')
+          g.visible = true
+        end
+        dialog.execute_script("refreshGridlines()") rescue nil
+      end
+
+      dialog.add_action_callback('hideAllGridlines') do |_ctx|
+        model = Sketchup.active_model
+        return unless model
+        model.active_entities.grep(Sketchup::Group).each do |g|
+          next unless g.valid? && g.get_attribute('TakeoffGridline', 'label')
+          g.visible = false
+        end
         dialog.execute_script("refreshGridlines()") rescue nil
       end
 

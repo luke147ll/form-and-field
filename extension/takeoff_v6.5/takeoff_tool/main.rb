@@ -185,22 +185,6 @@ module TakeoffTool
     cmd_scan.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_scan)
 
-    cmd_drill = UI::Command.new("Ray Gun") { DrillBit.toggle }
-    cmd_drill.small_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_24.png")
-    cmd_drill.large_icon = File.join(PLUGIN_DIR, "icons", "drill_bit_32.png")
-    cmd_drill.tooltip = "Ray Gun - Click through nested components"
-    cmd_drill.status_bar_text = "Activate Ray Gun mode to select deeply nested components"
-    cmd_drill.set_validation_proc { MF_ENABLED }
-    toolbar.add_item(cmd_drill)
-
-    cmd_nav = UI::Command.new("Precision Nav") { PrecisionNav.toggle }
-    cmd_nav.small_icon = File.join(PLUGIN_DIR, "icons", "nav_mode_24.png")
-    cmd_nav.large_icon = File.join(PLUGIN_DIR, "icons", "nav_mode_32.png")
-    cmd_nav.tooltip = "Precision Nav - Fly through the model"
-    cmd_nav.status_bar_text = "Activate fly camera navigation mode"
-    cmd_nav.set_validation_proc { MF_ENABLED }
-    toolbar.add_item(cmd_nav)
-
     cmd_report = UI::Command.new("View Report") { TakeoffTool.open_dashboard }
     cmd_report.small_icon = File.join(PLUGIN_DIR, "icons", "dashboard_24.png")
     cmd_report.large_icon = File.join(PLUGIN_DIR, "icons", "dashboard_32.png")
@@ -232,22 +216,6 @@ module TakeoffTool
     cmd_elev.status_bar_text = "Click faces to place elevation reference tags"
     cmd_elev.set_validation_proc { MF_ENABLED }
     toolbar.add_item(cmd_elev)
-
-    cmd_note = UI::Command.new("Note Tag") { TakeoffTool.activate_note_tool }
-    cmd_note.small_icon = File.join(PLUGIN_DIR, "icons", "note_tag_24.png")
-    cmd_note.large_icon = File.join(PLUGIN_DIR, "icons", "note_tag_32.png")
-    cmd_note.tooltip = "Note Tag — Click to place text annotations"
-    cmd_note.status_bar_text = "Click a point to place a text note annotation"
-    cmd_note.set_validation_proc { MF_ENABLED }
-    toolbar.add_item(cmd_note)
-
-    cmd_anno = UI::Command.new("Annotation Tag") { TakeoffTool.activate_annotation_tag_tool }
-    cmd_anno.small_icon = File.join(PLUGIN_DIR, "icons", "note_tag_24.png")
-    cmd_anno.large_icon = File.join(PLUGIN_DIR, "icons", "note_tag_32.png")
-    cmd_anno.tooltip = "Annotation Tag — Gridlines, Sections, Details"
-    cmd_anno.status_bar_text = "Click to place numbered/lettered annotation tags"
-    cmd_anno.set_validation_proc { MF_ENABLED }
-    toolbar.add_item(cmd_anno)
 
     # Dev reload button (only in debug mode)
     if Sketchup.read_default("FormAndField", "debug_mode", false)
