@@ -93,11 +93,7 @@ module TakeoffTool
           # Route measurement entities through Highlighter
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
-              e.visible = false
-            elsif mtype == 'SF'
-              Highlighter.hide_sf_measurement_faces(m, e)
-            end
+            e.visible = false
             e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
             meas_changed = true
           else
@@ -139,11 +135,7 @@ module TakeoffTool
 
           if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
             mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            if mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK' || mtype == 'NOTE'
-              e.visible = true
-            elsif mtype == 'SF'
-              Highlighter.show_sf_measurement_faces(m, e)
-            end
+            e.visible = true
             e.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
             meas_changed = true
           else
@@ -302,13 +294,13 @@ module TakeoffTool
 
       private
 
-      # Returns true for CAD overlay groups, gridline planes, and gridline circle tags.
-      # These have their own visibility controls and should not be touched by show_all/isolate.
+      # Returns true for groups that have their own visibility controls
+      # and should not be touched by show_all/isolate/hide_category.
       def cad_or_grid?(e)
         return false unless e.is_a?(Sketchup::Group)
         return true if e.get_attribute('FF_CadOverlay', 'sheet_name')
         return true if e.get_attribute('TakeoffGridline', 'label')
-        return true if e.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+        return true if e.get_attribute('TakeoffMeasurement', 'type')
         false
       rescue
         false

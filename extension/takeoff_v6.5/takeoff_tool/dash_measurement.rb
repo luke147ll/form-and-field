@@ -373,31 +373,119 @@ module TakeoffTool
         end
       end
 
-      dialog.add_action_callback('editSFFaces') do |_ctx, cat_str|
+      dialog.add_action_callback('addSFFaces') do |_ctx, json_str|
         begin
-          cat = cat_str.to_s
-          # Check if any faces have been manually edited (FF_EditSF attributes)
-          has_edits = false
-          sr = TakeoffTool.filtered_scan_results || []
-          ca = TakeoffTool.category_assignments || {}
-          sr.each do |r|
-            rcat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-            next unless rcat == cat
-            e = TakeoffTool.find_entity(r[:entity_id])
-            next unless e && e.valid? && e.respond_to?(:definition)
-            e.definition.entities.grep(Sketchup::Face).each do |f|
-              if (f.get_attribute('FF_EditSF', 'original_mat') rescue nil) || (f.get_attribute('FF_EditSF', 'was_new') rescue nil)
-                has_edits = true
-                break
-              end
-            end
-            break if has_edits
-          end
-          # Only run debug visualization if no manual edits exist
-          Scanner.debug_area_category(cat) unless has_edits
-          TakeoffTool.activate_edit_sf(cat)
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_sf_tool_for_group(eid, cat)
         rescue => e
-          puts "editSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+          puts "addSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeSFFaces') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_sf_tool(eid_str.to_i)
+        rescue => e
+          puts "removeSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('newSFMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']  # [r,g,b] array
+          TakeoffTool.activate_sf_tool_new(cat, label, color)
+        rescue => e
+          puts "newSFMeasurement error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateSFLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_sf_label(data['eid'].to_i, data['label'].to_s)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateSFLabel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateSFColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_sf_color(data['eid'].to_i, data['color'])
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateSFColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      # ─── LF Face Tool callbacks ───
+
+      dialog.add_action_callback('newLFMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']
+          TakeoffTool.activate_lf_face_tool_new(cat, label, color)
+        rescue => e
+          puts "newLFMeasurement error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('addLFFaces') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_lf_face_tool_for_group(eid, cat)
+        rescue => e
+          puts "addLFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeLFFaces') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_sf_tool(eid_str.to_i)
+        rescue => e
+          puts "removeLFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateLFLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_lf_label(data['eid'].to_i, data['label'].to_s)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateLFLabel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateLFColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_lf_color(data['eid'].to_i, data['color'])
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateLFColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 

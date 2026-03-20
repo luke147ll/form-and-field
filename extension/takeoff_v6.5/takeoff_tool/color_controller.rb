@@ -508,12 +508,14 @@ module TakeoffTool
               next unless f
 
               fm = f.material
-              if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
+              fm_name = fm.respond_to?(:name) ? fm.name : nil
+              if fm.nil? || (fm_name && fm_name.start_with?('FF_') && fm_name != 'FF_EDIT_MEASURED' && fm_name != 'FF_EDIT_EXCLUDED')
                 f.material = (front_name && !front_name.empty?) ? materials[front_name] : nil
                 fixed += 1
               end
               bm = f.back_material
-              if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
+              bm_name = bm.respond_to?(:name) ? bm.name : nil
+              if bm.nil? || (bm_name && bm_name.start_with?('FF_') && bm_name != 'FF_EDIT_MEASURED' && bm_name != 'FF_EDIT_EXCLUDED')
                 f.back_material = (back_name && !back_name.empty?) ? materials[back_name] : nil
                 fixed += 1
               end
@@ -530,12 +532,14 @@ module TakeoffTool
 
           defn.entities.grep(Sketchup::Face).each do |f|
             fm = f.material
-            if fm.nil? || (fm.respond_to?(:name) && fm.name.start_with?('FF_'))
+            fm_name = fm.respond_to?(:name) ? fm.name : nil
+            if fm.nil? || (fm_name && fm_name.start_with?('FF_') && fm_name != 'FF_EDIT_MEASURED' && fm_name != 'FF_EDIT_EXCLUDED')
               f.material = face_mat
               fixed += 1
             end
             bm = f.back_material
-            if bm.nil? || (bm.respond_to?(:name) && bm.name.start_with?('FF_'))
+            bm_name = bm.respond_to?(:name) ? bm.name : nil
+            if bm.nil? || (bm_name && bm_name.start_with?('FF_') && bm_name != 'FF_EDIT_MEASURED' && bm_name != 'FF_EDIT_EXCLUDED')
               f.back_material = face_mat
               fixed += 1
             end

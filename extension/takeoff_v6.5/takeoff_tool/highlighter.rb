@@ -51,7 +51,7 @@ module TakeoffTool
       ColorController.highlights_active?
     end
 
-    # ─── Measurement methods (UNCHANGED — use FF_Original entity attrs, not originals cache) ───
+    # ─── Measurement visibility (all types use group.visible) ───
 
     def self.clear_measurement_highlights
       m = Sketchup.active_model; return unless m
@@ -60,44 +60,21 @@ module TakeoffTool
       m.commit_operation
     end
 
-    # Non-destructive hide: restores SF face materials but keeps FF_Original attrs
+    # Non-destructive hide: hides all measurement groups
     def self.hide_measurement_highlights_inner(m)
-      restored = 0
-
-      # Restore SF-colored faces inside all definitions (components/groups)
-      m.definitions.each do |defn|
-        next if defn.image?
-        defn.entities.grep(Sketchup::Face).each do |face|
-          orig_name = face.get_attribute('FF_Original', 'material')
-          next unless orig_name
-          face.material = orig_name.empty? ? nil : m.materials[orig_name]
-          # Keep FF_Original attrs for re-show
-          restored += 1
-        end
-      end
-
-      # Restore loose faces in model entities
-      m.entities.grep(Sketchup::Face).each do |face|
-        orig_name = face.get_attribute('FF_Original', 'material')
-        next unless orig_name
-        face.material = orig_name.empty? ? nil : m.materials[orig_name]
-        restored += 1
-      end
-
-      # Hide LF ribbon groups
       hidden = 0
       m.entities.grep(Sketchup::Group).each do |grp|
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
-        if (mtype == 'LF' || mtype == 'ELEV' || mtype == 'BENCHMARK') && grp.visible?
+        if grp.visible?
           grp.visible = false
           hidden += 1
         end
         grp.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
       end
 
-      puts "Takeoff: Hid measurement highlights (#{restored} faces restored, #{hidden} ribbons hidden)" if restored > 0 || hidden > 0
+      puts "Takeoff: Hid measurement highlights (#{hidden} groups hidden)" if hidden > 0
     end
 
     # ─── Measurement visibility controls ───
@@ -117,13 +94,7 @@ module TakeoffTool
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
-        if mtype == 'LF'
-          grp.visible = true
-        elsif mtype == 'SF'
-          show_sf_measurement_faces(m, grp)
-        elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
-          grp.visible = true
-        end
+        grp.visible = true
         grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       end
       m.commit_operation
@@ -144,13 +115,7 @@ module TakeoffTool
       return unless mtype
 
       m.start_operation('Show Measurement', true)
-      if mtype == 'LF'
-        grp.visible = true
-      elsif mtype == 'SF'
-        show_sf_measurement_faces(m, grp)
-      elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
-        grp.visible = true
-      end
+      grp.visible = true
       grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       m.commit_operation
     end
@@ -163,13 +128,7 @@ module TakeoffTool
       return unless mtype
 
       m.start_operation('Hide Measurement', true)
-      if mtype == 'LF'
-        grp.visible = false
-      elsif mtype == 'SF'
-        hide_sf_measurement_faces(m, grp)
-      elsif mtype == 'ELEV' || mtype == 'BENCHMARK'
-        grp.visible = false
-      end
+      grp.visible = false
       grp.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
       m.commit_operation
     end
@@ -178,12 +137,8 @@ module TakeoffTool
       m = Sketchup.active_model; return unless m
       grp = TakeoffTool.find_entity(grp_eid.to_i)
       return unless grp && grp.valid?
-      mtype = grp.get_attribute('TakeoffMeasurement', 'type')
 
       m.start_operation('Delete Measurement', true)
-      if mtype == 'SF'
-        delete_sf_measurement_faces(m, grp)
-      end
 
       # Remove from registries
       eid = grp.entityID
@@ -198,121 +153,7 @@ module TakeoffTool
       puts "Takeoff: Deleted measurement eid=#{eid}"
     end
 
-    private
-
-    # Resolve face references stored in group attrs
-    def self.resolve_face_refs(m, grp)
-      require 'json'
-      refs_json = grp.get_attribute('TakeoffMeasurement', 'face_refs')
-      return [] unless refs_json
-      begin
-        refs = JSON.parse(refs_json)
-      rescue
-        return []
-      end
-      faces = []
-      refs.each do |ref|
-        face = nil
-        # Try persistent_id first
-        pid = ref['pid']
-        if pid
-          face = find_face_by_persistent_id(m, pid)
-        end
-        # Fallback: defn + fidx
-        unless face
-          defn_name = ref['defn']
-          fidx = ref['fidx']
-          if defn_name && fidx && fidx >= 0
-            if defn_name == '__model__'
-              all_faces = m.entities.grep(Sketchup::Face)
-              face = all_faces[fidx] if fidx < all_faces.length
-            else
-              defn = m.definitions[defn_name]
-              if defn
-                all_faces = defn.entities.grep(Sketchup::Face)
-                face = all_faces[fidx] if fidx < all_faces.length
-              end
-            end
-          end
-        end
-        faces << face if face && face.valid?
-      end
-      faces
-    end
-
-    def self.find_face_by_persistent_id(m, pid)
-      # Search loose model entities
-      m.entities.grep(Sketchup::Face).each do |f|
-        return f if f.respond_to?(:persistent_id) && f.persistent_id == pid
-      end
-      # Search definitions
-      m.definitions.each do |defn|
-        next if defn.image?
-        defn.entities.grep(Sketchup::Face).each do |f|
-          return f if f.respond_to?(:persistent_id) && f.persistent_id == pid
-        end
-      end
-      nil
-    end
-
-    def self.show_sf_measurement_faces(m, grp)
-      require 'json'
-      mat_name = grp.get_attribute('TakeoffMeasurement', 'material_name')
-      rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
-      return unless mat_name
-
-      # Get or create the material — always force solid green
-      mat = m.materials[mat_name] || m.materials.add(mat_name)
-      mat.color = Sketchup::Color.new(166, 227, 161)
-      mat.alpha = 1.0
-
-      faces = resolve_face_refs(m, grp)
-      faces.each do |face|
-        begin
-          # Save original material if not already saved
-          unless face.get_attribute('FF_Original', 'material')
-            orig_name = face.material ? face.material.display_name : ''
-            face.set_attribute('FF_Original', 'material', orig_name)
-          end
-          face.material = mat
-        rescue => e
-          puts "HL: show_sf face error: #{e.message}"
-        end
-      end
-    end
-
-    def self.hide_sf_measurement_faces(m, grp)
-      faces = resolve_face_refs(m, grp)
-      faces.each do |face|
-        begin
-          orig_name = face.get_attribute('FF_Original', 'material')
-          next unless orig_name
-          face.material = orig_name.empty? ? nil : m.materials[orig_name]
-          # Keep FF_Original attrs for re-show
-        rescue => e
-          puts "HL: hide_sf face error: #{e.message}"
-        end
-      end
-    end
-
-    def self.delete_sf_measurement_faces(m, grp)
-      faces = resolve_face_refs(m, grp)
-      faces.each do |face|
-        begin
-          orig_name = face.get_attribute('FF_Original', 'material')
-          if orig_name
-            face.material = orig_name.empty? ? nil : m.materials[orig_name]
-          end
-          face.delete_attribute('FF_Original', 'material')
-          face.delete_attribute('FF_Original', 'group_eid')
-          face.delete_attribute('FF_Original') rescue nil
-        rescue => e
-          puts "HL: delete_sf face error: #{e.message}"
-        end
-      end
-    end
-
-    # ─── Visibility (UNCHANGED) ───
+    # ─── Visibility ───
 
     def self.collect_ancestors(entity)
       ancestors = []
@@ -556,13 +397,13 @@ module TakeoffTool
 
     private
 
-    # Returns true for CAD overlay groups, gridline planes, and gridline circle tags.
-    # These have their own visibility controls and should not be touched by show_all/isolate.
+    # Returns true for groups that have their own visibility controls
+    # and should not be touched by show_all/isolate/hide_category.
     def self.cad_or_grid?(e)
       return false unless e.is_a?(Sketchup::Group)
       return true if e.get_attribute('FF_CadOverlay', 'sheet_name')
       return true if e.get_attribute('TakeoffGridline', 'label')
-      return true if e.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+      return true if e.get_attribute('TakeoffMeasurement', 'type')
       false
     rescue
       false

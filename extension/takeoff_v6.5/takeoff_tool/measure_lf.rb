@@ -807,4 +807,625 @@ module TakeoffTool
   def self.activate_lf_tool_for_category(cat)
     Sketchup.active_model.select_tool(MeasureLFTool.new(cat))
   end
+
+  # ═══════════════════════════════════════════════════════════
+  #  MeasureLFFaceTool — click model faces to measure perimeter.
+  #  Flood-fills coplanar neighbors, extracts boundary, creates
+  #  ribbon geometry. Same UX pattern as MeasureSFTool.
+  # ═══════════════════════════════════════════════════════════
+
+  class MeasureLFFaceTool
+    FLOOD_ANGLE_TOL = 5.0   # degrees — coplanar threshold
+    OFFSET_DIST     = 0.5   # inches — offset toward camera
+    LF_RIBBON_WIDTH = 1.5   # inches — ribbon visual width
+    DIR_HORIZ_Z_MAX = 0.342 # sin(20°) — Z ratio below this = horizontal edge
+    DIR_VERT_Z_MIN  = 0.940 # cos(20°) — Z ratio above this = vertical edge
+    VK_LEFT = 37; VK_UP = 38; VK_RIGHT = 39; VK_DOWN = 40
+    DIR_LABELS = {
+      bottom: "\u2193 BOTTOM", top: "\u2191 TOP",
+      vert_left: "\u2190 VERT-L", vert_right: "\u2192 VERT-R", all: 'ALL'
+    }.freeze
+
+    def initialize(category, opts = {})
+      @category = category
+      @group_eid = opts[:group_eid]
+      @label = opts[:label] || category
+      @color_rgb = opts[:color] || [166, 227, 161]
+      @hover_face = nil
+      @hover_xform = nil
+      @hover_cluster = nil
+      @hover_boundary = nil
+      @hover_normal = nil
+      @hover_segments = nil
+      @hover_lf = 0.0
+      @measurement_group = nil
+      @total_lf = 0.0
+      @edge_count = 0
+      @dir_filter = :bottom  # :bottom, :top, :vert_left, :vert_right, :all
+    end
+
+    def activate
+      find_or_create_group
+      recompute_totals
+      update_status
+    end
+
+    def deactivate(view)
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
+      view.invalidate
+    end
+
+    def resume(view)
+      recompute_totals
+      update_status
+      view.invalidate
+    end
+
+    # ─── Mouse ───
+
+    def onMouseMove(flags, x, y, view)
+      ph = view.pick_helper
+      ph.do_pick(x, y)
+
+      face = nil
+      xform = nil
+
+      ph.count.times do |i|
+        leaf = ph.leaf_at(i)
+        if leaf.is_a?(Sketchup::Face)
+          path = ph.path_at(i)
+          next if path && path.any? { |e| e == @measurement_group }
+          face = leaf
+          xform = ph.transformation_at(i)
+          break
+        end
+      end
+
+      if !face
+        path = ph.path_at(0)
+        if path && path.last.is_a?(Sketchup::Face)
+          unless path.any? { |e| e == @measurement_group }
+            face = path.last
+            xform = ph.transformation_at(0)
+          end
+        end
+      end
+
+      if face && !face.equal?(@hover_face)
+        @hover_face = face
+        @hover_xform = xform || Geom::Transformation.new
+        @hover_cluster = flood_fill_coplanar(face, @hover_xform)
+        @hover_boundary = extract_outer_boundary(@hover_cluster, @hover_xform)
+        _centroid, @hover_normal = compute_best_fit_plane(@hover_cluster, @hover_xform)
+        @hover_segments = filter_segments(@hover_boundary)
+        @hover_lf = compute_segments_lf(@hover_segments)
+        mode = DIR_LABELS[@dir_filter] || 'ALL'
+        view.tooltip = "#{mode}: #{'%.1f' % @hover_lf} LF (#{@hover_segments.length} edges)"
+        view.invalidate
+      elsif !face && @hover_face
+        @hover_face = nil
+        @hover_xform = nil
+        @hover_cluster = nil
+        @hover_boundary = nil
+        @hover_normal = nil
+        @hover_segments = nil
+        @hover_lf = 0.0
+        view.invalidate
+      end
+    end
+
+    def onLButtonDown(flags, x, y, view)
+      return unless @hover_face && @hover_cluster && @hover_boundary
+      return unless @hover_segments && @hover_segments.length > 0
+
+      model = Sketchup.active_model
+      model.start_operation('Add LF Segment', false)
+
+      begin
+        # Compute best-fit plane for offset
+        centroid, normal = compute_best_fit_plane(@hover_cluster, @hover_xform)
+        return model.abort_operation unless centroid && normal
+
+        find_or_create_group unless @measurement_group && @measurement_group.valid?
+        mat = get_lf_material(model)
+
+        # Create ribbon for each filtered segment
+        @hover_segments.each do |pt_a, pt_b|
+          off = project_and_offset([pt_a, pt_b], centroid, normal, view)
+          next if off.length < 2
+          add_ribbon_segment(@measurement_group.entities, off[0], off[1], mat, normal)
+        end
+
+        recompute_totals
+        update_group_attributes
+        model.commit_operation
+        update_status
+      rescue => e
+        model.abort_operation
+        puts "MeasureLFFace error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+      end
+
+      @hover_face = nil
+      @hover_cluster = nil
+      @hover_boundary = nil
+      @hover_normal = nil
+      @hover_segments = nil
+      @hover_lf = 0.0
+      view.invalidate
+    end
+
+    def enableVCB?
+      false
+    end
+
+    def onKeyDown(key, repeat, flags, view)
+      case key
+      when 27  # Escape
+        Sketchup.active_model.select_tool(nil)
+        return true
+      when 40  # Down arrow
+        @dir_filter = @dir_filter == :bottom ? :all : :bottom
+        refresh_hover(view)
+        return true
+      when 38  # Up arrow
+        @dir_filter = @dir_filter == :top ? :all : :top
+        refresh_hover(view)
+        return true
+      when 37  # Left arrow
+        @dir_filter = @dir_filter == :vert_left ? :all : :vert_left
+        refresh_hover(view)
+        return true
+      when 39  # Right arrow
+        @dir_filter = @dir_filter == :vert_right ? :all : :vert_right
+        refresh_hover(view)
+        return true
+      end
+      false
+    end
+
+    def onCancel(reason, view)
+      Sketchup.active_model.select_tool(nil)
+    end
+
+    def draw(view)
+      begin
+        r, g, b = @color_rgb
+
+        # Draw dimmed full boundary when filtering so the user sees the whole outline
+        if @dir_filter != :all && @hover_boundary && @hover_boundary.length >= 2
+          view.line_width = 1
+          view.drawing_color = Sketchup::Color.new(r, g, b, 40)
+          loop_pts = @hover_boundary + [@hover_boundary.first]
+          view.draw(GL_LINE_STRIP, loop_pts)
+        end
+
+        # Draw active filtered segments in bright color
+        if @hover_segments && @hover_segments.length > 0
+          view.line_width = 4
+          view.drawing_color = Sketchup::Color.new(r, g, b, 220)
+          pts = @hover_segments.flat_map { |a, b_pt| [a, b_pt] }
+          view.draw(GL_LINES, pts)
+
+          # Endpoints
+          uniq_pts = []
+          seen = {}
+          pts.each do |p|
+            k = "#{p.x.round(2)}_#{p.y.round(2)}_#{p.z.round(2)}"
+            unless seen[k]
+              uniq_pts << p
+              seen[k] = true
+            end
+          end
+          view.draw_points(uniq_pts, 8, 2, Sketchup::Color.new(r, g, b))
+        end
+
+        # Draw mode badge at screen top-left
+        mode = DIR_LABELS[@dir_filter] || 'ALL'
+        view.drawing_color = Sketchup::Color.new(r, g, b)
+        pt2d = Geom::Point3d.new(14, view.vpheight - 28, 0)
+        view.draw_text(pt2d, "LF Face: #{mode}", size: 14, bold: true, color: Sketchup::Color.new(r, g, b))
+      rescue
+      end
+    end
+
+    def getExtents
+      bb = Geom::BoundingBox.new
+      if @hover_boundary
+        @hover_boundary.each { |pt| bb.add(pt) }
+      end
+      bb
+    end
+
+    private
+
+    # ─── Flood Fill (same as MeasureSFTool) ───
+
+    def flood_fill_coplanar(seed_face, xform)
+      seed_normal = TakeoffTool.get_world_normal(seed_face, xform)
+      cos_threshold = Math.cos(FLOOD_ANGLE_TOL * Math::PI / 180.0)
+      seed_parent = seed_face.parent
+
+      visited = { seed_face.entityID => true }
+      cluster = [seed_face]
+      queue = [seed_face]
+
+      while (current = queue.shift)
+        current.edges.each do |edge|
+          edge.faces.each do |neighbor|
+            next if visited[neighbor.entityID]
+            next if neighbor.parent != seed_parent
+            visited[neighbor.entityID] = true
+
+            n_normal = TakeoffTool.get_world_normal(neighbor, xform)
+            if seed_normal.dot(n_normal) >= cos_threshold
+              cluster << neighbor
+              queue << neighbor
+            end
+          end
+        end
+      end
+
+      cluster
+    end
+
+    # ─── Boundary Extraction (same as MeasureSFTool) ───
+
+    def extract_outer_boundary(cluster, xform)
+      return [] if cluster.empty?
+
+      if cluster.length == 1
+        return cluster[0].outer_loop.vertices.map { |v| xform * v.position }
+      end
+
+      cluster_ids = {}
+      cluster.each { |f| cluster_ids[f.entityID] = true }
+
+      boundary_edges = []
+      edge_seen = {}
+      cluster.each do |face|
+        face.edges.each do |edge|
+          next if edge_seen[edge.entityID]
+          edge_seen[edge.entityID] = true
+          cluster_count = edge.faces.count { |f| cluster_ids[f.entityID] }
+          boundary_edges << edge if cluster_count == 1
+        end
+      end
+
+      return [] if boundary_edges.empty?
+      order_boundary_edges(boundary_edges, xform)
+    end
+
+    def order_boundary_edges(edges, xform)
+      vert_edges = {}
+      edges.each do |e|
+        e.vertices.each do |v|
+          vert_edges[v.entityID] ||= []
+          vert_edges[v.entityID] << e
+        end
+      end
+
+      loop_pts = []
+      used = {}
+      current_edge = edges.first
+      current_vert = current_edge.start
+
+      loop do
+        loop_pts << (xform * current_vert.position)
+        used[current_edge.entityID] = true
+        other_vert = current_edge.other_vertex(current_vert)
+
+        candidates = (vert_edges[other_vert.entityID] || []).reject { |e| used[e.entityID] }
+        break if candidates.empty?
+        current_edge = candidates.first
+        current_vert = other_vert
+      end
+
+      loop_pts
+    end
+
+    # ─── Plane Projection (same as MeasureSFTool) ───
+
+    def compute_best_fit_plane(cluster, xform)
+      total_area = 0.0
+      wx = 0.0; wy = 0.0; wz = 0.0
+      cx = 0.0; cy = 0.0; cz = 0.0
+
+      cluster.each do |face|
+        area = face.area
+        normal = TakeoffTool.get_world_normal(face, xform)
+        center = xform * face.bounds.center
+
+        wx += normal.x * area
+        wy += normal.y * area
+        wz += normal.z * area
+
+        cx += center.x * area
+        cy += center.y * area
+        cz += center.z * area
+
+        total_area += area
+      end
+
+      return nil if total_area < 0.001
+
+      avg_normal = Geom::Vector3d.new(wx, wy, wz)
+      avg_normal.normalize!
+      centroid = Geom::Point3d.new(cx / total_area, cy / total_area, cz / total_area)
+
+      [centroid, avg_normal]
+    end
+
+    def project_and_offset(boundary_pts, plane_pt, plane_normal, view)
+      cam_eye = view.camera.eye
+      to_cam = cam_eye - plane_pt
+      dot = to_cam.x * plane_normal.x + to_cam.y * plane_normal.y + to_cam.z * plane_normal.z
+      offset_dir = dot >= 0 ? plane_normal : plane_normal.reverse
+      offset_vec = Geom::Vector3d.new(
+        offset_dir.x * OFFSET_DIST,
+        offset_dir.y * OFFSET_DIST,
+        offset_dir.z * OFFSET_DIST
+      )
+
+      boundary_pts.map do |pt|
+        diff = pt - plane_pt
+        dist_to_plane = diff.x * plane_normal.x + diff.y * plane_normal.y + diff.z * plane_normal.z
+        projected = Geom::Point3d.new(
+          pt.x - dist_to_plane * plane_normal.x,
+          pt.y - dist_to_plane * plane_normal.y,
+          pt.z - dist_to_plane * plane_normal.z
+        )
+        Geom::Point3d.new(
+          projected.x + offset_vec.x,
+          projected.y + offset_vec.y,
+          projected.z + offset_vec.z
+        )
+      end
+    end
+
+    # ─── Direction Filtering + Perimeter ───
+
+    def filter_segments(boundary_pts)
+      return [] if boundary_pts.nil? || boundary_pts.length < 2
+      pairs = boundary_pts.each_cons(2).to_a
+      pairs << [boundary_pts.last, boundary_pts.first] if boundary_pts.length >= 3
+
+      return pairs if @dir_filter == :all
+
+      n = boundary_pts.length.to_f
+      # Centroid for top/bottom and left/right splits
+      cx = boundary_pts.sum { |p| p.x } / n
+      cy = boundary_pts.sum { |p| p.y } / n
+      cz = boundary_pts.sum { |p| p.z } / n
+
+      # Wall horizontal axis for left/right vertical split
+      # normal.cross([0,0,1]) = [normal.y, -normal.x, 0]
+      wall_horiz = nil
+      if @hover_normal && (@dir_filter == :vert_left || @dir_filter == :vert_right)
+        wh = Geom::Vector3d.new(@hover_normal.y, -@hover_normal.x, 0)
+        if wh.length > 0.001
+          wh.normalize!
+          wall_horiz = wh
+        end
+      end
+
+      pairs.select do |pt_a, pt_b|
+        len = pt_a.distance(pt_b)
+        next false if len < 0.001
+        dz = (pt_b.z - pt_a.z).abs
+        z_ratio = dz / len
+
+        case @dir_filter
+        when :bottom
+          edge_z = (pt_a.z + pt_b.z) / 2.0
+          z_ratio < DIR_HORIZ_Z_MAX && edge_z <= cz
+        when :top
+          edge_z = (pt_a.z + pt_b.z) / 2.0
+          z_ratio < DIR_HORIZ_Z_MAX && edge_z >= cz
+        when :vert_left
+          next false unless z_ratio > DIR_VERT_Z_MIN
+          if wall_horiz
+            mid_x = (pt_a.x + pt_b.x) / 2.0 - cx
+            mid_y = (pt_a.y + pt_b.y) / 2.0 - cy
+            proj = mid_x * wall_horiz.x + mid_y * wall_horiz.y
+            proj <= 0
+          else
+            true  # fallback: include all vertical if no wall axis
+          end
+        when :vert_right
+          next false unless z_ratio > DIR_VERT_Z_MIN
+          if wall_horiz
+            mid_x = (pt_a.x + pt_b.x) / 2.0 - cx
+            mid_y = (pt_a.y + pt_b.y) / 2.0 - cy
+            proj = mid_x * wall_horiz.x + mid_y * wall_horiz.y
+            proj >= 0
+          else
+            true
+          end
+        end
+      end
+    end
+
+    def compute_segments_lf(segments)
+      return 0.0 if segments.nil? || segments.empty?
+      segments.sum { |a, b| a.distance(b) } / 12.0
+    end
+
+    def refresh_hover(view)
+      if @hover_boundary && @hover_boundary.length >= 2
+        @hover_segments = filter_segments(@hover_boundary)
+        @hover_lf = compute_segments_lf(@hover_segments)
+      end
+      update_status
+      view.invalidate
+    end
+
+    def update_status
+      display = @label != @category ? "#{@category} / #{@label}" : @category
+      mode = DIR_LABELS[@dir_filter] || 'ALL'
+      Sketchup.status_text = "LF Face [#{display}] #{mode}: #{'%.1f' % @total_lf} LF (#{@edge_count} segs) | \u2193Bottom \u2191Top \u2190Vert-L \u2192Vert-R | Esc=done"
+    end
+
+    # ─── Ribbon Geometry ───
+
+    def add_ribbon_segment(entities, pt_a, pt_b, mat, plane_normal)
+      dir = pt_b - pt_a
+      return if dir.length < 0.001
+
+      # Use the plane normal to compute a perpendicular that lies IN the plane
+      perp = dir.cross(plane_normal)
+      if perp.length < 0.001
+        # Fallback: try world up
+        perp = dir.cross(Geom::Vector3d.new(0, 0, 1))
+        perp = dir.cross(Geom::Vector3d.new(1, 0, 0)) if perp.length < 0.001
+      end
+      return if perp.length < 0.001
+      perp.normalize!
+
+      half_w = LF_RIBBON_WIDTH / 2.0
+      offset = Geom::Vector3d.new(perp.x * half_w, perp.y * half_w, perp.z * half_w)
+
+      p1 = Geom::Point3d.new(pt_a.x + offset.x, pt_a.y + offset.y, pt_a.z + offset.z)
+      p2 = Geom::Point3d.new(pt_a.x - offset.x, pt_a.y - offset.y, pt_a.z - offset.z)
+      p3 = Geom::Point3d.new(pt_b.x - offset.x, pt_b.y - offset.y, pt_b.z - offset.z)
+      p4 = Geom::Point3d.new(pt_b.x + offset.x, pt_b.y + offset.y, pt_b.z + offset.z)
+
+      begin
+        face = entities.add_face(p1, p2, p3, p4)
+        if face
+          face.material = mat
+          face.back_material = mat
+        end
+      rescue => e
+        puts "LFFace: ribbon segment failed: #{e.message}"
+      end
+    end
+
+    # ─── Material ───
+
+    def get_lf_material(model)
+      r, g, b = @color_rgb
+      eid = @measurement_group ? @measurement_group.entityID : 0
+      mat_name = "FF_LF_#{eid}"
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(r, g, b)
+      mat.alpha = 0.7
+      mat
+    end
+
+    # ─── Group Management ───
+
+    def find_or_create_group
+      m = Sketchup.active_model
+      return unless m
+
+      if @group_eid
+        grp = TakeoffTool.find_entity(@group_eid)
+        if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'LF'
+          @measurement_group = grp
+          @label = grp.get_attribute('TakeoffMeasurement', 'label') || @label
+          return
+        end
+      end
+
+      require 'json'
+      tag_name = 'TO_Measurements'
+      tag = m.layers[tag_name] || m.layers.add(tag_name)
+      r, g, b = @color_rgb
+
+      @measurement_group = m.active_entities.add_group
+      @measurement_group.layer = tag
+      @measurement_group.name = "TO_LF: #{@label} — 0.0 LF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'type', 'LF')
+      @measurement_group.set_attribute('TakeoffMeasurement', 'category', @category)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'label', @label)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_ft', 0.0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_inches', 0.0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'segment_count', 0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([r, g, b, 179]))
+      @measurement_group.set_attribute('TakeoffMeasurement', 'material_name', "FF_LF_#{@measurement_group.entityID}")
+
+      TakeoffTool.entity_registry[@measurement_group.entityID] = @measurement_group
+      TakeoffTool.invalidate_entity_cache
+    end
+
+    def recompute_totals
+      if @measurement_group && @measurement_group.valid?
+        edges = @measurement_group.entities.grep(Sketchup::Edge)
+        faces = @measurement_group.entities.grep(Sketchup::Face)
+        # Each ribbon segment creates 4 edges + 1 face. Count faces as segments.
+        @edge_count = faces.length
+        # Sum unique edge lengths along the ribbon center lines
+        # Each ribbon face has 2 long edges (the measurement) and 2 short edges (the width).
+        # The total LF = sum of long edge lengths / 2 (each measured twice).
+        # Simpler: sum face areas / ribbon_width gives total length.
+        total_inches = 0.0
+        faces.each do |f|
+          # Each ribbon face is a rectangle: length × width.
+          # area / width = length
+          total_inches += f.area / LF_RIBBON_WIDTH
+        end
+        @total_lf = (total_inches / 12.0).round(2)
+      else
+        @edge_count = 0
+        @total_lf = 0.0
+      end
+    end
+
+    def update_group_attributes
+      return unless @measurement_group && @measurement_group.valid?
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_ft', @total_lf)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_inches', (@total_lf * 12.0).round(2))
+      @measurement_group.set_attribute('TakeoffMeasurement', 'segment_count', @edge_count)
+      @measurement_group.name = "TO_LF: #{@label} — #{'%.1f' % @total_lf} LF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+    end
+  end
+
+  # ─── LF Face Tool entry points ───
+
+  def self.activate_lf_face_tool_for_category(cat)
+    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(cat))
+  end
+
+  def self.activate_lf_face_tool_new(category, label, color_rgb)
+    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(category, label: label, color: color_rgb))
+  end
+
+  def self.activate_lf_face_tool_for_group(group_eid, category)
+    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(category, group_eid: group_eid.to_i))
+  end
+
+  def self.update_lf_label(group_eid, new_label)
+    grp = find_entity(group_eid.to_i)
+    return unless grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'LF'
+    m = Sketchup.active_model
+    m.start_operation('Rename LF Measurement', true)
+    grp.set_attribute('TakeoffMeasurement', 'label', new_label)
+    total = grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0
+    grp.name = "TO_LF: #{new_label} — #{'%.1f' % total} LF"
+    m.commit_operation
+  end
+
+  def self.update_lf_color(group_eid, color_rgb)
+    grp = find_entity(group_eid.to_i)
+    return unless grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'LF'
+    m = Sketchup.active_model
+    require 'json'
+    m.start_operation('Change LF Color', true)
+    grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([color_rgb[0], color_rgb[1], color_rgb[2], 179]))
+    r, g, b = color_rgb
+    mat_name = "FF_LF_#{grp.entityID}"
+    mat = m.materials[mat_name] || m.materials.add(mat_name)
+    mat.color = Sketchup::Color.new(r, g, b)
+    mat.alpha = 0.7
+    grp.entities.grep(Sketchup::Face).each do |face|
+      face.material = mat
+      face.back_material = mat
+    end
+    m.commit_operation
+  end
 end

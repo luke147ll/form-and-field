@@ -47,7 +47,7 @@ module TakeoffTool
     def self.show(sr, ca, cca)
       if @dialog && @dialog.visible?; send_live_data; return; end
 
-      @dialog = UI::HtmlDialog.new(dialog_title:"Form and Field \u2014 Takeoff Report", preferences_key:"TakeoffDash",
+      @dialog = UI::HtmlDialog.new(dialog_title:"Form and Field \u2014 Takeoff Report", preferences_key:"TakeoffDash_v3",
         width:1280, height:780, left:80, top:80, resizable:true, style:UI::HtmlDialog::STYLE_DIALOG)
       @dialog.set_file(File.join(PLUGIN_DIR,'ui','dashboard.html'))
 
@@ -1170,9 +1170,18 @@ module TakeoffTool
         }
 
         if mtype == 'SF'
-          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+          # Derive SF from physical geometry faces; fall back to stored attr for legacy groups
+          geo_faces = grp.entities.grep(Sketchup::Face)
+          if geo_faces.any?
+            entry[:value] = (geo_faces.sum { |f| f.area } / 144.0).round(2)
+            entry[:faceCount] = geo_faces.length
+          else
+            entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+            entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+          end
           entry[:unit] = 'SF'
-          entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color  # per-group RGBA from color_rgba attr
         elsif mtype == 'ELEV'
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'elevation') || 0
           entry[:unit] = grp.get_attribute('TakeoffMeasurement', 'benchmark_unit') || 'feet'
@@ -1199,6 +1208,8 @@ module TakeoffTool
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0
           entry[:unit] = 'LF'
           entry[:segments] = grp.get_attribute('TakeoffMeasurement', 'segment_count') || 1
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color  # per-group RGBA from color_rgba attr
         end
 
         measurements << entry

@@ -14,7 +14,7 @@ module TakeoffTool
 
       @dialog = UI::HtmlDialog.new(
         dialog_title: "Form and Field \u2014 Measurements",
-        preferences_key: "TakeoffMeasPanel",
+        preferences_key: "TakeoffMeasPanel_v3",
         width: 1000, height: 700, left: 120, top: 100,
         resizable: true, style: UI::HtmlDialog::STYLE_DIALOG
       )
@@ -139,9 +139,18 @@ module TakeoffTool
 
         case mtype
         when 'SF'
-          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+          # Derive SF from physical geometry faces; fall back to stored attr for legacy groups
+          geo_faces = grp.entities.grep(Sketchup::Face)
+          if geo_faces.any?
+            entry[:value] = (geo_faces.sum { |f| f.area } / 144.0).round(2)
+            entry[:faceCount] = geo_faces.length
+          else
+            entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+            entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+          end
           entry[:unit]  = 'SF'
-          entry[:faceCount] = grp.get_attribute('TakeoffMeasurement', 'face_count') || 0
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color  # per-group RGBA from color_rgba attr
         when 'ELEV'
           entry[:value] = grp.get_attribute('TakeoffMeasurement', 'elevation') || 0
           entry[:unit]  = grp.get_attribute('TakeoffMeasurement', 'benchmark_unit') || 'feet'
@@ -163,6 +172,8 @@ module TakeoffTool
           entry[:value]    = grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0
           entry[:unit]     = 'LF'
           entry[:segments] = grp.get_attribute('TakeoffMeasurement', 'segment_count') || 1
+          entry[:label]    = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor]  = color  # per-group RGBA
         end
 
         measurements << entry
@@ -325,6 +336,118 @@ module TakeoffTool
 
       @dialog.add_action_callback('activateBoxForCat') do |_ctx, cat_str|
         TakeoffTool.activate_box_tool rescue nil
+      end
+
+      @dialog.add_action_callback('addSFFaces') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_sf_tool_for_group(eid, cat)
+        rescue => e
+          puts "[FF MeasPanel] addSFFaces error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('removeSFFaces') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_sf_tool(eid_str.to_i)
+        rescue => e
+          puts "[FF MeasPanel] removeSFFaces error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('newSFMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']
+          TakeoffTool.activate_sf_tool_new(cat, label, color)
+        rescue => e
+          puts "[FF MeasPanel] newSFMeasurement error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('updateSFLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_sf_label(data['eid'].to_i, data['label'].to_s)
+          send_data
+        rescue => e
+          puts "[FF MeasPanel] updateSFLabel error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('updateSFColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_sf_color(data['eid'].to_i, data['color'])
+          send_data
+        rescue => e
+          puts "[FF MeasPanel] updateSFColor error: #{e.message}"
+        end
+      end
+
+      # ─── LF Face Tool callbacks ───
+
+      @dialog.add_action_callback('newLFMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']
+          TakeoffTool.activate_lf_face_tool_new(cat, label, color)
+        rescue => e
+          puts "[FF MeasPanel] newLFMeasurement error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('addLFFaces') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_lf_face_tool_for_group(eid, cat)
+        rescue => e
+          puts "[FF MeasPanel] addLFFaces error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('removeLFFaces') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_sf_tool(eid_str.to_i)
+        rescue => e
+          puts "[FF MeasPanel] removeLFFaces error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('updateLFLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_lf_label(data['eid'].to_i, data['label'].to_s)
+          send_data
+        rescue => e
+          puts "[FF MeasPanel] updateLFLabel error: #{e.message}"
+        end
+      end
+
+      @dialog.add_action_callback('updateLFColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_lf_color(data['eid'].to_i, data['color'])
+          send_data
+        rescue => e
+          puts "[FF MeasPanel] updateLFColor error: #{e.message}"
+        end
       end
 
       @dialog.add_action_callback('editMeasNote') do |_ctx, json_str|

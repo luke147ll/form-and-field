@@ -3,6 +3,22 @@ module TakeoffTool
   SF_COLORS = {}
   SF_DEFAULT_COLOR = [166, 227, 161, 255]
 
+  # Catppuccin Mocha palette for SF measurement color picker
+  SF_COLOR_PALETTE = [
+    { name: 'Green',     rgb: [166, 227, 161] },
+    { name: 'Blue',      rgb: [137, 180, 250] },
+    { name: 'Peach',     rgb: [250, 179, 135] },
+    { name: 'Mauve',     rgb: [203, 166, 247] },
+    { name: 'Yellow',    rgb: [249, 226, 175] },
+    { name: 'Teal',      rgb: [148, 226, 213] },
+    { name: 'Sky',       rgb: [137, 220, 235] },
+    { name: 'Pink',      rgb: [245, 194, 231] },
+    { name: 'Flamingo',  rgb: [242, 205, 205] },
+    { name: 'Red',       rgb: [243, 139, 168] },
+    { name: 'Lavender',  rgb: [180, 190, 254] },
+    { name: 'Sapphire',  rgb: [116, 199, 236] },
+  ]
+
   SF_CATEGORIES = ['Drywall','Roofing','Metal Roofing','Shingle Roofing',
     'Roof Sheathing','Wall Sheathing','Flooring','Concrete','Ceilings',
     'Masonry / Veneer','Siding','Soffit','Insulation','Membrane',
@@ -20,7 +36,6 @@ module TakeoffTool
         mat.alpha = 1.0
       end
     end
-    # Also fix debug materials
     measured = m.materials['FF_DEBUG_MEASURED']
     if measured
       measured.color = green
@@ -31,7 +46,6 @@ module TakeoffTool
       excluded.color = Sketchup::Color.new(243, 139, 168)
       excluded.alpha = 1.0
     end
-    # Also update stored color_rgba on measurement groups
     require 'json'
     m.entities.grep(Sketchup::Group).each do |grp|
       next unless grp.valid?
@@ -40,53 +54,67 @@ module TakeoffTool
     end
   end
 
-  class MeasureSFTool
+  # ═══════════════════════════════════════════════════════════
+  #  MeasureSFTool — click model faces to create physical
+  #  measurement geometry. Flood-fills coplanar neighbors,
+  #  projects a flat face, offsets toward camera.
+  # ═══════════════════════════════════════════════════════════
 
-    def initialize(preset_category = nil)
-      @picked_faces = []
+  class MeasureSFTool
+    FLOOD_ANGLE_TOL = 5.0   # degrees — coplanar threshold
+    OFFSET_DIST     = 0.5   # inches — offset toward camera
+
+    def initialize(category, opts = {})
+      @category = category
+      @group_eid = opts[:group_eid]    # target specific group, or nil for new
+      @label = opts[:label] || category # sub-label (e.g., "Tile", "Wood")
+      @color_rgb = opts[:color]         # [r,g,b] or nil for default green
       @hover_face = nil
-      @hover_transform = nil
-      @hover_area = 0
+      @hover_xform = nil
+      @hover_cluster = nil
+      @hover_boundary = nil
+      @hover_sf = 0.0
+      @measurement_group = nil
       @total_sf = 0.0
-      @preset_category = preset_category
-      @panel = nil
-      @save_pending = false
+      @face_count = 0
     end
 
     def activate
-      reset_full
-      open_panel
-      update_status
+      find_or_create_group
+      recompute_totals
+      display = @label != @category ? "#{@category} / #{@label}" : @category
+      Sketchup.status_text = "Measure SF [#{display}]: Click faces to measure. Flood-fills coplanar neighbors. Total = #{'%.1f' % @total_sf} SF. Escape to finish."
     end
 
     def deactivate(view)
-      close_panel
-      @picked_faces.each do |pf|
-        begin; pf[:face].material = pf[:original_mat]; rescue; end
-      end
-      reset_full
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
       view.invalidate
     end
 
     def resume(view)
-      update_status
+      recompute_totals
+      display = @label != @category ? "#{@category} / #{@label}" : @category
+      Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Click to add more. Escape to finish."
       view.invalidate
     end
 
     # ─── Mouse ───
 
     def onMouseMove(flags, x, y, view)
-      return if @save_pending
       ph = view.pick_helper
       ph.do_pick(x, y)
 
       face = nil
       xform = nil
 
-      count = ph.count
-      count.times do |i|
+      ph.count.times do |i|
         leaf = ph.leaf_at(i)
         if leaf.is_a?(Sketchup::Face)
+          # Skip faces inside our own measurement group
+          path = ph.path_at(i)
+          next if path && path.any? { |e| e == @measurement_group }
           face = leaf
           xform = ph.transformation_at(i)
           break
@@ -95,10 +123,9 @@ module TakeoffTool
 
       if !face
         path = ph.path_at(0)
-        if path
-          last = path.last
-          if last.is_a?(Sketchup::Face)
-            face = last
+        if path && path.last.is_a?(Sketchup::Face)
+          unless path.any? { |e| e == @measurement_group }
+            face = path.last
             xform = ph.transformation_at(0)
           end
         end
@@ -106,294 +133,272 @@ module TakeoffTool
 
       if face && !face.equal?(@hover_face)
         @hover_face = face
-        @hover_transform = xform || Geom::Transformation.new
-        @hover_area = compute_world_area(face, @hover_transform)
+        @hover_xform = xform || Geom::Transformation.new
+        @hover_cluster = flood_fill_coplanar(face, @hover_xform)
+        @hover_boundary = extract_outer_boundary(@hover_cluster, @hover_xform)
+        @hover_sf = @hover_cluster.sum { |f| compute_world_area(f, @hover_xform) } / 144.0
+        view.tooltip = "Cluster: #{'%.1f' % @hover_sf} SF (#{@hover_cluster.length} faces)"
         view.invalidate
       elsif !face && @hover_face
         @hover_face = nil
-        @hover_transform = nil
-        @hover_area = 0
+        @hover_xform = nil
+        @hover_cluster = nil
+        @hover_boundary = nil
+        @hover_sf = 0.0
         view.invalidate
-      end
-
-      if @hover_face
-        sf = @hover_area / 144.0
-        view.tooltip = "Face: #{'%.1f' % sf} SF"
       end
     end
 
     def onLButtonDown(flags, x, y, view)
-      return if @save_pending
-      return unless @hover_face
+      return unless @hover_face && @hover_cluster && @hover_boundary
+      return if @hover_boundary.length < 3
 
-      face = @hover_face
+      model = Sketchup.active_model
+      model.start_operation('Add SF Face', false)
 
-      already = @picked_faces.find { |pf| pf[:face].equal?(face) }
-      if already
-        remove_face(already, view)
-        return
-      end
+      begin
+        # Compute best-fit plane
+        centroid, normal = compute_best_fit_plane(@hover_cluster, @hover_xform)
+        return model.abort_operation unless centroid && normal
 
-      # Auto-detect category from the first picked face's parent entity
-      if @picked_faces.empty?
-        cat = detect_category_at(x, y, view)
-        set_panel_category(cat) if cat
-      end
+        # Project boundary onto plane and offset toward camera
+        offset_pts = project_and_offset(@hover_boundary, centroid, normal, view)
+        return model.abort_operation if offset_pts.length < 3
 
-      pick_face(face, @hover_transform, view)
-    end
-
-    def onLButtonDoubleClick(flags, x, y, view)
-      if @picked_faces.length >= 1
-        trigger_save
-      elsif @hover_face
-        pick_face(@hover_face, @hover_transform, view)
-        trigger_save if @picked_faces.length >= 1
-      end
-    end
-
-    def getMenu(menu, flags, x, y, view)
-      if @picked_faces.length >= 1
-        menu.add_item("Save (#{'%.1f' % @total_sf} SF)") { trigger_save }
-        menu.add_separator
-      end
-      if @hover_face
-        already = @picked_faces.find { |pf| pf[:face].equal?(@hover_face) }
-        if already
-          sf = already[:sf]
-          menu.add_item("Remove This Face (#{'%.1f' % sf} SF)") { remove_face(already, view) }
-        else
-          sf = @hover_area / 144.0
-          menu.add_item("Add This Face (#{'%.1f' % sf} SF)") { pick_face(@hover_face, @hover_transform, view) }
+        # Create face in measurement group
+        find_or_create_group unless @measurement_group && @measurement_group.valid?
+        new_face = @measurement_group.entities.add_face(offset_pts)
+        if new_face
+          mat = get_sf_material(model)
+          new_face.material = mat
+          new_face.back_material = mat
         end
-      end
-      menu.add_separator if @picked_faces.length >= 1 || @hover_face
-      menu.add_item("Cancel") { cancel(view) }
-      true
-    end
 
-    # ─── Keyboard ───
+        recompute_totals
+        update_group_attributes
+        model.commit_operation
+
+        display = @label != @category ? "#{@category} / #{@label}" : @category
+        Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Click to add more. Escape to finish."
+      rescue => e
+        model.abort_operation
+        puts "MeasureSF error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+      end
+
+      view.invalidate
+    end
 
     def onKeyDown(key, repeat, flags, view)
-      case key
-      when 13
-        trigger_save if @picked_faces.length >= 1
-      when 27
-        cancel(view)
+      if key == 27
+        Sketchup.active_model.select_tool(nil)
       end
+      false
     end
 
     def onCancel(reason, view)
-      cancel(view)
+      Sketchup.active_model.select_tool(nil)
     end
-
-    # ─── Draw overlay ───
 
     def draw(view)
-      if @hover_face && !@picked_faces.find { |pf| pf[:face].equal?(@hover_face) }
-        draw_face_highlight(view, @hover_face, @hover_transform, Sketchup::Color.new(255, 255, 100, 60))
-      end
-
-      if @picked_faces.length > 0
-        view.draw_text([10, 10, 0], "#{@picked_faces.length} face#{'s' if @picked_faces.length>1} selected — #{'%.1f' % @total_sf} SF",
-          color: Sketchup::Color.new(100, 255, 100))
-      end
-    end
-
-    def draw_face_highlight(view, face, xform, color)
+      return unless @hover_cluster && @hover_cluster.any?
       begin
-        mesh = face.mesh(0)
-        pts = []
-        (1..mesh.count_points).each do |i|
-          pt = mesh.point_at(i)
-          pts << (xform ? xform * pt : pt)
+        r, g, b = active_color_rgb
+        # Draw flood-fill highlight on all cluster faces
+        view.drawing_color = Sketchup::Color.new(r, g, b, 80)
+        @hover_cluster.each do |face|
+          mesh = face.mesh(0)
+          pts = []
+          (1..mesh.count_points).each do |i|
+            pt = mesh.point_at(i)
+            pts << (@hover_xform ? @hover_xform * pt : pt)
+          end
+          next if pts.length < 3
+          view.draw(GL_POLYGON, pts)
         end
-        return if pts.length < 3
-        view.drawing_color = color
-        view.draw(GL_POLYGON, pts)
-      rescue => e
+
+        # Draw boundary outline
+        if @hover_boundary && @hover_boundary.length >= 3
+          view.line_width = 2
+          view.drawing_color = Sketchup::Color.new(r, g, b, 200)
+          loop_pts = @hover_boundary + [@hover_boundary.first]
+          view.draw(GL_LINE_STRIP, loop_pts)
+        end
+      rescue
       end
     end
 
     def getExtents
       bb = Geom::BoundingBox.new
-      @picked_faces.each do |pf|
-        begin
-          xform = pf[:transform]
-          pf[:face].vertices.each do |v|
-            pt = xform ? xform * v.position : v.position
-            bb.add(pt)
-          end
-        rescue; end
+      if @hover_boundary
+        @hover_boundary.each { |pt| bb.add(pt) }
       end
       bb
     end
 
     private
 
-    # ─── Panel ───
+    # ─── Flood Fill ───
 
-    def open_panel
-      all_cats = TakeoffTool.master_categories
-      default_cat = @preset_category || @last_cat || 'Drywall'
-      cat_opts = all_cats.map { |c|
-        sel = c == default_cat ? ' selected' : ''
-        "<option value=\"#{c}\"#{sel}>#{c}</option>"
-      }.join
-      cat_opts += '<option value="__custom__">+ Custom...</option>'
+    def flood_fill_coplanar(seed_face, xform)
+      seed_normal = TakeoffTool.get_world_normal(seed_face, xform)
+      cos_threshold = Math.cos(FLOOD_ANGLE_TOL * Math::PI / 180.0)
+      seed_parent = seed_face.parent
 
-      @panel = UI::HtmlDialog.new(
-        dialog_title: "SF Measurement",
-        width: 260, height: 440,
-        left: 80, top: 200,
-        style: UI::HtmlDialog::STYLE_UTILITY,
-        resizable: false
-      )
+      visited = { seed_face.entityID => true }
+      cluster = [seed_face]
+      queue = [seed_face]
 
-      sf_tool = self
+      while (current = queue.shift)
+        current.edges.each do |edge|
+          edge.faces.each do |neighbor|
+            next if visited[neighbor.entityID]
+            next if neighbor.parent != seed_parent
+            visited[neighbor.entityID] = true
 
-      @panel.add_action_callback('save') do |_ctx, json_str|
-        begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          cat = data['cat'].to_s.strip
-          cc  = data['cc'].to_s
-          note = data['note'].to_s
-          part_name = data['name'].to_s.strip
-          sf_tool.send(:save_measurement, cat, cc, note, part_name) unless cat.empty?
-        rescue => e
-          puts "Takeoff SF: save error: #{e.message}"
+            n_normal = TakeoffTool.get_world_normal(neighbor, xform)
+            if seed_normal.dot(n_normal) >= cos_threshold
+              cluster << neighbor
+              queue << neighbor
+            end
+          end
         end
       end
 
-      @panel.add_action_callback('cancel') do |_ctx|
-        Sketchup.active_model.select_tool(nil)
+      cluster
+    end
+
+    # ─── Boundary Extraction ───
+
+    def extract_outer_boundary(cluster, xform)
+      return [] if cluster.empty?
+
+      # Single face — just return its outer loop vertices
+      if cluster.length == 1
+        return cluster[0].outer_loop.vertices.map { |v| xform * v.position }
       end
 
-      @panel.set_on_closed do
-        @panel = nil
-        UI.start_timer(0) { Sketchup.active_model.select_tool(nil) }
+      # Build set of cluster face IDs
+      cluster_ids = {}
+      cluster.each { |f| cluster_ids[f.entityID] = true }
+
+      # Find boundary edges (belong to exactly 1 cluster face)
+      boundary_edges = []
+      edge_seen = {}
+      cluster.each do |face|
+        face.edges.each do |edge|
+          next if edge_seen[edge.entityID]
+          edge_seen[edge.entityID] = true
+          cluster_count = edge.faces.count { |f| cluster_ids[f.entityID] }
+          boundary_edges << edge if cluster_count == 1
+        end
       end
 
-      @panel.set_html(sf_panel_html(cat_opts))
-      @panel.show
+      return [] if boundary_edges.empty?
+      order_boundary_edges(boundary_edges, xform)
     end
 
-    def close_panel
-      return unless @panel
-      p = @panel
-      @panel = nil
-      begin; p.set_on_closed {}; p.close; rescue; end
-    end
-
-    def update_panel
-      return unless @panel
-      @panel.execute_script("updateTotal(#{@total_sf},#{@picked_faces.length})") rescue nil
-    end
-
-    def trigger_save
-      return unless @panel && @picked_faces.length >= 1
-      @save_pending = true
-      @panel.bring_to_front rescue nil
-      @panel.execute_script("focusName()") rescue nil
-    end
-
-    def sf_panel_html(cat_options)
-      <<~HTML
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow:hidden}
-        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
-        .total-val{font-size:28px;font-weight:700;color:#a6e3a1;text-align:center;margin:4px 0 2px}
-        .total-detail{font-size:11px;color:#6c7086;text-align:center;margin-bottom:10px}
-        .divider{height:1px;background:#313244;margin:0 -14px 10px}
-        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:3px;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
-        label:first-of-type{margin-top:0}
-        select,input[type=text]{width:100%;padding:7px 9px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
-        select:focus,input:focus{outline:none;border-color:#89b4fa}
-        .btns{display:flex;gap:8px;margin-top:14px}
-        .btn{flex:1;padding:8px 0;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
-        .btn-save{background:#a6e3a1;color:#1e1e2e}
-        .btn-save:hover:not(:disabled){background:#8cd68c}
-        .btn-save:disabled{opacity:0.4;cursor:default}
-        .btn-cancel{background:#45475a;color:#cdd6f4}
-        .btn-cancel:hover{background:#585b70}
-        #customRow{display:none;margin-top:6px}
-        #customRow.show{display:block}
-        </style></head><body>
-        <div class="hdr">SF Measurement</div>
-        <div class="total-val" id="totalVal">0.0 SF</div>
-        <div class="total-detail" id="totalDetail">Click faces to measure</div>
-        <div class="divider"></div>
-        <label>Name</label>
-        <input id="name" type="text" placeholder="e.g. R-19 Batt, 5/8 Board...">
-        <label>Category</label>
-        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
-        <div id="customRow"><input id="customName" type="text" placeholder="New category name..."></div>
-        <label>Cost Code</label>
-        <input id="cc" type="text" placeholder="Optional">
-        <label>Note</label>
-        <input id="note" type="text" placeholder="Optional">
-        <div class="btns">
-          <button class="btn btn-cancel" onclick="doCancel()">Cancel</button>
-          <button class="btn btn-save" id="saveBtn" onclick="doSave()" disabled>Save</button>
-        </div>
-        <script>
-        function updateTotal(sf,count){
-          document.getElementById('totalVal').textContent=sf.toFixed(1)+' SF';
-          document.getElementById('totalDetail').textContent=count+' face'+(count!==1?'s':'')+' selected';
-          document.getElementById('saveBtn').disabled=count<1;
-        }
-        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
-        function doSave(){
-          var cat=document.getElementById('cat').value;
-          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
-          if(document.getElementById('saveBtn').disabled)return;
-          sketchup.save(JSON.stringify({name:document.getElementById('name').value,cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
-        }
-        function doCancel(){sketchup.cancel();}
-        function focusName(){document.getElementById('name').focus();}
-        function setCategory(cat){var sel=document.getElementById('cat');for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===cat){sel.selectedIndex=i;onCatChange();return;}}}
-        document.addEventListener('keydown',function(e){if(e.key==='Escape')doCancel();});
-        </script>
-        </body></html>
-      HTML
-    end
-
-    def detect_category_at(x, y, view)
-      ph = view.pick_helper
-      ph.do_pick(x, y)
-      path = ph.path_at(0)
-      return nil unless path
-      assignments = TakeoffTool.category_assignments
-      path.each do |ent|
-        next unless ent.respond_to?(:entityID)
-        cat = assignments[ent.entityID]
-        return cat if cat
+    def order_boundary_edges(edges, xform)
+      # Build vertex → edges adjacency
+      vert_edges = {}
+      edges.each do |e|
+        e.vertices.each do |v|
+          vert_edges[v.entityID] ||= []
+          vert_edges[v.entityID] << e
+        end
       end
-      nil
+
+      loop_pts = []
+      used = {}
+      current_edge = edges.first
+      current_vert = current_edge.start
+
+      loop do
+        loop_pts << (xform * current_vert.position)
+        used[current_edge.entityID] = true
+        other_vert = current_edge.other_vertex(current_vert)
+
+        candidates = (vert_edges[other_vert.entityID] || []).reject { |e| used[e.entityID] }
+        break if candidates.empty?
+        current_edge = candidates.first
+        current_vert = other_vert
+      end
+
+      loop_pts
     end
 
-    def set_panel_category(cat)
-      return unless @panel
-      require 'json'
-      @panel.execute_script("setCategory(#{JSON.generate(cat)})") rescue nil
+    # ─── Plane Projection ───
+
+    def compute_best_fit_plane(cluster, xform)
+      total_area = 0.0
+      wx = 0.0; wy = 0.0; wz = 0.0
+      cx = 0.0; cy = 0.0; cz = 0.0
+
+      cluster.each do |face|
+        area = compute_world_area(face, xform)
+        normal = TakeoffTool.get_world_normal(face, xform)
+        center = xform * face.bounds.center
+
+        wx += normal.x * area
+        wy += normal.y * area
+        wz += normal.z * area
+
+        cx += center.x * area
+        cy += center.y * area
+        cz += center.z * area
+
+        total_area += area
+      end
+
+      return nil if total_area < 0.001
+
+      avg_normal = Geom::Vector3d.new(wx, wy, wz)
+      avg_normal.normalize!
+      centroid = Geom::Point3d.new(cx / total_area, cy / total_area, cz / total_area)
+
+      [centroid, avg_normal]
     end
 
-    # ─── Measurement ───
+    def project_and_offset(boundary_pts, plane_pt, plane_normal, view)
+      # Determine offset direction (toward camera)
+      cam_eye = view.camera.eye
+      to_cam = cam_eye - plane_pt
+      dot = to_cam.x * plane_normal.x + to_cam.y * plane_normal.y + to_cam.z * plane_normal.z
+      offset_dir = dot >= 0 ? plane_normal : plane_normal.reverse
+      offset_vec = Geom::Vector3d.new(
+        offset_dir.x * OFFSET_DIST,
+        offset_dir.y * OFFSET_DIST,
+        offset_dir.z * OFFSET_DIST
+      )
+
+      boundary_pts.map do |pt|
+        # Project onto plane: pt' = pt - ((pt - plane_pt) · normal) * normal
+        diff = pt - plane_pt
+        dist_to_plane = diff.x * plane_normal.x + diff.y * plane_normal.y + diff.z * plane_normal.z
+        projected = Geom::Point3d.new(
+          pt.x - dist_to_plane * plane_normal.x,
+          pt.y - dist_to_plane * plane_normal.y,
+          pt.z - dist_to_plane * plane_normal.z
+        )
+        # Offset toward camera
+        Geom::Point3d.new(
+          projected.x + offset_vec.x,
+          projected.y + offset_vec.y,
+          projected.z + offset_vec.z
+        )
+      end
+    end
+
+    # ─── Geometry Helpers ───
 
     def compute_world_area(face, xform)
       return face.area unless xform
-
       begin
         sx = Geom::Vector3d.new(xform.xaxis).length
         sy = Geom::Vector3d.new(xform.yaxis).length
         sz = Geom::Vector3d.new(xform.zaxis).length
-
         if (sx - sy).abs < 0.001 && (sy - sz).abs < 0.001
           return face.area * sx * sy
         end
-
         mesh = face.mesh(0)
         total = 0.0
         (1..mesh.count_polygons).each do |pi|
@@ -412,250 +417,291 @@ module TakeoffTool
       end
     end
 
-    def pick_face(face, xform, view)
-      orig_mat = face.material
-      sf = compute_world_area(face, xform) / 144.0
-
-      begin
-        highlight_mat = get_or_create_highlight_mat
-        face.material = highlight_mat
-      rescue => e
-        puts "Takeoff SF: Could not highlight face: #{e.message}"
-      end
-
-      @picked_faces << { face: face, sf: sf, original_mat: orig_mat, transform: xform }
-      @total_sf += sf
-
-      update_vcb
-      update_status
-      update_panel
-      view.invalidate
-      puts "Takeoff SF: Picked face #{'%.1f' % sf} SF (total: #{'%.1f' % @total_sf} SF, #{@picked_faces.length} faces)"
-    end
-
-    def remove_face(pf, view)
-      begin; pf[:face].material = pf[:original_mat]; rescue; end
-      @total_sf -= pf[:sf]
-      @picked_faces.delete(pf)
-      update_vcb
-      update_status
-      update_panel
-      view.invalidate
-    end
-
-    def cancel(view)
-      Sketchup.active_model.select_tool(nil)
-    end
-
-    def reset_full
-      @picked_faces = []
-      @hover_face = nil
-      @hover_transform = nil
-      @hover_area = 0
-      @total_sf = 0.0
-      @save_pending = false
-      update_vcb
-    end
-
-    def update_vcb
-      Sketchup.vcb_label = "Total SF"
-      Sketchup.vcb_value = "#{'%.1f' % @total_sf} SF"
-    end
-
-    def update_status
-      n = @picked_faces.length
-      cat_label = @preset_category ? " [#{@preset_category}]" : ""
-      if n == 0
-        Sketchup.status_text = "SF Tool#{cat_label}: Click faces to select. Click selected face to deselect. Enter/Dbl-click to save. Esc to cancel."
-      else
-        Sketchup.status_text = "SF Tool#{cat_label}: #{n} face#{'s' if n>1}, #{'%.1f' % @total_sf} SF — Click more / click to deselect / Enter to save / Esc to cancel."
+    def active_color_rgb
+      @color_rgb || begin
+        if @measurement_group && @measurement_group.valid?
+          require 'json'
+          rgba_json = @measurement_group.get_attribute('TakeoffMeasurement', 'color_rgba')
+          arr = rgba_json ? (JSON.parse(rgba_json) rescue nil) : nil
+          arr && arr.length >= 3 ? arr[0..2] : [166, 227, 161]
+        else
+          [166, 227, 161]
+        end
       end
     end
 
-    def get_or_create_highlight_mat
-      model = Sketchup.active_model
-      mat = model.materials['TO_SF_Highlight']
-      unless mat
-        mat = model.materials.add('TO_SF_Highlight')
-        mat.color = Sketchup::Color.new(100, 255, 100)
-        mat.alpha = 0.5
-      end
+    def get_sf_material(model)
+      r, g, b = active_color_rgb
+      # Per-group material keyed by group eid to avoid color conflicts
+      eid = @measurement_group ? @measurement_group.entityID : 0
+      mat_name = "FF_SF_#{eid}"
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(r, g, b)
+      mat.alpha = 0.6
       mat
     end
 
-    # ─── Save ───
-
-    def save_measurement(cat, cc, note, part_name = '')
-      return if @picked_faces.empty?
-
-      TakeoffTool.add_custom_category(cat) unless TakeoffTool.master_categories.include?(cat)
-      @last_cat = cat
-      @last_cc = cc
-      @last_note = note
-      @last_part_name = part_name || ''
-
-      # Set category measurement type to SF if not already set
+    def find_or_create_group
       m = Sketchup.active_model
-      existing_mt = m.get_attribute('TakeoffMeasurementTypes', cat) rescue nil
-      m.set_attribute('TakeoffMeasurementTypes', cat, 'sf') if !existing_mt || existing_mt.empty?
+      return unless m
 
-      apply_final_color(cat)
-      grp = create_sf_record(cat)
-      @picked_faces.each do |pf|
-        begin; pf[:face].set_attribute('FF_Original', 'group_eid', grp.entityID); rescue; end
-      end
-      add_to_results(cat, grp)
-
-      Sketchup.status_text = "SF Tool: Saved #{'%.1f' % @total_sf} SF of #{cat}. Click to start new measurement."
-      reset_full
-      update_panel
-      Sketchup.active_model.active_view.invalidate
-    end
-
-    def apply_final_color(cat)
-      model = Sketchup.active_model
-      model.start_operation('SF Color', true)
-
-      rgba = SF_COLORS[cat] || SF_DEFAULT_COLOR
-      mat_name = "TO_SF_#{cat.gsub(/[\s\/]+/,'_')}"
-      mat = model.materials[mat_name] || model.materials.add(mat_name)
-      mat.color = Sketchup::Color.new(166, 227, 161)
-      mat.alpha = 1.0
-
-      @picked_faces.each do |pf|
-        begin
-          f = pf[:face]
-          orig_name = pf[:original_mat] ? pf[:original_mat].display_name : ''
-          f.set_attribute('FF_Original', 'material', orig_name)
-          f.material = mat
-        rescue => e
-          puts "Takeoff SF: Failed to color face: #{e.message}"
+      # Target specific group by eid if provided
+      if @group_eid
+        grp = TakeoffTool.find_entity(@group_eid)
+        if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
+          @measurement_group = grp
+          @label = grp.get_attribute('TakeoffMeasurement', 'label') || @label
+          return
         end
       end
 
-      model.commit_operation
-    end
-
-    def create_sf_record(cat)
-      model = Sketchup.active_model
-      model.start_operation('SF Record', true)
-
-      tag = model.layers[LF_TAG] || model.layers.add(LF_TAG)
-
-      grp = model.active_entities.add_group
-      grp.layer = tag
-      pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
-      grp.name = pn ? "TO_SF: #{pn} — #{cat} — #{'%.1f' % @total_sf} SF" : "TO_SF: #{cat} — #{'%.1f' % @total_sf} SF"
-
-      center = Geom::Point3d.new(0, 0, 0)
-      if @picked_faces.length > 0
-        begin
-          fc = @picked_faces.first
-          local_center = fc[:face].bounds.center
-          center = fc[:transform] ? fc[:transform] * local_center : local_center
-        rescue; end
-      end
-      grp.entities.add_cpoint(center)
-      grp.hidden = true
-
-      grp.set_attribute('TakeoffMeasurement', 'type', 'SF')
-      grp.set_attribute('TakeoffMeasurement', 'category', cat)
-      grp.set_attribute('TakeoffMeasurement', 'part_name', @last_part_name || '')
-      grp.set_attribute('TakeoffMeasurement', 'total_sf', @total_sf)
-      grp.set_attribute('TakeoffMeasurement', 'face_count', @picked_faces.length)
-      grp.set_attribute('TakeoffMeasurement', 'cost_code', @last_cc || '')
-      grp.set_attribute('TakeoffMeasurement', 'note', @last_note || '')
-      grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
-      grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
-
+      # Create new group with label and color
       require 'json'
-      refs = @picked_faces.map do |pf|
-        f = pf[:face]
-        pid = f.respond_to?(:persistent_id) ? f.persistent_id : nil
-        parent = f.parent
-        defn_name = if parent.is_a?(Sketchup::ComponentDefinition)
-                      parent.name
-                    else
-                      '__model__'
-                    end
-        fidx = begin
-          parent_ents = parent.is_a?(Sketchup::ComponentDefinition) ? parent.entities : model.entities
-          parent_ents.grep(Sketchup::Face).index(f) || -1
-        rescue
-          -1
-        end
-        { 'pid' => pid, 'defn' => defn_name, 'fidx' => fidx }
-      end
-      grp.set_attribute('TakeoffMeasurement', 'face_refs', JSON.generate(refs))
+      tag_name = 'TO_Measurements'
+      tag = m.layers[tag_name] || m.layers.add(tag_name)
+      r, g, b = @color_rgb || [166, 227, 161]
 
-      rgba = SF_COLORS[cat] || SF_DEFAULT_COLOR
-      mat_name = "TO_SF_#{cat.gsub(/[\s\/]+/,'_')}"
-      grp.set_attribute('TakeoffMeasurement', 'material_name', mat_name)
-      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
+      @measurement_group = m.active_entities.add_group
+      @measurement_group.layer = tag
+      @measurement_group.name = "TO_SF: #{@label} — 0.0 SF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'type', 'SF')
+      @measurement_group.set_attribute('TakeoffMeasurement', 'category', @category)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'label', @label)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_sf', 0.0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'face_count', 0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([r, g, b, 153]))
+      @measurement_group.set_attribute('TakeoffMeasurement', 'material_name', "FF_SF_#{@measurement_group.entityID}")
 
-      TakeoffTool.entity_registry[grp.entityID] = grp
-
-      model.commit_operation
-      grp
+      # Register in entity cache so find_entity can locate this group
+      TakeoffTool.entity_registry[@measurement_group.entityID] = @measurement_group
+      TakeoffTool.invalidate_entity_cache
     end
 
-    def add_to_results(cat, grp)
-      face_count = @picked_faces.length
-      eid = grp.entityID
-      pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
-      display = pn ? "#{pn} — #{cat} — #{'%.1f' % @total_sf} SF" : "#{cat} — #{'%.1f' % @total_sf} SF"
-
-      result = {
-        entity_id: eid,
-        tag: LF_TAG,
-        definition_name: display,
-        display_name: display,
-        material: '',
-        is_solid: false,
-        instance_count: 1,
-        volume_ft3: 0.0,
-        volume_bf: 0.0,
-        area_sf: @total_sf,
-        linear_ft: 0.0,
-        bb_width_in: 0, bb_height_in: 0, bb_depth_in: 0,
-        ifc_type: nil,
-        warnings: [],
-        parsed: {
-          auto_category: cat,
-          auto_subcategory: pn || '',
-          element_type: cat,
-          function: 'SF',
-          material: @last_note || '',
-          thickness: '',
-          size_nominal: '',
-          revit_id: nil
-        },
-        source: :manual_sf
-      }
-
-      TakeoffTool.scan_results << result
-      TakeoffTool.category_assignments[eid] = cat
-      if @last_cc && !@last_cc.empty?
-        TakeoffTool.cost_code_assignments[eid] = @last_cc
+    def recompute_totals
+      if @measurement_group && @measurement_group.valid?
+        faces = @measurement_group.entities.grep(Sketchup::Face)
+        @face_count = faces.length
+        @total_sf = (faces.sum { |f| f.area } / 144.0).round(2)
+      else
+        @face_count = 0
+        @total_sf = 0.0
       end
+    end
 
-      d = Dashboard.instance_variable_get(:@dialog)
-      if d && d.visible?
-        Dashboard.invalidate_measurement_cache
-        Dashboard.send_data(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
-        Dashboard.send_measurement_data
-      end
-
-      puts "Takeoff SF: Added #{cat} #{'%.1f' % @total_sf} SF #{face_count} faces (entity #{eid})"
+    def update_group_attributes
+      return unless @measurement_group && @measurement_group.valid?
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_sf', @total_sf)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'face_count', @face_count)
+      @measurement_group.name = "TO_SF: #{@label} — #{'%.1f' % @total_sf} SF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
     end
   end
 
+  # ═══════════════════════════════════════════════════════════
+  #  RemoveSFFaceTool — click faces inside a measurement group
+  #  to delete them. Totals update automatically.
+  # ═══════════════════════════════════════════════════════════
+
+  class RemoveSFFaceTool
+    def initialize(group_eid)
+      @group_eid = group_eid.to_i
+      @measurement_group = nil
+      @hover_face = nil
+      @label = nil
+    end
+
+    def activate
+      m = Sketchup.active_model
+      return Sketchup.active_model.select_tool(nil) unless m
+
+      grp = TakeoffTool.find_entity(@group_eid)
+      mtype = grp ? grp.get_attribute('TakeoffMeasurement', 'type') : nil
+      if grp && grp.valid? && (mtype == 'SF' || mtype == 'LF')
+        @measurement_group = grp
+        @mtype = mtype
+        @label = grp.get_attribute('TakeoffMeasurement', 'label') || grp.get_attribute('TakeoffMeasurement', 'category') || mtype
+      end
+
+      unless @measurement_group
+        puts "RemoveFace: No SF/LF measurement group found for eid=#{@group_eid}"
+        Sketchup.active_model.select_tool(nil)
+        return
+      end
+
+      @measurement_group.visible = true
+      face_count = @measurement_group.entities.grep(Sketchup::Face).length
+      Sketchup.status_text = "Remove #{@mtype} [#{@label}]: Click measurement faces to remove (#{face_count} faces). Escape to finish."
+    end
+
+    def deactivate(view)
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
+      view.invalidate
+    end
+
+    def resume(view)
+      if @measurement_group && @measurement_group.valid?
+        face_count = @measurement_group.entities.grep(Sketchup::Face).length
+        Sketchup.status_text = "Remove #{@mtype} [#{@label}]: Click measurement faces to remove (#{face_count} faces). Escape to finish."
+      end
+      view.invalidate
+    end
+
+    def onMouseMove(flags, x, y, view)
+      @hover_face = nil
+      return unless @measurement_group && @measurement_group.valid?
+
+      ph = view.pick_helper
+      ph.do_pick(x, y)
+
+      ph.count.times do |i|
+        leaf = ph.leaf_at(i)
+        if leaf.is_a?(Sketchup::Face)
+          # Only pick faces inside our measurement group
+          path = ph.path_at(i)
+          if path && path.include?(@measurement_group)
+            @hover_face = leaf
+            if @mtype == 'LF'
+              lf = leaf.area / RIBBON_WIDTH / 12.0
+              view.tooltip = "Click to remove: #{'%.1f' % lf} LF"
+            else
+              sf = leaf.area / 144.0
+              view.tooltip = "Click to remove: #{'%.1f' % sf} SF"
+            end
+            break
+          end
+        end
+      end
+
+      view.invalidate
+    end
+
+    def onLButtonDown(flags, x, y, view)
+      return unless @hover_face && @hover_face.valid?
+      return unless @measurement_group && @measurement_group.valid?
+
+      model = Sketchup.active_model
+      model.start_operation("Remove #{@mtype} Face", false)
+      begin
+        edges = @hover_face.edges.dup
+        @hover_face.erase!
+        @hover_face = nil
+        # Clean up orphaned edges (no longer bounding any face)
+        edges.each { |e| e.erase! if e.valid? && e.faces.empty? }
+
+        # Update totals based on type
+        faces = @measurement_group.entities.grep(Sketchup::Face)
+        if @mtype == 'LF'
+          total_lf = (faces.sum { |f| f.area / RIBBON_WIDTH } / 12.0).round(2)
+          @measurement_group.set_attribute('TakeoffMeasurement', 'total_ft', total_lf)
+          @measurement_group.set_attribute('TakeoffMeasurement', 'total_inches', (total_lf * 12).round(2))
+          @measurement_group.set_attribute('TakeoffMeasurement', 'segment_count', faces.length)
+          @measurement_group.name = "TO_LF: #{@label} — #{'%.1f' % total_lf} LF"
+          model.commit_operation
+          Sketchup.status_text = "Remove LF [#{@label}]: #{'%.1f' % total_lf} LF (#{faces.length} faces). Click to remove more. Escape to finish."
+        else
+          total_sf = (faces.sum { |f| f.area } / 144.0).round(2)
+          @measurement_group.set_attribute('TakeoffMeasurement', 'total_sf', total_sf)
+          @measurement_group.set_attribute('TakeoffMeasurement', 'face_count', faces.length)
+          @measurement_group.name = "TO_SF: #{@label} — #{'%.1f' % total_sf} SF"
+          model.commit_operation
+          Sketchup.status_text = "Remove SF [#{@label}]: #{'%.1f' % total_sf} SF (#{faces.length} faces). Click to remove more. Escape to finish."
+        end
+      rescue => e
+        model.abort_operation
+        puts "RemoveFace error: #{e.message}"
+      end
+
+      view.invalidate
+    end
+
+    def onKeyDown(key, repeat, flags, view)
+      if key == 27
+        Sketchup.active_model.select_tool(nil)
+      end
+      false
+    end
+
+    def onCancel(reason, view)
+      Sketchup.active_model.select_tool(nil)
+    end
+
+    def draw(view)
+      return unless @hover_face && @hover_face.valid?
+      begin
+        mesh = @hover_face.mesh(0)
+        pts = []
+        xform = @measurement_group ? @measurement_group.transformation : Geom::Transformation.new
+        (1..mesh.count_points).each do |i|
+          pt = mesh.point_at(i)
+          pts << (xform * pt)
+        end
+        return if pts.length < 3
+        view.drawing_color = Sketchup::Color.new(243, 139, 168, 120)
+        view.draw(GL_POLYGON, pts)
+      rescue
+      end
+    end
+
+    def getExtents
+      Geom::BoundingBox.new
+    end
+  end
+
+  # ─── Module entry points ───
+
   def self.activate_sf_tool
-    Sketchup.active_model.select_tool(MeasureSFTool.new)
+    Sketchup.active_model.select_tool(MeasureSFTool.new('Drywall'))
   end
 
   def self.activate_sf_tool_for_category(cat)
     Sketchup.active_model.select_tool(MeasureSFTool.new(cat))
+  end
+
+  def self.activate_sf_tool_for_group(group_eid, category)
+    Sketchup.active_model.select_tool(MeasureSFTool.new(category, group_eid: group_eid.to_i))
+  end
+
+  def self.activate_sf_tool_new(category, label, color_rgb)
+    Sketchup.active_model.select_tool(MeasureSFTool.new(category, label: label, color: color_rgb))
+  end
+
+  def self.activate_remove_sf_tool(group_eid)
+    Sketchup.active_model.select_tool(RemoveSFFaceTool.new(group_eid))
+  end
+
+  def self.update_sf_label(group_eid, new_label)
+    grp = find_entity(group_eid.to_i)
+    return unless grp && grp.valid?
+    m = Sketchup.active_model
+    m.start_operation('Rename SF Measurement', true)
+    grp.set_attribute('TakeoffMeasurement', 'label', new_label)
+    total = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
+    grp.name = "TO_SF: #{new_label} — #{'%.1f' % total} SF"
+    m.commit_operation
+  end
+
+  def self.update_sf_color(group_eid, color_rgb)
+    grp = find_entity(group_eid.to_i)
+    return unless grp && grp.valid?
+    m = Sketchup.active_model
+    require 'json'
+    m.start_operation('Change SF Color', true)
+    grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([color_rgb[0], color_rgb[1], color_rgb[2], 153]))
+    # Repaint all faces in the group
+    r, g, b = color_rgb
+    mat_name = "FF_SF_#{grp.entityID}"
+    mat = m.materials[mat_name] || m.materials.add(mat_name)
+    mat.color = Sketchup::Color.new(r, g, b)
+    mat.alpha = 0.6
+    grp.entities.grep(Sketchup::Face).each do |face|
+      face.material = mat
+      face.back_material = mat
+    end
+    m.commit_operation
   end
 
   # ═══════════════════════════════════════════════════════════
@@ -779,298 +825,5 @@ module TakeoffTool
 
   def self.activate_normal_sample_tool(cat)
     Sketchup.active_model.select_tool(NormalSampleTool.new(cat))
-  end
-
-  # ═══════════════════════════════════════════════════════════
-  #  Edit SF Tool — click green (measured) faces to exclude
-  #  them from an auto SF calculation. Works on the debug
-  #  visualization painted by Scanner.debug_area_category.
-  # ═══════════════════════════════════════════════════════════
-
-  class EditSFTool
-
-    def initialize(category)
-      @category = category
-      @ip = Sketchup::InputPoint.new
-      @hover_face = nil
-      @hover_xform = nil
-      @hover_is_excluded = false
-      @hover_is_new = false
-      @edit_count = 0
-    end
-
-    def activate
-      @current_total = compute_category_total
-      Sketchup.status_text = "Edit SF [#{@category}]: Click green/blue to exclude (→ orange), orange/red to re-include (→ blue), bare to add (→ blue). Escape to finish."
-    end
-
-    def deactivate(view)
-      view.invalidate
-    end
-
-    def resume(view)
-      @current_total = compute_category_total
-      Sketchup.status_text = "Edit SF [#{@category}]: #{'%.1f' % @current_total} SF (#{@edit_count} edits). Escape to finish."
-      view.invalidate
-    end
-
-    def onMouseMove(flags, x, y, view)
-      @ip.pick(view, x, y)
-      @hover_face = nil
-      @hover_xform = nil
-      @hover_is_excluded = false
-      @hover_is_new = false
-      if @ip.valid? && @ip.face
-        face = @ip.face
-        mat = face.material
-        if mat && (mat.name == 'FF_DEBUG_EXCLUDED' || mat.name == 'FF_EDIT_EXCLUDED')
-          @hover_face = face
-          @hover_xform = @ip.transformation
-          @hover_is_excluded = true
-          sf = face.area / 144.0
-          view.tooltip = "Click to re-include: +#{'%.1f' % sf} SF"
-        elsif mat && sf_face?(mat)
-          @hover_face = face
-          @hover_xform = @ip.transformation
-          sf = face.area / 144.0
-          view.tooltip = "Click to exclude: -#{'%.1f' % sf} SF"
-        elsif face.is_a?(Sketchup::Face)
-          @hover_face = face
-          @hover_xform = @ip.transformation
-          @hover_is_new = true
-          sf = face.area / 144.0
-          view.tooltip = "Click to add: +#{'%.1f' % sf} SF"
-        end
-      end
-      view.invalidate
-    end
-
-    def onLButtonDown(flags, x, y, view)
-      return unless @hover_face && @hover_face.valid?
-
-      face = @hover_face
-      sf = face.area / 144.0
-      model = Sketchup.active_model
-
-      if @hover_is_excluded
-        # RE-INCLUDE: orange → blue, ADD sf back to total
-        model.start_operation('Include SF Face', true)
-        face.material = get_edit_measured_mat(model)
-        face.back_material = get_edit_measured_mat(model)
-        model.commit_operation
-        adjust_total(sf)
-
-      elsif @hover_is_new
-        # ADD: bare face → blue, ADD sf to total
-        model.start_operation('Add SF Face', true)
-        orig_mat_name = face.material ? face.material.name : ''
-        face.set_attribute('FF_EditSF', 'original_mat', orig_mat_name)
-        face.set_attribute('FF_EditSF', 'was_new', true)
-        face.material = get_edit_measured_mat(model)
-        face.back_material = get_edit_measured_mat(model)
-        model.commit_operation
-        adjust_total(sf)
-
-      else
-        # EXCLUDE: green/blue → red, SUBTRACT sf from total
-        model.start_operation('Exclude SF Face', true)
-        face.set_attribute('FF_EditSF', 'original_mat', face.material ? face.material.name : '')
-        face.material = get_edit_excluded_mat(model)
-        face.back_material = get_edit_excluded_mat(model)
-        model.commit_operation
-        adjust_total(-sf)
-      end
-
-      @edit_count += 1
-      @current_total = compute_category_total
-      Sketchup.status_text = "Edit SF [#{@category}]: #{'%.1f' % @current_total} SF (#{@edit_count} edits). Escape to finish."
-
-      @hover_face = nil
-      @hover_is_excluded = false
-      @hover_is_new = false
-      view.invalidate
-    end
-
-    def onKeyDown(key, repeat, flags, view)
-      if key == 27 # Escape
-        refresh_panel
-        Sketchup.active_model.select_tool(nil)
-      end
-      false
-    end
-
-    def onCancel(reason, view)
-      refresh_panel
-      Sketchup.active_model.select_tool(nil)
-    end
-
-    def draw(view)
-      return unless @hover_face && @hover_face.valid?
-      begin
-        mesh = @hover_face.mesh(0)
-        pts = []
-        (1..mesh.count_points).each do |i|
-          pt = mesh.point_at(i)
-          pts << (@hover_xform ? @hover_xform * pt : pt)
-        end
-        return if pts.length < 3
-        if @hover_is_excluded
-          view.drawing_color = Sketchup::Color.new(166, 227, 161, 100)
-        elsif @hover_is_new
-          view.drawing_color = Sketchup::Color.new(137, 180, 250, 100)
-        else
-          view.drawing_color = Sketchup::Color.new(243, 139, 168, 100)
-        end
-        view.draw(GL_POLYGON, pts)
-      rescue
-      end
-    end
-
-    def getExtents
-      Geom::BoundingBox.new
-    end
-
-    private
-
-    def sf_face?(mat)
-      return false unless mat
-      name = mat.name
-      name == 'FF_DEBUG_MEASURED' || name == 'FF_EDIT_MEASURED' || name.start_with?('TO_SF_')
-    end
-
-    def get_edit_measured_mat(model)
-      mat = model.materials['FF_EDIT_MEASURED'] || model.materials.add('FF_EDIT_MEASURED')
-      mat.color = Sketchup::Color.new(116, 199, 236)  # Blue to distinguish from auto green
-      mat.alpha = 1.0
-      mat
-    end
-
-    def get_edit_excluded_mat(model)
-      mat = model.materials['FF_EDIT_EXCLUDED'] || model.materials.add('FF_EDIT_EXCLUDED')
-      mat.color = Sketchup::Color.new(250, 179, 135)  # Orange — distinct from auto red
-      mat.alpha = 1.0
-      mat
-    end
-
-    # Directly adjust area_sf on scan results for this category
-    # AND update the total_sf attribute on any manual SF measurement groups
-    def adjust_total(delta_sf)
-      sr = TakeoffTool.scan_results || []
-      ca = TakeoffTool.category_assignments || {}
-
-      # Find scan results in this category
-      cat_results = sr.select do |r|
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-        cat == @category
-      end
-
-      if cat_results.any?
-        # Distribute the delta proportionally across entities
-        total = cat_results.sum { |r| (r[:area_sf] || 0).to_f }
-        if total > 0 && delta_sf.abs > 0.01
-          factor = (total + delta_sf) / total
-          cat_results.each do |r|
-            r[:area_sf] = ((r[:area_sf] || 0) * factor).round(2)
-          end
-        elsif delta_sf > 0 && total == 0
-          # Adding to a zero-total category — put it all on the first result
-          cat_results.first[:area_sf] = delta_sf.round(2) if cat_results.first
-        end
-      end
-
-      # Also update total_sf on any manual SF measurement groups for this category
-      m = Sketchup.active_model
-      return unless m
-      m.entities.grep(Sketchup::Group).each do |grp|
-        next unless grp.valid?
-        next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
-        next unless grp.get_attribute('TakeoffMeasurement', 'category') == @category
-        old_total = (grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0).to_f
-        new_total = [old_total + delta_sf, 0.0].max
-        grp.set_attribute('TakeoffMeasurement', 'total_sf', new_total.round(2))
-        # Only adjust one group per click — the delta applies once
-        break
-      end
-    end
-
-    def compute_category_total
-      sr = TakeoffTool.scan_results || []
-      ca = TakeoffTool.category_assignments || {}
-      total = 0.0
-      sr.each do |r|
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-        next unless cat == @category
-        total += (r[:area_sf] || 0).to_f
-      end
-      total
-    end
-
-    def refresh_panel
-      rebuild_face_refs_for_category
-      Dashboard.invalidate_measurement_cache rescue nil
-      Dashboard.send_measurement_data rescue nil
-      Dashboard.send_live_data rescue nil
-    end
-
-    def rebuild_face_refs_for_category
-      m = Sketchup.active_model
-      return unless m
-
-      # Collect all currently-measured faces (green) in entities belonging to this category
-      sr = TakeoffTool.scan_results || []
-      ca = TakeoffTool.category_assignments || {}
-      measured_faces = []
-
-      sr.each do |r|
-        cat = ca[r[:entity_id]] || r[:parsed][:auto_category]
-        next unless cat == @category
-        e = TakeoffTool.find_entity(r[:entity_id])
-        next unless e && e.valid? && e.respond_to?(:definition)
-        e.definition.entities.grep(Sketchup::Face).each do |f|
-          fm = f.material
-          next unless fm
-          if fm.name == 'FF_DEBUG_MEASURED' || fm.name == 'FF_EDIT_MEASURED' || fm.name.start_with?('TO_SF_')
-            measured_faces << f
-          end
-        end
-      end
-
-      # Find manual SF measurement groups for this category and rebuild their face_refs
-      require 'json'
-      m.entities.grep(Sketchup::Group).each do |grp|
-        next unless grp.valid?
-        next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
-        next unless grp.get_attribute('TakeoffMeasurement', 'category') == @category
-
-        # Rebuild refs from currently measured faces
-        refs = measured_faces.map do |f|
-          pid = f.respond_to?(:persistent_id) ? f.persistent_id : nil
-          parent = f.parent
-          defn_name = if parent.is_a?(Sketchup::ComponentDefinition)
-                        parent.name
-                      else
-                        '__model__'
-                      end
-          fidx = begin
-            parent_ents = parent.is_a?(Sketchup::ComponentDefinition) ? parent.entities : m.entities
-            parent_ents.grep(Sketchup::Face).index(f) || -1
-          rescue
-            -1
-          end
-          { 'pid' => pid, 'defn' => defn_name, 'fidx' => fidx }
-        end
-
-        new_total = measured_faces.sum { |f| f.area / 144.0 }.round(2)
-
-        grp.set_attribute('TakeoffMeasurement', 'face_refs', JSON.generate(refs))
-        grp.set_attribute('TakeoffMeasurement', 'face_count', measured_faces.length)
-        grp.set_attribute('TakeoffMeasurement', 'total_sf', new_total)
-        puts "EditSF: Rebuilt face_refs for #{@category}: #{measured_faces.length} faces, #{'%.1f' % new_total} SF"
-      end
-    end
-  end
-
-  def self.activate_edit_sf(category)
-    Sketchup.active_model.select_tool(EditSFTool.new(category))
   end
 end

@@ -114,8 +114,8 @@ body{background:var(--base);color:var(--text);font:12px/1.4 var(--font-mono);
 .cat-add-dd .meas-dd-menu{left:auto;right:0}
 
 /* ═══ MEASUREMENT ROW ═══ */
-.meas-list{overflow:hidden;transition:max-height .3s ease}
-.cat-hdr.collapsed+.meas-list{max-height:0!important}
+.meas-list{overflow:visible;transition:max-height .3s ease}
+.cat-hdr.collapsed+.meas-list{max-height:0!important;overflow:hidden}
 .meas-row{display:grid;grid-template-columns:22px 22px 1fr auto auto 60px;align-items:center;
   padding:0 14px 0 42px;height:34px;gap:8px;transition:background .1s;position:relative;cursor:default}
 .meas-row:hover{background:rgba(255,255,255,.015)}
@@ -139,13 +139,45 @@ body{background:var(--base);color:var(--text);font:12px/1.4 var(--font-mono);
   border-radius:3px;padding:0 4px;white-space:nowrap;font-weight:600}
 .m-value{font-size:12px;font-family:var(--font-num);font-weight:700;text-align:right;white-space:nowrap}
 .m-unit{font-size:9px;font-weight:500;opacity:.7;text-align:left}
-.m-actions{position:absolute;right:14px;display:flex;gap:1px;opacity:0;transition:opacity .12s;
-  background:linear-gradient(to right,transparent,var(--base) 6px);padding-left:12px}
+.m-actions{position:absolute;right:14px;display:flex;gap:3px;align-items:center;opacity:0;transition:opacity .12s;
+  background:linear-gradient(to right,transparent,var(--base) 12px);padding-left:16px}
 .meas-row:hover .m-actions{opacity:1}
 .s-btn{width:22px;height:22px;border-radius:3px;border:none;background:transparent;color:var(--overlay0);
   cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
 .s-btn:hover{background:var(--surface0);color:var(--text)}
 .s-btn.danger:hover{color:var(--red)}
+.s-btn.sf-text{width:auto;font-size:9px;font-family:inherit;padding:2px 6px;white-space:nowrap;font-weight:600}
+/* SF swatch + color picker */
+.sf-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;transition:transform .1s}
+.sf-swatch:hover{transform:scale(1.2);border-color:rgba(255,255,255,.4)}
+.sf-label{cursor:default}
+.sf-label:hover{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.sf-cpicker{position:fixed;z-index:999;background:var(--mantle);border:1px solid var(--surface1);border-radius:8px;padding:8px;display:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.sf-cpicker.open{display:flex;flex-wrap:wrap;gap:4px;max-width:140px}
+.sf-cpicker-dot{width:22px;height:22px;border-radius:4px;border:2px solid transparent;cursor:pointer;transition:all .12s}
+.sf-cpicker-dot:hover{border-color:var(--text);transform:scale(1.1)}
+.sf-cpicker-dot.active{border-color:var(--text)}
+/* Measurement cards */
+.mc-card{border-bottom:1px solid var(--surface0);transition:background .12s}
+.mc-card.open{background:rgba(255,255,255,.015)}
+.mc-card-hdr{display:flex;align-items:center;gap:6px;padding:5px 14px 5px 42px;cursor:pointer;transition:background .12s;position:relative;min-height:30px}
+.mc-card-hdr::before{content:'';position:absolute;left:32px;top:0;bottom:0;width:1px;background:var(--surface0)}
+.mc-card-hdr::after{content:'';position:absolute;left:32px;top:50%;width:6px;height:1px;background:var(--surface0)}
+.mc-card-hdr:hover{background:rgba(255,255,255,.02)}
+.mc-card-dot{width:22px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.mc-card-name{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.mc-card-badge{font-size:9px;color:var(--overlay1);white-space:nowrap}
+.mc-card-val{font-size:12px;font-weight:700;margin-left:auto;white-space:nowrap}
+.mc-card-unit{font-size:9px;color:var(--overlay1);font-weight:500}
+.mc-card-chev{font-size:8px;color:var(--overlay0);margin-left:4px;transition:color .12s;flex-shrink:0}
+.mc-card:hover .mc-card-chev{color:var(--subtext0)}
+.mc-card-body{display:none;padding:6px 14px 8px 52px;border-top:1px solid var(--surface0);background:rgba(0,0,0,.1)}
+.mc-card-actions{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.mc-card-btn{font:500 10px var(--font-mono);padding:4px 10px;border-radius:4px;border:1px solid var(--surface1);background:transparent;cursor:pointer;transition:all .12s;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.mc-card-btn:hover{background:var(--surface0);border-color:var(--overlay0)}
+.mc-card-btn svg{width:12px;height:12px}
+.mc-card-detail{font-size:10px;color:var(--subtext0);margin-bottom:4px}
+.mc-card-detail span{color:var(--overlay1);font-weight:600}
 
 /* ═══ EMPTY STATE ═══ */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -306,8 +338,15 @@ var SVG={
 /* ═══ STATE ═══ */
 var MEAS=[],CONTAINERS=[],CATEGORIES=[],CO=[],SCAN_TOTALS={},DERIVED={};
 var activeTypes={lf:true,sf:true,elev:true,vol:true};
-var openConts={},openCats={};
+var openConts={},openCats={},_openMeasCards={};
 var _confirmCb=null;
+
+/* ═══ SF COLOR PALETTE (Catppuccin Mocha) ═══ */
+var SF_PALETTE=[
+  [137,180,250],[166,227,161],[249,226,175],[250,179,135],
+  [235,160,172],[203,166,247],[245,194,231],[148,226,213],
+  [137,220,235],[116,199,236],[242,205,205],[245,224,220]
+];
 
 /* ═══ HELPERS ═══ */
 function X(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
@@ -415,6 +454,77 @@ document.addEventListener('click',function(){closeDD()});
 /* ─── Container/Category collapse ─── */
 function togCont(name){openConts[name]=openConts[name]===false?true:false;render();}
 function togCat(key){openCats[key]=openCats[key]===false?true:false;render();}
+function togMeasCard(eid){_openMeasCards[eid]=!_openMeasCards[eid];render();}
+
+/* ─── SF/LF measurement helpers ─── */
+function newSFMeasurement(cat){
+  var label=prompt('Label for new SF measurement (e.g. Tile, Wood, Stone):','');
+  if(!label||!label.trim())return;
+  var usedRGB={};
+  for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='SF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
+  var c=[137,180,250];
+  for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
+  callJSON('newSFMeasurement',{category:cat,label:label.trim(),color:c});
+  toast('SF tool activated — click faces','#89b4fa');
+}
+function newLFMeasurement(cat){
+  var label=prompt('Label for new LF measurement:','');
+  if(!label||!label.trim())return;
+  var usedRGB={};
+  for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='LF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
+  var c=[166,227,161];
+  for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
+  callJSON('newLFMeasurement',{category:cat,label:label.trim(),color:c});
+  toast('LF tool activated — click faces','#a6e3a1');
+}
+function editSFLabel(eid,cur){
+  var m=null;for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){m=MEAS[i];break;}}
+  var mtype=(m&&m.type)||'SF';
+  var label=prompt('Rename '+mtype+' measurement:',cur);
+  if(label===null||!label.trim())return;
+  var cb=mtype==='LF'?'updateLFLabel':'updateSFLabel';
+  callJSON(cb,{eid:eid,label:label.trim()});
+  if(m)m.label=label.trim();
+  render();toast('Label updated');
+}
+var _sfCPEid=null;
+function showSFColorPicker(eid,ev){
+  ev.stopPropagation();
+  closeSFCP();
+  _sfCPEid=eid;
+  var cp=document.getElementById('sfColorPicker');
+  if(!cp){
+    cp=document.createElement('div');cp.id='sfColorPicker';cp.className='sf-cpicker';
+    var h='';
+    for(var i=0;i<SF_PALETTE.length;i++){
+      var c=SF_PALETTE[i];
+      h+='<div class="sf-cpicker-dot" style="background:rgb('+c[0]+','+c[1]+','+c[2]+')" onclick="pickSFColor('+i+')"></div>';
+    }
+    cp.innerHTML=h;
+    document.body.appendChild(cp);
+  }
+  var r=ev.target.getBoundingClientRect();
+  cp.style.left=Math.min(r.left,window.innerWidth-160)+'px';
+  cp.style.top=(r.bottom+4)+'px';
+  cp.classList.add('open');
+}
+function pickSFColor(idx){
+  if(_sfCPEid===null)return;
+  var c=SF_PALETTE[idx];
+  var m=null;for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===_sfCPEid){m=MEAS[i];break;}}
+  var cb=(m&&m.type==='LF')?'updateLFColor':'updateSFColor';
+  callJSON(cb,{eid:_sfCPEid,color:c});
+  if(m)m.sfColor=c;
+  closeSFCP();render();toast('Color updated');
+}
+function closeSFCP(){
+  var cp=document.getElementById('sfColorPicker');
+  if(cp)cp.classList.remove('open');
+  _sfCPEid=null;
+}
+document.addEventListener('click',function(ev){
+  if(_sfCPEid!==null&&!ev.target.closest('.sf-cpicker')&&!ev.target.closest('.sf-swatch'))closeSFCP();
+});
 
 /* ─── Add Part form ─── */
 var _addPartCat='';
@@ -620,35 +730,74 @@ function render(){
           h+='<div class="cat-add-dd">';
           h+='<button class="cat-add-btn" onclick="event.stopPropagation();toggleCatDD(\''+ddId+'\',event)" title="Add measurement">'+SVG.plus+'</button>';
           h+='<div class="meas-dd-menu" id="'+ddId+'">';
-          h+='<button class="meas-dd-item" onclick="call(\'activateLFForCat\',\''+X2(cat)+'\');closeDD()"><span class="dd-dot" style="background:#a6e3a1"></span>LF</button>';
-          h+='<button class="meas-dd-item" onclick="call(\'activateSFForCat\',\''+X2(cat)+'\');closeDD()"><span class="dd-dot" style="background:#89b4fa"></span>SF</button>';
+          h+='<button class="meas-dd-item" onclick="call(\'activateLFForCat\',\''+X2(cat)+'\');closeDD()"><span class="dd-dot" style="background:#a6e3a1"></span>LF Poly</button>';
+          h+='<button class="meas-dd-item" onclick="closeDD();newLFMeasurement(\''+X2(cat)+'\')"><span class="dd-dot" style="background:#a6e3a1"></span>LF Face</button>';
+          h+='<button class="meas-dd-item" onclick="closeDD();newSFMeasurement(\''+X2(cat)+'\')"><span class="dd-dot" style="background:#89b4fa"></span>SF</button>';
           h+='<button class="meas-dd-item" onclick="call(\'activateBoxForCat\',\''+X2(cat)+'\');closeDD()"><span class="dd-dot" style="background:#cba6f7"></span>Box</button>';
           h+='<button class="meas-dd-item" onclick="closeDD();showAddPart(\''+X2(cat)+'\')"><span class="dd-dot" style="background:#cba6f7"></span>+ Part</button>';
           h+='</div></div>';
           h+='</div></div>';
 
-          /* Measurement rows + derived parts */
-          var totalRows=items.length+dItems.length;
-          h+='<div class="meas-list" style="max-height:'+(catOpen?totalRows*36+2:0)+'px">';
+          /* Measurement cards + derived parts */
+          h+='<div class="meas-list" style="max-height:'+(catOpen?'none':'0')+'px">';
 
           for(var mi2=0;mi2<items.length;mi2++){
             var m=items[mi2],t=TYPES[measTypeKey(m.type,m.unit)]||TYPES.lf;
             var isVis=m.visible;
             var valDisp=m.type==='ELEV'?m.value.toFixed(1)+"'":fmtVal(m.value,m.unit);
-            var mName=m.partName||m.category||'Measurement';
+            var isSFLF=(m.type==='SF'||m.type==='LF');
+            var mName=isSFLF?(m.label||m.partName||m.category||m.type):(m.partName||m.category||'Measurement');
+            var cardOpen=!!_openMeasCards[m.eid];
+            var sfCol=isSFLF&&m.sfColor?'rgb('+m.sfColor[0]+','+m.sfColor[1]+','+m.sfColor[2]+')':t.color;
+            var mUnit=m.type==='SF'?'SF':m.type==='LF'?'LF':t.unit;
+            var mBadge=m.type==='SF'?((m.faceCount||0)+' faces'):m.type==='LF'?((m.segments||0)+' segs'):'';
 
-            h+='<div class="meas-row">';
-            h+='<button class="m-eye'+(isVis?'':' off')+'" onclick="togMeasVis('+m.eid+','+(isVis?'false':'true')+')" style="color:'+(isVis?cm.color:'')+'">'+( isVis?SVG.eyeOn:SVG.eyeOff)+'</button>';
-            h+='<div class="m-type-dot" style="background:'+t.color+'20;color:'+t.color+'"><span style="font-size:9px;font-weight:700">'+t.label+'</span></div>';
-            h+='<div class="m-name-area"><span class="m-name">'+X(mName)+'</span>';
-            if(m.note)h+='<span class="m-note">&mdash; '+X(m.note)+'</span>';
+            h+='<div class="mc-card'+(cardOpen?' open':'')+'">';
+            /* ── Card header ── */
+            h+='<div class="mc-card-hdr" onclick="togMeasCard('+m.eid+')">';
+            h+='<button class="m-eye'+(isVis?'':' off')+'" onclick="event.stopPropagation();togMeasVis('+m.eid+','+(isVis?'false':'true')+')" style="color:'+(isVis?sfCol:'')+'">'+( isVis?SVG.eyeOn:SVG.eyeOff)+'</button>';
+            if(isSFLF&&m.sfColor){
+              h+='<div class="sf-swatch" style="background:'+sfCol+'" onclick="event.stopPropagation();showSFColorPicker('+m.eid+',event)" title="Change color"></div>';
+            } else {
+              h+='<div class="mc-card-dot" style="background:'+t.color+'20;color:'+t.color+'">'+t.label+'</div>';
+            }
+            if(isSFLF){
+              h+='<span class="mc-card-name sf-label" onclick="event.stopPropagation();editSFLabel('+m.eid+',\''+X2(mName)+'\')" title="Click to rename">'+X(mName)+'</span>';
+            } else {
+              h+='<span class="mc-card-name">'+X(mName)+'</span>';
+            }
+            if(m.note&&!isSFLF)h+='<span class="mc-card-badge">&mdash; '+X(m.note)+'</span>';
+            if(mBadge)h+='<span class="mc-card-badge">'+mBadge+'</span>';
+            h+='<span class="mc-card-val" style="color:'+sfCol+'">'+valDisp+'</span>';
+            h+='<span class="mc-card-unit" style="color:'+sfCol+'">'+mUnit+'</span>';
+            h+='<span class="mc-card-chev">'+(cardOpen?'&#9660;':'&#9654;')+'</span>';
             h+='</div>';
-            h+='<span class="m-value" style="color:'+t.color+'">'+valDisp+'</span>';
-            h+='<span class="m-unit" style="color:'+t.color+'">'+(m.type==='ELEV'?'':t.unit)+'</span>';
-            h+='<div class="m-actions">';
-            h+='<button class="s-btn" onclick="zoomMeas('+m.eid+')" title="Zoom to">'+SVG.zoom+'</button>';
-            h+='<button class="s-btn danger" onclick="delMeas('+m.eid+')" title="Delete">'+SVG.trash+'</button>';
-            h+='</div></div>';
+            /* ── Card body (expanded) ── */
+            if(cardOpen){
+              h+='<div class="mc-card-body" style="display:block">';
+              if(m.note)h+='<div class="mc-card-detail"><span>Note:</span> '+X(m.note)+'</div>';
+              if(m.type==='SF'){
+                h+='<div class="mc-card-detail"><span>Faces:</span> '+(m.faceCount||0)+'</div>';
+                h+='<div class="mc-card-detail"><span>Area:</span> '+valDisp+'</div>';
+              }
+              if(m.type==='LF')h+='<div class="mc-card-detail"><span>Segments:</span> '+(m.segments||1)+'</div>';
+              if(m.type==='BOX'){
+                h+='<div class="mc-card-detail"><span>Dimensions:</span> '+(m.width_in||0).toFixed(1)+'" x '+(m.depth_in||0).toFixed(1)+'" x '+(m.height_in||0).toFixed(1)+'"</div>';
+                if(m.total_sf)h+='<div class="mc-card-detail"><span>Surface:</span> '+m.total_sf.toFixed(1)+' SF</div>';
+              }
+              h+='<div class="mc-card-actions">';
+              if(isSFLF){
+                var addCb=m.type==='SF'?'addSFFaces':'addLFFaces';
+                var rmCb=m.type==='SF'?'removeSFFaces':'removeLFFaces';
+                h+='<button class="mc-card-btn" style="color:'+sfCol+';border-color:'+sfCol+'40" onclick="callJSON(\''+addCb+'\',{eid:'+m.eid+',category:\''+X2(m.category)+'\'})">+ Add</button>';
+                h+='<button class="mc-card-btn" style="color:var(--peach);border-color:rgba(250,179,135,.3)" onclick="call(\''+rmCb+'\',\''+m.eid+'\')">- Remove</button>';
+              }
+              h+='<button class="mc-card-btn" onclick="zoomMeas('+m.eid+')">'+SVG.zoom+' Zoom</button>';
+              h+='<button class="mc-card-btn" onclick="var n=prompt(\'Note:\',\''+X2(m.note||'')+'\');if(n!==null){callJSON(\'editMeasNote\',{eid:'+m.eid+',note:n});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid==='+m.eid+'){MEAS[i].note=n;break;}}render();}">'+SVG.edit+' Note</button>';
+              h+='<button class="mc-card-btn" style="color:var(--red);border-color:rgba(243,139,168,.3)" onclick="delMeas('+m.eid+')">'+SVG.trash+' Delete</button>';
+              h+='</div></div>';
+            }
+            h+='</div>';
           }
 
           /* Derived part rows */
