@@ -113,19 +113,24 @@ module TakeoffTool
     return unless m
     require 'json'
 
-    ca_by_pid = {}
-    cc_by_pid = {}
-    (@category_assignments || {}).each do |eid, cat|
-      e = find_entity(eid)
-      next unless e && e.valid? && e.respond_to?(:persistent_id)
-      pid = e.persistent_id.to_s
-      ca_by_pid[pid] = cat
+    # Build entityID → persistent_id map directly from model (doesn't depend on entity_registry)
+    eid_to_pid = {}
+    m.definitions.each do |defn|
+      next if defn.image?
+      defn.instances.each do |inst|
+        eid_to_pid[inst.entityID] = inst.persistent_id.to_s if inst.respond_to?(:persistent_id)
+      end
     end
+
+    ca_by_pid = {}
+    (@category_assignments || {}).each do |eid, cat|
+      pid = eid_to_pid[eid]
+      ca_by_pid[pid] = cat if pid && cat && !cat.empty?
+    end
+    cc_by_pid = {}
     (@cost_code_assignments || {}).each do |eid, cc|
-      e = find_entity(eid)
-      next unless e && e.valid? && e.respond_to?(:persistent_id)
-      pid = e.persistent_id.to_s
-      cc_by_pid[pid] = cc
+      pid = eid_to_pid[eid]
+      cc_by_pid[pid] = cc if pid && cc && !cc.empty?
     end
 
     m.set_attribute('FormAndField', 'saved_category_assignments', JSON.generate(ca_by_pid))
