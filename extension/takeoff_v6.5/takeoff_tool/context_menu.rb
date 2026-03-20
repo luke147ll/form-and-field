@@ -68,6 +68,9 @@ module TakeoffTool
       publish(EVENT_ASSIGNMENT_CHANGED, eid: e.entityID, key: 'category', value: category)
     end
 
+    # Save assignments to model attribute
+    schedule_assignments_save rescue nil
+
     # Refresh dashboard if open
     if Dashboard.visible?
       Dashboard.send_data(filtered_scan_results, @category_assignments, @cost_code_assignments)

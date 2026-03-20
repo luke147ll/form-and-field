@@ -32,6 +32,72 @@ module TakeoffTool
     asms
   end
 
+  # Remap assembly part entity_ids after a file reload (entity IDs change every session).
+  # Uses persistent_id first, then falls back to definition_name matching.
+  def self.remap_assembly_entity_ids
+    m = Sketchup.active_model
+    return unless m
+    asms = load_assemblies
+    return if asms.empty?
+
+    # Build lookup tables: persistent_id → current entityID, definition_name → [entityID, ...]
+    pid_map = {}    # persistent_id string → entityID
+    defn_map = {}   # definition_name → [entityID, ...]
+    m.definitions.each do |defn|
+      next if defn.image?
+      defn.instances.each do |inst|
+        if inst.respond_to?(:persistent_id)
+          pid_map[inst.persistent_id.to_s] = inst.entityID
+        end
+        (defn_map[defn.name] ||= []) << inst.entityID
+      end
+    end
+
+    changed = false
+    asms.each do |_id, asm|
+      (asm['parts'] || []).each do |part|
+        next if part['is_virtual']
+        old_eid = part['entity_id'].to_i
+
+        # Check if current entity_id is still valid
+        e = TakeoffTool.find_entity(old_eid) rescue nil
+        next if e && e.valid?
+
+        # Try persistent_id remap
+        pid = part['persistent_id']
+        if pid && pid_map[pid]
+          part['entity_id'] = pid_map[pid]
+          part.delete('stale')
+          changed = true
+          next
+        end
+
+        # Fallback: definition_name remap (pick first unassigned instance)
+        dname = part['definition_name']
+        if dname && defn_map[dname] && !defn_map[dname].empty?
+          # Find an instance not already claimed by another part in this assembly
+          claimed = {}
+          (asm['parts'] || []).each { |p| claimed[p['entity_id'].to_i] = true unless p.equal?(part) }
+          match = defn_map[dname].find { |eid| !claimed[eid] }
+          if match
+            part['entity_id'] = match
+            # Update persistent_id for future loads
+            inst = TakeoffTool.find_entity(match) rescue nil
+            part['persistent_id'] = inst.persistent_id.to_s if inst && inst.respond_to?(:persistent_id)
+            part.delete('stale')
+            changed = true
+            next
+          end
+        end
+      end
+    end
+
+    if changed
+      save_assemblies(asms)
+      puts "[FF Assembly] Remapped entity IDs for #{asms.length} assemblies"
+    end
+  end
+
   def self.save_assemblies(assemblies)
     m = Sketchup.active_model
     return unless m
@@ -106,9 +172,15 @@ module TakeoffTool
       r = eid_sr[eid]
       part_name = r ? (r[:display_name] || r[:definition_name] || 'Unknown') : "Entity #{eid}"
       cat = ca[eid] || (r ? (r[:parsed][:auto_category] rescue 'Uncategorized') : 'Uncategorized')
+      # Store persistent_id and definition_name for cross-session remapping
+      e = TakeoffTool.find_entity(eid)
+      pid = (e && e.respond_to?(:persistent_id)) ? e.persistent_id.to_s : nil
+      defn_name = (e && e.respond_to?(:definition)) ? e.definition.name : nil
       parts << {
         'part_number'      => "#{prefix}-#{seq.to_s.rjust(3, '0')}",
         'entity_id'        => eid,
+        'persistent_id'    => pid,
+        'definition_name'  => defn_name,
         'name'             => part_name,
         'category'         => cat,
         'quantity'          => 1,
@@ -180,9 +252,14 @@ module TakeoffTool
     cat = ca[eid] || (r ? (r[:parsed][:auto_category] rescue 'Uncategorized') : 'Uncategorized')
 
     pn = next_part_number(a)
+    e = TakeoffTool.find_entity(eid)
+    pid = (e && e.respond_to?(:persistent_id)) ? e.persistent_id.to_s : nil
+    defn_name = (e && e.respond_to?(:definition)) ? e.definition.name : nil
     part = {
       'part_number'      => pn,
       'entity_id'        => eid,
+      'persistent_id'    => pid,
+      'definition_name'  => defn_name,
       'name'             => part_name,
       'category'         => cat,
       'quantity'          => 1,
@@ -345,6 +422,17 @@ module TakeoffTool
         was_stale = part['stale']
         part['stale'] = !(e && e.valid?)
         changed = true if part['stale'] != was_stale
+        # Backfill persistent_id and definition_name for cross-session remapping
+        if e && e.valid?
+          if !part['persistent_id'] && e.respond_to?(:persistent_id)
+            part['persistent_id'] = e.persistent_id.to_s
+            changed = true
+          end
+          if !part['definition_name'] && e.respond_to?(:definition)
+            part['definition_name'] = e.definition.name
+            changed = true
+          end
+        end
       end
     end
     save_assemblies(assemblies) if changed

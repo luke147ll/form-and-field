@@ -274,6 +274,10 @@ module TakeoffTool
         puts "Takeoff: Scan data restored - dashboard ready#{updated > 0 ? " (#{updated} SF values refreshed)" : ''}"
         ColorController.strip_baked_ff_materials if defined?(ColorController)
         TakeoffTool.refresh_sf_material_colors rescue nil
+        # Remap assembly entity IDs (they change every session)
+        TakeoffTool.remap_assembly_entity_ids rescue nil
+        # Ensure assignment map is saved for next session (bootstraps persistent_id map)
+        TakeoffTool.save_assignments_to_model rescue nil
       end
       # Check for backup newer than last save (crash recovery)
       begin

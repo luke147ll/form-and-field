@@ -275,6 +275,16 @@ body{background:var(--base);color:var(--text);font:12px/1.4 var(--font-mono);
     <button class="modal-cancel" onclick="closeModal()">Cancel</button>
   </div>
 </div>
+<div class="modal-bg" id="inputModalBg">
+  <div class="modal-box" style="text-align:left">
+    <p id="inputModalTitle" style="margin-bottom:8px"></p>
+    <input id="inputModalVal" type="text" style="width:100%;box-sizing:border-box;background:var(--surface0);color:var(--text);border:1px solid var(--surface1);border-radius:4px;padding:6px 8px;font:11px var(--font-mono);outline:none;margin-bottom:12px" />
+    <div style="text-align:right">
+      <button class="modal-cancel" onclick="cancelInputModal()">Cancel</button>
+      <button class="modal-ok" style="background:var(--green);color:var(--crust);margin-left:4px" onclick="confirmInputModal()">OK</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ═══ TYPE CONFIG ═══ */
@@ -418,6 +428,31 @@ function showConfirm(msg,cb){
 }
 function closeModal(){document.getElementById('modalBg').classList.remove('open');_confirmCb=null;}
 
+var _inputCb=null;
+function showInputModal(title,cb,defVal){
+  _inputCb=cb;
+  document.getElementById('inputModalTitle').textContent=title;
+  var inp=document.getElementById('inputModalVal');inp.value=defVal||'';
+  document.getElementById('inputModalBg').classList.add('open');
+  setTimeout(function(){inp.focus();inp.select();},50);
+}
+function confirmInputModal(){
+  var v=document.getElementById('inputModalVal').value.trim();
+  document.getElementById('inputModalBg').classList.remove('open');
+  if(v&&_inputCb)_inputCb(v);
+  _inputCb=null;
+}
+function cancelInputModal(){
+  document.getElementById('inputModalBg').classList.remove('open');
+  _inputCb=null;
+}
+document.addEventListener('keydown',function(e){
+  if(document.getElementById('inputModalBg').classList.contains('open')){
+    if(e.key==='Enter'){e.preventDefault();confirmInputModal();}
+    if(e.key==='Escape'){e.preventDefault();cancelInputModal();}
+  }
+});
+
 /* ═══ ACTIONS ═══ */
 function toggleType(type,el){activeTypes[type]=!activeTypes[type];el.classList.toggle('active',activeTypes[type]);render();}
 function doRecalc(){callJSON('recalcMeasurements',{});toast('Recalculating...','#a6e3a1');}
@@ -458,34 +493,42 @@ function togMeasCard(eid){_openMeasCards[eid]=!_openMeasCards[eid];render();}
 
 /* ─── SF/LF measurement helpers ─── */
 function newSFMeasurement(cat){
-  var label=prompt('Label for new SF measurement (e.g. Tile, Wood, Stone):','');
-  if(!label||!label.trim())return;
-  var usedRGB={};
-  for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='SF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
-  var c=[137,180,250];
-  for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
-  callJSON('newSFMeasurement',{category:cat,label:label.trim(),color:c});
-  toast('SF tool activated — click faces','#89b4fa');
+  showInputModal('Label for new SF measurement',function(label){
+    var usedRGB={};
+    for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='SF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
+    var c=[137,180,250];
+    for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
+    callJSON('newSFMeasurement',{category:cat,label:label,color:c});
+    toast('SF tool activated — click faces','#89b4fa');
+  });
 }
 function newLFMeasurement(cat){
-  var label=prompt('Label for new LF measurement:','');
-  if(!label||!label.trim())return;
-  var usedRGB={};
-  for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='LF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
-  var c=[166,227,161];
-  for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
-  callJSON('newLFMeasurement',{category:cat,label:label.trim(),color:c});
-  toast('LF tool activated — click faces','#a6e3a1');
+  showInputModal('Label for new LF measurement',function(label){
+    var usedRGB={};
+    for(var i=0;i<MEAS.length;i++){if(MEAS[i].type==='LF'&&MEAS[i].category===cat&&MEAS[i].sfColor)usedRGB[MEAS[i].sfColor.join(',')]=true;}
+    var c=[166,227,161];
+    for(var i=0;i<SF_PALETTE.length;i++){var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];if(!usedRGB[k]){c=SF_PALETTE[i];break;}}
+    callJSON('newLFMeasurement',{category:cat,label:label,color:c});
+    toast('LF tool activated — click faces','#a6e3a1');
+  });
 }
 function editSFLabel(eid,cur){
   var m=null;for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){m=MEAS[i];break;}}
   var mtype=(m&&m.type)||'SF';
-  var label=prompt('Rename '+mtype+' measurement:',cur);
-  if(label===null||!label.trim())return;
-  var cb=mtype==='LF'?'updateLFLabel':'updateSFLabel';
-  callJSON(cb,{eid:eid,label:label.trim()});
-  if(m)m.label=label.trim();
-  render();toast('Label updated');
+  showInputModal('Rename '+mtype+' measurement',function(label){
+    var cb=mtype==='LF'?'updateLFLabel':'updateSFLabel';
+    callJSON(cb,{eid:eid,label:label});
+    if(m)m.label=label;
+    render();toast('Label updated');
+  },cur);
+}
+function editMeasNote(eid){
+  var m=null;for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){m=MEAS[i];break;}}
+  showInputModal('Note',function(n){
+    callJSON('editMeasNote',{eid:eid,note:n});
+    if(m)m.note=n;
+    render();
+  },(m&&m.note)||'');
 }
 var _sfCPEid=null;
 function showSFColorPicker(eid,ev){
@@ -793,7 +836,7 @@ function render(){
                 h+='<button class="mc-card-btn" style="color:var(--peach);border-color:rgba(250,179,135,.3)" onclick="call(\''+rmCb+'\',\''+m.eid+'\')">- Remove</button>';
               }
               h+='<button class="mc-card-btn" onclick="zoomMeas('+m.eid+')">'+SVG.zoom+' Zoom</button>';
-              h+='<button class="mc-card-btn" onclick="var n=prompt(\'Note:\',\''+X2(m.note||'')+'\');if(n!==null){callJSON(\'editMeasNote\',{eid:'+m.eid+',note:n});for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid==='+m.eid+'){MEAS[i].note=n;break;}}render();}">'+SVG.edit+' Note</button>';
+              h+='<button class="mc-card-btn" onclick="editMeasNote('+m.eid+')">'+SVG.edit+' Note</button>';
               h+='<button class="mc-card-btn" style="color:var(--red);border-color:rgba(243,139,168,.3)" onclick="delMeas('+m.eid+')">'+SVG.trash+' Delete</button>';
               h+='</div></div>';
             }

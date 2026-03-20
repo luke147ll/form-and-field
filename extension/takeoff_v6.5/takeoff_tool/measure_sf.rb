@@ -30,6 +30,7 @@ module TakeoffTool
     m = Sketchup.active_model
     return unless m
     green = Sketchup::Color.new(166, 227, 161)
+    # Reset legacy TO_SF_ and debug materials
     m.materials.each do |mat|
       if mat.name.start_with?('TO_SF_')
         mat.color = green
@@ -46,12 +47,30 @@ module TakeoffTool
       excluded.color = Sketchup::Color.new(243, 139, 168)
       excluded.alpha = 1.0
     end
+    # Restore per-group face materials from saved color_rgba attribute
     require 'json'
+    m.start_operation('Restore measurement colors', true)
     m.entities.grep(Sketchup::Group).each do |grp|
       next unless grp.valid?
-      next unless grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
-      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([166, 227, 161, 255]))
+      mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+      next unless mtype == 'SF' || mtype == 'LF'
+      rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
+      next unless rgba_json
+      rgba = (JSON.parse(rgba_json) rescue nil)
+      next unless rgba.is_a?(Array) && rgba.length >= 3
+      r, g, b = rgba[0].to_i, rgba[1].to_i, rgba[2].to_i
+      prefix = mtype == 'SF' ? 'FF_SF_' : 'FF_LF_'
+      alpha = mtype == 'SF' ? 0.6 : 0.7
+      mat_name = "#{prefix}#{grp.entityID}"
+      mat = m.materials[mat_name] || m.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(r, g, b)
+      mat.alpha = alpha
+      grp.entities.grep(Sketchup::Face).each do |face|
+        face.material = mat
+        face.back_material = mat
+      end
     end
+    m.commit_operation
   end
 
   # ═══════════════════════════════════════════════════════════

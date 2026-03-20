@@ -7,6 +7,8 @@ module TakeoffTool
       begin
         e.set_attribute('TakeoffAssignments', key, value)
         publish(EVENT_ASSIGNMENT_CHANGED, eid: eid, key: key, value: value)
+        # Debounced save of full assignment map to model attribute
+        schedule_assignments_save if key == 'category' || key == 'cost_code'
       rescue => err
         puts "Takeoff: save_assignment error eid=#{eid} key=#{key}: #{err.message}"
       end
@@ -15,26 +17,70 @@ module TakeoffTool
     end
   end
 
+  # Debounce: save assignments to model attribute after a brief pause (batches rapid changes)
+  def self.schedule_assignments_save
+    @_assignments_save_pending = true
+    @_assignments_save_timer ||= UI.start_timer(2.0, false) do
+      @_assignments_save_timer = nil
+      if @_assignments_save_pending
+        @_assignments_save_pending = false
+        save_assignments_to_model rescue nil
+      end
+    end
+  end
+
   # Load all saved assignments from entity attributes after scan
   def self.load_saved_assignments
     count_cat = 0
     count_cc = 0
+
+    # ── Primary: restore from model-level persistent_id map (fast, survives entity ID changes) ──
+    m = Sketchup.active_model
+    if m
+      require 'json'
+      pid_to_eid = build_persistent_id_map(m)
+
+      ca_json = m.get_attribute('FormAndField', 'saved_category_assignments')
+      if ca_json && !ca_json.empty?
+        saved_cats = (JSON.parse(ca_json) rescue {})
+        saved_cats.each do |pid, cat|
+          eid = pid_to_eid[pid.to_s]
+          if eid && cat && !cat.empty?
+            @category_assignments[eid] = cat
+            count_cat += 1
+          end
+        end
+      end
+
+      cc_json = m.get_attribute('FormAndField', 'saved_cost_code_assignments')
+      if cc_json && !cc_json.empty?
+        saved_ccs = (JSON.parse(cc_json) rescue {})
+        saved_ccs.each do |pid, cc|
+          eid = pid_to_eid[pid.to_s]
+          if eid && cc && !cc.empty?
+            @cost_code_assignments[eid] = cc
+            count_cc += 1
+          end
+        end
+      end
+    end
+
+    # ── Fallback: read from entity attributes (catches anything missed above) ──
     @entity_registry.each do |eid, e|
       next unless e && e.valid?
       begin
         cat = e.get_attribute('TakeoffAssignments', 'category')
-        if cat && !cat.empty?
+        if cat && !cat.empty? && !@category_assignments.key?(eid)
           @category_assignments[eid] = cat
           count_cat += 1
         end
         cc = e.get_attribute('TakeoffAssignments', 'cost_code')
-        if cc && !cc.empty?
+        if cc && !cc.empty? && !@cost_code_assignments.key?(eid)
           @cost_code_assignments[eid] = cc
           count_cc += 1
         end
         sz = e.get_attribute('TakeoffAssignments', 'size')
         if sz && !sz.empty?
-          # Update scan result with saved size
           @scan_results.each do |r|
             if r[:entity_id] == eid
               r[:parsed][:size_nominal] = sz
@@ -47,6 +93,43 @@ module TakeoffTool
       end
     end
     puts "Takeoff: Loaded #{count_cat} saved categories, #{count_cc} saved cost codes" if (count_cat + count_cc) > 0
+  end
+
+  # Build persistent_id → current entityID lookup (once per load)
+  def self.build_persistent_id_map(model)
+    pid_map = {}
+    model.definitions.each do |defn|
+      next if defn.image?
+      defn.instances.each do |inst|
+        pid_map[inst.persistent_id.to_s] = inst.entityID if inst.respond_to?(:persistent_id)
+      end
+    end
+    pid_map
+  end
+
+  # Save assignments as model-level JSON keyed by persistent_id (survives entity ID changes)
+  def self.save_assignments_to_model
+    m = Sketchup.active_model
+    return unless m
+    require 'json'
+
+    ca_by_pid = {}
+    cc_by_pid = {}
+    (@category_assignments || {}).each do |eid, cat|
+      e = find_entity(eid)
+      next unless e && e.valid? && e.respond_to?(:persistent_id)
+      pid = e.persistent_id.to_s
+      ca_by_pid[pid] = cat
+    end
+    (@cost_code_assignments || {}).each do |eid, cc|
+      e = find_entity(eid)
+      next unless e && e.valid? && e.respond_to?(:persistent_id)
+      pid = e.persistent_id.to_s
+      cc_by_pid[pid] = cc
+    end
+
+    m.set_attribute('FormAndField', 'saved_category_assignments', JSON.generate(ca_by_pid))
+    m.set_attribute('FormAndField', 'saved_cost_code_assignments', JSON.generate(cc_by_pid))
   end
 
   # Count active definitions excluding CAD overlay groups
@@ -118,6 +201,8 @@ module TakeoffTool
 
       count += 1
     end
+    # Also save assignment maps keyed by persistent_id
+    save_assignments_to_model
     puts "Takeoff: Saved #{count} scan results to model"
   rescue => e
     puts "Takeoff: save_scan_to_model error: #{e.message}"

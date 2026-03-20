@@ -139,6 +139,7 @@ module TakeoffTool
       invalidate_container_lookup
 
       save_master_categories
+      save_assignments_to_model rescue nil
       m.commit_operation
       broadcast_category_update
       puts "Takeoff: Renamed category '#{old_name}' -> '#{new_name}'"
@@ -189,6 +190,7 @@ module TakeoffTool
       @master_subcategories.delete(name)
       save_master_categories
       save_master_subcategories
+      save_assignments_to_model rescue nil
       m.commit_operation
       broadcast_category_update
       puts "Takeoff: Removed category '#{name}' — items moved to Uncategorized"
@@ -764,6 +766,7 @@ module TakeoffTool
       end
 
       save_master_subcategories
+      save_assignments_to_model rescue nil
       m.commit_operation
       broadcast_category_update
       puts "Takeoff: Moved subcategory '#{sub_name}' (#{moved_count} items) from '#{source_cat}' to '#{target_cat}'"

@@ -6997,6 +6997,8 @@ function renderMeasPanel(){
       h+='<div class="mcard-hdr">';
       if(isSFLF){
         h+='<span class="mcard-label" ondblclick="editSFLabel(this,'+mm.eid+')" title="Double-click to rename">'+X(mLabel)+'</span>';
+      } else if(mm.type==='ELEV'){
+        h+='<span class="mcard-label" ondblclick="editElevLabel('+mm.eid+',this)" title="Double-click to rename">'+X(mLabel)+'</span>';
       } else {
         h+='<span class="mcard-label">'+X(mLabel)+'</span>';
       }
@@ -7237,39 +7239,37 @@ function editSFLabel(el,eid){
   inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();inp.blur();}if(e.key==='Escape'){inp.value=cur;inp.blur();}};
 }
 function newSFMeasurement(cat){
-  var label=prompt('Label for new SF measurement:','');
-  if(!label||!label.trim())return;
-  label=label.trim();
-  // Pick a color that's not already used in this category
-  var usedRGB={};
-  for(var i=0;i<MEAS.length;i++){
-    if(MEAS[i].type==='SF'&&MEAS[i].category===cat&&MEAS[i].sfColor){
-      usedRGB[MEAS[i].sfColor.join(',')]=true;
+  showInputModal('Label for new SF measurement',function(label){
+    // Pick a color that's not already used in this category
+    var usedRGB={};
+    for(var i=0;i<MEAS.length;i++){
+      if(MEAS[i].type==='SF'&&MEAS[i].category===cat&&MEAS[i].sfColor){
+        usedRGB[MEAS[i].sfColor.join(',')]=true;
+      }
     }
-  }
-  var color=[166,227,161];
-  for(var i=0;i<SF_PALETTE.length;i++){
-    var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];
-    if(!usedRGB[k]){color=[SF_PALETTE[i][0],SF_PALETTE[i][1],SF_PALETTE[i][2]];break;}
-  }
-  callJSON('newSFMeasurement',{category:cat,label:label,color:color});
+    var color=[166,227,161];
+    for(var i=0;i<SF_PALETTE.length;i++){
+      var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];
+      if(!usedRGB[k]){color=[SF_PALETTE[i][0],SF_PALETTE[i][1],SF_PALETTE[i][2]];break;}
+    }
+    callJSON('newSFMeasurement',{category:cat,label:label,color:color});
+  });
 }
 function newLFMeasurement(cat){
-  var label=prompt('Label for new LF measurement:','');
-  if(!label||!label.trim())return;
-  label=label.trim();
-  var usedRGB={};
-  for(var i=0;i<MEAS.length;i++){
-    if(MEAS[i].type==='LF'&&MEAS[i].category===cat&&MEAS[i].sfColor){
-      usedRGB[MEAS[i].sfColor.join(',')]=true;
+  showInputModal('Label for new LF measurement',function(label){
+    var usedRGB={};
+    for(var i=0;i<MEAS.length;i++){
+      if(MEAS[i].type==='LF'&&MEAS[i].category===cat&&MEAS[i].sfColor){
+        usedRGB[MEAS[i].sfColor.join(',')]=true;
+      }
     }
-  }
-  var color=[166,227,161];
-  for(var i=0;i<SF_PALETTE.length;i++){
-    var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];
-    if(!usedRGB[k]){color=[SF_PALETTE[i][0],SF_PALETTE[i][1],SF_PALETTE[i][2]];break;}
-  }
-  callJSON('newLFMeasurement',{category:cat,label:label,color:color});
+    var color=[166,227,161];
+    for(var i=0;i<SF_PALETTE.length;i++){
+      var k=SF_PALETTE[i][0]+','+SF_PALETTE[i][1]+','+SF_PALETTE[i][2];
+      if(!usedRGB[k]){color=[SF_PALETTE[i][0],SF_PALETTE[i][1],SF_PALETTE[i][2]];break;}
+    }
+    callJSON('newLFMeasurement',{category:cat,label:label,color:color});
+  });
 }
 function delDerived(id){showConfirmModal('Delete this derived part?',function(){call('deleteDerivedPart',id);var wasHL=(_hlScanId===id);delete DERIVED[id];if(wasHL)clrScanHL();renderMeasPanel();showToast('Deleted','warning');});}
 function genCatMeas(cat,unit){closeMeasGDD();callJSON('generateCategoryMeasurement',{category:cat,unit:unit});showToast('Scanning '+cat+' for '+unit+'...','success');}
