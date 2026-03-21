@@ -968,6 +968,7 @@ module TakeoffTool
                         custom_colors.dig('subcategories', "#{cat}|#{(TakeoffTool.find_entity(r[:entity_id])&.get_attribute('TakeoffAssignments', 'subcategory') rescue nil) || r[:parsed][:auto_subcategory] || ''}") ||
                         custom_colors.dig('categories', cat),
           modelSource: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'model_source') rescue nil) || 'model_a',
+          committedFrom: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'committed_from') rescue nil),
           visible: (TakeoffTool.find_entity(r[:entity_id])&.visible? rescue true),
           cosmetic: (TakeoffTool.find_entity(r[:entity_id])&.get_attribute('FormAndField', 'cosmetic') rescue nil) == true,
           isPart: r[:entity_type] == 'Part',
@@ -1039,6 +1040,7 @@ module TakeoffTool
       send_parts_data
       send_multiverse_data
       send_cad_sheets
+      send_overlay_vis_state
       heartbeat_stop
 
       rescue => e
@@ -1212,6 +1214,25 @@ module TakeoffTool
           entry[:height_in] = grp.get_attribute('TakeoffMeasurement', 'height_in') || 0
           entry[:total_sf] = grp.get_attribute('TakeoffMeasurement', 'total_sf') || 0
           entry[:net_wall_sf] = grp.get_attribute('TakeoffMeasurement', 'net_wall_sf') || 0
+        elsif mtype == 'VOL'
+          # Derive volume from marker sub-groups; fall back to stored attr
+          markers = grp.entities.grep(Sketchup::Group).select { |g|
+            g.valid? && g.get_attribute('VOL_Marker', 'volume_cy')
+          }
+          if markers.any?
+            entry[:value] = markers.sum { |g| (g.get_attribute('VOL_Marker', 'volume_cy') || 0).to_f }.round(4)
+            entry[:objectCount] = markers.length
+          else
+            entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_cy') || 0
+            entry[:objectCount] = grp.get_attribute('TakeoffMeasurement', 'object_count') || 0
+          end
+          entry[:unit] = 'CY'
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color
+        elsif mtype == 'CARD'
+          entry[:value] = 0
+          entry[:unit] = ''
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
         elsif mtype == 'BENCHMARK'
           next  # Don't show benchmark point in measurement panel
         else
@@ -1482,20 +1503,68 @@ module TakeoffTool
       @dialog.execute_script("receiveCadSheets(JSON.parse(atob('#{b64}')))") rescue nil
     end
 
+    def self.send_overlay_vis_state
+      return unless @dialog && @dialog.visible?
+      m = Sketchup.active_model
+      return unless m
+
+      # Measurements: check if any non-GRID measurement group is visible
+      meas_vis = false
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        mtype = grp.get_attribute('TakeoffMeasurement', 'type')
+        next unless mtype && mtype != 'GRID' && mtype != 'CARD'
+        if grp.visible?
+          meas_vis = true
+          break
+        end
+      end
+
+      # CAD: check FF_CAD_* layers
+      cad_vis = false
+      m.layers.each do |l|
+        if l.name.start_with?('FF_CAD_') && l.visible?
+          cad_vis = true
+          break
+        end
+      end
+
+      # Gridlines: check FF_Gridlines layer and GRID-type tags
+      grid_vis = false
+      gl = m.layers['FF_Gridlines']
+      grid_vis = true if gl && gl.visible?
+      unless grid_vis
+        m.entities.grep(Sketchup::Group).each do |grp|
+          next unless grp.valid?
+          if grp.get_attribute('TakeoffGridline', 'label') || grp.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+            if grp.visible?
+              grid_vis = true
+              break
+            end
+          end
+        end
+      end
+
+      js = "{\"meas\":#{meas_vis},\"cad\":#{cad_vis},\"grid\":#{grid_vis}}"
+      @dialog.execute_script("receiveOverlayVis(#{js})") rescue nil
+    end
+
     def self.send_multiverse_data
       return unless @dialog && @dialog.visible?
       require 'json'
       mv = TakeoffTool.multiverse_data
+      commit_log = TakeoffTool.build_commit_log rescue []
       if mv && mv['models'] && mv['models'].length > 1
         summary = TakeoffTool.build_comparison_summary
         payload = {
           models: mv['models'],
           activeView: mv['active_view'] || 'a',
           comparison: summary,
-          needsScan: !!mv['needs_scan']
+          needsScan: !!mv['needs_scan'],
+          commitLog: commit_log
         }
       else
-        payload = { models: [], activeView: 'a', comparison: [], needsScan: false }
+        payload = { models: [], activeView: 'a', comparison: [], needsScan: false, commitLog: commit_log }
       end
       js = JSON.generate(payload)
       b64 = [js].pack('m0')

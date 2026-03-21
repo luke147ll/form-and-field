@@ -5,6 +5,12 @@ module TakeoffTool
   # Returns current multiverse view mode ('a', 'b', 'ab') or nil when inactive
   def self.active_mv_view
     return nil unless @multiverse_data && @multiverse_data['models'] && @multiverse_data['models'].length > 1
+    # Safety: if FF_Model_B layer doesn't exist, multiverse data is stale
+    m = Sketchup.active_model
+    if m && !m.layers['FF_Model_B']
+      @multiverse_data = nil
+      return nil
+    end
     @multiverse_data['active_view'] || 'a'
   end
 
@@ -68,6 +74,12 @@ module TakeoffTool
     count = 0
     @entity_registry.each do |eid, e|
       next unless e && e.valid?
+      # Skip CAD overlays, gridlines, and measurement groups — they manage their own visibility
+      if e.is_a?(Sketchup::Group)
+        next if e.get_attribute('FF_CadOverlay', 'sheet_name')
+        next if e.get_attribute('TakeoffGridline', 'label')
+        next if e.get_attribute('TakeoffMeasurement', 'type')
+      end
       existing = e.get_attribute('FormAndField', 'model_source')
       next if existing && !existing.empty?
       e.set_attribute('FormAndField', 'model_source', 'model_a')
@@ -590,11 +602,19 @@ module TakeoffTool
 
     model.start_operation('Remove Comparison Model', true)
     begin
-      # Find and erase Model B entities
+      # Build set of committed entity IDs — these must NOT be touched
+      committed_eids = {}
+      @entity_registry.each do |eid, e|
+        next unless e && e.valid?
+        committed_eids[eid] = true if e.get_attribute('FormAndField', 'committed_from')
+      end
+
+      # Find and erase Model B entities (skip anything committed to A)
       erase_count = 0
       to_erase = []
       @entity_registry.each do |eid, e|
         next unless e && e.valid?
+        next if committed_eids[eid]
         ms = e.get_attribute('FormAndField', 'model_source')
         next unless ms && ms != 'model_a'
         to_erase << e
@@ -606,14 +626,14 @@ module TakeoffTool
         erase_count += 1
       end
 
-      # Remove FF_Model_B layer
+      # Remove FF_Model_B layer — use false to MOVE entities to default, not delete
       default_layer = model.layers[0]
       layer_b = model.layers['FF_Model_B']
       if layer_b
         model.entities.each do |e|
           e.layer = default_layer if e.valid? && e.respond_to?(:layer) && e.layer == layer_b
         end
-        model.layers.remove(layer_b, true)
+        model.layers.remove(layer_b, false)
       end
 
       # Move Model A entities back to default layer, remove FF_Model_A layer
@@ -622,23 +642,29 @@ module TakeoffTool
         model.entities.each do |e|
           e.layer = default_layer if e.valid? && e.respond_to?(:layer) && e.layer == layer_a
         end
-        model.layers.remove(layer_a, true)
+        model.layers.remove(layer_a, false)
       end
 
-      # Clear model_source from remaining entities
+      # Clear model_source from remaining entities (but keep committed_from)
       @entity_registry.each do |eid, e|
         next unless e && e.valid?
+        # Skip CAD overlays, gridlines, and measurement groups
+        if e.is_a?(Sketchup::Group)
+          next if e.get_attribute('FF_CadOverlay', 'sheet_name')
+          next if e.get_attribute('TakeoffGridline', 'label')
+          next if e.get_attribute('TakeoffMeasurement', 'type')
+        end
         e.delete_attribute('FormAndField', 'model_source') rescue nil
       end
 
       model.commit_operation
       invalidate_entity_cache
 
-      # Clear multiverse data
+      # Clear multiverse data but preserve commit log
       @multiverse_data = nil
       model.delete_attribute('FormAndField', 'multiverse')
 
-      # Re-filter scan results to remove B entries
+      # Re-filter scan results to remove invalid (erased B) entries
       @scan_results.reject! do |r|
         e = @entity_registry[r[:entity_id]]
         !e || !e.valid?
@@ -647,13 +673,21 @@ module TakeoffTool
       # Clean entity registry
       @entity_registry.reject! { |eid, e| !e || !e.valid? }
 
+      # Clean category assignments — remove entries for erased entities
+      if @category_assignments
+        @category_assignments.reject! { |eid, _| !@entity_registry[eid] }
+      end
+
+      # Update stored def_count so staleness check doesn't trigger a rescan prompt
+      model.set_attribute('FormAndField', 'def_count', scannable_def_count(model))
+
       # Refresh dashboard
       if Dashboard.visible?
         Dashboard.send_data(@scan_results, @category_assignments, @cost_code_assignments)
       end
 
-      puts "Multiverse: Removed #{erase_count} Model B entities"
-      Dashboard.portal_complete("#{erase_count} entities removed")
+      puts "Multiverse: Removed #{erase_count} Model B entities (#{committed_eids.length} committed entities preserved)"
+      Dashboard.portal_complete("#{erase_count} entities removed, #{committed_eids.length} committed preserved")
 
     rescue => e
       model.abort_operation
@@ -668,6 +702,36 @@ module TakeoffTool
     return unless model && @multiverse_data
     require 'json'
     model.set_attribute('FormAndField', 'multiverse', JSON.generate(@multiverse_data))
+  end
+
+  # Build a commit log from entity attributes — groups committed entities by category and date
+  def self.build_commit_log
+    reg = @entity_registry || {}
+    ca = @category_assignments || {}
+    sr = @scan_results || []
+    log = []
+
+    # Build eid→scan_result map for display names
+    sr_map = {}
+    sr.each { |r| sr_map[r[:entity_id]] = r }
+
+    # Group by category + date
+    groups = {}
+    reg.each do |eid, e|
+      next unless e && e.valid?
+      cf = e.get_attribute('FormAndField', 'committed_from') rescue nil
+      next unless cf
+      date = (e.get_attribute('FormAndField', 'committed_date') rescue nil) || 'Unknown'
+      ctype = (e.get_attribute('FormAndField', 'commit_type') rescue nil) || 'committed'
+      cat = ca[eid] || (sr_map[eid] ? (sr_map[eid][:parsed][:auto_category] rescue nil) : nil) || 'Unknown'
+      name = sr_map[eid] ? sr_map[eid][:display_name] : (e.respond_to?(:definition) ? e.definition.name : e.typename)
+
+      key = "#{cat}|#{date}"
+      groups[key] ||= { category: cat, date: date, items: [] }
+      groups[key][:items] << { eid: eid, name: name, type: ctype }
+    end
+
+    groups.values.sort_by { |g| g[:date] }.reverse
   end
 
   # Load multiverse state from model attributes
@@ -824,6 +888,10 @@ module TakeoffTool
     defn = inst.respond_to?(:definition) ? inst.definition : nil
     return unless defn
 
+    # Quick check: does this definition actually have anything on FF_Model_B?
+    # Skip the expensive make_unique + recursion if nothing needs relayering.
+    return unless has_layer_recursive?(defn.entities, 'FF_Model_B')
+
     # If definition is shared with other instances, make unique to avoid
     # changing layers on non-committed Model B entities.
     if defn.respond_to?(:instances) && defn.instances.length > 1
@@ -835,6 +903,25 @@ module TakeoffTool
     puts "[FF Move] Fixed #{count} internal entities from FF_Model_B → #{target_layer.name}" if count > 0
   rescue => e
     puts "[FF Move] fix_internal_layers error: #{e.message}"
+  end
+
+  # Fast read-only check: does any entity in this tree use the given layer?
+  def self.has_layer_recursive?(entities, layer_name, visited = nil)
+    visited ||= {}
+    entities.each do |e|
+      next unless e.valid?
+      return true if e.respond_to?(:layer) && e.layer && e.layer.name == layer_name
+      if e.is_a?(Sketchup::ComponentInstance) && e.definition
+        d = e.definition
+        unless visited[d.object_id]
+          visited[d.object_id] = true
+          return true if has_layer_recursive?(d.entities, layer_name, visited)
+        end
+      elsif e.is_a?(Sketchup::Group) && e.respond_to?(:entities)
+        return true if has_layer_recursive?(e.entities, layer_name, visited)
+      end
+    end
+    false
   end
 
   # Walk a definition's entities, changing any on old_layer_name to target_layer.
@@ -1537,7 +1624,7 @@ module TakeoffTool
         stashed += 1
       end
       done_ops += 1
-      if done_ops % 5 == 0 || done_ops == total_ops
+      if done_ops % 10 == 0 || done_ops == total_ops
         pct = total_ops > 0 ? ((done_ops.to_f / total_ops) * 100).round(0) : 0
         Dashboard.update_portal_progress(pct, "#{done_ops}/#{total_ops}")
       end
@@ -1546,7 +1633,9 @@ module TakeoffTool
     puts "[FF Compare] Erased #{stashed} matching entities (#{erase_failed} used hide fallback)"
 
     model.set_attribute('FormAndField', 'vault', JSON.generate(vault_data))
-    @scan_results.reject! { |s| stashed_eids.include?(s[:entity_id]) }
+    stashed_set = {}
+    stashed_eids.each { |eid| stashed_set[eid] = true }
+    @scan_results.reject! { |s| stashed_set[s[:entity_id]] }
 
     # ── STEP 2: Move discrepancies out of Model B component into Model A ──
     disc_eids = []
@@ -1560,6 +1649,7 @@ module TakeoffTool
     mat_disc.alpha = 0.85
 
     new_disc_eids = []
+    eid_remap = {}  # old_eid → new_eid for batch scan_results update
 
     disc_eids.each do |eid|
       e = reg[eid]
@@ -1603,13 +1693,8 @@ module TakeoffTool
         save_assignment(new_eid, 'category', cat_a)
         save_assignment(new_eid, 'subcategory', 'Discrepancy')
 
-        # Update scan_results: swap entity_id
-        @scan_results.each do |s|
-          if s[:entity_id] == eid
-            s[:entity_id] = new_eid
-            s[:parsed][:auto_subcategory] = 'Discrepancy'
-          end
-        end
+        # Collect remap for batch scan_results update
+        eid_remap[eid] = new_eid
 
         new_disc_eids << new_eid
         flagged += 1
@@ -1627,9 +1712,18 @@ module TakeoffTool
         flagged += 1
       end
       done_ops += 1
-      if done_ops % 5 == 0 || done_ops == total_ops
+      if done_ops % 10 == 0 || done_ops == total_ops
         pct = total_ops > 0 ? ((done_ops.to_f / total_ops) * 100).round(0) : 0
         Dashboard.update_portal_progress(pct, "#{done_ops}/#{total_ops}")
+      end
+    end
+
+    # Batch update scan_results: single pass instead of O(N) per entity
+    @scan_results.each do |s|
+      new_eid = eid_remap[s[:entity_id]]
+      if new_eid
+        s[:entity_id] = new_eid
+        s[:parsed][:auto_subcategory] = 'Discrepancy'
       end
     end
 
@@ -1650,29 +1744,24 @@ module TakeoffTool
     @category_assignments = ca
     @compare_results = nil
 
-    # ── STEP 4: Switch to Model A view — hide remaining Model B ──
-    # Discrepancies were moved to FF_Model_A layer in step 2,
-    # so hiding Model B only hides uncompared B entities.
-    layer_b = model.layers['FF_Model_B']
-    layer_b.visible = false if layer_b
-
+    # ── STEP 4: Stay on current view ──
+    current_view = @multiverse_data ? (@multiverse_data['active_view'] || 'a') : 'a'
     layer_a_vis = model.layers['FF_Model_A']
     layer_a_vis.visible = true if layer_a_vis
-
-    # Keep DisplayColorByLayer OFF so red materials show
-    model.rendering_options['DisplayColorByLayer'] = false
-
-    # Update multiverse state to view 'a'
-    if @multiverse_data
-      @multiverse_data['active_view'] = 'a'
-      save_multiverse_data
+    layer_b = model.layers['FF_Model_B']
+    if current_view == 'ab'
+      layer_b.visible = true if layer_b
+      model.rendering_options['DisplayColorByLayer'] = true
+    else
+      layer_b.visible = false if layer_b
+      model.rendering_options['DisplayColorByLayer'] = false
     end
 
     # Force viewport redraw
     model.active_view.invalidate
 
-    # Persist updated scan data to entity attributes
-    save_scan_to_model rescue nil
+    # Persist only the committed entities (not full re-save)
+    save_committed_entities(eid_remap.values + stashed_eids) rescue nil
 
     puts "[FF Compare] Done: stashed #{stashed}, flagged #{flagged} in #{cat_a} > Discrepancy"
 
@@ -1706,11 +1795,17 @@ module TakeoffTool
 
     return { 'error' => 'No Model B entities in this category' } if b_eids.empty?
 
+    t_start = Time.now
     puts "[FF Commit] Committing #{b_eids.length} entities from '#{category}' to Model A"
+
+    # Build eid→scan_result index for O(1) lookup instead of O(N) per entity
+    sr_index = {}
+    @scan_results.each { |s| sr_index[s[:entity_id]] = s }
 
     model.start_operation('Commit to Main', true)
     committed = 0
     total = b_eids.length
+    eid_remap = {}  # old_eid → new_eid for batch scan_results update
 
     b_eids.each do |eid|
       e = reg[eid]
@@ -1734,10 +1829,8 @@ module TakeoffTool
         old_cat = ca.delete(eid)
         ca[new_eid] = old_cat || category
 
-        # Update scan_results: swap entity_id
-        @scan_results.each do |s|
-          s[:entity_id] = new_eid if s[:entity_id] == eid
-        end
+        # Collect remap for batch scan_results update
+        eid_remap[eid] = new_eid
 
         committed += 1
       else
@@ -1750,9 +1843,15 @@ module TakeoffTool
         committed += 1
       end
 
-      # Update portal progress
+      # Update portal progress every 10 entities
       pct = ((committed.to_f / total) * 100).round(0)
-      Dashboard.update_portal_progress(pct, "#{committed}/#{total}") if committed % 5 == 0 || committed == total
+      Dashboard.update_portal_progress(pct, "#{committed}/#{total}") if committed % 10 == 0 || committed == total
+    end
+
+    # Batch update scan_results: single pass instead of O(N) per entity
+    @scan_results.each do |s|
+      new_eid = eid_remap[s[:entity_id]]
+      s[:entity_id] = new_eid if new_eid
     end
 
     model.commit_operation
@@ -1767,23 +1866,25 @@ module TakeoffTool
 
     @category_assignments = ca
 
-    # Switch to Model A view
-    layer_b = model.layers['FF_Model_B']
-    layer_b.visible = false if layer_b
+    # Stay on current view so user can quickly commit more categories
+    current_view = @multiverse_data ? (@multiverse_data['active_view'] || 'a') : 'a'
     layer_a.visible = true if layer_a
-    model.rendering_options['DisplayColorByLayer'] = false
-
-    if @multiverse_data
-      @multiverse_data['active_view'] = 'a'
-      save_multiverse_data
+    layer_b = model.layers['FF_Model_B']
+    if current_view == 'ab'
+      layer_b.visible = true if layer_b
+      model.rendering_options['DisplayColorByLayer'] = true
+    else
+      layer_b.visible = false if layer_b
+      model.rendering_options['DisplayColorByLayer'] = false
     end
 
     model.active_view.invalidate
 
-    # Persist updated scan data to entity attributes
-    save_scan_to_model rescue nil
+    # Persist only the committed entities (not full re-save)
+    save_committed_entities(eid_remap.values) rescue nil
 
-    puts "[FF Commit] Done: committed #{committed} entities into '#{category}'"
+    elapsed = (Time.now - t_start).round(1)
+    puts "[FF Commit] Done: committed #{committed} entities into '#{category}' (#{elapsed}s)"
     { 'committed' => committed, 'category' => category }
   end
 
@@ -1857,20 +1958,28 @@ module TakeoffTool
     end
 
     model.set_attribute('FormAndField', 'vault', JSON.generate(vault_data))
-    @scan_results.reject! { |s| stashed_eids.include?(s[:entity_id]) }
+    stashed_set = {}
+    stashed_eids.each { |eid| stashed_set[eid] = true }
+    @scan_results.reject! { |s| stashed_set[s[:entity_id]] }
 
     # ── STEP 2: Commit discrepancies (only-B + modified) — move out of Model B component ──
     old_commit_eids = []
     modified.each { |m| old_commit_eids << m[:b_eid] }
     r[:onlyB].each { |eid| old_commit_eids << eid }
 
+    # Pre-build modified eid set for O(1) lookup instead of O(N) .any? per entity
+    modified_eids = {}
+    modified.each { |m| modified_eids[m[:b_eid]] = true }
+
     new_commit_eids = []
+    eid_remap = {}      # old_eid → new_eid
+    eid_subcats = {}    # old_eid → subcategory string
 
     old_commit_eids.each do |eid|
       e = reg[eid]
       next unless e && e.valid?
 
-      is_modified = modified.any? { |m| m[:b_eid] == eid }
+      is_modified = modified_eids[eid]
       subcat = is_modified ? 'Modified from B' : 'Committed from B'
 
       # Physically move entity from Model B component to active_entities
@@ -1894,13 +2003,9 @@ module TakeoffTool
         save_assignment(new_eid, 'category', cat_a)
         save_assignment(new_eid, 'subcategory', subcat)
 
-        # Update scan_results: swap entity_id
-        @scan_results.each do |s|
-          if s[:entity_id] == eid
-            s[:entity_id] = new_eid
-            s[:parsed][:auto_subcategory] = subcat
-          end
-        end
+        # Collect remap for batch scan_results update
+        eid_remap[eid] = new_eid
+        eid_subcats[eid] = subcat
 
         new_commit_eids << new_eid
         committed += 1
@@ -1919,9 +2024,19 @@ module TakeoffTool
         committed += 1
       end
       done_ops += 1
-      if done_ops % 5 == 0 || done_ops == total_ops
+      if done_ops % 10 == 0 || done_ops == total_ops
         pct = total_ops > 0 ? ((done_ops.to_f / total_ops) * 100).round(0) : 0
         Dashboard.update_portal_progress(pct, "#{done_ops}/#{total_ops}")
+      end
+    end
+
+    # Batch update scan_results: single pass instead of O(N) per entity
+    @scan_results.each do |s|
+      old_eid = s[:entity_id]
+      new_eid = eid_remap[old_eid]
+      if new_eid
+        s[:entity_id] = new_eid
+        s[:parsed][:auto_subcategory] = eid_subcats[old_eid]
       end
     end
 
@@ -1941,22 +2056,23 @@ module TakeoffTool
     @category_assignments = ca
     @compare_results = nil
 
-    # ── STEP 4: Switch to Model A view ──
-    layer_b = model.layers['FF_Model_B']
-    layer_b.visible = false if layer_b
+    # ── STEP 4: Stay on current view ──
+    current_view = @multiverse_data ? (@multiverse_data['active_view'] || 'a') : 'a'
     layer_a_vis = model.layers['FF_Model_A']
     layer_a_vis.visible = true if layer_a_vis
-    model.rendering_options['DisplayColorByLayer'] = false
-
-    if @multiverse_data
-      @multiverse_data['active_view'] = 'a'
-      save_multiverse_data
+    layer_b = model.layers['FF_Model_B']
+    if current_view == 'ab'
+      layer_b.visible = true if layer_b
+      model.rendering_options['DisplayColorByLayer'] = true
+    else
+      layer_b.visible = false if layer_b
+      model.rendering_options['DisplayColorByLayer'] = false
     end
 
     model.active_view.invalidate
 
-    # Persist updated scan data to entity attributes
-    save_scan_to_model rescue nil
+    # Persist only the committed entities (not full re-save)
+    save_committed_entities(eid_remap.values) rescue nil
 
     puts "[FF Commit] Done: stashed #{stashed}, committed #{committed} into '#{cat_a}'"
     { 'stashed' => stashed, 'committed' => committed, 'category' => cat_a }

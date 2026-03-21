@@ -259,7 +259,8 @@ module TakeoffTool
         model = Sketchup.active_model
         return unless model
         model.active_entities.grep(Sketchup::Group).each do |g|
-          next unless g.valid? && g.get_attribute('TakeoffGridline', 'label')
+          next unless g.valid?
+          next unless g.get_attribute('TakeoffGridline', 'label') || g.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
           g.visible = true
         end
         dialog.execute_script("refreshGridlines()") rescue nil
@@ -269,48 +270,11 @@ module TakeoffTool
         model = Sketchup.active_model
         return unless model
         model.active_entities.grep(Sketchup::Group).each do |g|
-          next unless g.valid? && g.get_attribute('TakeoffGridline', 'label')
+          next unless g.valid?
+          next unless g.get_attribute('TakeoffGridline', 'label') || g.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
           g.visible = false
         end
         dialog.execute_script("refreshGridlines()") rescue nil
-      end
-
-      # ═══ SCENES ═══
-
-      dialog.add_action_callback('requestScenes') do |_ctx|
-        begin
-          m = Sketchup.active_model
-          if m
-            require 'json'
-            pages = m.pages
-            scenes = pages.map { |p| { name: p.name, description: p.description.to_s } }
-            active_name = pages.selected_page ? pages.selected_page.name : ''
-            data = { scenes: scenes, active: active_name }
-            dialog.execute_script("receiveScenes(#{JSON.generate(data)})")
-          end
-        rescue => e
-          puts "Dashboard: requestScenes error: #{e.message}"
-        end
-      end
-
-      dialog.add_action_callback('activateScene') do |_ctx, json_str|
-        begin
-          require 'json'
-          data = JSON.parse(json_str.to_s)
-          name = data['name'].to_s
-          m = Sketchup.active_model
-          if m
-            page = m.pages[name]
-            if page
-              m.pages.selected_page = page
-              puts "Dashboard: Activated scene '#{name}'"
-            else
-              puts "Dashboard: Scene '#{name}' not found"
-            end
-          end
-        rescue => e
-          puts "Dashboard: activateScene error: #{e.message}"
-        end
       end
 
     end

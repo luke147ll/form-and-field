@@ -580,7 +580,11 @@ module TakeoffTool
       pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
       grp.name = pn ? "TO_LF: #{pn} — #{cat} — #{'%.1f' % total_ft} ft" : "TO_LF: #{cat} — #{'%.1f' % total_ft} ft"
 
-      rgba = LF_COLORS[cat] || LF_DEFAULT_COLOR
+      rgba = if @part_link_color.is_a?(Array) && @part_link_color.length >= 3
+               @part_link_color.length >= 4 ? @part_link_color : @part_link_color + [160]
+             else
+               LF_COLORS[cat] || LF_DEFAULT_COLOR
+             end
       mat_name = "TO_LF_#{cat.gsub(/\s+/,'_')}"
       mat = model.materials[mat_name]
       unless mat
@@ -841,6 +845,10 @@ module TakeoffTool
     Sketchup.active_model.select_tool(MeasureLFTool.new(cat))
   end
 
+  def self.activate_lf_tool_new(category, label, color_rgb)
+    Sketchup.active_model.select_tool(MeasureLFTool.new(category, label: label, color: color_rgb))
+  end
+
   # ═══════════════════════════════════════════════════════════
   #  MeasureLFFaceTool — click model faces to measure perimeter.
   #  Flood-fills coplanar neighbors, extracts boundary, creates
@@ -865,10 +873,9 @@ module TakeoffTool
       @label = opts[:label] || category
       @color_rgb = opts[:color] || [166, 227, 161]
       @part_link_id = opts[:part_link_id] # derived part ID to link on deactivate
-      @hover_face = nil
+      @hover_edge = nil
       @hover_xform = nil
       @hover_cluster = nil
-      @hover_boundary = nil
       @hover_normal = nil
       @hover_segments = nil
       @hover_lf = 0.0
@@ -885,6 +892,7 @@ module TakeoffTool
     end
 
     def deactivate(view)
+      TakeoffTool.instance_variable_set(:@active_lf_face_tool, nil)
       # Link measurement group to derived part if this was a tool measurement
       if @part_link_id && @measurement_group && @measurement_group.valid?
         begin
@@ -919,46 +927,55 @@ module TakeoffTool
       ph = view.pick_helper
       ph.do_pick(x, y)
 
-      face = nil
+      edge = nil
       xform = nil
 
+      # Pick the nearest edge directly
       ph.count.times do |i|
         leaf = ph.leaf_at(i)
-        if leaf.is_a?(Sketchup::Face)
+        if leaf.is_a?(Sketchup::Edge)
           path = ph.path_at(i)
           next if path && path.any? { |e| e == @measurement_group }
-          face = leaf
+          edge = leaf
           xform = ph.transformation_at(i)
           break
         end
       end
 
-      if !face
-        path = ph.path_at(0)
-        if path && path.last.is_a?(Sketchup::Face)
-          unless path.any? { |e| e == @measurement_group }
-            face = path.last
-            xform = ph.transformation_at(0)
-          end
-        end
-      end
-
-      if face && !face.equal?(@hover_face)
-        @hover_face = face
+      if edge && !edge.equal?(@hover_edge)
+        @hover_edge = edge
         @hover_xform = xform || Geom::Transformation.new
-        @hover_cluster = flood_fill_coplanar(face, @hover_xform)
-        @hover_boundary = extract_outer_boundary(@hover_cluster, @hover_xform)
-        _centroid, @hover_normal = compute_best_fit_plane(@hover_cluster, @hover_xform)
-        @hover_segments = filter_segments(@hover_boundary)
-        @hover_lf = compute_segments_lf(@hover_segments)
+        pt_a = @hover_xform * edge.start.position
+        pt_b = @hover_xform * edge.end.position
+        seg = [pt_a, pt_b]
+
+        # Get normal from an adjacent face for offset
+        adj_face = edge.faces.first
+        if adj_face
+          @hover_normal = TakeoffTool.get_world_normal(adj_face, @hover_xform)
+          @hover_cluster = [adj_face]
+        else
+          @hover_normal = Geom::Vector3d.new(0, 0, 1)
+          @hover_cluster = []
+        end
+
+        # Apply direction filter
+        filtered = filter_edge_segment(seg)
+        if filtered
+          @hover_segments = [seg]
+          @hover_lf = pt_a.distance(pt_b) / 12.0
+        else
+          @hover_segments = []
+          @hover_lf = 0.0
+        end
+
         mode = DIR_LABELS[@dir_filter] || 'ALL'
-        view.tooltip = "#{mode}: #{'%.1f' % @hover_lf} LF (#{@hover_segments.length} edges)"
+        view.tooltip = "#{mode}: #{'%.1f' % @hover_lf} LF"
         view.invalidate
-      elsif !face && @hover_face
-        @hover_face = nil
+      elsif !edge && @hover_edge
+        @hover_edge = nil
         @hover_xform = nil
         @hover_cluster = nil
-        @hover_boundary = nil
         @hover_normal = nil
         @hover_segments = nil
         @hover_lf = 0.0
@@ -967,24 +984,21 @@ module TakeoffTool
     end
 
     def onLButtonDown(flags, x, y, view)
-      return unless @hover_face && @hover_cluster && @hover_boundary
-      return unless @hover_segments && @hover_segments.length > 0
+      return unless @hover_edge && @hover_segments && @hover_segments.length > 0
 
       model = Sketchup.active_model
       model.start_operation('Add LF Segment', false)
 
       begin
-        # Compute best-fit plane for offset
-        centroid, normal = compute_best_fit_plane(@hover_cluster, @hover_xform)
-        return model.abort_operation unless centroid && normal
+        normal = @hover_normal || Geom::Vector3d.new(0, 0, 1)
+        pt_a, pt_b = @hover_segments.first
+        centroid = Geom::Point3d.linear_combination(0.5, pt_a, 0.5, pt_b)
 
         find_or_create_group unless @measurement_group && @measurement_group.valid?
         mat = get_lf_material(model)
 
-        # Create ribbon for each filtered segment
-        @hover_segments.each do |pt_a, pt_b|
-          off = project_and_offset([pt_a, pt_b], centroid, normal, view)
-          next if off.length < 2
+        off = project_and_offset([pt_a, pt_b], centroid, normal, view)
+        if off.length >= 2
           add_ribbon_segment(@measurement_group.entities, off[0], off[1], mat, normal)
         end
 
@@ -997,9 +1011,8 @@ module TakeoffTool
         puts "MeasureLFFace error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
       end
 
-      @hover_face = nil
+      @hover_edge = nil
       @hover_cluster = nil
-      @hover_boundary = nil
       @hover_normal = nil
       @hover_segments = nil
       @hover_lf = 0.0
@@ -1043,32 +1056,13 @@ module TakeoffTool
       begin
         r, g, b = @color_rgb
 
-        # Draw dimmed full boundary when filtering so the user sees the whole outline
-        if @dir_filter != :all && @hover_boundary && @hover_boundary.length >= 2
-          view.line_width = 1
-          view.drawing_color = Sketchup::Color.new(r, g, b, 40)
-          loop_pts = @hover_boundary + [@hover_boundary.first]
-          view.draw(GL_LINE_STRIP, loop_pts)
-        end
-
-        # Draw active filtered segments in bright color
+        # Draw hovered edge in bright color
         if @hover_segments && @hover_segments.length > 0
           view.line_width = 4
           view.drawing_color = Sketchup::Color.new(r, g, b, 220)
-          pts = @hover_segments.flat_map { |a, b_pt| [a, b_pt] }
-          view.draw(GL_LINES, pts)
-
-          # Endpoints
-          uniq_pts = []
-          seen = {}
-          pts.each do |p|
-            k = "#{p.x.round(2)}_#{p.y.round(2)}_#{p.z.round(2)}"
-            unless seen[k]
-              uniq_pts << p
-              seen[k] = true
-            end
-          end
-          view.draw_points(uniq_pts, 8, 2, Sketchup::Color.new(r, g, b))
+          pt_a, pt_b = @hover_segments.first
+          view.draw(GL_LINES, [pt_a, pt_b])
+          view.draw_points([pt_a, pt_b], 8, 2, Sketchup::Color.new(r, g, b))
         end
 
         # Draw mode badge at screen top-left
@@ -1082,8 +1076,8 @@ module TakeoffTool
 
     def getExtents
       bb = Geom::BoundingBox.new
-      if @hover_boundary
-        @hover_boundary.each { |pt| bb.add(pt) }
+      if @hover_segments && @hover_segments.length > 0
+        @hover_segments.first.each { |pt| bb.add(pt) }
       end
       bb
     end
@@ -1302,10 +1296,34 @@ module TakeoffTool
       segments.sum { |a, b| a.distance(b) } / 12.0
     end
 
+    # Check if a single edge [pt_a, pt_b] passes the current direction filter
+    def filter_edge_segment(seg)
+      return true if @dir_filter == :all
+      pt_a, pt_b = seg
+      len = pt_a.distance(pt_b)
+      return false if len < 0.001
+      dz = (pt_b.z - pt_a.z).abs
+      z_ratio = dz / len
+
+      case @dir_filter
+      when :bottom, :top
+        z_ratio < DIR_HORIZ_Z_MAX
+      when :vert_left, :vert_right
+        z_ratio > DIR_VERT_Z_MIN
+      else
+        true
+      end
+    end
+
     def refresh_hover(view)
-      if @hover_boundary && @hover_boundary.length >= 2
-        @hover_segments = filter_segments(@hover_boundary)
-        @hover_lf = compute_segments_lf(@hover_segments)
+      if @hover_edge && @hover_segments && @hover_segments.length > 0
+        seg = @hover_segments.first
+        if filter_edge_segment(seg)
+          @hover_lf = seg[0].distance(seg[1]) / 12.0
+        else
+          @hover_segments = []
+          @hover_lf = 0.0
+        end
       end
       update_status
       view.invalidate
@@ -1442,16 +1460,25 @@ module TakeoffTool
 
   # ─── LF Face Tool entry points ───
 
+  @active_lf_face_tool = nil
+
+  def self.active_lf_face_tool
+    @active_lf_face_tool
+  end
+
   def self.activate_lf_face_tool_for_category(cat)
-    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(cat))
+    @active_lf_face_tool = MeasureLFFaceTool.new(cat)
+    Sketchup.active_model.select_tool(@active_lf_face_tool)
   end
 
   def self.activate_lf_face_tool_new(category, label, color_rgb)
-    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(category, label: label, color: color_rgb))
+    @active_lf_face_tool = MeasureLFFaceTool.new(category, label: label, color: color_rgb)
+    Sketchup.active_model.select_tool(@active_lf_face_tool)
   end
 
   def self.activate_lf_face_tool_for_group(group_eid, category)
-    Sketchup.active_model.select_tool(MeasureLFFaceTool.new(category, group_eid: group_eid.to_i))
+    @active_lf_face_tool = MeasureLFFaceTool.new(category, group_eid: group_eid.to_i)
+    Sketchup.active_model.select_tool(@active_lf_face_tool)
   end
 
   def self.update_lf_label(group_eid, new_label)

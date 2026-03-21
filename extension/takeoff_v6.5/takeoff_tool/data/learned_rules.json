@@ -1256,5 +1256,18 @@
     "times_applied": 1,
     "created": "2026-03-10",
     "last_applied": "2026-03-10"
+  },
+  {
+    "keyword": "HSS-Hollow Structural Section",
+    "material": "Steel ASTM A500, Grade B, Rectangular and Square",
+    "ifc_type": "IfcColumn",
+    "size_pattern": "",
+    "from_category": "Structural Steel",
+    "to_category": "Steel Tubes (HSS)",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 1,
+    "created": "2026-03-20",
+    "last_applied": "2026-03-20"
   }
 ]

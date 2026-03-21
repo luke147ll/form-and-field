@@ -138,7 +138,18 @@ module TakeoffTool
       defn = inst.respond_to?(:definition) ? inst.definition : nil
       return :keep unless defn
 
+      # Never flatten CAD overlays, gridlines, or measurement groups
+      if inst.is_a?(Sketchup::Group)
+        return :keep if inst.get_attribute('FF_CadOverlay', 'sheet_name')
+        return :keep if inst.get_attribute('TakeoffGridline', 'label')
+        return :keep if inst.get_attribute('TakeoffMeasurement', 'type')
+      end
+
       tag = inst.layer ? inst.layer.name : 'Untagged'
+
+      # Never flatten entities on FF overlay layers
+      return :keep if tag.start_with?('FF_CAD_') || tag == 'FF_Gridlines' || tag == 'FF_Elevation_Tags' || tag == 'TO_Measurements'
+
       ents = defn.entities
 
       faces = ents.grep(Sketchup::Face)

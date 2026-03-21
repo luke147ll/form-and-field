@@ -213,6 +213,40 @@ module TakeoffTool
     puts "Takeoff: save_scan_to_model error: #{e.message}"
   end
 
+  # Targeted save: only persist scan data for specific entity IDs (after commit/move).
+  # Much faster than save_scan_to_model which writes ALL entities.
+  def self.save_committed_entities(eids)
+    m = Sketchup.active_model
+    return unless m
+    eid_set = {}
+    eids.each { |eid| eid_set[eid] = true }
+    count = 0
+    @scan_results.each do |r|
+      next unless eid_set[r[:entity_id]]
+      e = @entity_registry[r[:entity_id]]
+      next unless e && e.valid?
+      d = 'TakeoffScanData'
+      e.set_attribute(d, 'display_name', r[:display_name].to_s)
+      e.set_attribute(d, 'tag', r[:tag].to_s)
+      e.set_attribute(d, 'auto_category', r[:parsed][:auto_category].to_s)
+      e.set_attribute(d, 'auto_subcategory', (r[:parsed][:auto_subcategory] || '').to_s)
+      e.set_attribute(d, 'measurement_type', (r[:parsed][:measurement_type] || '').to_s)
+      e.set_attribute(d, 'category_source', (r[:parsed][:category_source] || '').to_s)
+      e.set_attribute(d, 'is_solid', r[:is_solid] ? true : false)
+      e.set_attribute(d, 'volume_ft3', r[:volume_ft3].to_f)
+      e.set_attribute(d, 'area_sf', r[:area_sf] ? r[:area_sf].to_f : 0.0)
+      e.set_attribute(d, 'linear_ft', r[:linear_ft].to_f)
+      e.set_attribute(d, 'instance_count', r[:instance_count].to_i)
+      e.set_attribute(d, 'material', (r[:material] || '').to_s)
+      e.set_attribute(d, 'ifc_type', (r[:ifc_type] || '').to_s)
+      count += 1
+    end
+    save_assignments_to_model
+    puts "Takeoff: Saved #{count} committed entities to model"
+  rescue => e
+    puts "Takeoff: save_committed_entities error: #{e.message}"
+  end
+
   # Reconstruct scan results from saved entity attributes (no expensive recomputation)
   def self.load_scan_from_model
     m = Sketchup.active_model

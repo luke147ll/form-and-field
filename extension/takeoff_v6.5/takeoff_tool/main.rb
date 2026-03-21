@@ -37,6 +37,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'elevation_tool.rb')
   load File.join(PLUGIN_DIR, 'note_tool.rb')
   load File.join(PLUGIN_DIR, 'measure_box.rb')
+  load File.join(PLUGIN_DIR, 'measure_vol.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
   load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')
@@ -293,6 +294,12 @@ module TakeoffTool
       end
 
       mv_active = active_mv_view
+      # Safety: if multiverse thinks it's active but Model B layer doesn't exist, clear stale state
+      if mv_active && !m.layers['FF_Model_B']
+        puts "[FF] Multiverse state was active but FF_Model_B layer is gone — clearing stale state"
+        @multiverse_data = nil
+        mv_active = nil
+      end
       if mv_active
         # Multiverse active: only rescan Model A, preserve Model B results
         model_b_results = (@scan_results || []).select do |r|

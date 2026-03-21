@@ -10,6 +10,10 @@ module TakeoffTool
         TakeoffTool.activate_lf_tool_for_category(cat_str.to_s)
       end
 
+      dialog.add_action_callback('activateLFFace') do |_ctx|
+        TakeoffTool.activate_lf_face_tool_for_category('Custom')
+      end
+
       dialog.add_action_callback('activateSF') do |_ctx|
         TakeoffTool.activate_sf_tool
       end
@@ -28,6 +32,14 @@ module TakeoffTool
 
       dialog.add_action_callback('activateBoxForCat') do |_ctx, cat_str|
         TakeoffTool.activate_box_tool_for_category(cat_str.to_s)
+      end
+
+      dialog.add_action_callback('activateVol') do |_ctx|
+        TakeoffTool.activate_vol_tool
+      end
+
+      dialog.add_action_callback('activateVolForCat') do |_ctx, cat_str|
+        TakeoffTool.activate_vol_tool_for_category(cat_str.to_s)
       end
 
       dialog.add_action_callback('clearNormal') do |_ctx, cat_str|
@@ -91,6 +103,54 @@ module TakeoffTool
           Scanner.clear_debug
         rescue => e
           puts "[FF Debug] clearDebug error: #{e.message}"
+        end
+      end
+
+      # ─── Create empty measurement card (container for parts) ───
+
+      dialog.add_action_callback('createEmptyCard') do |_ctx, label_str|
+        begin
+          label = label_str.to_s.strip
+          label = 'Untitled' if label.empty?
+          m = Sketchup.active_model
+          next unless m
+          m.start_operation('Create Measurement Card', true)
+          tag = m.layers['TO_Measurements'] || m.layers.add('TO_Measurements')
+          grp = m.active_entities.add_group
+          grp.entities.add_cpoint(ORIGIN)  # placeholder so SketchUp doesn't auto-delete empty group
+          grp.layer = tag
+          grp.name = "TO_CARD: #{label}"
+          grp.set_attribute('TakeoffMeasurement', 'type', 'CARD')
+          grp.set_attribute('TakeoffMeasurement', 'label', label)
+          grp.set_attribute('TakeoffMeasurement', 'category', 'Custom')
+          grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+          grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+          m.commit_operation
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "createEmptyCard error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateCardLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          label = data['label'].to_s.strip
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'CARD'
+            m = Sketchup.active_model
+            m.start_operation('Rename Card', true)
+            grp.set_attribute('TakeoffMeasurement', 'label', label)
+            grp.name = "TO_CARD: #{label}"
+            m.commit_operation
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+          end
+        rescue => e
+          puts "updateCardLabel error: #{e.message}"
         end
       end
 
@@ -232,6 +292,8 @@ module TakeoffTool
             m.select_tool(MeasureSFTool.new(cat, label: label, color: color, part_link_id: id))
           elsif src_type == 'tool_lf'
             m.select_tool(MeasureLFTool.new(cat, label: label, color: color, part_link_id: id))
+          elsif src_type == 'tool_vol'
+            m.select_tool(MeasureVolTool.new(cat, label: label, color: color, part_link_id: id))
           end
         rescue => e
           puts "Dashboard createPartAndMeasure error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
@@ -247,7 +309,7 @@ module TakeoffTool
           part = parts[id_str.to_s]
           if part
             src_eid = (part['sourceEid'] || 0).to_i
-            if part['sourceType'] == 'tool_sf' || part['sourceType'] == 'tool_lf'
+            if part['sourceType'] == 'tool_sf' || part['sourceType'] == 'tool_lf' || part['sourceType'] == 'tool_vol'
               # Tool part: delete the child measurement group
               if src_eid > 0
                 grp = TakeoffTool.find_entity(src_eid)
@@ -275,6 +337,33 @@ module TakeoffTool
           Dashboard.send_measurement_data
         rescue => e
           puts "Dashboard deleteDerivedPart error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('deleteDerivedPartPermanent') do |_ctx, id_str|
+        begin
+          require 'json'
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          part = parts[id_str.to_s]
+          if part
+            src_eid = (part['sourceEid'] || 0).to_i
+            if src_eid > 0
+              grp = TakeoffTool.find_entity(src_eid)
+              if grp && grp.valid?
+                m.start_operation('Delete Linked Card', true)
+                grp.erase!
+                m.commit_operation
+              end
+            end
+          end
+          parts.delete(id_str.to_s)
+          m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "Dashboard deleteDerivedPartPermanent error: #{e.message}"
         end
       end
 
@@ -546,6 +635,19 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('newLFPolyMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']
+          TakeoffTool.activate_lf_tool_new(cat, label, color)
+        rescue => e
+          puts "newLFPolyMeasurement error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       dialog.add_action_callback('addLFFaces') do |_ctx, json_str|
         begin
           require 'json'
@@ -587,6 +689,84 @@ module TakeoffTool
           Dashboard.send_measurement_data
         rescue => e
           puts "updateLFColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      # ─── Volume Tool callbacks ───
+
+      dialog.add_action_callback('newVolMeasurement') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'].to_s
+          color = data['color']
+          TakeoffTool.activate_vol_tool_new(cat, label, color)
+        rescue => e
+          puts "newVolMeasurement error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('addVolObjects') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_vol_tool_for_group(eid, cat)
+        rescue => e
+          puts "addVolObjects error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeVolObjects') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_vol_tool(eid_str.to_i)
+        rescue => e
+          puts "removeVolObjects error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateVolLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_vol_label(data['eid'].to_i, data['label'].to_s)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateVolLabel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateVolColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_vol_color(data['eid'].to_i, data['color'])
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateVolColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      # Forward arrow keys from dashboard to active measurement tool
+      dialog.add_action_callback('toolArrowKey') do |_ctx, key_str|
+        begin
+          key = key_str.to_i
+          tool = Sketchup.active_model.tools.active_tool_id rescue nil
+          # Send the key event to the active tool if it's a LF Face tool
+          active = Sketchup.active_model.tools
+          # Use send_action to simulate key — but SketchUp doesn't support this directly.
+          # Instead, access the tool instance and call its method.
+          t = TakeoffTool.active_lf_face_tool
+          if t
+            view = Sketchup.active_model.active_view
+            t.onKeyDown(key, 1, 0, view)
+          end
+        rescue => e
+          puts "toolArrowKey error: #{e.message}"
         end
       end
 

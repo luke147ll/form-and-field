@@ -53,21 +53,32 @@ module TakeoffTool
     m.entities.grep(Sketchup::Group).each do |grp|
       next unless grp.valid?
       mtype = grp.get_attribute('TakeoffMeasurement', 'type')
-      next unless mtype == 'SF' || mtype == 'LF'
+      next unless mtype == 'SF' || mtype == 'LF' || mtype == 'VOL'
       rgba_json = grp.get_attribute('TakeoffMeasurement', 'color_rgba')
       next unless rgba_json
       rgba = (JSON.parse(rgba_json) rescue nil)
       next unless rgba.is_a?(Array) && rgba.length >= 3
       r, g, b = rgba[0].to_i, rgba[1].to_i, rgba[2].to_i
-      prefix = mtype == 'SF' ? 'FF_SF_' : 'FF_LF_'
-      alpha = mtype == 'SF' ? 0.6 : 0.7
+      prefix = mtype == 'SF' ? 'FF_SF_' : mtype == 'VOL' ? 'FF_VOL_' : 'FF_LF_'
+      alpha = mtype == 'SF' ? 0.6 : mtype == 'VOL' ? 0.4 : 0.7
       mat_name = "#{prefix}#{grp.entityID}"
       mat = m.materials[mat_name] || m.materials.add(mat_name)
       mat.color = Sketchup::Color.new(r, g, b)
       mat.alpha = alpha
-      grp.entities.grep(Sketchup::Face).each do |face|
-        face.material = mat
-        face.back_material = mat
+      if mtype == 'VOL'
+        # VOL markers are sub-groups with faces inside
+        grp.entities.grep(Sketchup::Group).each do |marker|
+          next unless marker.valid?
+          marker.entities.grep(Sketchup::Face).each do |face|
+            face.material = mat
+            face.back_material = mat
+          end
+        end
+      else
+        grp.entities.grep(Sketchup::Face).each do |face|
+          face.material = mat
+          face.back_material = mat
+        end
       end
     end
     m.commit_operation

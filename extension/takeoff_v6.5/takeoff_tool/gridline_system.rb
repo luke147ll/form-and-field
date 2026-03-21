@@ -211,7 +211,9 @@ module TakeoffTool
     def self.toggle_all
       model = Sketchup.active_model
       return unless model
-      grids = model.active_entities.grep(Sketchup::Group).select { |g| g.valid? && g.get_attribute(GRID_DICT, 'label') }
+      grids = model.active_entities.grep(Sketchup::Group).select do |g|
+        g.valid? && (g.get_attribute(GRID_DICT, 'label') || g.get_attribute('TakeoffMeasurement', 'type') == 'GRID')
+      end
       any_vis = grids.any?(&:visible?)
       grids.each { |g| g.visible = !any_vis }
     end

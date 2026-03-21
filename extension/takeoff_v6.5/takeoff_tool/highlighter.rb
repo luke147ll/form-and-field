@@ -60,13 +60,14 @@ module TakeoffTool
       m.commit_operation
     end
 
-    # Non-destructive hide: hides all measurement groups
+    # Non-destructive hide: hides all measurement groups (skip GRID tags — those toggle with gridlines)
     def self.hide_measurement_highlights_inner(m)
       hidden = 0
       m.entities.grep(Sketchup::Group).each do |grp|
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
+        next if mtype == 'GRID' || mtype == 'CARD'
         if grp.visible?
           grp.visible = false
           hidden += 1
@@ -94,6 +95,7 @@ module TakeoffTool
         next unless grp.valid?
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
+        next if mtype == 'GRID' || mtype == 'CARD'
         grp.visible = true
         grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       end
