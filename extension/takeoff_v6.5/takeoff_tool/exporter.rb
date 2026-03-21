@@ -46,6 +46,10 @@ module TakeoffTool
     # ─── CSV EXPORT ───
 
     def self.export_csv(sr, ca, cca)
+      unless TakeoffTool::LicenseManager.licensed?
+        UI.messagebox("A valid Form and Field license is required to export.\nGo to Extensions > Form and Field > License to activate.")
+        return
+      end
       return UI.messagebox("No data.") if sr.empty?
       model = Sketchup.active_model
       model_name = model ? File.basename(model.path, '.*') : 'Untitled'
@@ -211,6 +215,10 @@ module TakeoffTool
     # ─── HTML REPORT ───
 
     def self.export_html(sr, ca, cca)
+      unless TakeoffTool::LicenseManager.licensed?
+        UI.messagebox("A valid Form and Field license is required to export.\nGo to Extensions > Form and Field > License to activate.")
+        return
+      end
       return UI.messagebox("No data.") if sr.empty?
       model = Sketchup.active_model
       model_name = model ? File.basename(model.path, '.*') : 'Untitled'

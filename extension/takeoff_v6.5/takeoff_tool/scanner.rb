@@ -180,6 +180,10 @@ module TakeoffTool
     # model_source_filter: nil = scan all, 'model_a' = only model_a, 'model_b' = only non-model_a
     # existing_results/existing_reg: when provided, append to these instead of starting fresh
     def self.scan_model(model, model_source_filter: nil, existing_results: nil, existing_reg: nil, &progress)
+      unless TakeoffTool::LicenseManager.licensed?
+        UI.messagebox("A valid Form and Field license is required.\nGo to Extensions > Form and Field > License to activate.")
+        return existing_results || []
+      end
       results = existing_results || []; reg = existing_reg || {}; seen = {}
       # When appending, mark existing entity IDs as seen so we don't re-process them
       reg.each_key { |eid| seen[eid] = true } if existing_reg

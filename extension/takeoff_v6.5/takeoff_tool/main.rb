@@ -1,6 +1,7 @@
 module TakeoffTool
 
   load File.join(PLUGIN_DIR, 'event_bus.rb')
+  load File.join(PLUGIN_DIR, 'license_manager.rb')
   load File.join(PLUGIN_DIR, 'category_manager.rb')
   load File.join(PLUGIN_DIR, 'assembly_manager.rb')
   load File.join(PLUGIN_DIR, 'parts_manager.rb')
@@ -171,6 +172,7 @@ module TakeoffTool
     sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
     sub.add_separator
     sub.add_item('Bug Reporter') { TakeoffTool::BugReporter.show }
+    sub.add_item('License...') { LicenseManager.show_status_dialog }
     sub.add_item('About') { UI.messagebox("#{PLUGIN_NAME} v#{PLUGIN_VERSION}\n\nInteractive construction takeoff tool.\nScans Revit imports and generates quantities.") }
     @menu_loaded = true
   end
@@ -256,6 +258,16 @@ module TakeoffTool
       end
     end
     @auto_load_done = true
+  end
+
+  # License check on startup — show activation dialog if not licensed
+  unless @license_checked
+    UI.start_timer(2.0, false) do
+      unless LicenseManager.licensed?
+        LicenseManager.show_activation_dialog
+      end
+    end
+    @license_checked = true
   end
 
   def self.trigger_backup

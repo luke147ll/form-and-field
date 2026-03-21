@@ -45,6 +45,10 @@ module TakeoffTool
     end
 
     def self.show(sr, ca, cca)
+      unless TakeoffTool::LicenseManager.licensed?
+        TakeoffTool::LicenseManager.show_activation_dialog
+        return
+      end
       if @dialog && @dialog.visible?; send_live_data; return; end
 
       @dialog = UI::HtmlDialog.new(dialog_title:"Form and Field \u2014 Takeoff Report", preferences_key:"TakeoffDash_v3",
