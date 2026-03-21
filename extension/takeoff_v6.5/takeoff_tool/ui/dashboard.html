@@ -6356,12 +6356,20 @@ function renderAsmPanelV2(){
 
       // Tab bar
       h+='<div class="ac2-tabs">';
-      var tabs=[{key:'breakdown',label:'Breakdown',count:breakdown.length},{key:'parts',label:'Parts',count:otherParts.length},{key:'beams',label:'Auto Beam',count:bi.length}];
-      for(var ti=0;ti<tabs.length;ti++){
-        var t=tabs[ti];
+      var mainTabs=[{key:'breakdown',label:'Breakdown',count:breakdown.length},{key:'parts',label:'Parts',count:otherParts.length}];
+      if(tabKey==='beams')mainTabs.push({key:'beams',label:'Beam Inv',count:bi.length});
+      else if(tabKey==='auto_sf')mainTabs.push({key:'auto_sf',label:'Auto SF',count:eids.length});
+      else if(tabKey==='auto_lf')mainTabs.push({key:'auto_lf',label:'Auto LF',count:eids.length});
+      else if(tabKey==='auto_vol')mainTabs.push({key:'auto_vol',label:'Auto Vol',count:eids.length});
+      for(var ti=0;ti<mainTabs.length;ti++){
+        var t=mainTabs[ti];
         var tActive=tabKey===t.key?' active':'';
         h+='<button class="ac2-tab'+tActive+'" onclick="event.stopPropagation();_ac2Tab[\''+id+'\']=\''+t.key+'\';renderAsmPanel()">'+t.label+'<span class="ac2-tab-count">'+t.count+'</span></button>';
       }
+      // Auto scan dropdown button
+      h+='<div style="position:relative;display:inline-flex">';
+      h+='<button class="ac2-tab" onclick="event.stopPropagation();toggleAsmAutoDD(this,'+si+')" style="color:var(--overlay0);gap:2px">Auto &#9662;</button>';
+      h+='</div>';
       h+='<span style="flex:1"></span>';
       if(asm.notes)h+='<span class="ac2-notes" title="'+X(asm.notes)+'">'+X(asm.notes)+'</span>';
       h+='</div>';
@@ -6527,6 +6535,59 @@ function renderAsmPanelV2(){
           h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+bColor+'"></span>'+X(bd.category)+'</span>';
         }
         h+='</div>';
+        h+='</div>';
+
+      } else if(tabKey==='auto_sf'||tabKey==='auto_lf'||tabKey==='auto_vol'){
+        // Auto scan summary — compute per-category totals from scan data for this assembly
+        var autoUnit=tabKey==='auto_sf'?'SF':tabKey==='auto_lf'?'LF':'CF';
+        var autoField=tabKey==='auto_sf'?'areaSF':tabKey==='auto_lf'?'linearFt':'volumeFt3';
+        var autoLabel=tabKey==='auto_sf'?'SF':tabKey==='auto_lf'?'LF':'CY';
+        var autoDivisor=tabKey==='auto_vol'?27.0:1.0; // CF→CY
+        var asmEidSet={};for(var ae=0;ae<eids.length;ae++)asmEidSet[eids[ae]]=true;
+        var autoCats={},autoTotal=0;
+        if(D&&D.length){
+          for(var si3=0;si3<D.length;si3++){
+            var sr=D[si3];
+            if(!asmEidSet[sr.entityId])continue;
+            var val=(sr[autoField]||0);
+            if(val<=0)continue;
+            var scat=sr.category||'Uncategorized';
+            if(!autoCats[scat])autoCats[scat]={total:0,count:0};
+            autoCats[scat].total+=val;
+            autoCats[scat].count++;
+            autoTotal+=val;
+          }
+        }
+        autoTotal=autoTotal/autoDivisor;
+        var autoCatKeys=Object.keys(autoCats).sort(function(a,b){return autoCats[b].total-autoCats[a].total;});
+
+        h+='<div style="padding:14px">';
+        if(autoCatKeys.length===0){
+          h+='<div style="text-align:center;color:#45475a;font-size:10px;padding:12px 0">No '+autoLabel+' data for entities in this assembly</div>';
+        } else {
+          for(var aci=0;aci<autoCatKeys.length;aci++){
+            var ac=autoCatKeys[aci],acData=autoCats[ac];
+            var acVal=acData.total/autoDivisor;
+            var acPct=autoTotal>0?Math.round(acVal/autoTotal*100):0;
+            var acColor=getCatColor(ac);
+            h+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:3px 0">';
+            h+='<span style="width:6px;height:6px;border-radius:2px;flex-shrink:0;background:'+acColor+'"></span>';
+            h+='<span style="color:var(--subtext0);flex:1">'+X(ac)+'</span>';
+            h+='<span style="font-family:var(--font-num);color:var(--overlay0);font-size:9px;min-width:24px;text-align:right">'+acData.count+'</span>';
+            h+='<span style="font-family:var(--font-num);font-weight:600;color:var(--text);min-width:60px;text-align:right">'+acVal.toFixed(1)+'</span>';
+            h+='<span style="font-size:9px;color:#585b70;min-width:20px">'+autoLabel+'</span>';
+            h+='<span style="font-family:var(--font-num);color:#585b70;font-size:9px;min-width:28px;text-align:right">'+acPct+'%</span>';
+            h+='</div>';
+          }
+          // Total row
+          h+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:6px 0;margin-top:4px;border-top:1px solid var(--surface0)">';
+          h+='<span style="width:6px"></span>';
+          h+='<span style="color:var(--subtext0);flex:1;font-weight:600">TOTAL</span>';
+          h+='<span style="font-family:var(--font-num);font-weight:700;color:var(--text);min-width:60px;text-align:right">'+autoTotal.toFixed(1)+'</span>';
+          h+='<span style="font-size:9px;color:#585b70;min-width:20px">'+autoLabel+'</span>';
+          h+='<span style="min-width:28px"></span>';
+          h+='</div>';
+        }
         h+='</div>';
       }
 
@@ -7704,7 +7765,40 @@ function openMeasGDD(btn,cat,ev){
   dd.classList.add('open');
 }
 function closeMeasGDD(){var dd=_getMeasGDD();dd.classList.remove('open');dd._btn=null;}
-document.addEventListener('click',function(){closeMeasGDD();});
+document.addEventListener('click',function(){closeMeasGDD();closeAsmAutoDD();});
+/* ── Assembly Auto-scan dropdown ── */
+var _asmAutoDD=null;
+function _getAsmAutoDD(){
+  if(_asmAutoDD)return _asmAutoDD;
+  _asmAutoDD=document.createElement('div');
+  _asmAutoDD.className='meas-gdd';
+  document.body.appendChild(_asmAutoDD);
+  return _asmAutoDD;
+}
+function toggleAsmAutoDD(btn,asmId){
+  var dd=_getAsmAutoDD();
+  if(dd.classList.contains('open')&&dd._btn===btn){closeAsmAutoDD();return;}
+  dd._btn=btn;
+  var opts=[
+    {key:'beams',label:'Auto Beam',dot:'var(--peach)'},
+    {key:'auto_sf',label:'Auto SF',dot:'var(--blue)'},
+    {key:'auto_lf',label:'Auto LF',dot:'var(--green)'},
+    {key:'auto_vol',label:'Auto Vol',dot:'var(--mauve)'}
+  ];
+  var h='';
+  for(var i=0;i<opts.length;i++){
+    var o=opts[i];
+    h+='<button class="meas-gdd-item" onclick="event.stopPropagation();_ac2Tab[\''+asmId+'\']=\''+o.key+'\';closeAsmAutoDD();renderAsmPanel()">';
+    h+='<span class="dd-dot" style="background:'+o.dot+'"></span>'+o.label+'</button>';
+  }
+  dd.innerHTML=h;
+  var r=btn.getBoundingClientRect();
+  dd.style.top=(r.bottom+2)+'px';
+  dd.style.left='auto';
+  dd.style.right=(window.innerWidth-r.right)+'px';
+  dd.classList.add('open');
+}
+function closeAsmAutoDD(){var dd=_getAsmAutoDD();dd.classList.remove('open');dd._btn=null;}
 /* ── Add Part form ── */
 function showAddPartForm(eid,cat,mtype){
   // Close any other open forms first
