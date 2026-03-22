@@ -979,6 +979,216 @@ module TakeoffTool
         end
       end
 
+      # ─── FF Model Export / Import ───
+
+      dialog.add_action_callback('exportFFModel') do |_ctx, _json|
+        begin
+          model = Sketchup.active_model
+          # Count exportable measurement groups
+          export_groups = model.entities.select { |g|
+            g.valid? &&
+            (g.is_a?(Sketchup::Group) || g.is_a?(Sketchup::ComponentInstance)) &&
+            g.get_attribute('TakeoffMeasurement', 'type') &&
+            !%w[GRID BENCHMARK].include?(g.get_attribute('TakeoffMeasurement', 'type')) &&
+            !g.get_attribute('TakeoffMeasurement', 'part_link')
+          }
+          if export_groups.empty?
+            dialog.execute_script("showToast('No measurements to export','warning')")
+            next
+          end
+
+          path = UI.savepanel('Export FF Measurements', '', 'measurements.skp')
+          next unless path
+          path += '.skp' unless path.downcase.end_with?('.skp')
+
+          model.start_operation('Export FF Measurements', true)
+
+          # Mark as FF measurement export
+          model.set_attribute('FF_Export', 'type', 'measurements')
+          model.set_attribute('FF_Export', 'source_model', File.basename(model.path.to_s))
+          model.set_attribute('FF_Export', 'timestamp', Time.now.to_s)
+          model.set_attribute('FF_Export', 'count', export_groups.length)
+
+          # Build keep set (entity IDs of measurement groups to export)
+          keep_eids = {}
+          export_groups.each { |g| keep_eids[g.entityID] = true }
+
+          # Delete everything not in the keep set
+          to_delete = model.entities.to_a.reject { |e|
+            (e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)) && keep_eids[e.entityID]
+          }
+          model.entities.erase_entities(to_delete) if to_delete.any?
+
+          # Save only measurements
+          status = model.save_copy(path)
+
+          # Abort restores the model to pre-delete state
+          model.abort_operation
+
+          if status
+            dialog.execute_script("showToast('Exported #{export_groups.length} measurements to #{File.basename(path).gsub("'", "\\\\'")}','success')")
+          else
+            dialog.execute_script("showToast('Export failed','error')")
+          end
+        rescue => e
+          model.abort_operation rescue nil
+          puts "exportFFModel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+          dialog.execute_script("showToast('Export error: #{e.message.gsub("'", "\\\\'")}','error')") rescue nil
+        end
+      end
+
+      dialog.add_action_callback('importFFMeasurements') do |_ctx, _json|
+        begin
+          model = Sketchup.active_model
+          path = UI.openpanel('Import FF Measurements', '', 'SketchUp Files|*.skp||')
+          next unless path
+
+          model.start_operation('Import FF Measurements', true)
+
+          # Load the .skp as a component definition
+          defn = model.definitions.load(path)
+          unless defn
+            dialog.execute_script("showToast('Failed to load file','error')")
+            model.abort_operation
+            next
+          end
+
+          # Place at origin and explode
+          inst = model.entities.add_instance(defn, Geom::Transformation.new)
+          exploded = inst.explode || []
+
+          # Ensure TO_Measurements layer exists
+          meas_tag = model.layers['TO_Measurements'] || model.layers.add('TO_Measurements')
+          source_name = File.basename(path, '.skp')
+          imported_count = 0
+          to_delete = []
+
+          exploded.each do |e|
+            next unless e.valid?
+            if (e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)) &&
+               e.get_attribute('TakeoffMeasurement', 'type')
+              # Tag as imported
+              e.set_attribute('TakeoffMeasurement', 'imported', true)
+              e.set_attribute('TakeoffMeasurement', 'import_source', source_name)
+              e.layer = meas_tag
+              imported_count += 1
+            else
+              to_delete << e if e.respond_to?(:erase!)
+            end
+          end
+
+          # Clean up non-measurement leftovers
+          to_delete.each { |e| e.erase! if e.valid? } rescue nil
+
+          # Purge the imported definition if unused
+          model.definitions.purge_unused
+
+          model.commit_operation
+
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+
+          if imported_count > 0
+            dialog.execute_script("showToast('Imported #{imported_count} measurements from #{source_name.gsub("'", "\\\\'")}','success')")
+          else
+            dialog.execute_script("showToast('No measurements found in file','warning')")
+          end
+        rescue => e
+          model.abort_operation rescue nil
+          puts "importFFMeasurements error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+          dialog.execute_script("showToast('Import error: #{e.message.gsub("'", "\\\\'")}','error')") rescue nil
+        end
+      end
+
+      dialog.add_action_callback('commitImportedMeasurement') do |_ctx, eid_str|
+        begin
+          model = Sketchup.active_model
+          eid = eid_str.to_s.to_i
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid?
+            model.start_operation('Commit Imported Measurement', true)
+            source = grp.get_attribute('TakeoffMeasurement', 'import_source') || 'Unknown'
+            grp.delete_attribute('TakeoffMeasurement', 'imported')
+            grp.delete_attribute('TakeoffMeasurement', 'import_source')
+            # Stamp commit metadata for commit log + author badge
+            grp.set_attribute('TakeoffMeasurement', 'committed_from', source)
+            grp.set_attribute('TakeoffMeasurement', 'committed_date', Time.now.strftime('%Y-%m-%d %H:%M'))
+            grp.set_attribute('TakeoffMeasurement', 'committed_by', source)
+            model.commit_operation
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+            Dashboard.send_multiverse_data rescue nil
+          end
+        rescue => e
+          puts "commitImportedMeasurement error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('discardImportedMeasurement') do |_ctx, eid_str|
+        begin
+          model = Sketchup.active_model
+          eid = eid_str.to_s.to_i
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid?
+            model.start_operation('Discard Imported Measurement', true)
+            grp.erase!
+            model.commit_operation
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+          end
+        rescue => e
+          puts "discardImportedMeasurement error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('commitAllImported') do |_ctx, _json|
+        begin
+          model = Sketchup.active_model
+          model.start_operation('Commit All Imported Measurements', true)
+          count = 0
+          timestamp = Time.now.strftime('%Y-%m-%d %H:%M')
+          model.entities.each do |grp|
+            next unless grp.valid?
+            next unless grp.is_a?(Sketchup::Group) || grp.is_a?(Sketchup::ComponentInstance)
+            next unless grp.get_attribute('TakeoffMeasurement', 'imported')
+            source = grp.get_attribute('TakeoffMeasurement', 'import_source') || 'Unknown'
+            grp.delete_attribute('TakeoffMeasurement', 'imported')
+            grp.delete_attribute('TakeoffMeasurement', 'import_source')
+            grp.set_attribute('TakeoffMeasurement', 'committed_from', source)
+            grp.set_attribute('TakeoffMeasurement', 'committed_date', timestamp)
+            grp.set_attribute('TakeoffMeasurement', 'committed_by', source)
+            count += 1
+          end
+          model.commit_operation
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+          Dashboard.send_multiverse_data rescue nil
+          dialog.execute_script("showToast('Committed #{count} measurements','success')") if count > 0
+        rescue => e
+          puts "commitAllImported error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('discardAllImported') do |_ctx, _json|
+        begin
+          model = Sketchup.active_model
+          model.start_operation('Discard All Imported Measurements', true)
+          to_erase = model.entities.select { |g|
+            g.valid? &&
+            (g.is_a?(Sketchup::Group) || g.is_a?(Sketchup::ComponentInstance)) &&
+            g.get_attribute('TakeoffMeasurement', 'imported')
+          }
+          count = to_erase.length
+          model.entities.erase_entities(to_erase) if to_erase.any?
+          model.commit_operation
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+          dialog.execute_script("showToast('Discarded #{count} imported measurements','success')") if count > 0
+        rescue => e
+          puts "discardAllImported error: #{e.message}"
+        end
+      end
+
     end
   end
 end

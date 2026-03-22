@@ -770,6 +770,26 @@ module TakeoffTool
       groups[key][:items] << { eid: eid, name: name, type: ctype }
     end
 
+    # Also include committed measurement groups (from FF measurement imports)
+    model = Sketchup.active_model
+    if model
+      model.entities.each do |ent|
+        next unless ent.valid?
+        next unless ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance)
+        cf = ent.get_attribute('TakeoffMeasurement', 'committed_from') rescue nil
+        next unless cf
+        mtype = ent.get_attribute('TakeoffMeasurement', 'type') || '?'
+        date = ent.get_attribute('TakeoffMeasurement', 'committed_date') || 'Unknown'
+        cat = ent.get_attribute('TakeoffMeasurement', 'category') || 'Measurement'
+        label = ent.get_attribute('TakeoffMeasurement', 'label') || ent.name || mtype
+        source = ent.get_attribute('TakeoffMeasurement', 'committed_by') || cf
+
+        key = "FF:#{source}|#{date}"
+        groups[key] ||= { category: "FF Import: #{source}", date: date, items: [] }
+        groups[key][:items] << { eid: ent.entityID, name: "#{mtype}: #{label}", type: 'measurement' }
+      end
+    end
+
     groups.values.sort_by { |g| g[:date] }.reverse
   end
 

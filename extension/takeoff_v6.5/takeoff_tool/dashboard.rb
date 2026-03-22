@@ -1150,8 +1150,10 @@ module TakeoffTool
       end
 
       measurements = []
-      m.entities.grep(Sketchup::Group).each do |grp|
+      # Collect measurement groups (Groups and ComponentInstances with TakeoffMeasurement attrs)
+      m.entities.each do |grp|
         next unless grp.valid?
+        next unless grp.is_a?(Sketchup::Group) || grp.is_a?(Sketchup::ComponentInstance)
         mtype = grp.get_attribute('TakeoffMeasurement', 'type')
         next unless mtype
         next if mtype == 'GRID'  # Gridlines are managed in CAD overlay tab, not measurements
@@ -1174,6 +1176,9 @@ module TakeoffTool
           cost_code = cc_arr.first if cc_arr && cc_arr.length == 1
         end
 
+        is_imported = !!grp.get_attribute('TakeoffMeasurement', 'imported')
+        import_source = grp.get_attribute('TakeoffMeasurement', 'import_source') || ''
+
         entry = {
           eid: grp.entityID,
           type: mtype,
@@ -1184,6 +1189,13 @@ module TakeoffTool
           partName: part_name,
           costCode: cost_code || ''
         }
+        if is_imported
+          entry[:imported] = true
+          entry[:importSource] = import_source
+        end
+
+        committed_by = grp.get_attribute('TakeoffMeasurement', 'committed_by')
+        entry[:committedBy] = committed_by if committed_by
 
         if mtype == 'SF'
           # Derive SF from physical geometry faces; fall back to stored attr for legacy groups

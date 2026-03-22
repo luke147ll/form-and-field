@@ -198,6 +198,8 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 /* ── Split measurement cards ── */
 .mcard{display:flex;margin:6px 10px;border:1px solid var(--surface0);border-radius:6px;background:var(--mantle);overflow:hidden;transition:opacity .2s}
 .mcard.mcard-hidden{opacity:.3}
+.mcard.mcard-imported{border-color:rgba(250,179,135,0.4);background:rgba(250,179,135,0.04)}
+.mcard.mcard-imported .mcard-left{border-left-color:var(--peach)!important}
 .mcard.mcard-hidden .mcard-val{text-decoration:line-through}
 .mcard-left{flex:1;display:flex;border-left:3px solid var(--green);min-width:0}
 .mcard-vis{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px 10px 8px;flex-shrink:0}
@@ -4462,7 +4464,8 @@ function renderCommitLog(log){
     var g=log[i];
     h+='<div style="margin-bottom:6px;border:1px solid #313244;border-radius:6px;padding:6px 8px;background:#181825">';
     h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
-    h+='<span class="src-badge b">B</span>';
+    var isFF=g.category.indexOf('FF Import')===0;
+    h+='<span class="src-badge '+(isFF?'':' b')+'" style="'+(isFF?'background:#a6e3a1;color:#1e1e2e':'')+'">'+( isFF?'FF':'B')+'</span>';
     h+='<span style="font-size:11px;font-weight:600;color:#cdd6f4">'+X(g.category)+'</span>';
     h+='<span style="font-size:10px;color:#6c7086;margin-left:auto">'+X(g.date)+'</span>';
     h+='</div>';
@@ -4470,7 +4473,7 @@ function renderCommitLog(log){
     var max=g.items.length>12?12:g.items.length;
     for(var j=0;j<max;j++){
       var it=g.items[j];
-      var tc=it.type==='modified'?'#f9e2af':'#89b4fa';
+      var tc=it.type==='modified'?'#f9e2af':it.type==='measurement'?'#a6e3a1':'#89b4fa';
       h+='<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(137,180,250,.08);color:'+tc+';border:1px solid rgba(137,180,250,.15);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px" title="'+X(it.name)+'">'+X(it.name.length>18?it.name.substring(0,18)+'…':it.name)+'</span>';
     }
     if(g.items.length>12)h+='<span style="font-size:9px;color:#6c7086;padding:1px 4px">+'+(g.items.length-12)+' more</span>';
@@ -7174,13 +7177,28 @@ function renderMeasPanel(){
   var visCount=0;
   for(var vi=0;vi<filtered.length;vi++){if(filtered[vi].type!=='CARD'&&filtered[vi].visible)visCount++;}
   sh+='<div style="flex:1"></div>';
+  sh+='<button onclick="call(\'exportFFModel\')" style="background:none;border:1px solid var(--peach);border-radius:3px;color:var(--peach);font:500 9px var(--font-mono);padding:2px 8px;cursor:pointer;margin-right:4px" title="Export measurements as FF model (.skp)">\u2191 Export FF</button>';
+  sh+='<button onclick="call(\'importFFMeasurements\')" style="background:none;border:1px solid var(--blue);border-radius:3px;color:var(--blue);font:500 9px var(--font-mono);padding:2px 8px;cursor:pointer;margin-right:4px" title="Import FF measurements from .skp">\u2193 Import FF</button>';
   sh+='<button onclick="exportAllMeasCSV()" style="background:none;border:1px solid var(--surface1);border-radius:3px;color:var(--green);font:500 9px var(--font-mono);padding:2px 8px;cursor:pointer;margin-right:6px" title="Export all measurements + parts to CSV">\u2193 Export All</button>';
   sh+='<span style="font-size:10px;color:var(--overlay0)">'+visCount+'/'+filtered.length+' visible</span>';
   var sumEl=document.getElementById('measSummary');
   if(sumEl)sumEl.innerHTML=sh;
 
+  // Check for imported measurements — show banner
+  var importedCount=0;
+  for(var ic=0;ic<filtered.length;ic++){if(filtered[ic].imported)importedCount++;}
+
   // Build card HTML
   var h='';
+  if(importedCount>0){
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin:0 0 4px;background:rgba(250,179,135,0.08);border:1px solid rgba(250,179,135,0.25);border-radius:4px">';
+    h+='<span style="font-size:9px;font-weight:600;color:var(--peach)">'+importedCount+' IMPORTED</span>';
+    h+='<span style="flex:1;font-size:8px;color:var(--overlay0)">Review and commit to keep</span>';
+    h+='<button onclick="call(\'commitAllImported\')" style="background:var(--green);color:var(--base);border:none;border-radius:3px;font:600 8px var(--font-mono);padding:2px 8px;cursor:pointer">\u2713 Commit All</button>';
+    h+='<button onclick="if(confirm(\'Discard all imported measurements?\'))call(\'discardAllImported\')" style="background:none;border:1px solid var(--red);border-radius:3px;color:var(--red);font:600 8px var(--font-mono);padding:2px 8px;cursor:pointer">\u2717 Discard All</button>';
+    h+='</div>';
+  }
+
   // Track which derived part IDs have been used so we don't duplicate
   var usedDpIds={};
 
@@ -7246,7 +7264,8 @@ function renderMeasPanel(){
       var rmCb=mm.type==='SF'?'removeSFFaces':mm.type==='LF'?'removeLFFaces':mm.type==='VOL'?'removeVolObjects':mm.type==='COUNT'?'removeCountMarkers':mm.type==='WALL'?'removeWallSegments':'';
 
       // ── Card start ──
-      h+='<div class="mcard'+(isVis?'':' mcard-hidden')+'" data-eid="'+mm.eid+'">';
+      var isImported=!!mm.imported;
+      h+='<div class="mcard'+(isVis?'':' mcard-hidden')+(isImported?' mcard-imported':'')+'" data-eid="'+mm.eid+'">';
 
       // Left side
       h+='<div class="mcard-left" style="border-left-color:'+accentHex+'">';
@@ -7275,6 +7294,8 @@ function renderMeasPanel(){
         h+='<span class="mcard-label">'+X(mLabel)+'</span>';
       }
       if(!isCard)h+='<span class="mcard-pill">'+X(mm.category||'Custom')+'</span>';
+      if(isImported)h+='<span class="mcard-pill" style="background:var(--peach);color:var(--base);font-weight:600">IMPORTED</span>';
+      if(mm.committedBy)h+='<span class="mcard-pill" style="background:var(--blue);color:var(--base);font-weight:500" title="Committed from '+X(mm.committedBy)+'">'+X(mm.committedBy)+'</span>';
       h+='</div>';
       // Value row
       if(!isCard){
@@ -7302,20 +7323,36 @@ function renderMeasPanel(){
 
       // Action buttons
       h+='<div class="mcard-acts">';
-      if(!isCard && addCb){
-        var addTip=mm.type==='VOL'?'Add objects':mm.type==='COUNT'?'Add markers':mm.type==='WALL'?'Add segments':'Add faces';
-        var rmTip=mm.type==='VOL'?'Remove objects':mm.type==='COUNT'?'Remove markers':mm.type==='WALL'?'Remove segments':'Remove faces';
-        h+='<button class="mcard-act add" onclick="call(\''+addCb+'\',JSON.stringify({eid:'+mm.eid+',category:\''+X2(mm.category)+'\'}))" title="'+addTip+'">+</button>';
-        h+='<button class="mcard-act sub" onclick="call(\''+rmCb+'\',\''+mm.eid+'\')" title="'+rmTip+'">&minus;</button>';
+      if(isImported){
+        h+='<button class="mcard-act" onclick="call(\'commitImportedMeasurement\',\''+mm.eid+'\')" title="Commit to model" style="color:var(--green);font-size:11px">\u2713</button>';
+        h+='<button class="mcard-act del" onclick="call(\'discardImportedMeasurement\',\''+mm.eid+'\')" title="Discard">\u2717</button>';
+      } else {
+        if(!isCard && addCb){
+          var addTip=mm.type==='VOL'?'Add objects':mm.type==='COUNT'?'Add markers':mm.type==='WALL'?'Add segments':'Add faces';
+          var rmTip=mm.type==='VOL'?'Remove objects':mm.type==='COUNT'?'Remove markers':mm.type==='WALL'?'Remove segments':'Remove faces';
+          h+='<button class="mcard-act add" onclick="call(\''+addCb+'\',JSON.stringify({eid:'+mm.eid+',category:\''+X2(mm.category)+'\'}))" title="'+addTip+'">+</button>';
+          h+='<button class="mcard-act sub" onclick="call(\''+rmCb+'\',\''+mm.eid+'\')" title="'+rmTip+'">&minus;</button>';
+        }
+        if(!isCard)h+='<button class="mcard-act exp" onclick="exportMeasCSV('+mm.eid+')" title="Export CSV">\u2193</button>';
+        h+='<button class="mcard-act del" onclick="delMeas('+mm.eid+')" title="Delete">\u00d7</button>';
       }
-      if(!isCard)h+='<button class="mcard-act exp" onclick="exportMeasCSV('+mm.eid+')" title="Export CSV">\u2193</button>';
-      h+='<button class="mcard-act del" onclick="delMeas('+mm.eid+')" title="Delete">\u00d7</button>';
       h+='</div>';
 
       h+='</div>'; // end mcard-left
 
       // Right side — derived parts
       h+='<div class="mcard-right">';
+      if(isImported){
+        // Imported cards: show source info instead of parts builder
+        h+='<div class="mcard-parts-hdr">';
+        h+='<span class="mcard-parts-title" style="color:var(--peach)">Imported</span>';
+        h+='</div>';
+        h+='<div style="padding:4px 8px;font-size:8px;color:var(--overlay0)">From: '+X(mm.importSource||'Unknown')+'</div>';
+        h+='<div style="padding:0 8px 4px;display:flex;gap:4px">';
+        h+='<button onclick="call(\'commitImportedMeasurement\',\''+mm.eid+'\')" style="flex:1;background:var(--green);color:var(--base);border:none;border-radius:3px;font:600 8px var(--font-mono);padding:3px 6px;cursor:pointer">\u2713 Commit</button>';
+        h+='<button onclick="call(\'discardImportedMeasurement\',\''+mm.eid+'\')" style="flex:1;background:none;border:1px solid var(--red);border-radius:3px;color:var(--red);font:600 8px var(--font-mono);padding:3px 6px;cursor:pointer">\u2717 Discard</button>';
+        h+='</div>';
+      } else {
       h+='<div class="mcard-parts-hdr">';
       h+='<span class="mcard-parts-title">Parts</span>';
       h+='<button class="mcard-parts-add" onclick="openPB('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')">+ part</button>';
@@ -7425,6 +7462,7 @@ function renderMeasPanel(){
       h+='<button class="apf-btn cancel" onclick="hideAddPartForm('+mm.eid+')">Cancel</button>';
       h+='<button class="apf-btn save" onclick="submitAddPart('+mm.eid+',\''+X2(mm.category)+'\')">Create</button>';
       h+='</div></div>';
+      } // end if(!isImported) parts section
 
       h+='</div>'; // end mcard-right
 
