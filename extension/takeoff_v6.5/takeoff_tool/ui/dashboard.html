@@ -7199,6 +7199,10 @@ function renderMeasPanel(){
     h+='</div>';
   }
 
+  // Build eid→measurement lookup for VS comparison
+  var measByEid={};
+  for(var me=0;me<filtered.length;me++){measByEid[filtered[me].eid]=filtered[me];}
+
   // Track which derived part IDs have been used so we don't duplicate
   var usedDpIds={};
 
@@ -7305,6 +7309,36 @@ function renderMeasPanel(){
         if(countDisp)h+='<span class="mcard-count">'+countDisp+'</span>';
         h+='</div>';
       }
+      // VS Comparison delta row
+      var vsOther=null;
+      if(mm.vsTarget && measByEid[mm.vsTarget]){
+        // This is the local comparison card — vsTarget points to the imported card
+        vsOther=measByEid[mm.vsTarget];
+      } else if(mm.vsLocal && measByEid[mm.vsLocal]){
+        // This is the imported card — vsLocal points to the local comparison card
+        vsOther=measByEid[mm.vsLocal];
+      }
+      if(vsOther && !isCard){
+        var myVal=mm.value||0, theirVal=vsOther.value||0;
+        var delta,deltaLabel;
+        if(mm.vsTarget){
+          // I'm the local card, they are the imported card
+          delta=myVal-theirVal;
+          deltaLabel='vs Imported: '+fmtMeasVal(theirVal,mUnit)+' '+mUnit;
+        } else {
+          // I'm the imported card, they are the local card
+          delta=theirVal-myVal;
+          deltaLabel='Local: '+fmtMeasVal(theirVal,mUnit)+' '+mUnit;
+        }
+        var dSign=delta>0?'+':delta<0?'\u2212':'';
+        var dColor=Math.abs(delta)<0.1?'var(--overlay0)':(delta>0?'var(--green)':'var(--red)');
+        var dAbs=Math.abs(delta);
+        h+='<div style="margin-top:2px;padding:3px 0;border-top:1px dashed var(--surface1);display:flex;align-items:center;gap:6px;font-size:9px">';
+        h+='<span style="color:var(--peach);font-weight:600">VS</span>';
+        h+='<span style="color:var(--overlay0)">'+deltaLabel+'</span>';
+        h+='<span style="color:'+dColor+';font-weight:700">\u0394 '+dSign+dAbs.toFixed(1)+' '+mUnit+'</span>';
+        h+='</div>';
+      }
       // Wall segment details (consolidated by nominal + height)
       if(mm.type==='WALL'&&mm.wallDetails&&mm.wallDetails.length){
         h+='<div style="margin-top:3px;padding:3px 0;border-top:1px solid var(--surface0)">';
@@ -7324,6 +7358,9 @@ function renderMeasPanel(){
       // Action buttons
       h+='<div class="mcard-acts">';
       if(isImported){
+        if(isSFLF && !mm.vsLocal){
+          h+='<button class="mcard-act" onclick="call(\'startMeasComparison\',JSON.stringify({eid:'+mm.eid+',type:\''+mm.type+'\',category:\''+X2(mm.category||'')+'\'}))" title="Compare \u2014 measure locally and see the difference" style="color:var(--peach);font-weight:700;font-size:9px">VS</button>';
+        }
         h+='<button class="mcard-act" onclick="call(\'commitImportedMeasurement\',\''+mm.eid+'\')" title="Commit to model" style="color:var(--green);font-size:11px">\u2713</button>';
         h+='<button class="mcard-act del" onclick="call(\'discardImportedMeasurement\',\''+mm.eid+'\')" title="Discard">\u2717</button>';
       } else {
@@ -7349,6 +7386,9 @@ function renderMeasPanel(){
         h+='</div>';
         h+='<div style="padding:4px 8px;font-size:8px;color:var(--overlay0)">From: '+X(mm.importSource||'Unknown')+'</div>';
         h+='<div style="padding:0 8px 4px;display:flex;gap:4px">';
+        if(isSFLF && !mm.vsLocal){
+          h+='<button onclick="call(\'startMeasComparison\',JSON.stringify({eid:'+mm.eid+',type:\''+mm.type+'\',category:\''+X2(mm.category||'')+'\'}))" style="flex:1;background:var(--peach);color:var(--base);border:none;border-radius:3px;font:700 8px var(--font-mono);padding:3px 6px;cursor:pointer">VS Compare</button>';
+        }
         h+='<button onclick="call(\'commitImportedMeasurement\',\''+mm.eid+'\')" style="flex:1;background:var(--green);color:var(--base);border:none;border-radius:3px;font:600 8px var(--font-mono);padding:3px 6px;cursor:pointer">\u2713 Commit</button>';
         h+='<button onclick="call(\'discardImportedMeasurement\',\''+mm.eid+'\')" style="flex:1;background:none;border:1px solid var(--red);border-radius:3px;color:var(--red);font:600 8px var(--font-mono);padding:3px 6px;cursor:pointer">\u2717 Discard</button>';
         h+='</div>';

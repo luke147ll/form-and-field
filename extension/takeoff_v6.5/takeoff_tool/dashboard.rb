@@ -1197,6 +1197,11 @@ module TakeoffTool
         committed_by = grp.get_attribute('TakeoffMeasurement', 'committed_by')
         entry[:committedBy] = committed_by if committed_by
 
+        vs_target = grp.get_attribute('TakeoffMeasurement', 'vs_target')
+        vs_local = grp.get_attribute('TakeoffMeasurement', 'vs_local')
+        entry[:vsTarget] = vs_target.to_i if vs_target
+        entry[:vsLocal] = vs_local.to_i if vs_local
+
         if mtype == 'SF'
           # Derive SF from physical geometry faces; fall back to stored attr for legacy groups
           geo_faces = grp.entities.grep(Sketchup::Face)

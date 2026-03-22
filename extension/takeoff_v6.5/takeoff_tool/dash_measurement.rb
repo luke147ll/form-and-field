@@ -1189,6 +1189,106 @@ module TakeoffTool
         end
       end
 
+      # ─── Measurement Comparison (VS) ───
+
+      dialog.add_action_callback('startMeasComparison') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          imported_eid = data['eid'].to_i
+          mtype = data['type'].to_s    # SF, LF, VOL, COUNT, WALL
+          cat = data['category'].to_s
+
+          model = Sketchup.active_model
+          imported_grp = TakeoffTool.find_entity(imported_eid)
+          next unless imported_grp && imported_grp.valid? && model
+
+          model.start_operation('Start Measurement Comparison', true)
+
+          tag = model.layers['TO_Measurements'] || model.layers.add('TO_Measurements')
+          imported_label = imported_grp.get_attribute('TakeoffMeasurement', 'label') || cat
+          vs_label = "VS: #{imported_label}"
+
+          # Peach comparison color
+          vs_color = [250, 179, 135]
+
+          grp = model.active_entities.add_group
+          grp.entities.add_cpoint(ORIGIN) if mtype == 'WALL'
+          grp.layer = tag
+          grp.name = "TO_#{mtype}: #{vs_label}"
+          grp.set_attribute('TakeoffMeasurement', 'type', mtype)
+          grp.set_attribute('TakeoffMeasurement', 'category', cat)
+          grp.set_attribute('TakeoffMeasurement', 'label', vs_label)
+          grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+          grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+          grp.set_attribute('TakeoffMeasurement', 'vs_target', imported_eid)
+
+          case mtype
+          when 'SF'
+            grp.set_attribute('TakeoffMeasurement', 'total_sf', 0.0)
+            grp.set_attribute('TakeoffMeasurement', 'face_count', 0)
+            grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([*vs_color, 153]))
+            grp.set_attribute('TakeoffMeasurement', 'material_name', "FF_VS_#{grp.entityID}")
+          when 'LF'
+            grp.set_attribute('TakeoffMeasurement', 'total_ft', 0.0)
+            grp.set_attribute('TakeoffMeasurement', 'segment_count', 0)
+            grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([*vs_color, 179]))
+            grp.set_attribute('TakeoffMeasurement', 'material_name', "FF_VS_#{grp.entityID}")
+          when 'VOL'
+            grp.set_attribute('TakeoffMeasurement', 'total_cy', 0.0)
+            grp.set_attribute('TakeoffMeasurement', 'object_count', 0)
+            grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([*vs_color, 102]))
+            grp.set_attribute('TakeoffMeasurement', 'material_name', "FF_VS_#{grp.entityID}")
+          when 'COUNT'
+            grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([*vs_color, 179]))
+            grp.set_attribute('TakeoffMeasurement', 'material_name', "FF_VS_#{grp.entityID}")
+          when 'WALL'
+            grp.set_attribute('TakeoffMeasurement', 'total_lf', 0.0)
+            grp.set_attribute('TakeoffMeasurement', 'segment_count', 0)
+            grp.set_attribute('TakeoffMeasurement', 'total_studs', 0)
+            grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([*vs_color, 200]))
+            grp.set_attribute('TakeoffMeasurement', 'material_name', "FF_VS_#{grp.entityID}")
+            # Copy wall config from imported group
+            cfg_json = imported_grp.get_attribute('TakeoffMeasurement', 'wall_config')
+            grp.set_attribute('TakeoffMeasurement', 'wall_config', cfg_json) if cfg_json
+            grp.set_attribute('TakeoffMeasurement', 'oc_spacing',
+              imported_grp.get_attribute('TakeoffMeasurement', 'oc_spacing') || 16)
+          end
+
+          # Cross-link: imported card knows about the local comparison
+          imported_grp.set_attribute('TakeoffMeasurement', 'vs_local', grp.entityID)
+
+          TakeoffTool.entity_registry[grp.entityID] = grp rescue nil
+          TakeoffTool.invalidate_entity_cache rescue nil
+          model.commit_operation
+
+          # Activate the appropriate measurement tool for the new group
+          new_eid = grp.entityID
+          case mtype
+          when 'SF'
+            TakeoffTool.activate_sf_tool_for_group(new_eid, cat)
+          when 'LF'
+            TakeoffTool.activate_lf_face_tool_for_group(new_eid, cat)
+          when 'VOL'
+            TakeoffTool.activate_vol_tool_for_group(new_eid, cat)
+          when 'COUNT'
+            TakeoffTool.activate_count_tool_for_group(new_eid, cat)
+          when 'WALL'
+            opts = { category: cat, label: vs_label }
+            cfg = cfg_json ? (JSON.parse(cfg_json) rescue {}) : {}
+            opts[:oc_spacing] = cfg['oc_spacing'] if cfg['oc_spacing']
+            opts[:plates] = cfg['plates'] if cfg['plates']
+            opts[:waste] = cfg['waste_pct'] if cfg['waste_pct']
+            TakeoffTool.activate_wall_tool(opts)
+          end
+
+          dialog.execute_script("showToast('Measure to compare \u2014 press Escape when done','info')")
+        rescue => e
+          Sketchup.active_model.abort_operation rescue nil
+          puts "startMeasComparison error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
     end
   end
 end
