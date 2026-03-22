@@ -1085,6 +1085,9 @@ module TakeoffTool
 
           model.commit_operation
 
+          # Update stored def_count so staleness check doesn't trigger a rescan prompt
+          model.set_attribute('FormAndField', 'def_count', TakeoffTool.scannable_def_count(model))
+
           Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
 
@@ -1213,7 +1216,7 @@ module TakeoffTool
           vs_color = [250, 179, 135]
 
           grp = model.active_entities.add_group
-          grp.entities.add_cpoint(ORIGIN) if mtype == 'WALL'
+          grp.entities.add_cpoint(ORIGIN)  # keep group alive through commit_operation
           grp.layer = tag
           grp.name = "TO_#{mtype}: #{vs_label}"
           grp.set_attribute('TakeoffMeasurement', 'type', mtype)

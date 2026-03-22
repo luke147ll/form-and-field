@@ -105,6 +105,7 @@ module TakeoffTool
       @hover_cluster = nil
       @hover_boundary = nil
       @hover_sf = 0.0
+      @remove_hover_face = nil   # Ctrl+click removal target
       @measurement_group = nil
       @total_sf = 0.0
       @face_count = 0
@@ -114,7 +115,7 @@ module TakeoffTool
       find_or_create_group
       recompute_totals
       display = @label != @category ? "#{@category} / #{@label}" : @category
-      Sketchup.status_text = "Measure SF [#{display}]: Click faces to measure. Flood-fills coplanar neighbors. Total = #{'%.1f' % @total_sf} SF. Escape to finish."
+      Sketchup.status_text = "Measure SF [#{display}]: Click faces to add. Ctrl+Click to remove. Total = #{'%.1f' % @total_sf} SF. Escape to finish."
     end
 
     def deactivate(view)
@@ -143,15 +144,44 @@ module TakeoffTool
     def resume(view)
       recompute_totals
       display = @label != @category ? "#{@category} / #{@label}" : @category
-      Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Click to add more. Escape to finish."
+      Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Click to add, Ctrl+Click to remove. Escape to finish."
       view.invalidate
     end
 
     # ─── Mouse ───
 
     def onMouseMove(flags, x, y, view)
+      ctrl = (flags & COPY_MODIFIER_MASK) != 0
       ph = view.pick_helper
       ph.do_pick(x, y)
+
+      if ctrl && @measurement_group && @measurement_group.valid?
+        # ── Ctrl held: pick faces inside the measurement group for removal ──
+        @hover_face = nil; @hover_cluster = nil; @hover_boundary = nil; @hover_sf = 0.0
+        found = nil
+        ph.count.times do |i|
+          leaf = ph.leaf_at(i)
+          if leaf.is_a?(Sketchup::Face)
+            path = ph.path_at(i)
+            if path && path.include?(@measurement_group)
+              found = leaf
+              break
+            end
+          end
+        end
+        if found != @remove_hover_face
+          @remove_hover_face = found
+          if found
+            sf = found.area / 144.0
+            view.tooltip = "Ctrl+Click to remove: #{'%.1f' % sf} SF"
+          end
+          view.invalidate
+        end
+        return
+      end
+
+      # ── Normal mode: pick model faces for addition ──
+      @remove_hover_face = nil
 
       face = nil
       xform = nil
@@ -197,6 +227,32 @@ module TakeoffTool
     end
 
     def onLButtonDown(flags, x, y, view)
+      ctrl = (flags & COPY_MODIFIER_MASK) != 0
+
+      # ── Ctrl+Click: remove a face from the measurement group ──
+      if ctrl && @remove_hover_face && @remove_hover_face.valid? &&
+         @measurement_group && @measurement_group.valid?
+        model = Sketchup.active_model
+        model.start_operation('Remove SF Face', false)
+        begin
+          edges = @remove_hover_face.edges.dup
+          @remove_hover_face.erase!
+          @remove_hover_face = nil
+          edges.each { |e| e.erase! if e.valid? && e.faces.empty? }
+          recompute_totals
+          update_group_attributes
+          model.commit_operation
+          display = @label != @category ? "#{@category} / #{@label}" : @category
+          Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Ctrl+Click to remove more. Escape to finish."
+        rescue => e
+          model.abort_operation
+          puts "MeasureSF remove error: #{e.message}"
+        end
+        view.invalidate
+        return
+      end
+
+      # ── Normal click: add a face ──
       return unless @hover_face && @hover_cluster && @hover_boundary
       return if @hover_boundary.length < 3
 
@@ -247,10 +303,28 @@ module TakeoffTool
     end
 
     def draw(view)
+      # ── Ctrl remove mode: red highlight on the targeted face ──
+      if @remove_hover_face && @remove_hover_face.valid?
+        begin
+          xform = @measurement_group ? @measurement_group.transformation : Geom::Transformation.new
+          mesh = @remove_hover_face.mesh(0)
+          pts = []
+          (1..mesh.count_points).each do |i|
+            pts << (xform * mesh.point_at(i))
+          end
+          if pts.length >= 3
+            view.drawing_color = Sketchup::Color.new(243, 139, 168, 120)
+            view.draw(GL_POLYGON, pts)
+          end
+        rescue
+        end
+        return
+      end
+
+      # ── Normal mode: green flood-fill highlight ──
       return unless @hover_cluster && @hover_cluster.any?
       begin
         r, g, b = active_color_rgb
-        # Draw flood-fill highlight on all cluster faces
         view.drawing_color = Sketchup::Color.new(r, g, b, 80)
         @hover_cluster.each do |face|
           mesh = face.mesh(0)
@@ -263,7 +337,6 @@ module TakeoffTool
           view.draw(GL_POLYGON, pts)
         end
 
-        # Draw boundary outline
         if @hover_boundary && @hover_boundary.length >= 3
           view.line_width = 2
           view.drawing_color = Sketchup::Color.new(r, g, b, 200)
