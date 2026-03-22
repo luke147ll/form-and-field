@@ -26,6 +26,30 @@ module TakeoffTool
         TakeoffTool.rescan_model_b
       end
 
+      dialog.add_action_callback('rescanModelBWithTemplate') do |_ctx, tpl_name|
+        tpl = tpl_name.to_s.strip
+        TakeoffTool.rescan_model_b(template_name: tpl.empty? ? nil : tpl)
+      end
+
+      dialog.add_action_callback('setModelBTemplate') do |_ctx, tpl_name|
+        tpl = tpl_name.to_s.strip
+        mv = TakeoffTool.multiverse_data
+        if mv
+          mv['template_model_b'] = tpl.empty? ? nil : tpl
+          TakeoffTool.save_multiverse_data
+        end
+      end
+
+      dialog.add_action_callback('getTemplateList') do |_ctx|
+        require 'json'
+        templates = defined?(CategoryTemplates) ? CategoryTemplates.list : []
+        mv = TakeoffTool.multiverse_data || {}
+        current = mv['template_model_b'] || ''
+        payload = { templates: templates, current: current }
+        safe = JSON.generate(payload).gsub('</') { '<\\/' }
+        dialog.execute_script("receiveTemplateList(#{safe})")
+      end
+
       # ═══ MODEL COMPARISON (Quantity Delta + Visual Diff) ═══
 
       dialog.add_action_callback('runCompare') do |_ctx|

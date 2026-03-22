@@ -27,8 +27,8 @@
     },
     {
       "code": "1.104",
-      "description": "HCB Survey",
-      "full": "1.104 HCB Survey"
+      "description": "In House Survey",
+      "full": "1.104 In House Survey"
     },
     {
       "code": "1.201",
@@ -67,8 +67,8 @@
     },
     {
       "code": "1.400",
-      "description": "HCB Demo Labor",
-      "full": "1.400 HCB Demo Labor"
+      "description": "In House Demo Labor",
+      "full": "1.400 In House Demo Labor"
     },
     {
       "code": "002.000",
@@ -97,8 +97,8 @@
     },
     {
       "code": "2.202",
-      "description": "HCB Foundation Labor",
-      "full": "2.202 HCB Foundation Labor"
+      "description": "In House Foundation Labor",
+      "full": "2.202 In House Foundation Labor"
     },
     {
       "code": "2.210",
@@ -162,8 +162,8 @@
     },
     {
       "code": "3.015",
-      "description": "HCB Framing Labor",
-      "full": "3.015 HCB Framing Labor"
+      "description": "In House Framing Labor",
+      "full": "3.015 In House Framing Labor"
     },
     {
       "code": "3.016",
@@ -177,8 +177,8 @@
     },
     {
       "code": "3.021",
-      "description": "HCB Structural Steel",
-      "full": "3.021 HCB Structural Steel"
+      "description": "In House Structural Steel",
+      "full": "3.021 In House Structural Steel"
     },
     {
       "code": "3.030",
@@ -187,13 +187,13 @@
     },
     {
       "code": "3.031",
-      "description": "HCB Timbersmith Labor",
-      "full": "3.031 HCB Timbersmith Labor"
+      "description": "In House Timbersmith Labor",
+      "full": "3.031 In House Timbersmith Labor"
     },
     {
       "code": "3.032",
-      "description": "HCB Timber Package (Structural)",
-      "full": "3.032 HCB Timber Package (Structural)"
+      "description": "In House Timber Package (Structural)",
+      "full": "3.032 In House Timber Package (Structural)"
     },
     {
       "code": "3.040",
@@ -247,8 +247,8 @@
     },
     {
       "code": "3.900",
-      "description": "HCB Rough Shell Labor",
-      "full": "3.900 HCB Rough Shell Labor"
+      "description": "In House Rough Shell Labor",
+      "full": "3.900 In House Rough Shell Labor"
     },
     {
       "code": "004.000",
@@ -327,8 +327,8 @@
     },
     {
       "code": "4.069",
-      "description": "HCB Roofing Labor",
-      "full": "4.069 HCB Roofing Labor"
+      "description": "In House Roofing Labor",
+      "full": "4.069 In House Roofing Labor"
     },
     {
       "code": "4.070",
@@ -367,8 +367,8 @@
     },
     {
       "code": "4.900",
-      "description": "HCB Full Enclosure Labor",
-      "full": "4.900 HCB Full Enclosure Labor"
+      "description": "In House Full Enclosure Labor",
+      "full": "4.900 In House Full Enclosure Labor"
     },
     {
       "code": "005.000",
@@ -692,8 +692,8 @@
     },
     {
       "code": "7.029",
-      "description": "HCB Equipment Rental",
-      "full": "7.029 HCB Equipment Rental"
+      "description": "In House Equipment Rental",
+      "full": "7.029 In House Equipment Rental"
     },
     {
       "code": "7.030",
@@ -762,8 +762,8 @@
     },
     {
       "code": "8.003",
-      "description": "Change Orders - HCB Labor",
-      "full": "8.003 Change Orders - HCB Labor"
+      "description": "Change Orders - In House Labor",
+      "full": "8.003 Change Orders - In House Labor"
     },
     {
       "code": "8.004",
@@ -802,8 +802,8 @@
     },
     {
       "code": "8.505",
-      "description": "HCB Labor Package",
-      "full": "8.505 HCB Labor Package"
+      "description": "In House Labor Package",
+      "full": "8.505 In House Labor Package"
     },
     {
       "code": "009.000",
@@ -837,8 +837,8 @@
     },
     {
       "code": "9.006",
-      "description": "HCB Design Agreement",
-      "full": "9.006 HCB Design Agreement"
+      "description": "In House Design Agreement",
+      "full": "9.006 In House Design Agreement"
     }
   ],
   "category_to_cost_code": {

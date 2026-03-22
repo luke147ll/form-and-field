@@ -35,6 +35,8 @@
   .tpl-item:hover { background:#45475a; border-radius:4px; }
   .tpl-name { font-weight:600; color:#cdd6f4; flex:1; cursor:pointer; }
   .tpl-name:hover { color:#89b4fa; }
+  .tpl-rename-input { flex:1; background:#1e1e2e; border:1px solid #89b4fa; color:#cdd6f4; padding:2px 6px; border-radius:4px; font-size:12px; font-family:inherit; font-weight:600; }
+  .tpl-rename-input:focus { outline:none; }
   .tpl-meta { color:#6c7086; font-size:10px; white-space:nowrap; }
   .tpl-default { background:#a6e3a1; color:#1e1e2e; font-size:9px; padding:1px 5px; border-radius:8px; font-weight:700; }
   .tpl-actions { display:flex; gap:3px; }
@@ -130,6 +132,7 @@
         html += '<span class="tpl-actions">';
         html += '<button class="btn grn sm" onclick="applyTpl(\'' + escQ(t.name) + '\')">Apply</button>';
         html += '<button class="btn teal sm" onclick="updateTpl(\'' + escQ(t.name) + '\')">Update</button>';
+        html += '<button class="btn sm" onclick="startRename(\'' + escQ(t.name) + '\',this)">Rename</button>';
         if (!isDefault) {
           html += '<button class="btn mauve sm" onclick="setDefault(\'' + escQ(t.name) + '\')">Set Default</button>';
         } else {
@@ -177,6 +180,31 @@
 
     function clearDefault() {
       sketchup.clearDefault();
+    }
+
+    function startRename(oldName, btn) {
+      var row = btn.closest('.tpl-item');
+      var nameEl = row.querySelector('.tpl-name');
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'tpl-rename-input';
+      input.value = oldName;
+      input.dataset.oldName = oldName;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') commitRename(input);
+        if (e.key === 'Escape') renderList();
+      });
+      input.addEventListener('blur', function() { commitRename(input); });
+    }
+
+    function commitRename(input) {
+      var oldName = input.dataset.oldName;
+      var newName = input.value.trim();
+      if (!newName || newName === oldName) { renderList(); return; }
+      sketchup.renameTemplate(JSON.stringify({old: oldName, new: newName}));
     }
 
     function receivePreview(data) {

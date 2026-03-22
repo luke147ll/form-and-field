@@ -751,6 +751,65 @@ module TakeoffTool
         end
       end
 
+      # ── Count Measurement ──
+
+      dialog.add_action_callback('measureCount') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cat = data['category'].to_s
+          label = data['label'] || cat
+          color = data['color']
+          TakeoffTool.activate_count_tool_new(cat, label, color)
+        rescue => e
+          puts "measureCount error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('addCountMarkers') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'].to_s
+          TakeoffTool.activate_count_tool_for_group(eid, cat)
+        rescue => e
+          puts "addCountMarkers error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeCountMarkers') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_count_tool(eid_str.to_i)
+        rescue => e
+          puts "removeCountMarkers error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateCountLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_count_label(data['eid'].to_i, data['label'].to_s)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateCountLabel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateCountColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_count_color(data['eid'].to_i, data['color'])
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateCountColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       # Forward arrow keys from dashboard to active measurement tool
       dialog.add_action_callback('toolArrowKey') do |_ctx, key_str|
         begin

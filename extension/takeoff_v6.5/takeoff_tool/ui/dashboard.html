@@ -272,6 +272,37 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .apf-btn.save:hover{opacity:.85}
 .apf-btn.cancel{background:transparent;border:1px solid var(--surface1);color:var(--subtext0)}
 .apf-btn.cancel:hover{border-color:var(--overlay0);color:var(--text)}
+/* ── Parts Builder Modal ── */
+.pb-overlay{display:none;position:fixed;inset:0;background:rgba(17,17,27,.85);z-index:9000;align-items:center;justify-content:center}
+.pb-overlay.open{display:flex}
+.pb-modal{background:var(--base);border:1px solid var(--surface1);border-radius:10px;width:420px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.pb-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--surface0)}
+.pb-hdr-title{font:600 13px var(--font-mono);color:var(--text)}
+.pb-hdr-sub{font-size:10px;color:var(--overlay0);margin-left:8px;font-weight:400}
+.pb-close{background:none;border:none;color:var(--overlay0);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}.pb-close:hover{color:var(--red);background:rgba(243,139,168,.08)}
+.pb-body{padding:12px 16px;overflow-y:auto;flex:1;min-height:0}
+.pb-types{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.pb-type{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;border-radius:6px;border:1px solid var(--surface1);cursor:pointer;transition:all .15s;background:var(--mantle)}
+.pb-type:hover{border-color:var(--overlay0);background:var(--surface0)}
+.pb-type.sel{border-color:var(--mauve);background:rgba(203,166,247,.08)}
+.pb-type-ico{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:700 11px var(--font-mono);color:var(--crust)}
+.pb-type-lbl{font-size:9px;color:var(--subtext0);text-align:center;line-height:1.2}
+.pb-cfg{display:none}.pb-cfg.open{display:block}
+.pb-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.pb-lbl{font-size:10px;color:var(--overlay1);width:70px;flex-shrink:0}
+.pb-inp{background:var(--mantle);border:1px solid var(--surface1);border-radius:4px;padding:4px 8px;color:var(--text);font:11px var(--font-mono);flex:1}.pb-inp:focus{outline:none;border-color:var(--mauve)}
+.pb-sel{background:var(--mantle);border:1px solid var(--surface1);border-radius:4px;padding:4px 8px;color:var(--text);font:11px var(--font-mono)}.pb-sel:focus{outline:none;border-color:var(--mauve)}
+.pb-preview{background:var(--mantle);border:1px solid var(--surface0);border-radius:6px;padding:8px 12px;margin-top:10px;font-size:11px;color:var(--subtext0);line-height:1.5}
+.pb-preview b{color:var(--text);font-weight:700}
+.pb-preview .pb-order{font:700 14px var(--font-num);color:var(--green)}
+.pb-acts{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--surface0)}
+.pb-btn{font:500 11px var(--font-mono);padding:6px 16px;border-radius:5px;border:none;cursor:pointer;transition:all .15s}
+.pb-btn.pri{background:var(--mauve);color:var(--crust);font-weight:600}.pb-btn.pri:hover{opacity:.85}
+.pb-btn.sec{background:transparent;border:1px solid var(--surface1);color:var(--subtext0)}.pb-btn.sec:hover{border-color:var(--overlay0)}
+/* Parts builder part row icon */
+.pb-ico{width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font:700 8px var(--font-mono);color:var(--crust);flex-shrink:0}
+.mcard-part-cfg{font-size:8px;color:var(--overlay0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.mcard-part-order{font:700 10px var(--font-num);color:var(--green);white-space:nowrap}
 /* ── Meas empty state ── */
 .meas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:60px 20px;color:var(--overlay0);gap:12px}
@@ -1514,9 +1545,10 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   </div>
   <button id="mvExitAnalysis" onclick="exitAnalysisMode()" style="display:none;font-size:11px;padding:4px 14px;background:#f38ba8;color:#1e1e2e;border:none;border-radius:4px;cursor:pointer;font-weight:700;font-family:inherit;">Exit Analysis</button>
   <span class="mv-label" id="mvLabel"></span>
-  <button class="mv-compare-btn" id="mvCompareBtn" onclick="runCompare()">Compare</button>
-  <button class="mv-graph-btn" id="mvGraphBtn" onclick="showGraph()" style="display:none">&#127822; Graph</button>
-  <span class="mv-diff-toggle" id="mvDiffToggle" onclick="toggleDiff()">Diff</span>
+  <!-- hidden for release: compare + apples-to-apples -->
+  <button class="mv-compare-btn" id="mvCompareBtn" onclick="runCompare()" style="display:none!important">Compare</button>
+  <button class="mv-graph-btn" id="mvGraphBtn" onclick="showGraph()" style="display:none!important">&#127822; Graph</button>
+  <span class="mv-diff-toggle" id="mvDiffToggle" onclick="toggleDiff()" style="display:none!important">Diff</span>
   <span class="mv-filter-toggle" id="mvMatchedToggle" onclick="toggleMatchedFilter()" style="display:none">Matched Only</span>
   <span class="mv-summary" id="mvSummary"></span>
 </div>
@@ -1633,7 +1665,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   </div>
 
   <!-- COMPARISON RESULTS (quantity delta table) -->
-  <div class="comp-results" id="compResults">
+  <!-- hidden for release: compare results panel -->
+  <div class="comp-results" id="compResults" style="display:none!important">
     <div class="comp-header">
       <span class="comp-title" id="compTitle">Quantity Delta &mdash; A vs B</span>
       <button class="comp-flip-btn" onclick="flipCompBaseline()" title="Swap baseline" style="background:#45475a;color:#cdd6f4;border:1px solid #585b70;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px">&#8644; Flip</button>
@@ -1648,8 +1681,8 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     </div>
   </div>
 
-  <!-- GRAPH OVERLAY (apples-to-apples comparison) -->
-  <div class="graph-overlay" id="graphOverlay">
+  <!-- GRAPH OVERLAY (apples-to-apples comparison) — hidden for release -->
+  <div class="graph-overlay" id="graphOverlay" style="display:none!important">
     <div class="graph-header">
       <span class="graph-title">&#127822; Apples to Apples &mdash; Quantity Comparison</span>
       <button class="graph-close" onclick="closeGraph()">&times;</button>
@@ -1687,6 +1720,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
           <button class="mtype-chip sf active" onclick="togMeasType('sf',this)"><span class="mc-icon">&#11026;</span>SF<span class="mc-count" id="mcSF">0</span></button>
           <button class="mtype-chip elev active" onclick="togMeasType('elev',this)"><span class="mc-icon">&#8895;</span>Elev<span class="mc-count" id="mcElev">0</span></button>
           <button class="mtype-chip vol active" onclick="togMeasType('vol',this)"><span class="mc-icon">&#10696;</span>Vol<span class="mc-count" id="mcVol">0</span></button>
+          <button class="mtype-chip count active" onclick="togMeasType('count',this)" style="--chip-color:#f9e2af"><span class="mc-icon">&#9670;</span>Count<span class="mc-count" id="mcCount">0</span></button>
         </div>
         <div class="ms-search">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M9 9L12 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -1754,7 +1788,12 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
         <div class="mv-models" id="mvModels"></div>
         <div class="mv-needs-scan" id="mvNeedsScan" style="display:none">
           <span style="color:#f9e2af;font-size:11px">Model B imported — not yet scanned</span>
-          <span class="mv-scan-b-btn" onclick="showLoading('SCANNING MODEL B','scan');setTimeout(function(){call('rescanModelB');},60)">Scan Model B</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <select id="mvTplSelectScan" style="background:var(--surface0);border:1px solid var(--surface1);color:var(--text);border-radius:4px;padding:3px 8px;font:10px var(--font-mono);max-width:180px">
+              <option value="">No template</option>
+            </select>
+            <span class="mv-scan-b-btn" onclick="scanBWithTemplate()">Scan Model B</span>
+          </div>
         </div>
         <!-- Smart Diff Controls Panel (top priority) -->
         <div id="smartDiffPanel" style="display:none;background:#1e1e2e;border:1px solid #313244;border-radius:8px;padding:10px;margin:6px 0;">
@@ -1797,8 +1836,14 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
             <div id="mvCommitLog" style="max-height:200px;overflow-y:auto;"></div>
           </div>
         </div>
-        <div class="mv-management">
-          <span class="mv-mgmt-btn" onclick="showLoading('RESCANNING MODEL B','scan');setTimeout(function(){call('rescanModelB');},60)">Rescan B</span>
+        <div class="mv-management" style="flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:4px">
+            <span style="font-size:9px;color:var(--overlay0);white-space:nowrap">B Template:</span>
+            <select id="mvTplSelect" onchange="call('setModelBTemplate',this.value)" style="background:var(--surface0);border:1px solid var(--surface1);color:var(--text);border-radius:4px;padding:3px 8px;font:10px var(--font-mono);flex:1;max-width:200px">
+              <option value="">None (use Model A categories)</option>
+            </select>
+          </div>
+          <span class="mv-mgmt-btn" onclick="rescanBWithTemplate()">Rescan B</span>
           <span class="mv-mgmt-btn" onclick="call('importComparisonModel')">Import New</span>
           <span class="mv-mgmt-btn danger" onclick="confirmRemoveMv()">Remove Model B</span>
         </div>
@@ -4100,6 +4145,22 @@ function updatePortalProgress(percent,text){
   document.getElementById('portalProgressFill').style.width=percent+'%';
   document.getElementById('portalProgressText').textContent=text||(percent+'%');
 }
+function showPortalPrompt(title,placeholder,onSubmit){
+  document.getElementById('portalTitle').textContent=title;
+  document.getElementById('portalDesc').textContent='';
+  document.getElementById('portalProgress').style.display='none';
+  var acts=document.getElementById('portalActions');
+  acts.style.display='flex';
+  acts.innerHTML='<input type="text" id="portalPromptInput" placeholder="'+(placeholder||'')+'" style="flex:1;background:var(--mantle);border:1px solid var(--surface1);border-radius:4px;padding:6px 10px;color:var(--text);font:12px var(--font-mono);outline:none"><span class="portal-btn portal-confirm" id="portalPromptOk">OK</span><span class="portal-btn portal-cancel" onclick="hidePortal()">Cancel</span>';
+  var inp=document.getElementById('portalPromptInput');
+  var btn=document.getElementById('portalPromptOk');
+  function submit(){var v=(inp.value||'').trim();if(!v)return;hidePortal();onSubmit(v);}
+  btn.onclick=submit;
+  inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();submit();}if(e.key==='Escape'){hidePortal();}};
+  var ov=document.getElementById('portalOverlay');
+  ov.style.display='flex';ov.style.opacity='';ov.style.transition='';
+  setTimeout(function(){inp.focus();},100);
+}
 function hidePortal(){
   var ov=document.getElementById('portalOverlay');
   ov.style.opacity='0';ov.style.transition='opacity 0.3s ease';
@@ -4246,11 +4307,11 @@ function setMvView(mode){
   if(mode==='a') lbl.textContent='Model A: '+mvModelA;
   else if(mode==='b') lbl.textContent='Model B: '+mvModelB;
   else lbl.textContent='Comparing A + B';
-  // Show Compare button only in A+B mode
-  var cmpBtn=document.getElementById('mvCompareBtn');
-  if(cmpBtn)cmpBtn.style.display=(mode==='ab')?'inline-block':'none';
-  var gBtn=document.getElementById('mvGraphBtn');
-  if(gBtn)gBtn.style.display=(mode==='ab')?'inline-block':'none';
+  // Compare + Graph hidden for release
+  // var cmpBtn=document.getElementById('mvCompareBtn');
+  // if(cmpBtn)cmpBtn.style.display=(mode==='ab')?'inline-block':'none';
+  // var gBtn=document.getElementById('mvGraphBtn');
+  // if(gBtn)gBtn.style.display=(mode==='ab')?'inline-block':'none';
   // Clear diff state when leaving A+B
   if(mode!=='ab'){
     diffActive=false;diffComputed=false;comparisonResults=null;
@@ -4321,6 +4382,7 @@ function receiveMultiverseData(data){
     renderMvModels(d.models);
     renderMvComparison(d.comparison||[]);
     renderCommitLog(d.commitLog||[]);
+    call('getTemplateList');
     var diff=0;(d.comparison||[]).forEach(function(c){diff+=c.diff;});
     document.getElementById('mvSummary').textContent=(diff>=0?'+':'')+diff+' items';
     var lbl=document.getElementById('mvLabel');
@@ -4449,6 +4511,44 @@ function confirmRemoveMv(){
   showPortalConfirm('Remove Model B','Remove comparison model? All Model B entities will be deleted.',function(){
     call('removeComparisonModel');
   });
+}
+
+function scanBWithTemplate(){
+  var sel=document.getElementById('mvTplSelectScan');
+  var tpl=sel?sel.value:'';
+  if(tpl) call('rescanModelBWithTemplate',tpl);
+  else call('rescanModelB');
+}
+
+function rescanBWithTemplate(){
+  var sel=document.getElementById('mvTplSelect');
+  var tpl=sel?sel.value:'';
+  if(tpl) call('rescanModelBWithTemplate',tpl);
+  else call('rescanModelB');
+}
+
+function receiveTemplateList(data){
+  var d=typeof data==='string'?JSON.parse(data):data;
+  var templates=d.templates||[];
+  var current=d.current||'';
+  var selScan=document.getElementById('mvTplSelectScan');
+  var selMgmt=document.getElementById('mvTplSelect');
+  if(selScan){
+    var h='<option value="">No template</option>';
+    for(var i=0;i<templates.length;i++){
+      var sel=templates[i]===current?' selected':'';
+      h+='<option value="'+templates[i]+'"'+sel+'>'+templates[i]+'</option>';
+    }
+    selScan.innerHTML=h;
+  }
+  if(selMgmt){
+    var h2='<option value="">None (use Model A categories)</option>';
+    for(var j=0;j<templates.length;j++){
+      var sel2=templates[j]===current?' selected':'';
+      h2+='<option value="'+templates[j]+'"'+sel2+'>'+templates[j]+'</option>';
+    }
+    selMgmt.innerHTML=h2;
+  }
 }
 
 /* ═══ SMART DIFF ═══ */
@@ -4613,7 +4713,7 @@ function enterSplitMode(){
   if(dpWrap)dpWrap.style.display='none';
   if(sc)sc.style.display='flex';
   if(mmt)mmt.style.display='';
-  var gBtn=document.getElementById('mvGraphBtn');if(gBtn)gBtn.style.display='inline-block';
+  // var gBtn=document.getElementById('mvGraphBtn');if(gBtn)gBtn.style.display='inline-block'; // hidden for release
   // Populate panel headers
   document.getElementById('panelAName').textContent=mvModelA||'';
   document.getElementById('panelBName').textContent=mvModelB||'';
@@ -4723,8 +4823,9 @@ function renderSplitPanel(panel){
     var isIso2=(splitIsolateState[panel]===gk);
     catH+='<button class="split-iso-btn'+(isIso2?' iso-active':'')+'" data-cat="'+X2(gk)+'" onclick="event.stopPropagation();isolateSplitCat(\''+X2(gk)+'\',\''+panel+'\')" title="Isolate">&#8857;</button>';
     if(panel==='b'){catH+='<button class="split-commit-btn" onclick="event.stopPropagation();commitCategory(\''+X2(gk)+'\')" title="Commit to Model A">&#8599;</button>';}
-    var isAppled=!!graphCats[gk];
-    catH+='<button class="apple-btn'+(isAppled?' sel':'')+'" onclick="event.stopPropagation();toggleGraphCat(\''+X2(gk)+'\')" title="Select for graph comparison">&#127822;</button>';
+    // hidden for release: apple graph selector
+    // var isAppled=!!graphCats[gk];
+    // catH+='<button class="apple-btn'+(isAppled?' sel':'')+'" onclick="event.stopPropagation();toggleGraphCat(\''+X2(gk)+'\')" title="Select for graph comparison">&#127822;</button>';
     catH+='<span class="arr">&#9660;</span>';
     catH+=catNameSpan(gk);
     catH+='<span style="color:#6c7086;font-size:10px">('+items.length+')</span>';
@@ -5001,6 +5102,7 @@ function setDiffToggle(isOn){
   updateDiffToggle();
 }
 function updateDiffToggle(){
+  return; // hidden for release
   var el=document.getElementById('mvDiffToggle');
   if(!el)return;
   if(diffComputed){
@@ -6962,7 +7064,7 @@ function populateDebugCatSelect(){
   sel.innerHTML=h;
 }
 var MEAS=[],openMeasCats={},SCAN_TOTALS={},DERIVED={};
-var measTypeFilter={lf:true,sf:true,elev:true,vol:true};
+var measTypeFilter={lf:true,sf:true,elev:true,vol:true,count:true};
 var _linkPickEid=0; // parent card eid when in click-to-link mode
 var openMeasConts={};
 var MSVG={
@@ -6974,16 +7076,18 @@ var MSVG={
   plus:'<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2V10M2 6H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 };
 var MTYPES={
-  lf:  {label:'LF',  color:'#a6e3a1',unit:'LF', icon:'&#10236;'},
-  sf:  {label:'SF',  color:'#a6e3a1',unit:'SF', icon:'&#11026;'},
-  elev:{label:'Elev',color:'#a6e3a1',unit:"'",  icon:'&#8895;'},
-  vol: {label:'Vol', color:'#a6e3a1',unit:'CF', icon:'&#10696;'}
+  lf:   {label:'LF',   color:'#a6e3a1',unit:'LF', icon:'&#10236;'},
+  sf:   {label:'SF',   color:'#a6e3a1',unit:'SF', icon:'&#11026;'},
+  elev: {label:'Elev', color:'#a6e3a1',unit:"'",  icon:'&#8895;'},
+  vol:  {label:'Vol',  color:'#a6e3a1',unit:'CF', icon:'&#10696;'},
+  count:{label:'Count',color:'#f9e2af',unit:'EA', icon:'&#9670;'}
 };
 function measTypeKey(mtype,unit){
   if(mtype==='CARD')return 'card';
   if(mtype==='LF')return 'lf';if(mtype==='SF')return 'sf';
   if(mtype==='ELEV')return 'elev';if(mtype==='BOX'||mtype==='VOL')return 'vol';
-  if(unit==='LF')return 'lf';if(unit==='SF')return 'sf';if(unit==='CF')return 'vol';
+  if(mtype==='COUNT')return 'count';
+  if(unit==='LF')return 'lf';if(unit==='SF')return 'sf';if(unit==='CF')return 'vol';if(unit==='EA')return 'count';
   return 'lf';
 }
 function toggleMeasPanel(){toggleMeasSection();}
@@ -7032,16 +7136,17 @@ function renderMeasPanel(){
   }
 
   // Update type chip counts
-  var counts={lf:0,sf:0,elev:0,vol:0};
-  for(var ci=0;ci<MEAS.length;ci++){if(MEAS[ci].type==='NOTE'||MEAS[ci].type==='CARD')continue;var tk2=measTypeKey(MEAS[ci].type,MEAS[ci].unit);counts[tk2]++;}
+  var counts={lf:0,sf:0,elev:0,vol:0,count:0};
+  for(var ci=0;ci<MEAS.length;ci++){if(MEAS[ci].type==='NOTE'||MEAS[ci].type==='CARD')continue;var tk2=measTypeKey(MEAS[ci].type,MEAS[ci].unit);counts[tk2]=(counts[tk2]||0)+1;}
   var ce=document.getElementById('mcLF');if(ce)ce.textContent=counts.lf;
   ce=document.getElementById('mcSF');if(ce)ce.textContent=counts.sf;
   ce=document.getElementById('mcElev');if(ce)ce.textContent=counts.elev;
   ce=document.getElementById('mcVol');if(ce)ce.textContent=counts.vol;
+  ce=document.getElementById('mcCount');if(ce)ce.textContent=counts.count;
 
   // Summary strip
   var sh='';
-  var typeKeys=['lf','sf','elev','vol'];
+  var typeKeys=['lf','sf','elev','vol','count'];
   for(var ti=0;ti<typeKeys.length;ti++){
     var tk3=typeKeys[ti],t=MTYPES[tk3];
     if(!measTypeFilter[tk3])continue;
@@ -7081,7 +7186,7 @@ function renderMeasPanel(){
       var mm=filtered[mi];
       var t2=MTYPES[measTypeKey(mm.type,mm.unit)]||MTYPES.lf;
       var isVis=mm.visible;
-      var isSFLF=(mm.type==='SF'||mm.type==='LF'||mm.type==='VOL');
+      var isSFLF=(mm.type==='SF'||mm.type==='LF'||mm.type==='VOL'||mm.type==='COUNT');
       var isCard=(mm.type==='CARD');
 
       // Determine colors
@@ -7101,12 +7206,13 @@ function renderMeasPanel(){
 
       // Value display
       var valDisp=isCard?'':mm.type==='ELEV'?mm.value.toFixed(1)+"'":fmtMeasVal(mm.value,mm.unit);
-      var mUnit=isCard?'':mm.type==='VOL'?'CY':isSFLF?mm.type:t2.unit;
+      var mUnit=isCard?'':mm.type==='VOL'?'CY':mm.type==='COUNT'?'EA':isSFLF?mm.type:t2.unit;
 
       // Count display
       var countDisp='';
       if(mm.type==='SF')countDisp=(mm.faceCount||0)+' faces';
       else if(mm.type==='LF')countDisp=(mm.segments||0)+' segs';
+      else if(mm.type==='COUNT')countDisp=(mm.markerCount||mm.value||0)+' markers';
       else if(mm.type==='VOL')countDisp=(mm.objectCount||0)+' objs';
 
       // Find derived parts for this measurement
@@ -7128,8 +7234,8 @@ function renderMeasPanel(){
       }
 
       // Callback names for SF/LF add/remove
-      var addCb=mm.type==='SF'?'addSFFaces':mm.type==='LF'?'addLFFaces':mm.type==='VOL'?'addVolObjects':'';
-      var rmCb=mm.type==='SF'?'removeSFFaces':mm.type==='LF'?'removeLFFaces':mm.type==='VOL'?'removeVolObjects':'';
+      var addCb=mm.type==='SF'?'addSFFaces':mm.type==='LF'?'addLFFaces':mm.type==='VOL'?'addVolObjects':mm.type==='COUNT'?'addCountMarkers':'';
+      var rmCb=mm.type==='SF'?'removeSFFaces':mm.type==='LF'?'removeLFFaces':mm.type==='VOL'?'removeVolObjects':mm.type==='COUNT'?'removeCountMarkers':'';
 
       // ── Card start ──
       h+='<div class="mcard'+(isVis?'':' mcard-hidden')+'" data-eid="'+mm.eid+'">';
@@ -7175,8 +7281,8 @@ function renderMeasPanel(){
       // Action buttons
       h+='<div class="mcard-acts">';
       if(!isCard && addCb){
-        var addTip=mm.type==='VOL'?'Add objects':'Add faces';
-        var rmTip=mm.type==='VOL'?'Remove objects':'Remove faces';
+        var addTip=mm.type==='VOL'?'Add objects':mm.type==='COUNT'?'Add markers':'Add faces';
+        var rmTip=mm.type==='VOL'?'Remove objects':mm.type==='COUNT'?'Remove markers':'Remove faces';
         h+='<button class="mcard-act add" onclick="call(\''+addCb+'\',JSON.stringify({eid:'+mm.eid+',category:\''+X2(mm.category)+'\'}))" title="'+addTip+'">+</button>';
         h+='<button class="mcard-act sub" onclick="call(\''+rmCb+'\',\''+mm.eid+'\')" title="'+rmTip+'">&minus;</button>';
       }
@@ -7190,13 +7296,21 @@ function renderMeasPanel(){
       h+='<div class="mcard-right">';
       h+='<div class="mcard-parts-hdr">';
       h+='<span class="mcard-parts-title">Parts</span>';
-      h+='<button class="mcard-parts-add" onclick="showAddPartForm('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')">+ part</button>';
+      h+='<button class="mcard-parts-add" onclick="openPB('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')">+ part</button>';
+      h+='<button class="mcard-parts-add" onclick="showAddPartForm('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')" style="color:var(--overlay0);font-size:8px" title="Legacy add part">+ link</button>';
       h+='</div>';
       if(cardParts.length===0){
         h+='<div class="mcard-noparts">No derived parts</div>';
       } else {
         for(var pi=0;pi<cardParts.length;pi++){
           var pp=cardParts[pi],ppd=pp.data;
+
+          // Parts Builder parts — use typed renderer
+          if(ppd.partBuilder && ppd.pbType && PB_TYPES[ppd.pbType]){
+            h+=pbPartRow(pp,ppd);
+            continue;
+          }
+
           var pVal=ppd.computedValue||0;
           var pUnit=ppd.unit||'SF';
           var pWaste=(ppd.multiplier&&ppd.multiplier!==1)?(' ('+(ppd.multiplier>1?'+':'')+Math.round((ppd.multiplier-1)*100)+'%)'):'';
@@ -7318,8 +7432,12 @@ function renderMeasPanel(){
     h+='<button class="maf-btn" onclick="measAddCancel()" style="color:var(--overlay0);border-color:var(--surface1)">Cancel</button>';
     h+='</div>';
     h+='</div>';
-    h+='<div class="mcard-add" id="measAddBtn" onclick="measAddShow()">';
-    h+=MSVG.plus+' Add measurement card</div>';
+    h+='<div style="display:flex;gap:6px">';
+    h+='<div class="mcard-add" id="measAddBtn" onclick="measAddShow()" style="flex:1">';
+    h+=MSVG.plus+' Add card</div>';
+    h+='<div class="mcard-add" onclick="measCountNew()" style="flex:none;padding:6px 12px;color:#f9e2af">';
+    h+='&#9670; Count</div>';
+    h+='</div>';
   }
 
   document.getElementById('measBody').innerHTML=h;
@@ -7336,6 +7454,7 @@ function fmtMeasVal(val,unit){
   if(unit==='LF')return val.toFixed(1)+' LF';
   if(unit==='CF')return val.toFixed(1)+' CF';
   if(unit==='CY')return val.toFixed(2)+' CY';
+  if(unit==='EA')return Math.round(val)+' EA';
   if(unit==='feet'){var ft=Math.floor(val),inc=Math.round(Math.abs(val-ft)*12);if(inc>=12){ft+=(val>=0?1:-1);inc=0;}return ft+"'-"+inc+'"';}
   if(unit==='meters')return val.toFixed(3)+' m';
   if(unit==='inches')return val.toFixed(1)+'"';
@@ -7352,20 +7471,115 @@ function hideAllMeas(){call('hideAllMeasurements');}
 function recalcSF(){call('recalculateSF');}
 function hideMeasurements(){call('hideAllMeasurements');}
 function delMeas(eid){showConfirmModal('Delete this measurement? This cannot be undone.',function(){call('deleteMeasurement',''+eid);MEAS=MEAS.filter(function(m){return m.eid!==eid;});clrScanHL();updateMeasHdrCnt();renderMeasPanel();});}
+/* ── CSV helpers ── */
+function Q(s){return '"'+((s==null?'':s).toString().replace(/"/g,'""'))+'"';}
+function csvSafe(s){return (s||'').replace(/\u2014/g,'-').replace(/\u2013/g,'-').replace(/\u00d7/g,'x').replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"');}
+function measCleanUnit(mm){
+  if(mm.type==='SF')return 'SF';if(mm.type==='LF')return 'LF';
+  if(mm.type==='VOL')return 'CF';if(mm.type==='COUNT')return 'EA';
+  if(mm.type==='ELEV')return 'FT';return mm.unit||'';
+}
+var CSV_HDR='Parent,Part,Type,Base Qty,Unit,Waste %,Order Qty,Order Unit,Order Desc,Cost Code,Category\n';
+function csvRow(parent,part,type,baseQty,unit,waste,orderQty,orderUnit,orderDesc,cc,cat){
+  return Q(csvSafe(parent))+','+Q(csvSafe(part))+','+type+','
+    +(baseQty===''?'':Math.round(baseQty*100)/100)+','+unit+','
+    +(waste===''||waste===0?'':waste)+','
+    +(orderQty===''?'':Math.round(orderQty*100)/100)+','
+    +Q(csvSafe(orderUnit))+','+Q(csvSafe(orderDesc))+','
+    +Q(csvSafe(cc))+','+Q(csvSafe(cat));
+}
+function csvMeasRow(mm){
+  var label=mm.label||mm.partName||mm.category||'Measurement';
+  return csvRow(label,'','Measurement',mm.value,measCleanUnit(mm),'','','','',mm.costCode||'',mm.category||'');
+}
+/* PB type code map */
+function pbTypeCode(t){
+  var m={sheets:'SH',linear:'LN',rolls:'RL',framing:'WF',oncenter:'OC',coverage:'CV',custom:'FX'};
+  return m[t]||'FX';
+}
+/* Build CSV rows for a Parts Builder derived part */
+function pbCSVRows(dp,parentVal,parentLabel,cc,cat){
+  if(!dp.partBuilder||!dp.pbType||!dp.cfg)return null;
+  var r=pbCompute(dp.pbType,parentVal,dp.cfg);
+  if(!r)return null;
+  var w=dp.cfg.waste||0;
+  var name=csvSafe(dp.cfg.name||dp.name||'Part');
+  var rows=[];
+  if(r.compound&&r.lines){
+    // Studs row
+    var ln0=r.lines[0];
+    var studLen=dp.cfg.studLen||8;
+    var oc=dp.cfg.ocSpacing||16;
+    var wh=dp.cfg.wallHeight||8;
+    rows.push(csvRow(parentLabel,name+' - Studs','WF',ln0.sticks,'EA',w,ln0.sticks,'studs',oc+'" OC '+wh+"' walls "+studLen+"' studs",cc,cat));
+    // Plate rows
+    var plates=dp.cfg.plates||[];
+    for(var li=1;li<r.lines.length;li++){
+      var ln=r.lines[li];
+      var pc=plates[li-1]||{};
+      var pm=csvSafe(ln.material||'Plate');
+      var sLen=pc.stickLen||8;
+      rows.push(csvRow(parentLabel,name+' - '+pm,'PL',ln.lf,'LF',w,ln.sticks,'sticks',sLen+"' sticks"+(pc.multiplier>1?' ('+pc.multiplier+'x)':''),cc,cat));
+    }
+  } else if(dp.pbType==='sheets'){
+    var sw=dp.cfg.sheetW||4;var sh=dp.cfg.sheetH||8;
+    rows.push(csvRow(parentLabel,name,'SH',r.raw,'SF',w,r.order,'sheets',sw+"'x"+sh+"' sheets",cc,cat));
+  } else if(dp.pbType==='linear'){
+    var sl=dp.cfg.stickLen||12;
+    rows.push(csvRow(parentLabel,name,'LN',r.raw,'LF',w,r.order,'sticks',sl+"' sticks",cc,cat));
+  } else if(dp.pbType==='rolls'){
+    var cov=dp.cfg.coverage||150;var cu=dp.cfg.covUnit||'SF';
+    rows.push(csvRow(parentLabel,name,'RL',r.raw,cu==='LF'?'LF':'SF',w,r.order,'rolls',cov+' '+(cu||'SF')+'/roll',cc,cat));
+  } else if(dp.pbType==='oncenter'){
+    var sp=dp.cfg.spacing||32;var su=dp.cfg.spaceUnit||'in';
+    var spLbl=su==='in'?(sp+'"'):(sp+"'");
+    rows.push(csvRow(parentLabel,name,'OC',r.raw,'LF',w,r.order,'EA',spLbl+' O.C.',cc,cat));
+  } else if(dp.pbType==='coverage'){
+    var cr=dp.cfg.coverageRate||350;var cvu=dp.cfg.covUnit||'SF/gal';
+    var cvParts=cvu.split('/');var ouLbl=cvParts.length>1?cvParts[1]:'units';
+    var coats=dp.cfg.coats||1;
+    rows.push(csvRow(parentLabel,name,'CV',r.raw,'SF',w,r.order,ouLbl,cr+' '+cvu+(coats>1?', '+coats+' coats':''),cc,cat));
+  } else if(dp.pbType==='custom'){
+    var ru=dp.cfg.resultUnit||'units';
+    rows.push(csvRow(parentLabel,name,'FX',parentVal,'',w,r.order,ru,dp.cfg.formula||'',cc,cat));
+  }
+  return rows;
+}
+/* Build CSV rows for a legacy (non-PB) derived part */
+function legacyCSVRow(dp,parentLabel,cc,cat){
+  var waste=dp.multiplier?Math.round((dp.multiplier-1)*100):0;
+  var baseQty=dp.multiplier&&dp.multiplier>0?(dp.computedValue/dp.multiplier):dp.computedValue||0;
+  var totalQty=dp.computedValue||0;
+  var srcLabel='Part';
+  if(dp.sourceType==='category_scan')srcLabel='Scan';
+  else if(dp.sourceType==='measurement')srcLabel='Derived';
+  else if(dp.sourceType==='linked')srcLabel='Linked';
+  else if(dp.sourceType==='manual')srcLabel='Manual';
+  return csvRow(parentLabel,csvSafe(dp.name||'Part'),srcLabel,baseQty,dp.unit||'SF',waste,totalQty,dp.unit||'SF','',cc,cat);
+}
+function pbFindParentVal(dp){
+  if(!dp.parentMeasEid&&!dp.sourceEid)return dp.computedValue||0;
+  var eid=dp.parentMeasEid||dp.sourceEid;
+  for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid)return MEAS[i].value||0;}
+  return dp.computedValue||0;
+}
+function csvPartRows(dp,parentVal,parentLabel,cc,cat){
+  var pbRows=pbCSVRows(dp,parentVal,parentLabel,cc,cat);
+  if(pbRows)return pbRows;
+  return [legacyCSVRow(dp,parentLabel,cc,cat)];
+}
+
 /* ── CSV export for a single measurement ── */
 function exportMeasCSV(eid){
   var mm=null;
   for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mm=MEAS[i];break;}}
   if(!mm){showToast('Measurement not found','warning');return;}
   var label=mm.label||mm.partName||mm.category||'measurement';
-  var unit=mm.type==='SF'?'SF':mm.type==='LF'?'LF':mm.type==='VOL'?'CY':mm.unit||'';
-  var count=mm.type==='SF'?(mm.faceCount||0):mm.type==='LF'?(mm.segments||0):mm.type==='VOL'?(mm.objectCount||0):1;
   var cc=mm.costCode||'';
 
-  var csv='Item,Type,Base Qty,Waste %,Total Qty,Unit,Cost Code,Category\n';
-  csv+=Q(label)+',Measurement,'+mm.value+',,'+mm.value+','+unit+','+Q(cc)+','+Q(mm.category||'')+'\n';
+  var csv=CSV_HDR;
+  csv+=csvMeasRow(mm)+'\n';
 
-  // Find parts — match by sourceEid, parentMeasEid, or category for scan parts
   var parts=[];
   for(var id in DERIVED){
     if(!DERIVED.hasOwnProperty(id))continue;
@@ -7375,20 +7589,8 @@ function exportMeasCSV(eid){
     if(dp.category===mm.category&&(dp.sourceType==='category_total'||dp.sourceType==='category_scan')){parts.push(dp);continue;}
   }
   for(var pi=0;pi<parts.length;pi++){
-    var pp=parts[pi];
-    var waste=pp.multiplier?Math.round((pp.multiplier-1)*100):0;
-    var baseQty=pp.multiplier&&pp.multiplier>0?(pp.computedValue/pp.multiplier):pp.computedValue||0;
-    baseQty=Math.round(baseQty*100)/100;
-    var totalQty=pp.computedValue||0;
-    var srcLabel='Part';
-    if(pp.sourceType==='category_scan')srcLabel='Auto Scan';
-    else if(pp.sourceType==='measurement')srcLabel='Derived';
-    else if(pp.sourceType==='tool_sf')srcLabel='Measured SF';
-    else if(pp.sourceType==='tool_lf')srcLabel='Measured LF';
-    else if(pp.sourceType==='tool_vol')srcLabel='Measured Vol';
-    else if(pp.sourceType==='linked')srcLabel='Linked';
-    else if(pp.sourceType==='manual')srcLabel='Manual';
-    csv+=Q(pp.name||'Part')+','+srcLabel+','+baseQty+','+(waste>0?waste+'%':'')+','+totalQty+','+(pp.unit||'SF')+','+Q(cc)+','+Q(mm.category||'')+'\n';
+    var rows=csvPartRows(parts[pi],mm.value,label,cc,mm.category||'');
+    for(var ri=0;ri<rows.length;ri++)csv+=rows[ri]+'\n';
   }
 
   var slug=label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/_+$/,'');
@@ -7400,19 +7602,16 @@ function exportMeasCSV(eid){
   URL.revokeObjectURL(a.href);
   showToast('Exported '+label+' to CSV','success');
 }
-function Q(s){return '"'+(s||'').toString().replace(/"/g,'""')+'"';}
 function exportAllMeasCSV(){
   if(MEAS.length===0){showToast('No measurements to export','warning');return;}
-  var csv='Item,Type,Base Qty,Waste %,Total Qty,Unit,Cost Code,Category\n';
+  var csv=CSV_HDR;
   var usedDp={};
   for(var mi=0;mi<MEAS.length;mi++){
     var mm=MEAS[mi];
     if(mm.type==='NOTE'||mm.type==='BENCHMARK')continue;
     var label=mm.label||mm.partName||mm.category||'Measurement';
-    var unit=mm.type==='SF'?'SF':mm.type==='LF'?'LF':mm.type==='VOL'?'CY':mm.unit||'';
     var cc=mm.costCode||'';
-    csv+=Q(label)+',Measurement,'+mm.value+',,'+mm.value+','+unit+','+Q(cc)+','+Q(mm.category||'')+'\n';
-    // Parts for this card
+    csv+=csvMeasRow(mm)+'\n';
     for(var id in DERIVED){
       if(!DERIVED.hasOwnProperty(id)||usedDp[id])continue;
       var dp=DERIVED[id];
@@ -7422,27 +7621,17 @@ function exportAllMeasCSV(){
       else if(dp.category===mm.category&&(dp.sourceType==='category_total'||dp.sourceType==='category_scan'))match=true;
       if(!match)continue;
       usedDp[id]=true;
-      var waste=dp.multiplier?Math.round((dp.multiplier-1)*100):0;
-      var baseQty=dp.multiplier&&dp.multiplier>0?(dp.computedValue/dp.multiplier):dp.computedValue||0;
-      baseQty=Math.round(baseQty*100)/100;
-      var srcLabel='Part';
-      if(dp.sourceType==='category_scan')srcLabel='Auto Scan';
-      else if(dp.sourceType==='measurement')srcLabel='Derived';
-      else if(dp.sourceType==='tool_sf')srcLabel='Measured SF';
-      else if(dp.sourceType==='tool_lf')srcLabel='Measured LF';
-      else if(dp.sourceType==='tool_vol')srcLabel='Measured Vol';
-      else if(dp.sourceType==='linked')srcLabel='Linked';
-      else if(dp.sourceType==='manual')srcLabel='Manual';
-      csv+=Q(dp.name||'Part')+','+srcLabel+','+baseQty+','+(waste>0?waste+'%':'')+','+(dp.computedValue||0)+','+(dp.unit||'SF')+','+Q(cc)+','+Q(mm.category||'')+'\n';
+      var rows=csvPartRows(dp,mm.value,label,cc,mm.category||'');
+      for(var ri=0;ri<rows.length;ri++)csv+=rows[ri]+'\n';
     }
   }
-  // Orphan derived parts
   for(var oid in DERIVED){
     if(!DERIVED.hasOwnProperty(oid)||usedDp[oid])continue;
     var odp=DERIVED[oid];
-    var owaste=odp.multiplier?Math.round((odp.multiplier-1)*100):0;
-    var obase=odp.multiplier&&odp.multiplier>0?(odp.computedValue/odp.multiplier):odp.computedValue||0;
-    csv+=Q(odp.name||'Part')+',Standalone,'+Math.round(obase*100)/100+','+(owaste>0?owaste+'%':'')+','+(odp.computedValue||0)+','+(odp.unit||'SF')+',,'+Q(odp.category||'')+'\n';
+    var pv=pbFindParentVal(odp);
+    var plbl=csvSafe(odp.name||'Orphan part');
+    var rows=csvPartRows(odp,pv,plbl,'',odp.category||'');
+    for(var ri=0;ri<rows.length;ri++)csv+=rows[ri]+'\n';
   }
   var blob=new Blob([csv],{type:'text/csv'});
   var a=document.createElement('a');
@@ -7498,7 +7687,7 @@ function closeSFCP(){if(_sfCPEl){_sfCPEl.remove();_sfCPEl=null;}}
 function pickSFColor(eid,cat,rgb){
   closeSFCP();
   var mtype='SF';for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mtype=MEAS[i].type;break;}}
-  var cb=mtype==='LF'?'updateLFColor':mtype==='VOL'?'updateVolColor':'updateSFColor';
+  var cb=mtype==='LF'?'updateLFColor':mtype==='VOL'?'updateVolColor':mtype==='COUNT'?'updateCountColor':'updateSFColor';
   callJSON(cb,{eid:eid,color:rgb});
   for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].sfColor=rgb;MEAS[i].color=rgb;break;}}
   renderMeasPanel();
@@ -7506,7 +7695,7 @@ function pickSFColor(eid,cat,rgb){
 function editSFLabel(el,eid){
   var cur=el.textContent;
   var mtype='SF';for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mtype=MEAS[i].type;break;}}
-  var cb=mtype==='LF'?'updateLFLabel':mtype==='VOL'?'updateVolLabel':'updateSFLabel';
+  var cb=mtype==='LF'?'updateLFLabel':mtype==='VOL'?'updateVolLabel':mtype==='COUNT'?'updateCountLabel':'updateSFLabel';
   var inp=document.createElement('input');inp.type='text';inp.value=cur;
   inp.style.cssText='font:inherit;background:var(--surface0);color:var(--text);border:1px solid var(--overlay0);border-radius:3px;padding:1px 4px;width:100%;outline:none;font-size:11px';
   el.textContent='';el.appendChild(inp);inp.focus();inp.select();
@@ -7608,6 +7797,13 @@ function measAddCreate(){
   call('createEmptyCard',label);
   showToast('Created card "'+label+'"','success');
 }
+function measCountNew(){
+  showPortalPrompt('New Count Measurement','e.g. Joist Hangers',function(label){
+    callJSON('measureCount',{category:'Custom',label:label,color:null});
+    showToast('Count tool active — click to place markers','info');
+  });
+}
+
 /* ── Link-pick mode: click a card to link it ── */
 function applyLinkPickClasses(){
   // Build set of valid target eids from the dropdown
@@ -7900,6 +8096,330 @@ function submitAddPart(eid,cat){
     hideAddPartForm(eid);
     showToast('Part "'+name+'" created','success');
   }
+}
+
+/* ═══ PARTS BUILDER ═══ */
+var PB_TYPES={
+  sheets:  {code:'SH',label:'Sheet Goods',   color:'#89b4fa',desc:'Plywood, drywall, OSB'},
+  linear:  {code:'LN',label:'Linear Stock',  color:'#a6e3a1',desc:'Lumber, trim, pipe'},
+  rolls:   {code:'RL',label:'Roll Goods',    color:'#cba6f7',desc:'Housewrap, felt, membrane'},
+  framing: {code:'WF',label:'Wall Framing',  color:'#fab387',desc:'Studs + plates from wall LF'},
+  oncenter:{code:'OC',label:'On Center',     color:'#f5c2e7',desc:'Anchor bolts, rebar, fasteners'},
+  coverage:{code:'CV',label:'Area Coverage', color:'#94e2d5',desc:'Paint, concrete, coatings'},
+  custom:  {code:'FX',label:'Custom Calc',   color:'#89dcfe',desc:'Formula-based'}
+};
+var _pbPlates=[];
+var _pbEid=0,_pbCat='',_pbVal=0,_pbUnit='',_pbType=null,_pbLabel='';
+
+function openPB(eid,cat,mtype){
+  var mm=null;
+  for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mm=MEAS[i];break;}}
+  if(!mm)return;
+  _pbEid=eid;_pbCat=cat;_pbVal=mm.value||0;_pbUnit=mm.unit||mm.type||'SF';_pbType=null;
+  _pbLabel=(mm.label||mm.category||'Measurement');
+  document.getElementById('pbParentLabel').textContent=fmtMeasVal(_pbVal,_pbUnit)+' '+_pbUnit+' \u2014 '+_pbLabel;
+  // Render type picker
+  var h='';
+  for(var k in PB_TYPES){
+    if(!PB_TYPES.hasOwnProperty(k))continue;
+    var t=PB_TYPES[k];
+    h+='<div class="pb-type" data-type="'+k+'" onclick="pbSelectType(\''+k+'\')">';
+    h+='<div class="pb-type-ico" style="background:'+t.color+'">'+t.code+'</div>';
+    h+='<div class="pb-type-lbl">'+t.label+'</div>';
+    h+='</div>';
+  }
+  document.getElementById('pbTypes').innerHTML=h;
+  document.getElementById('pbCfg').className='pb-cfg';
+  document.getElementById('pbCfg').innerHTML='';
+  document.getElementById('pbPreview').style.display='none';
+  document.getElementById('pbAddBtn').style.display='none';
+  document.getElementById('pbOverlay').classList.add('open');
+}
+
+function closePB(){
+  document.getElementById('pbOverlay').classList.remove('open');
+  _pbType=null;
+}
+
+function pbSelectType(type){
+  _pbType=type;
+  document.querySelectorAll('.pb-type').forEach(function(el){el.classList.toggle('sel',el.dataset.type===type);});
+  var cfg=document.getElementById('pbCfg');
+  var h='';
+  if(type==='sheets'){
+    h+='<div class="pb-row"><span class="pb-lbl">Material</span><input class="pb-inp" id="pbName" placeholder="e.g. 1/2&quot; CDX Plywood" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Sheet W (ft)</span><input class="pb-inp" id="pbW" type="number" step="0.5" value="4" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Sheet H (ft)</span><input class="pb-inp" id="pbH" type="number" step="0.5" value="8" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="10" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+  } else if(type==='linear'){
+    h+='<div class="pb-row"><span class="pb-lbl">Material</span><input class="pb-inp" id="pbName" placeholder="e.g. 2\u00d76 SPF #2" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Stick length</span><select class="pb-sel" id="pbLen" onchange="pbCalc()">';
+    [8,10,12,14,16,20].forEach(function(l){h+='<option value="'+l+'"'+(l===12?' selected':'')+'>'+l+"'</option>";});
+    h+='</select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="5" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+  } else if(type==='rolls'){
+    h+='<div class="pb-row"><span class="pb-lbl">Material</span><input class="pb-inp" id="pbName" placeholder="e.g. Tyvek HomeWrap" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Coverage</span><input class="pb-inp" id="pbCov" type="number" step="1" value="150" style="width:80px;flex:none" oninput="pbCalc()">';
+    h+='<select class="pb-sel" id="pbCovUnit" onchange="pbCalc()" style="margin-left:4px"><option value="SF">SF/roll</option><option value="LF">LF/roll</option></select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="10" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+  } else if(type==='framing'){
+    _pbPlates=[];
+    h+='<div class="pb-row"><span class="pb-lbl">Description</span><input class="pb-inp" id="pbName" placeholder="e.g. Interior 2\u00d74 walls" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Wall height</span><input class="pb-inp" id="pbHeight" type="number" step="0.5" value="8" style="width:70px;flex:none" oninput="pbCalc()"><span style="font-size:10px;color:var(--overlay0);margin-left:4px">ft</span></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">OC spacing</span><select class="pb-sel" id="pbOC" onchange="pbCalc()">';
+    h+='<option value="12">12" OC</option><option value="16" selected>16" OC</option><option value="24">24" OC</option></select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Stud length</span><select class="pb-sel" id="pbStudLen" onchange="pbCalc()">';
+    [8,10,12,14,16,20].forEach(function(l){var sel=l===8?' selected':'';h+='<option value="'+l+'"'+sel+'>'+l+"'</option>";});
+    h+='</select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="5" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+    h+='<div style="border-top:1px solid var(--surface0);margin:8px 0 6px;padding-top:8px">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+    h+='<span style="font-size:10px;font-weight:600;color:var(--overlay1)">Plates</span>';
+    h+='<button class="pb-btn sec" onclick="pbAddPlate()" style="padding:2px 8px;font-size:9px">+ Plate</button>';
+    h+='</div>';
+    h+='<div id="pbPlateList"></div>';
+    h+='</div>';
+  } else if(type==='oncenter'){
+    h+='<div class="pb-row"><span class="pb-lbl">Item name</span><input class="pb-inp" id="pbName" placeholder="e.g. 1/2\u2033 Anchor Bolts" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Spacing</span><input class="pb-inp" id="pbSpacing" type="number" step="1" value="32" style="width:70px;flex:none" oninput="pbCalc()">';
+    h+='<select class="pb-sel" id="pbSpaceUnit" onchange="pbCalc()" style="margin-left:4px"><option value="in">inches</option><option value="ft">feet</option></select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Extra each end</span><select class="pb-sel" id="pbEndExtra" onchange="pbCalc()"><option value="1" selected>+1 (standard)</option><option value="0">None</option><option value="2">+2</option></select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="5" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+  } else if(type==='coverage'){
+    h+='<div class="pb-row"><span class="pb-lbl">Material</span><input class="pb-inp" id="pbName" placeholder="e.g. Interior latex paint" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Coverage</span><input class="pb-inp" id="pbCov" type="number" step="1" value="350" style="width:80px;flex:none" oninput="pbCalc()">';
+    h+='<select class="pb-sel" id="pbCovUnit" onchange="pbCalc()" style="margin-left:4px"><option value="SF/gal">SF/gal</option><option value="SF/bag">SF/bag</option><option value="SF/bucket">SF/bucket</option><option value="CF/CY">CF/CY</option></select></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Coats</span><input class="pb-inp" id="pbCoats" type="number" step="1" value="2" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Waste %</span><input class="pb-inp" id="pbWaste" type="number" step="1" value="5" style="width:70px;flex:none" oninput="pbCalc()"></div>';
+  } else if(type==='custom'){
+    h+='<div class="pb-row"><span class="pb-lbl">Part name</span><input class="pb-inp" id="pbName" placeholder="e.g. Fasteners" oninput="pbCalc()"></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Formula</span><input class="pb-inp" id="pbFormula" placeholder="val / 32 * 1.1" oninput="pbCalc()"><span style="font-size:9px;color:var(--overlay0);margin-left:4px">use <b>val</b></span></div>';
+    h+='<div class="pb-row"><span class="pb-lbl">Result unit</span><input class="pb-inp" id="pbResUnit" placeholder="boxes" style="width:80px;flex:none" oninput="pbCalc()"></div>';
+  }
+  cfg.innerHTML=h;
+  cfg.className='pb-cfg open';
+  document.getElementById('pbAddBtn').style.display='';
+  if(type==='framing')pbRenderPlates();
+  pbCalc();
+  var ni=document.getElementById('pbName');if(ni)ni.focus();
+}
+
+function pbAddPlate(){
+  _pbPlates.push({material:'Plate',multiplier:1,stickLen:8});
+  pbRenderPlates();
+  pbCalc();
+}
+function pbRemovePlate(i){
+  _pbPlates.splice(i,1);
+  pbRenderPlates();
+  pbCalc();
+}
+function pbRenderPlates(){
+  var el=document.getElementById('pbPlateList');
+  if(!el)return;
+  var h='';
+  _pbPlates.forEach(function(p,i){
+    h+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">';
+    h+='<select class="pb-sel" style="flex:0 0 80px;font-size:9px" onchange="_pbPlates['+i+'].material=this.value;pbCalc()">';
+    h+='<option value="Plate"'+(p.material==='Plate'?' selected':'')+'>Plate</option>';
+    h+='<option value="PT Plate"'+(p.material==='PT Plate'?' selected':'')+'>PT Plate</option>';
+    h+='</select>';
+    h+='<span style="font-size:9px;color:var(--overlay0)">\u00d7</span>';
+    h+='<input type="number" class="pb-inp" value="'+p.multiplier+'" min="1" max="10" step="1" style="width:36px;flex:none;font-size:9px;text-align:center" onchange="_pbPlates['+i+'].multiplier=parseInt(this.value)||1;pbCalc()">';
+    h+='<select class="pb-sel" style="flex:0 0 58px;font-size:9px" onchange="_pbPlates['+i+'].stickLen=parseInt(this.value);pbCalc()">';
+    [8,10,12,14,16,20].forEach(function(l){h+='<option value="'+l+'"'+(p.stickLen===l?' selected':'')+'>'+l+"'</option>";});
+    h+='</select>';
+    h+='<button class="pb-btn sec" onclick="pbRemovePlate('+i+')" style="padding:1px 5px;font-size:9px;color:var(--red);border-color:var(--red)">\u00d7</button>';
+    h+='</div>';
+  });
+  if(!_pbPlates.length){
+    h+='<span style="font-size:9px;color:var(--overlay0);font-style:italic">No plates added</span>';
+  }
+  el.innerHTML=h;
+}
+function pbUpdatePlate(i,field,val){
+  if(!_pbPlates[i])return;
+  _pbPlates[i][field]=val;
+  pbCalc();
+}
+
+function pbCalc(){
+  var prev=document.getElementById('pbPreview');
+  if(!_pbType){prev.style.display='none';return;}
+  var r=pbCompute(_pbType,_pbVal,null);
+  if(!r){prev.style.display='none';return;}
+  prev.style.display='block';
+  if(_pbType==='framing' && r.lines){
+    var h='From <b>'+fmtMeasVal(_pbVal,_pbUnit)+' '+_pbUnit+'</b> of '+X(_pbLabel)+':';
+    r.lines.forEach(function(ln){h+='<br><span class="pb-order">'+ln.order+'</span> '+X(ln.label);});
+    prev.innerHTML=h;
+  } else {
+    prev.innerHTML='From <b>'+fmtMeasVal(_pbVal,_pbUnit)+' '+_pbUnit+'</b> of '+X(_pbLabel)+':<br><span class="pb-order">'+r.order+'</span> '+X(r.orderUnit);
+  }
+}
+
+function pbReadCfg(type){
+  var c={};
+  c.name=((document.getElementById('pbName')||{}).value||'').trim();
+  c.waste=parseFloat((document.getElementById('pbWaste')||{}).value)||0;
+  if(type==='sheets'){
+    c.sheetW=parseFloat((document.getElementById('pbW')||{}).value)||4;
+    c.sheetH=parseFloat((document.getElementById('pbH')||{}).value)||8;
+  } else if(type==='linear'){
+    c.stickLen=parseFloat((document.getElementById('pbLen')||{}).value)||12;
+  } else if(type==='rolls'){
+    c.coverage=parseFloat((document.getElementById('pbCov')||{}).value)||150;
+    c.covUnit=(document.getElementById('pbCovUnit')||{}).value||'SF';
+  } else if(type==='framing'){
+    c.wallHeight=parseFloat((document.getElementById('pbHeight')||{}).value)||8;
+    c.ocSpacing=parseInt((document.getElementById('pbOC')||{}).value)||16;
+    c.studLen=parseInt((document.getElementById('pbStudLen')||{}).value)||8;
+    c.plates=_pbPlates.map(function(p){return{material:p.material,multiplier:p.multiplier,stickLen:p.stickLen};});
+  } else if(type==='oncenter'){
+    c.spacing=parseFloat((document.getElementById('pbSpacing')||{}).value)||32;
+    c.spaceUnit=(document.getElementById('pbSpaceUnit')||{}).value||'in';
+    c.endExtra=parseInt((document.getElementById('pbEndExtra')||{}).value)||1;
+  } else if(type==='coverage'){
+    c.coverageRate=parseFloat((document.getElementById('pbCov')||{}).value)||350;
+    c.covUnit=(document.getElementById('pbCovUnit')||{}).value||'SF/gal';
+    c.coats=parseInt((document.getElementById('pbCoats')||{}).value)||2;
+  } else if(type==='custom'){
+    c.formula=((document.getElementById('pbFormula')||{}).value||'').trim();
+    c.resultUnit=((document.getElementById('pbResUnit')||{}).value||'').trim();
+  }
+  return c;
+}
+
+function pbCompute(type,parentVal,cfg){
+  var c=cfg||pbReadCfg(type);
+  var w=c.waste||0;
+  if(type==='sheets'){
+    var sf=((c.sheetW||4)*(c.sheetH||8));
+    if(sf<=0)return null;
+    var total=parentVal*(1+w/100);
+    var sheets=Math.ceil(total/sf);
+    return{order:sheets,orderUnit:'sheets ('+(c.sheetW||4)+"'\u00d7"+(c.sheetH||8)+"')",raw:total};
+  } else if(type==='linear'){
+    var len=c.stickLen||12;
+    var total=parentVal*(1+w/100);
+    var sticks=Math.ceil(total/len);
+    return{order:sticks,orderUnit:len+"' sticks",raw:total};
+  } else if(type==='rolls'){
+    var cov=c.coverage||150;
+    if(cov<=0)return null;
+    var total=parentVal*(1+w/100);
+    var rolls=Math.ceil(total/cov);
+    return{order:rolls,orderUnit:'rolls ('+cov+' '+(c.covUnit||'SF')+'/roll)',raw:total};
+  } else if(type==='framing'){
+    var oc=c.ocSpacing||16;
+    var wallIn=parentVal*12;
+    var studs=Math.ceil(wallIn/oc)+1;
+    studs=Math.ceil(studs*(1+w/100));
+    var studLen=c.studLen||8;
+    var lines=[{order:studs,label:studs+' studs @ '+studLen+"'",sticks:studs,lf:studs*studLen}];
+    var plates=c.plates||[];
+    plates.forEach(function(p){
+      var mult=p.multiplier||1;
+      var totalLF=parentVal*mult*(1+w/100);
+      totalLF=Math.ceil(totalLF*10)/10;
+      var sLen=p.stickLen||8;
+      var stickCount=Math.ceil(totalLF/sLen);
+      lines.push({order:stickCount,label:stickCount+' sticks '+p.material+' ('+mult+'x) = '+totalLF.toFixed(1)+' LF @ '+sLen+"'",sticks:stickCount,lf:totalLF,material:p.material});
+    });
+    var totalOrder=lines[0].sticks;
+    plates.forEach(function(p,i){totalOrder+=lines[i+1].sticks;});
+    return{order:totalOrder,orderUnit:'total sticks',raw:studs,lines:lines,compound:true};
+  } else if(type==='oncenter'){
+    var spacing=c.spacing||32;
+    var unit=c.spaceUnit||'in';
+    var spacingFt=unit==='in'?spacing/12:spacing;
+    if(spacingFt<=0)return null;
+    var totalLF=parentVal*(1+w/100);
+    var count=Math.ceil(totalLF/spacingFt)+(c.endExtra||0);
+    var spaceLbl=unit==='in'?(spacing+'"'):(spacing+"'");
+    return{order:count,orderUnit:'EA @ '+spaceLbl+' O.C.',raw:totalLF};
+  } else if(type==='coverage'){
+    var rate=c.coverageRate||350;
+    if(rate<=0)return null;
+    var coats=c.coats||1;
+    var total=parentVal*coats*(1+w/100);
+    var units=Math.ceil(total/rate);
+    var parts=(c.covUnit||'SF/gal').split('/');
+    var unitLbl=parts.length>1?parts[1]:'units';
+    return{order:units,orderUnit:unitLbl+' ('+rate+' '+(c.covUnit||'SF/gal')+')',raw:total};
+  } else if(type==='custom'){
+    if(!c.formula)return null;
+    try{
+      var val=parentVal;
+      var result=eval(c.formula);
+      var order=Math.ceil(result);
+      return{order:order,orderUnit:c.resultUnit||'units',raw:result};
+    }catch(e){return null;}
+  }
+  return null;
+}
+
+function pbSubmit(){
+  if(!_pbType){showToast('Select a part type','warning');return;}
+  var c=pbReadCfg(_pbType);
+  if(!c.name && _pbType!=='custom'){showToast('Enter a material name','warning');return;}
+  if(_pbType==='custom' && !c.formula){showToast('Enter a formula','warning');return;}
+  var r=pbCompute(_pbType,_pbVal,c);
+  if(!r){showToast('Cannot calculate — check inputs','warning');return;}
+  // Build derived part payload
+  var payload={
+    name:c.name||'Custom part',
+    category:_pbCat,
+    sourceType:'measurement',
+    sourceEid:_pbEid,
+    parentMeasEid:_pbEid,
+    unit:_pbUnit,
+    multiplier:1.0,
+    wastePct:c.waste||0,
+    partBuilder:true,
+    pbType:_pbType,
+    cfg:c
+  };
+  callJSON('createDerivedPart',payload);
+  closePB();
+  showToast(PB_TYPES[_pbType].code+' part "'+c.name+'" added','success');
+}
+
+/* Render a parts-builder part row */
+function pbPartRow(pp,ppd){
+  var h='';
+  var t=PB_TYPES[ppd.pbType]||{code:'??',color:'#6c7086'};
+  var r=pbCompute(ppd.pbType,ppd.computedValue||0,ppd.cfg);
+  if(r && r.compound && r.lines){
+    /* Compound framing: header + sub-lines */
+    h+='<div class="mcard-part" style="flex-wrap:wrap">';
+    h+='<span class="pb-ico" style="background:'+t.color+'">'+t.code+'</span>';
+    h+='<span class="mcard-part-name" style="color:'+t.color+'">'+X(ppd.cfg.name||ppd.name||'Wall Framing')+'</span>';
+    h+='<span class="mcard-part-order">'+r.order+'</span>';
+    h+='<span class="mcard-part-unit">total sticks</span>';
+    if(ppd.cfg.waste)h+='<span class="mcard-part-waste">(+'+ppd.cfg.waste+'%)</span>';
+    h+='<button class="mcard-part-del" onclick="delDerived(\''+X2(pp.id)+'\')" title="Delete">\u00d7</button>';
+    h+='<div style="width:100%;padding-left:24px;margin-top:2px">';
+    r.lines.forEach(function(ln){
+      h+='<div style="font-size:9px;color:var(--subtext0);line-height:1.5">';
+      h+=X(ln.label);
+      h+='</div>';
+    });
+    h+='</div>';
+    h+='</div>';
+  } else {
+    h+='<div class="mcard-part">';
+    h+='<span class="pb-ico" style="background:'+t.color+'">'+t.code+'</span>';
+    h+='<span class="mcard-part-name" style="color:'+t.color+'">'+X(ppd.cfg.name||ppd.name||'Part')+'</span>';
+    if(r){
+      h+='<span class="mcard-part-order">'+r.order+'</span>';
+      h+='<span class="mcard-part-unit" style="width:auto;max-width:90px;overflow:hidden;text-overflow:ellipsis">'+X(r.orderUnit)+'</span>';
+    }
+    if(ppd.cfg.waste)h+='<span class="mcard-part-waste">(+'+ppd.cfg.waste+'%)</span>';
+    h+='<button class="mcard-part-del" onclick="delDerived(\''+X2(pp.id)+'\')" title="Delete">\u00d7</button>';
+    h+='</div>';
+  }
+  return h;
 }
 
 /* ═══ CAD OVERLAYS ═══ */
@@ -9353,5 +9873,25 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');}
     <div class="star s7"></div><div class="star s8"></div>
   </div>
 </div>
+
+<!-- Parts Builder Modal -->
+<div class="pb-overlay" id="pbOverlay" onclick="if(event.target===this)closePB()">
+  <div class="pb-modal">
+    <div class="pb-hdr">
+      <span><span class="pb-hdr-title">Parts Builder</span><span class="pb-hdr-sub" id="pbParentLabel"></span></span>
+      <button class="pb-close" onclick="closePB()">&times;</button>
+    </div>
+    <div class="pb-body">
+      <div class="pb-types" id="pbTypes"></div>
+      <div class="pb-cfg" id="pbCfg"></div>
+      <div class="pb-preview" id="pbPreview" style="display:none"></div>
+    </div>
+    <div class="pb-acts">
+      <button class="pb-btn sec" onclick="closePB()">Cancel</button>
+      <button class="pb-btn pri" id="pbAddBtn" onclick="pbSubmit()" style="display:none">Add Part</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

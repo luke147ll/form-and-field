@@ -244,9 +244,21 @@ module TakeoffTool
       end
     end
 
+    # Load a template's definition_map WITHOUT applying containers/rules/cost codes.
+    # Used for Model B scoping — applies a different template's categorization
+    # to only model B entities without changing the global project structure.
+    def self.load_definition_map_for(template_name)
+      return nil if template_name.nil? || template_name.strip.empty?
+      data = read_template(template_name)
+      return nil unless data
+      defn_map = data['definition_map'] || {}
+      defn_map.empty? ? nil : defn_map
+    end
+
     # Called after scan completes — applies definition_map as category assignments
     # and detects NEW entities not in the template (additions/changes in the updated model)
-    def self.apply_definition_map
+    # model_source_filter: nil = all entities, 'model_b' = only non-model_a entities
+    def self.apply_definition_map(model_source_filter: nil)
       return 0 unless @pending_definition_map && !@pending_definition_map.empty?
       defn_map = @pending_definition_map
       @pending_definition_map = nil
@@ -256,9 +268,21 @@ module TakeoffTool
       ca = TakeoffTool.category_assignments || {}
       cc = TakeoffTool.cost_code_assignments || {}
       m = Sketchup.active_model
+      reg = TakeoffTool.entity_registry || {}
 
       applied = 0
       sr.each do |r|
+        # Filter by model source if requested
+        if model_source_filter
+          e = reg[r[:entity_id]]
+          ms = (e && e.valid?) ? (e.get_attribute('FormAndField', 'model_source') || 'model_a') : 'model_a'
+          if model_source_filter == 'model_b'
+            next if ms == 'model_a'
+          elsif model_source_filter == 'model_a'
+            next unless ms == 'model_a'
+          end
+        end
+
         defn_name = r[:definition_name].to_s
         next if defn_name.empty?
         mapping = defn_map[defn_name]
@@ -331,6 +355,37 @@ module TakeoffTool
 
     def self.new_entity_count
       (@new_entities || []).length
+    end
+
+    def self.rename_template(old_name, new_name)
+      return false if old_name.nil? || new_name.nil?
+      old_name = old_name.strip
+      new_name = new_name.strip.gsub(/[^a-zA-Z0-9_\-\s]/, '').strip
+      return false if old_name.empty? || new_name.empty? || old_name == new_name
+
+      ensure_dir
+      old_path = File.join(TEMPLATES_DIR, "#{old_name}.json")
+      new_path = File.join(TEMPLATES_DIR, "#{new_name}.json")
+      return false unless File.exist?(old_path)
+      return false if File.exist?(new_path) # don't overwrite
+
+      require 'json'
+      data = JSON.parse(File.read(old_path))
+      data['template_name'] = new_name
+      File.write(new_path, JSON.pretty_generate(data))
+      File.delete(old_path)
+
+      # Update default template reference if it pointed to the old name
+      default = Sketchup.read_default('FormAndField', 'default_template', '') || ''
+      if default == old_name
+        Sketchup.write_default('FormAndField', 'default_template', new_name)
+      end
+
+      puts "Takeoff: Renamed template '#{old_name}' → '#{new_name}'"
+      true
+    rescue => e
+      puts "Takeoff: rename_template error: #{e.message}"
+      false
     end
 
     def self.delete_template(name)
@@ -420,6 +475,23 @@ module TakeoffTool
           send_template_list
         else
           @dialog.execute_script("showMsg('Failed to update template', 'error')") rescue nil
+        end
+      end
+
+      @dialog.add_action_callback('renameTemplate') do |_ctx, json_str|
+        require 'json'
+        data = JSON.parse(json_str.to_s)
+        old_name = data['old'].to_s.strip
+        new_name = data['new'].to_s.strip
+        if new_name.empty?
+          @dialog.execute_script("showMsg('Enter a new name', 'error')") rescue nil
+          next
+        end
+        if rename_template(old_name, new_name)
+          @dialog.execute_script("showMsg('Renamed!', 'success')") rescue nil
+          send_template_list
+        else
+          @dialog.execute_script("showMsg('Rename failed — name may already exist', 'error')") rescue nil
         end
       end
 

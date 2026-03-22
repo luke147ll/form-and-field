@@ -1233,6 +1233,15 @@ module TakeoffTool
           entry[:unit] = 'CY'
           entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
           entry[:sfColor] = color
+        elsif mtype == 'COUNT'
+          markers = grp.entities.grep(Sketchup::Group).select { |g|
+            g.valid? && g.get_attribute('COUNT_Marker', 'placed')
+          }
+          entry[:value] = markers.length
+          entry[:markerCount] = markers.length
+          entry[:unit] = 'EA'
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color
         elsif mtype == 'CARD'
           entry[:value] = 0
           entry[:unit] = ''

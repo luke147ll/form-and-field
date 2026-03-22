@@ -13,10 +13,17 @@ module TakeoffTool
 
     EVENT_LICENSE_CHANGED = :license_changed
 
+    # Dev bypass — set from Ruby Console:
+    #   TakeoffTool::LicenseManager.dev_mode = true
+    @dev_mode = false
+    class << self; attr_accessor :dev_mode; end
+
     # ── Public API ──────────────────────────────────────────────
 
     # Returns true if the user has a valid, active license.
     def self.licensed?
+      return true if @dev_mode
+
       key = stored_key
       return false unless key && !key.empty?
 

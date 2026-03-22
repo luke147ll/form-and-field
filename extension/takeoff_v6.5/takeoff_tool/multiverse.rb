@@ -119,7 +119,7 @@ module TakeoffTool
     model = Sketchup.active_model
     return UI.messagebox("No model open.") unless model
 
-    path = UI.openpanel('Import Comparison Model', '', 'SketchUp Files|*.skp|IFC Files|*.ifc||')
+    path = UI.openpanel('Import Comparison Model', '', 'SketchUp Files|*.skp|IFC Files|*.ifc|Revit Files|*.rvt||')
     return unless path && File.exist?(path)
 
     basename = File.basename(path)
@@ -141,25 +141,53 @@ module TakeoffTool
       layer_b = model.layers['FF_Model_B'] || model.layers.add('FF_Model_B')
       layer_b.color = Sketchup::Color.new(137, 180, 250) # blue
 
-      # Step 3: Load the file as a definition
+      # Step 3: Load the file
       t2 = Time.now
       mv_loading("Loading #{basename}...", 40)
-      defn = model.definitions.load(path)
-      unless defn
-        model.abort_operation
-        mv_loading_hide
-        UI.messagebox("Failed to load file: #{basename}")
-        return
-      end
-      puts "[FF Import] Load: #{(Time.now - t2).round(1)}s — #{defn.name}"
+      ext = File.extname(path).downcase
 
-      # Step 4: Place as a single component — NO EXPLODE
-      mv_loading('Placing Model B...', 70)
-      inst = model.active_entities.add_instance(defn, ORIGIN)
-      inst.layer = layer_b
-      inst.name = 'FF_ModelB_Import'
-      inst.set_attribute('FormAndField', 'model_source', 'model_b')
-      inst.set_attribute('FormAndField', 'model_b_import', true)
+      if ext == '.rvt'
+        # RVT must use model.import — it places entities directly
+        pre_ids = {}
+        model.active_entities.each { |e| pre_ids[e.entityID] = true }
+        ok = model.import(path)
+        unless ok
+          model.abort_operation
+          mv_loading_hide
+          UI.messagebox("Failed to import file: #{basename}")
+          return
+        end
+        # Collect newly-added top-level entities
+        new_ents = model.active_entities.select { |e| !pre_ids[e.entityID] }
+        puts "[FF Import] Load RVT: #{(Time.now - t2).round(1)}s — #{new_ents.length} new entities"
+
+        # Wrap new entities in a group so we can treat it like a single Model B root
+        mv_loading('Placing Model B...', 70)
+        grp = model.active_entities.add_group(new_ents)
+        grp.layer = layer_b
+        grp.name = 'FF_ModelB_Import'
+        grp.set_attribute('FormAndField', 'model_source', 'model_b')
+        grp.set_attribute('FormAndField', 'model_b_import', true)
+        inst = grp
+      else
+        # SKP / IFC — load as definition, place as component
+        defn = model.definitions.load(path)
+        unless defn
+          model.abort_operation
+          mv_loading_hide
+          UI.messagebox("Failed to load file: #{basename}")
+          return
+        end
+        puts "[FF Import] Load: #{(Time.now - t2).round(1)}s — #{defn.name}"
+
+        # Step 4: Place as a single component — NO EXPLODE
+        mv_loading('Placing Model B...', 70)
+        inst = model.active_entities.add_instance(defn, ORIGIN)
+        inst.layer = layer_b
+        inst.name = 'FF_ModelB_Import'
+        inst.set_attribute('FormAndField', 'model_source', 'model_b')
+        inst.set_attribute('FormAndField', 'model_b_import', true)
+      end
 
       model_b_id = "model_b_#{Time.now.to_i}"
 
@@ -283,7 +311,7 @@ module TakeoffTool
   # Rescan only Model B entities, preserving Model A results.
   # Also handles first-time scan after import: explodes the Model B
   # component, tags entities, then scans.
-  def self.rescan_model_b
+  def self.rescan_model_b(template_name: nil)
     model = Sketchup.active_model
     return unless model
 
@@ -429,10 +457,21 @@ module TakeoffTool
       Dashboard.scan_log_msg("Found #{b_precat} pre-categorized entities in Model B")
     end
 
-    # ── Apply pending template definition map to Model B entities ──
+    # ── Apply template definition map to Model B entities ──
+    # If a specific template was requested for Model B, load its definition map
+    if template_name && defined?(CategoryTemplates)
+      defn_map = CategoryTemplates.load_definition_map_for(template_name)
+      if defn_map
+        CategoryTemplates.instance_variable_set(:@pending_definition_map, defn_map)
+        puts "Multiverse: Loaded definition map from template '#{template_name}' for Model B"
+      end
+      # Store the template choice in multiverse data
+      @multiverse_data['template_model_b'] = template_name if @multiverse_data
+      save_multiverse_data
+    end
     if defined?(CategoryTemplates) && CategoryTemplates.pending_definition_map?
       Dashboard.scan_log_msg("Applying template definition map to Model B...")
-      tpl_applied = CategoryTemplates.apply_definition_map
+      tpl_applied = CategoryTemplates.apply_definition_map(model_source_filter: 'model_b')
       tpl_new = CategoryTemplates.new_entity_count
       if tpl_applied > 0
         Dashboard.scan_log_msg("Template: #{tpl_applied} matched, #{tpl_new} new")
@@ -503,7 +542,7 @@ module TakeoffTool
   # Find the unexploded Model B import component, or nil if already exploded
   def self.find_model_b_import(model)
     model.active_entities.each do |e|
-      next unless e.valid? && e.is_a?(Sketchup::ComponentInstance)
+      next unless e.valid? && (e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group))
       return e if e.get_attribute('FormAndField', 'model_b_import')
       return e if e.name == 'FF_ModelB_Import'
     end

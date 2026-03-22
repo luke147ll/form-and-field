@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Form and Field — Cost Code Editor</title>
+<style>
+:root{
+  --base:#1e1e2e;--mantle:#181825;--crust:#11111b;
+  --surface0:#313244;--surface1:#45475a;--surface2:#585b70;
+  --overlay0:#6c7086;--overlay1:#7f849c;
+  --subtext0:#a6adc8;--subtext1:#bac2de;--text:#cdd6f4;
+  --lavender:#b4befe;--blue:#89b4fa;--sapphire:#74c7ec;--sky:#89dceb;
+  --teal:#94e2d5;--green:#a6e3a1;--yellow:#f9e2af;--peach:#fab387;
+  --red:#f38ba8;--mauve:#cba6f7;--pink:#f5c2e7;
+  --font-mono:'JetBrains Mono','DM Mono','Fira Code',monospace;
+  --font-num:'Space Mono','JetBrains Mono',monospace
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:11px/1.4 var(--font-mono);background:var(--base);color:var(--text);
+  display:flex;flex-direction:column;height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface1);border-radius:3px}
+
+/* ── Header ── */
+.hdr{background:var(--crust);border-bottom:1px solid var(--surface0);
+  padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hdr h1{font-size:12px;font-weight:700;color:var(--mauve);letter-spacing:.5px;white-space:nowrap}
+.hdr-search{flex:1;max-width:240px;padding:5px 10px;border-radius:4px;
+  border:1px solid var(--surface1);background:var(--mantle);color:var(--text);
+  font:10px var(--font-mono);outline:none}
+.hdr-search:focus{border-color:var(--mauve)}
+.hdr-search::placeholder{color:var(--surface2)}
+.hdr-btn{padding:5px 12px;border-radius:4px;border:1px solid var(--surface1);
+  background:transparent;color:var(--subtext0);font:600 10px var(--font-mono);
+  cursor:pointer;transition:all .15s;white-space:nowrap}
+.hdr-btn:hover{background:var(--surface0);color:var(--text)}
+.hdr-btn.grn{color:var(--green);border-color:rgba(166,227,161,.3)}
+.hdr-btn.grn:hover{background:rgba(166,227,161,.1)}
+.hdr-btn.red{color:var(--red);border-color:rgba(243,139,168,.3)}
+.hdr-btn.red:hover{background:rgba(243,139,168,.1)}
+.hdr-btn.mve{color:var(--mauve);border-color:rgba(203,166,247,.3)}
+.hdr-btn.mve:hover{background:rgba(203,166,247,.1)}
+
+/* ── Panels ── */
+.panels{display:flex;flex:1;min-height:0;overflow:hidden}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.panel-left{border-right:1px solid var(--surface0)}
+.panel-hdr{padding:8px 14px;background:var(--mantle);border-bottom:1px solid var(--surface0);
+  display:flex;align-items:center;gap:8px;flex-shrink:0}
+.panel-hdr h2{font-size:10px;font-weight:700;color:var(--subtext0);letter-spacing:.5px;flex:1}
+.panel-hdr .cnt{font-size:9px;color:var(--overlay0);font-weight:400}
+.panel-search{padding:5px 10px;border-radius:3px;border:1px solid var(--surface0);
+  background:var(--base);color:var(--text);font:10px var(--font-mono);outline:none;width:160px}
+.panel-search:focus{border-color:var(--mauve)}
+.panel-search::placeholder{color:var(--surface2)}
+.panel-scroll{flex:1;overflow-y:auto;min-height:0}
+
+/* ── Division Groups ── */
+.div-hdr{padding:6px 14px;background:var(--surface0);border-bottom:1px solid rgba(0,0,0,.2);
+  display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;position:sticky;top:0;z-index:1}
+.div-hdr:hover{background:var(--surface1)}
+.div-arrow{font-size:8px;color:var(--overlay0);transition:transform .15s;width:10px;text-align:center}
+.div-arrow.open{transform:rotate(90deg)}
+.div-code{font-weight:700;color:var(--mauve);font-size:10px;min-width:50px}
+.div-name{color:var(--subtext1);font-size:10px;flex:1}
+.div-cnt{font-size:9px;color:var(--overlay0)}
+.div-body{display:none}
+.div-body.open{display:block}
+
+/* ── Code Rows ── */
+.cc-row{display:flex;align-items:center;gap:8px;padding:4px 14px 4px 34px;
+  border-bottom:1px solid rgba(0,0,0,.1);transition:background .1s}
+.cc-row:hover{background:var(--mantle)}
+.cc-code{font-weight:600;color:var(--peach);font-size:10px;min-width:54px;font-family:var(--font-num)}
+.cc-desc{color:var(--text);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-acts{display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.cc-row:hover .cc-acts{opacity:1}
+.cc-btn{width:20px;height:20px;border-radius:3px;border:none;background:transparent;
+  color:var(--overlay0);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px}
+.cc-btn:hover{background:var(--surface0);color:var(--text)}
+.cc-btn.del:hover{color:var(--red)}
+
+/* ── Inline Edit / Add Form ── */
+.cc-edit{display:flex;align-items:center;gap:6px;padding:4px 14px 4px 34px;background:var(--mantle);
+  border-bottom:1px solid var(--surface0)}
+.cc-input{padding:4px 8px;border-radius:3px;border:1px solid var(--surface1);background:var(--base);
+  color:var(--text);font:10px var(--font-mono);outline:none}
+.cc-input:focus{border-color:var(--mauve)}
+.cc-input.code-in{width:70px;font-family:var(--font-num)}
+.cc-input.desc-in{flex:1}
+.cc-save{padding:3px 10px;border-radius:3px;border:none;background:var(--green);
+  color:var(--crust);font:600 9px var(--font-mono);cursor:pointer}
+.cc-save:hover{filter:brightness(1.1)}
+.cc-cancel{padding:3px 10px;border-radius:3px;border:1px solid var(--surface1);background:transparent;
+  color:var(--subtext0);font:600 9px var(--font-mono);cursor:pointer}
+.cc-cancel:hover{background:var(--surface0)}
+.add-row{padding:8px 14px;border-bottom:1px solid var(--surface0)}
+.add-btn{padding:4px 12px;border-radius:3px;border:1px dashed var(--surface1);background:transparent;
+  color:var(--overlay0);font:500 10px var(--font-mono);cursor:pointer;width:100%;text-align:center}
+.add-btn:hover{border-color:var(--green);color:var(--green);background:rgba(166,227,161,.05)}
+
+/* ── Category Panel ── */
+.cat-row{display:flex;align-items:center;gap:8px;padding:5px 14px;
+  border-bottom:1px solid rgba(0,0,0,.1);transition:background .1s;min-height:30px}
+.cat-row:hover{background:var(--mantle)}
+.cat-name{color:var(--text);font-size:10px;min-width:140px;max-width:200px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-arrow{color:var(--overlay0);font-size:9px;flex-shrink:0}
+.cat-codes{display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0}
+.cat-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;
+  background:var(--surface0);color:var(--green);font:600 9px var(--font-num);white-space:nowrap}
+.cat-badge .badge-x{color:var(--overlay0);cursor:pointer;font-size:8px;margin-left:2px}
+.cat-badge .badge-x:hover{color:var(--red)}
+.cat-none{color:var(--surface2);font-size:9px;font-style:italic}
+.cat-add-btn{padding:2px 6px;border-radius:3px;border:1px dashed var(--surface1);background:transparent;
+  color:var(--overlay0);font-size:9px;cursor:pointer}
+.cat-add-btn:hover{border-color:var(--green);color:var(--green)}
+
+/* ── Code Picker Dropdown ── */
+.cc-picker{display:none;position:fixed;z-index:9999;background:var(--mantle);
+  border:1px solid var(--surface1);border-radius:4px;box-shadow:0 4px 16px rgba(0,0,0,.5);
+  min-width:200px;max-height:280px;overflow:hidden;flex-direction:column}
+.cc-picker.open{display:flex}
+.cc-picker-search{padding:6px 10px;border:none;border-bottom:1px solid var(--surface0);
+  background:var(--base);color:var(--text);font:10px var(--font-mono);outline:none}
+.cc-picker-list{overflow-y:auto;flex:1}
+.cc-picker-item{display:block;width:100%;padding:4px 10px;border:none;background:transparent;
+  color:var(--subtext0);font:10px var(--font-mono);cursor:pointer;text-align:left;white-space:nowrap}
+.cc-picker-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.cc-picker-item .pk-code{color:var(--peach);font-weight:600;font-family:var(--font-num);margin-right:8px}
+.cc-picker-div{font-size:9px;color:var(--overlay0);padding:4px 10px;
+  border-top:1px solid var(--surface0);margin-top:2px;font-weight:600}
+
+/* ── Status Bar ── */
+.status{background:var(--crust);border-top:1px solid var(--surface0);
+  padding:6px 16px;font-size:9px;color:var(--overlay0);display:flex;align-items:center;gap:16px;flex-shrink:0}
+.status .st-num{color:var(--subtext0);font-weight:600}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);padding:6px 16px;
+  border-radius:4px;font:600 10px var(--font-mono);z-index:10000;opacity:0;
+  transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.success{background:rgba(166,227,161,.15);color:var(--green);border:1px solid rgba(166,227,161,.2)}
+.toast.error{background:rgba(243,139,168,.15);color:var(--red);border:1px solid rgba(243,139,168,.2)}
+.toast.warning{background:rgba(249,226,175,.15);color:var(--yellow);border:1px solid rgba(249,226,175,.2)}
+.sort-btn{padding:3px 8px;border-radius:3px;border:1px solid var(--surface1);background:transparent;
+  color:var(--overlay0);font:600 9px var(--font-mono);cursor:pointer;transition:all .15s}
+.sort-btn:hover{background:var(--surface0);color:var(--text)}
+.sort-btn.active{background:var(--surface0);color:var(--mauve);border-color:rgba(203,166,247,.3)}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <h1>COST CODES</h1>
+  <span style="flex:1"></span>
+  <button class="hdr-btn grn" onclick="doImportCSV()">Import CSV</button>
+  <button class="hdr-btn mve" onclick="doExportCSV()">Export CSV</button>
+  <button class="hdr-btn red" onclick="doReset()">Reset Defaults</button>
+</div>
+
+<!-- Panels -->
+<div class="panels">
+  <!-- Left: Code List -->
+  <div class="panel panel-left" style="flex:0 0 45%">
+    <div class="panel-hdr">
+      <h2>CODES <span class="cnt" id="codeCount"></span></h2>
+      <input class="panel-search" id="codeSearch" placeholder="Filter codes..." oninput="renderCodes()">
+    </div>
+    <div class="panel-scroll" id="codeScroll"></div>
+  </div>
+  <!-- Right: Category Assignments -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <h2>CATEGORY ASSIGNMENTS <span class="cnt" id="catCount"></span></h2>
+      <button class="sort-btn active" id="sortAZ" onclick="setCatSort('az')">A-Z</button>
+      <button class="sort-btn" id="sortCode" onclick="setCatSort('code')">Code #</button>
+      <input class="panel-search" id="catSearch" placeholder="Filter categories..." oninput="renderCats()">
+    </div>
+    <div class="panel-scroll" id="catScroll"></div>
+  </div>
+</div>
+
+<!-- Status -->
+<div class="status">
+  <span>Codes: <span class="st-num" id="stCodes">0</span></span>
+  <span>Categories: <span class="st-num" id="stCats">0</span></span>
+  <span>Mapped: <span class="st-num" id="stMapped">0</span></span>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Code Picker (floating) -->
+<div class="cc-picker" id="ccPicker">
+  <input class="cc-picker-search" id="ccPickerSearch" placeholder="Search codes..." oninput="filterPicker()">
+  <div class="cc-picker-list" id="ccPickerList"></div>
+</div>
+
+<script>
+/* ═══ DATA ═══ */
+var CODES=[],CAT_MAP={},CATEGORIES=[];
+var _divOpen={};
+var _editingCode=null;
+var _addFormOpen=false;
+var _pickerCat=null;
+var _catSort='az';
+
+function receiveCCData(d){
+  CODES=d.codes||[];
+  CAT_MAP=d.categoryMap||{};
+  CATEGORIES=d.categories||[];
+  renderCodes();
+  renderCats();
+  updateStatus();
+}
+
+/* ═══ HELPERS ═══ */
+function X(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function callJSON(n,o){sketchup[n](JSON.stringify(o));}
+
+function getDivision(code){
+  var p=code.split('.');
+  if(!p.length)return'0';
+  var n=parseInt(p[0],10);
+  return isNaN(n)?'0':String(n);
+}
+
+function getDivisionName(divNum){
+  for(var i=0;i<CODES.length;i++){
+    var c=CODES[i];
+    // Division headers are like 001.000, 002.000, etc.
+    if(c.code.match(/^0*\d+\.0+$/)&&getDivision(c.code)===divNum){
+      return c.description;
+    }
+  }
+  return'Division '+divNum;
+}
+
+function groupByDivision(codes){
+  var groups={},order=[];
+  for(var i=0;i<codes.length;i++){
+    var c=codes[i];
+    // Skip division headers (like 001.000)
+    if(c.code.match(/^0+\d+\.0+$/))continue;
+    var d=getDivision(c.code);
+    if(!groups[d]){groups[d]=[];order.push(d);}
+    groups[d].push(c);
+  }
+  return{groups:groups,order:order};
+}
+
+/* ═══ RENDER CODES ═══ */
+function renderCodes(){
+  var filter=(document.getElementById('codeSearch').value||'').toLowerCase();
+  var filtered=CODES;
+  if(filter){
+    filtered=CODES.filter(function(c){
+      return c.code.toLowerCase().indexOf(filter)>=0||c.description.toLowerCase().indexOf(filter)>=0;
+    });
+  }
+  var g=groupByDivision(filtered);
+  var h='';
+  var totalCodes=0;
+
+  for(var di=0;di<g.order.length;di++){
+    var dv=g.order[di];
+    var items=g.groups[dv];
+    totalCodes+=items.length;
+    var isOpen=_divOpen[dv]!==false;// open by default
+    var name=getDivisionName(dv);
+
+    h+='<div class="div-hdr" onclick="toggleDiv(\''+dv+'\')">';
+    h+='<span class="div-arrow'+(isOpen?' open':'')+'">&#9654;</span>';
+    h+='<span class="div-code">'+X(dv.length<3?('00'+dv).slice(-3):dv)+'</span>';
+    h+='<span class="div-name">'+X(name)+'</span>';
+    h+='<span class="div-cnt">'+items.length+'</span>';
+    h+='</div>';
+    h+='<div class="div-body'+(isOpen?' open':'')+'">';
+
+    for(var ci=0;ci<items.length;ci++){
+      var c=items[ci];
+      if(_editingCode===c.code){
+        // Inline edit form
+        h+='<div class="cc-edit">';
+        h+='<input class="cc-input code-in" id="editCodeIn" value="'+X(c.code)+'">';
+        h+='<input class="cc-input desc-in" id="editDescIn" value="'+X(c.description)+'" onkeydown="if(event.key===\'Enter\')saveEdit(\''+X(c.code)+'\')">';
+        h+='<button class="cc-save" onclick="saveEdit(\''+X(c.code)+'\')">Save</button>';
+        h+='<button class="cc-cancel" onclick="cancelEdit()">Cancel</button>';
+        h+='</div>';
+      } else {
+        h+='<div class="cc-row">';
+        h+='<span class="cc-code">'+X(c.code)+'</span>';
+        h+='<span class="cc-desc">'+X(c.description)+'</span>';
+        h+='<span class="cc-acts">';
+        h+='<button class="cc-btn" onclick="event.stopPropagation();startEdit(\''+X(c.code)+'\')" title="Edit">&#9998;</button>';
+        h+='<button class="cc-btn del" onclick="event.stopPropagation();removeCode(\''+X(c.code)+'\',\''+X(c.description)+'\')" title="Delete">&times;</button>';
+        h+='</span>';
+        h+='</div>';
+      }
+    }
+    h+='</div>';
+  }
+
+  // Add code button
+  if(_addFormOpen){
+    h+='<div class="cc-edit" style="padding:8px 14px">';
+    h+='<input class="cc-input code-in" id="addCodeIn" placeholder="Code" onkeydown="if(event.key===\'Enter\')doAddCode()">';
+    h+='<input class="cc-input desc-in" id="addDescIn" placeholder="Description" onkeydown="if(event.key===\'Enter\')doAddCode()">';
+    h+='<button class="cc-save" onclick="doAddCode()">Add</button>';
+    h+='<button class="cc-cancel" onclick="_addFormOpen=false;renderCodes()">Cancel</button>';
+    h+='</div>';
+  } else {
+    h+='<div class="add-row"><button class="add-btn" onclick="_addFormOpen=true;renderCodes();setTimeout(function(){var e=document.getElementById(\'addCodeIn\');if(e)e.focus();},50)">+ Add Cost Code</button></div>';
+  }
+
+  document.getElementById('codeScroll').innerHTML=h;
+  document.getElementById('codeCount').textContent='('+totalCodes+')';
+}
+
+function toggleDiv(d){_divOpen[d]=_divOpen[d]===false?true:false;renderCodes();}
+
+function startEdit(code){_editingCode=code;renderCodes();setTimeout(function(){var e=document.getElementById('editDescIn');if(e)e.focus();},50);}
+function cancelEdit(){_editingCode=null;renderCodes();}
+
+function saveEdit(oldCode){
+  var nc=document.getElementById('editCodeIn').value.trim();
+  var nd=document.getElementById('editDescIn').value.trim();
+  if(!nc){showToast('Code cannot be empty','error');return;}
+  _editingCode=null;
+  callJSON('ccEditCode',{oldCode:oldCode,newCode:nc,description:nd});
+}
+
+function doAddCode(){
+  var c=document.getElementById('addCodeIn').value.trim();
+  var d=document.getElementById('addDescIn').value.trim();
+  if(!c){showToast('Code cannot be empty','error');return;}
+  _addFormOpen=false;
+  callJSON('ccAddCode',{code:c,description:d});
+}
+
+function removeCode(code,desc){
+  if(!confirm('Delete cost code '+code+' ('+desc+')?'))return;
+  sketchup.ccRemoveCode(code);
+}
+
+/* ═══ RENDER CATEGORIES ═══ */
+function renderCats(){
+  var filter=(document.getElementById('catSearch').value||'').toLowerCase();
+  var cats=CATEGORIES.slice();
+  if(filter){
+    cats=cats.filter(function(c){return c.toLowerCase().indexOf(filter)>=0;});
+  }
+
+  // Sort
+  if(_catSort==='code'){
+    // By first assigned code #, unmapped at bottom
+    cats.sort(function(a,b){
+      var aC=(CAT_MAP[a]&&CAT_MAP[a].length)?CAT_MAP[a][0]:'~~~';
+      var bC=(CAT_MAP[b]&&CAT_MAP[b].length)?CAT_MAP[b][0]:'~~~';
+      if(aC!==bC)return aC.localeCompare(bC);
+      return a.localeCompare(b);
+    });
+  } else {
+    // A-Z: mapped first, then alpha
+    cats.sort(function(a,b){
+      var aM=(CAT_MAP[a]&&CAT_MAP[a].length)?1:0;
+      var bM=(CAT_MAP[b]&&CAT_MAP[b].length)?1:0;
+      if(aM!==bM)return bM-aM;
+      return a.localeCompare(b);
+    });
+  }
+
+  var h='';
+  var mapped=0;
+  for(var i=0;i<cats.length;i++){
+    var cat=cats[i];
+    var codes=CAT_MAP[cat]||[];
+    if(codes.length)mapped++;
+
+    h+='<div class="cat-row">';
+    h+='<span class="cat-name" title="'+X(cat)+'">'+X(cat)+'</span>';
+    h+='<span class="cat-arrow">&rarr;</span>';
+    h+='<span class="cat-codes">';
+    if(codes.length){
+      for(var ci=0;ci<codes.length;ci++){
+        var cc=codes[ci];
+        // Find description
+        var ccDesc='';
+        for(var j=0;j<CODES.length;j++){if(CODES[j].code===cc){ccDesc=CODES[j].description;break;}}
+        h+='<span class="cat-badge" title="'+X(cc+' '+ccDesc)+'">';
+        h+='<span>'+X(cc)+'</span>';
+        h+='<span class="badge-x" onclick="event.stopPropagation();removeCatCode(\''+X(cat).replace(/'/g,"\\'")+'\',\''+X(cc)+'\')">&times;</span>';
+        h+='</span>';
+      }
+    } else {
+      h+='<span class="cat-none">unassigned</span>';
+    }
+    h+='<button class="cat-add-btn" onclick="event.stopPropagation();openPicker(this,\''+X(cat).replace(/'/g,"\\'")+'\')"'+'>+</button>';
+    h+='</span>';
+    h+='</div>';
+  }
+  document.getElementById('catScroll').innerHTML=h;
+  document.getElementById('catCount').textContent='('+cats.length+')';
+  document.getElementById('stMapped').textContent=mapped;
+}
+
+function setCatSort(mode){
+  _catSort=mode;
+  document.getElementById('sortAZ').className='sort-btn'+(mode==='az'?' active':'');
+  document.getElementById('sortCode').className='sort-btn'+(mode==='code'?' active':'');
+  renderCats();
+}
+
+function removeCatCode(cat,code){
+  callJSON('ccRemoveCategoryCode',{category:cat,code:code});
+}
+
+/* ═══ CODE PICKER ═══ */
+function openPicker(btn,cat){
+  var pk=document.getElementById('ccPicker');
+  if(pk.classList.contains('open')&&_pickerCat===cat){closePicker();return;}
+  _pickerCat=cat;
+  buildPickerList('');
+  var r=btn.getBoundingClientRect();
+  pk.style.top=Math.min(r.bottom+2,window.innerHeight-290)+'px';
+  pk.style.left=Math.min(r.left,window.innerWidth-220)+'px';
+  pk.classList.add('open');
+  var si=document.getElementById('ccPickerSearch');
+  si.value='';
+  setTimeout(function(){si.focus();},50);
+}
+
+function closePicker(){
+  document.getElementById('ccPicker').classList.remove('open');
+  _pickerCat=null;
+}
+
+function filterPicker(){
+  var q=(document.getElementById('ccPickerSearch').value||'').toLowerCase();
+  buildPickerList(q);
+}
+
+function buildPickerList(q){
+  var g=groupByDivision(CODES);
+  var h='';
+  for(var di=0;di<g.order.length;di++){
+    var dv=g.order[di];
+    var items=g.groups[dv];
+    var name=getDivisionName(dv);
+    var divItems=[];
+    for(var ci=0;ci<items.length;ci++){
+      var c=items[ci];
+      if(q&&c.code.toLowerCase().indexOf(q)<0&&c.description.toLowerCase().indexOf(q)<0)continue;
+      divItems.push(c);
+    }
+    if(!divItems.length)continue;
+    h+='<div class="cc-picker-div">'+X(name)+'</div>';
+    for(var ci=0;ci<divItems.length;ci++){
+      var c=divItems[ci];
+      h+='<button class="cc-picker-item" onclick="pickCode(\''+X(c.code)+'\')">';
+      h+='<span class="pk-code">'+X(c.code)+'</span>'+X(c.description);
+      h+='</button>';
+    }
+  }
+  if(!h)h='<div style="padding:12px;text-align:center;color:var(--overlay0);font-size:10px">No codes found</div>';
+  document.getElementById('ccPickerList').innerHTML=h;
+}
+
+function pickCode(code){
+  if(!_pickerCat)return;
+  callJSON('ccSetCategoryCode',{category:_pickerCat,code:code});
+  closePicker();
+}
+
+/* ═══ ACTIONS ═══ */
+function doImportCSV(){sketchup.ccImportCSV();}
+function doExportCSV(){sketchup.ccExportCSV();}
+function doReset(){
+  if(!confirm('Reset all cost codes to defaults?\nThis will remove any custom codes and category mappings.'))return;
+  sketchup.ccResetDefaults();
+}
+
+/* ═══ STATUS ═══ */
+function updateStatus(){
+  // Count non-header codes
+  var cnt=0;
+  for(var i=0;i<CODES.length;i++){
+    if(!CODES[i].code.match(/^0+\d+\.0+$/))cnt++;
+  }
+  document.getElementById('stCodes').textContent=cnt;
+  document.getElementById('stCats').textContent=CATEGORIES.length;
+  var mapped=0;
+  for(var i=0;i<CATEGORIES.length;i++){
+    if(CAT_MAP[CATEGORIES[i]]&&CAT_MAP[CATEGORIES[i]].length)mapped++;
+  }
+  document.getElementById('stMapped').textContent=mapped;
+}
+
+/* ═══ TOAST ═══ */
+var _toastTimer=null;
+function showToast(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast '+(type||'success')+' show';
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){el.classList.remove('show');},2500);
+}
+
+/* ═══ GLOBAL CLICK ═══ */
+document.addEventListener('click',function(e){
+  var pk=document.getElementById('ccPicker');
+  if(pk.classList.contains('open')&&!pk.contains(e.target)&&!e.target.classList.contains('cat-add-btn')){
+    closePicker();
+  }
+});
+
+/* ═══ INIT ═══ */
+document.addEventListener('DOMContentLoaded',function(){
+  sketchup.ccRequestData();
+});
+</script>
+</body>
+</html>

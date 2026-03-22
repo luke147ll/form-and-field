@@ -19,6 +19,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'dash_overlay.rb')
   load File.join(PLUGIN_DIR, 'dash_multiverse.rb')
   load File.join(PLUGIN_DIR, 'dash_scanner.rb')
+  load File.join(PLUGIN_DIR, 'dash_cost_codes.rb')
   load File.join(PLUGIN_DIR, 'startup_dialog.rb')
   load File.join(PLUGIN_DIR, 'exporter.rb')
   load File.join(PLUGIN_DIR, 'color_controller.rb')
@@ -39,6 +40,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'note_tool.rb')
   load File.join(PLUGIN_DIR, 'measure_box.rb')
   load File.join(PLUGIN_DIR, 'measure_vol.rb')
+  load File.join(PLUGIN_DIR, 'measure_count.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
   load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')
@@ -142,13 +144,9 @@ module TakeoffTool
     sub.add_item('Scan Model') { StartupDialog.show }
     sub.add_item('Open Dashboard') { TakeoffTool.open_dashboard }
     sub.add_separator
-    sub.add_item('📏 LF Measure Tool') { TakeoffTool.activate_lf_tool }
-    sub.add_item('📐 SF Measure Tool') { TakeoffTool.activate_sf_tool }
     sub.add_item('Set Elevation Benchmark') { TakeoffTool.activate_benchmark_tool }
     sub.add_item('Elevation Tag Tool') { TakeoffTool.activate_elevation_tool }
     sub.add_item('Note Tag Tool') { TakeoffTool.activate_note_tool }
-    sub.add_item('Annotation Tag Tool') { TakeoffTool.activate_annotation_tag_tool }
-    sub.add_item('📦 Box Measure Tool') { TakeoffTool.activate_box_tool }
     nav_cmd = UI::Command.new('Precision Navigation') { PrecisionNav.toggle }
     nav_cmd.set_validation_proc { PrecisionNav.enabled? ? MF_CHECKED : MF_UNCHECKED }
     sub.add_item(nav_cmd)
@@ -160,6 +158,7 @@ module TakeoffTool
     sub.add_item('Learned Rules') { LearningSystem.show_dialog }
     sub.add_item('Rule Builder') { LearningSystem.show_rule_builder }
     sub.add_item('Category Templates') { CategoryTemplates.show_dialog }
+    sub.add_item('Cost Code Editor') { DashCostCodes.show }
     sub.add_separator
     mv_sub = sub.add_submenu('Multiverse')
     mv_sub.add_item('Import Comparison Model') { TakeoffTool.import_comparison_model }
@@ -168,12 +167,9 @@ module TakeoffTool
     cad_sub.add_item('Import DWG Sheet') { TakeoffTool.import_cad_sheet }
     cad_sub.add_item('Manage Overlays') { TakeoffTool.show_cad_manager }
     sub.add_separator
-    sub.add_item('Export CSV') { Exporter.export_csv(@scan_results, @category_assignments, @cost_code_assignments) }
-    sub.add_item('Export Report (HTML)') { Exporter.export_html(@scan_results, @category_assignments, @cost_code_assignments) }
-    sub.add_separator
     sub.add_item('Bug Reporter') { TakeoffTool::BugReporter.show }
     sub.add_item('License...') { LicenseManager.show_status_dialog }
-    sub.add_item('About') { UI.messagebox("#{PLUGIN_NAME} v#{PLUGIN_VERSION}\n\nInteractive construction takeoff tool.\nScans Revit imports and generates quantities.") }
+    sub.add_item('About') { UI.messagebox("#{PLUGIN_NAME} v#{PLUGIN_VERSION}\n\nConstruction takeoff tool for SketchUp.\nScans Revit/IFC imports and generates quantities.") }
     @menu_loaded = true
   end
 
@@ -224,7 +220,8 @@ module TakeoffTool
     if Sketchup.read_default("FormAndField", "debug_mode", false)
       cmd_reload = UI::Command.new("Reload FF") {
         load 'takeoff_tool/main.rb'
-        puts "Form and Field reloaded!"
+        LicenseManager.dev_mode = true
+        puts "Form and Field reloaded! (dev_mode: license bypassed)"
       }
       cmd_reload.small_icon = File.join(PLUGIN_DIR, "icons", "report_24.png")
       cmd_reload.large_icon = File.join(PLUGIN_DIR, "icons", "report_32.png")
@@ -239,29 +236,43 @@ module TakeoffTool
 
   unless @auto_load_done
     UI.start_timer(1.0, false) do
+      # Show loading splash
+      splash = _create_splash
+      _splash_msg(splash, 'Restoring scan data...')
+
       if load_scan_from_model
-        # Recompute SF using current algorithm (cached values may be stale)
+        _splash_msg(splash, 'Recalculating areas...')
         updated = (Scanner.recalculate_sf rescue 0)
         puts "Takeoff: Scan data restored - dashboard ready#{updated > 0 ? " (#{updated} SF values refreshed)" : ''}"
+
+        _splash_msg(splash, 'Cleaning materials...')
         ColorController.strip_baked_ff_materials if defined?(ColorController)
         TakeoffTool.refresh_sf_material_colors rescue nil
-        # Remap assembly entity IDs (they change every session)
+
+        _splash_msg(splash, 'Remapping assemblies...')
         TakeoffTool.remap_assembly_entity_ids rescue nil
-        # Ensure assignment map is saved for next session (bootstraps persistent_id map)
         TakeoffTool.save_assignments_to_model rescue nil
       end
-      # Check for backup newer than last save (crash recovery)
+
+      _splash_msg(splash, 'Checking backups...')
       begin
         ScanBackup.check_for_recovery
       rescue => e
         puts "Takeoff: ScanBackup recovery check error: #{e.message}"
       end
+
+      _splash_msg(splash, 'Ready')
+      UI.start_timer(0.6, false) { splash.close rescue nil }
     end
     @auto_load_done = true
   end
 
-  # License check on startup — show activation dialog if not licensed
+  # License check on startup — skip in debug mode, show activation dialog otherwise
   unless @license_checked
+    if Sketchup.read_default("FormAndField", "debug_mode", false)
+      LicenseManager.dev_mode = true
+      puts "[FF] Debug mode — license bypassed"
+    end
     UI.start_timer(2.0, false) do
       unless LicenseManager.licensed?
         LicenseManager.show_activation_dialog
@@ -274,6 +285,53 @@ module TakeoffTool
     ScanBackup.save
   rescue => e
     puts "Takeoff: trigger_backup error: #{e.message}"
+  end
+
+  # ── Startup splash ──
+
+  def self._create_splash
+    dlg = UI::HtmlDialog.new(
+      dialog_title: "Form and Field",
+      preferences_key: "FF_Splash",
+      width: 320, height: 160,
+      left: (Sketchup.active_model&.active_view&.vpwidth.to_i / 2 - 160 + 200 rescue 400),
+      top: (Sketchup.active_model&.active_view&.vpheight.to_i / 2 - 80 + 100 rescue 300),
+      resizable: false,
+      style: UI::HtmlDialog::STYLE_DIALOG
+    )
+    dlg.set_html(<<~HTML)
+      <!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        :root{--base:#1e1e2e;--crust:#11111b;--surface0:#313244;--surface1:#45475a;
+          --overlay0:#6c7086;--text:#cdd6f4;--mauve:#cba6f7;--green:#a6e3a1;
+          --font-mono:'JetBrains Mono','Fira Code','Consolas',monospace}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:12px/1.5 var(--font-mono);background:var(--base);color:var(--text);
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          height:100vh;overflow:hidden;gap:16px}
+        .title{font-size:14px;font-weight:700;color:var(--mauve);letter-spacing:1px}
+        .ver{font-size:9px;color:var(--overlay0);margin-top:-12px}
+        .bar-wrap{width:200px;height:4px;background:var(--surface0);border-radius:2px;overflow:hidden}
+        .bar{height:100%;width:30%;background:var(--mauve);border-radius:2px;
+          animation:slide 1.2s ease-in-out infinite}
+        @keyframes slide{0%{transform:translateX(-100%);width:30%}
+          50%{transform:translateX(100%);width:60%}100%{transform:translateX(300%);width:30%}}
+        #msg{font-size:10px;color:var(--overlay0);min-height:14px;transition:opacity .15s}
+      </style></head><body>
+        <div class="title">FORM AND FIELD</div>
+        <div class="ver">v#{PLUGIN_VERSION}</div>
+        <div class="bar-wrap"><div class="bar"></div></div>
+        <div id="msg">Loading...</div>
+        <script>function setMsg(t){document.getElementById('msg').textContent=t;}</script>
+      </body></html>
+    HTML
+    dlg.show
+    dlg
+  end
+
+  def self._splash_msg(dlg, text)
+    return unless dlg
+    dlg.execute_script("setMsg('#{text.gsub("'", "\\\\'")}')") rescue nil
   end
 
   def self.run_scan(progress_dlg = nil)
