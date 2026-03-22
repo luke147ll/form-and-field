@@ -7357,10 +7357,11 @@ function renderMeasPanel(){
 
       // Action buttons
       h+='<div class="mcard-acts">';
+      // VS compare button — available on any measurable card without an existing comparison
+      if(isSFLF && !mm.vsLocal && !mm.vsTarget){
+        h+='<button class="mcard-act" onclick="call(\'startMeasComparison\',JSON.stringify({eid:'+mm.eid+',type:\''+mm.type+'\',category:\''+X2(mm.category||'')+'\'}))" title="Compare \u2014 measure locally and see the difference" style="color:var(--peach);font-weight:700;font-size:9px">VS</button>';
+      }
       if(isImported){
-        if(isSFLF && !mm.vsLocal){
-          h+='<button class="mcard-act" onclick="call(\'startMeasComparison\',JSON.stringify({eid:'+mm.eid+',type:\''+mm.type+'\',category:\''+X2(mm.category||'')+'\'}))" title="Compare \u2014 measure locally and see the difference" style="color:var(--peach);font-weight:700;font-size:9px">VS</button>';
-        }
         h+='<button class="mcard-act" onclick="call(\'commitImportedMeasurement\',\''+mm.eid+'\')" title="Commit to model" style="color:var(--green);font-size:11px">\u2713</button>';
         h+='<button class="mcard-act del" onclick="call(\'discardImportedMeasurement\',\''+mm.eid+'\')" title="Discard">\u2717</button>';
       } else {
