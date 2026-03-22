@@ -1242,6 +1242,24 @@ module TakeoffTool
           entry[:unit] = 'EA'
           entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
           entry[:sfColor] = color
+        elsif mtype == 'WALL'
+          entry[:value] = grp.get_attribute('TakeoffMeasurement', 'total_lf') || 0
+          entry[:unit] = 'LF'
+          entry[:segmentCount] = grp.get_attribute('TakeoffMeasurement', 'segment_count') || 0
+          entry[:totalStuds] = grp.get_attribute('TakeoffMeasurement', 'total_studs') || 0
+          entry[:ocSpacing] = grp.get_attribute('TakeoffMeasurement', 'oc_spacing') || 16
+          entry[:label] = grp.get_attribute('TakeoffMeasurement', 'label') || ''
+          entry[:sfColor] = color
+          begin
+            require 'json'
+            details_json = grp.get_attribute('TakeoffMeasurement', 'wall_details_json')
+            entry[:wallDetails] = details_json ? JSON.parse(details_json) : []
+            cfg_json = grp.get_attribute('TakeoffMeasurement', 'wall_config')
+            entry[:wallConfig] = cfg_json ? JSON.parse(cfg_json) : {}
+          rescue
+            entry[:wallDetails] = []
+            entry[:wallConfig] = {}
+          end
         elsif mtype == 'CARD'
           entry[:value] = 0
           entry[:unit] = ''
@@ -1425,12 +1443,44 @@ module TakeoffTool
 
         elsif src == 'measurement'
           # Derived from a specific measurement group (by sourceEid)
+          # If cfg has pbSourceEid, resolve value from that linked group directly
+          # (linked cards are excluded from measurements array due to part_link filter)
+          cfg = v['cfg'] || {}
+          pb_src_eid = (cfg['pbSourceEid'] || 0).to_i
           src_eid = (v['sourceEid'] || 0).to_i
           base = 0.0
-          measurements.each do |mm|
-            if mm[:eid] == src_eid
-              base = (mm[:value] || 0).to_f
-              break
+          if pb_src_eid > 0
+            # Resolve from linked source group directly
+            linked_grp = TakeoffTool.find_entity(pb_src_eid)
+            if linked_grp && linked_grp.valid?
+              lt = linked_grp.get_attribute('TakeoffMeasurement', 'type')
+              if lt == 'SF'
+                geo_faces = linked_grp.entities.grep(Sketchup::Face)
+                base = geo_faces.any? ? (geo_faces.sum { |f| f.area } / 144.0) : 0.0
+              elsif lt == 'LF' || lt.nil?
+                base = (linked_grp.get_attribute('TakeoffMeasurement', 'total_ft') || 0).to_f
+              elsif lt == 'BOX'
+                base = (linked_grp.get_attribute('TakeoffMeasurement', 'volume_cf') || 0).to_f
+              elsif lt == 'WALL'
+                base = (linked_grp.get_attribute('TakeoffMeasurement', 'total_lf') || 0).to_f
+              elsif lt == 'VOL'
+                markers = linked_grp.entities.grep(Sketchup::Group).select { |g|
+                  g.valid? && g.get_attribute('VOL_Marker', 'volume_cy')
+                }
+                base = markers.any? ? markers.sum { |g| (g.get_attribute('VOL_Marker', 'volume_cy') || 0).to_f } : 0.0
+              elsif lt == 'COUNT'
+                markers = linked_grp.entities.grep(Sketchup::Group).select { |g|
+                  g.valid? && g.get_attribute('COUNT_Marker', 'placed')
+                }
+                base = markers.length.to_f
+              end
+            end
+          else
+            measurements.each do |mm|
+              if mm[:eid] == src_eid
+                base = (mm[:value] || 0).to_f
+                break
+              end
             end
           end
           new_val = (base * mult).round(2)

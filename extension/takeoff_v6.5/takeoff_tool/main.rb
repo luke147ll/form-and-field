@@ -41,6 +41,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'measure_box.rb')
   load File.join(PLUGIN_DIR, 'measure_vol.rb')
   load File.join(PLUGIN_DIR, 'measure_count.rb')
+  load File.join(PLUGIN_DIR, 'measure_wall.rb')
   load File.join(PLUGIN_DIR, 'scan_backup.rb')
   load File.join(PLUGIN_DIR, 'geometry_matcher.rb')
   load File.join(PLUGIN_DIR, 'multiverse.rb')

@@ -80,11 +80,14 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .mtype-chip .mc-icon{font-size:11px;line-height:1}
 .mtype-chip.lf{color:var(--green)}.mtype-chip.sf{color:var(--blue)}
 .mtype-chip.elev{color:var(--peach)}.mtype-chip.vol{color:var(--mauve)}
+.mtype-chip.count{color:var(--yellow)}.mtype-chip.wall{color:var(--sapphire)}
 .mtype-chip.active{background:var(--surface0)}
 .mtype-chip.lf.active{box-shadow:inset 0 -2px 0 var(--green)}
 .mtype-chip.sf.active{box-shadow:inset 0 -2px 0 var(--blue)}
 .mtype-chip.elev.active{box-shadow:inset 0 -2px 0 var(--peach)}
 .mtype-chip.vol.active{box-shadow:inset 0 -2px 0 var(--mauve)}
+.mtype-chip.count.active{box-shadow:inset 0 -2px 0 var(--yellow)}
+.mtype-chip.wall.active{box-shadow:inset 0 -2px 0 var(--sapphire)}
 .mtype-chip:hover{background:rgba(255,255,255,.03)}
 .mc-count{font-size:8px;padding:1px 4px;border-radius:6px;background:var(--surface0);font-weight:500}
 /* ── Meas summary strip ── */
@@ -1721,6 +1724,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
           <button class="mtype-chip elev active" onclick="togMeasType('elev',this)"><span class="mc-icon">&#8895;</span>Elev<span class="mc-count" id="mcElev">0</span></button>
           <button class="mtype-chip vol active" onclick="togMeasType('vol',this)"><span class="mc-icon">&#10696;</span>Vol<span class="mc-count" id="mcVol">0</span></button>
           <button class="mtype-chip count active" onclick="togMeasType('count',this)" style="--chip-color:#f9e2af"><span class="mc-icon">&#9670;</span>Count<span class="mc-count" id="mcCount">0</span></button>
+          <button class="mtype-chip wall active" onclick="togMeasType('wall',this)"><span class="mc-icon">&#9640;</span>Wall<span class="mc-count" id="mcWall">0</span></button>
         </div>
         <div class="ms-search">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M9 9L12 12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
@@ -7064,7 +7068,7 @@ function populateDebugCatSelect(){
   sel.innerHTML=h;
 }
 var MEAS=[],openMeasCats={},SCAN_TOTALS={},DERIVED={};
-var measTypeFilter={lf:true,sf:true,elev:true,vol:true,count:true};
+var measTypeFilter={lf:true,sf:true,elev:true,vol:true,count:true,wall:true};
 var _linkPickEid=0; // parent card eid when in click-to-link mode
 var openMeasConts={};
 var MSVG={
@@ -7080,13 +7084,15 @@ var MTYPES={
   sf:   {label:'SF',   color:'#a6e3a1',unit:'SF', icon:'&#11026;'},
   elev: {label:'Elev', color:'#a6e3a1',unit:"'",  icon:'&#8895;'},
   vol:  {label:'Vol',  color:'#a6e3a1',unit:'CF', icon:'&#10696;'},
-  count:{label:'Count',color:'#f9e2af',unit:'EA', icon:'&#9670;'}
+  count:{label:'Count',color:'#f9e2af',unit:'EA', icon:'&#9670;'},
+  wall: {label:'Wall', color:'#74c7ec',unit:'LF', icon:'&#9640;'}
 };
 function measTypeKey(mtype,unit){
   if(mtype==='CARD')return 'card';
   if(mtype==='LF')return 'lf';if(mtype==='SF')return 'sf';
   if(mtype==='ELEV')return 'elev';if(mtype==='BOX'||mtype==='VOL')return 'vol';
   if(mtype==='COUNT')return 'count';
+  if(mtype==='WALL')return 'wall';
   if(unit==='LF')return 'lf';if(unit==='SF')return 'sf';if(unit==='CF')return 'vol';if(unit==='EA')return 'count';
   return 'lf';
 }
@@ -7136,17 +7142,18 @@ function renderMeasPanel(){
   }
 
   // Update type chip counts
-  var counts={lf:0,sf:0,elev:0,vol:0,count:0};
+  var counts={lf:0,sf:0,elev:0,vol:0,count:0,wall:0};
   for(var ci=0;ci<MEAS.length;ci++){if(MEAS[ci].type==='NOTE'||MEAS[ci].type==='CARD')continue;var tk2=measTypeKey(MEAS[ci].type,MEAS[ci].unit);counts[tk2]=(counts[tk2]||0)+1;}
   var ce=document.getElementById('mcLF');if(ce)ce.textContent=counts.lf;
   ce=document.getElementById('mcSF');if(ce)ce.textContent=counts.sf;
   ce=document.getElementById('mcElev');if(ce)ce.textContent=counts.elev;
   ce=document.getElementById('mcVol');if(ce)ce.textContent=counts.vol;
   ce=document.getElementById('mcCount');if(ce)ce.textContent=counts.count;
+  ce=document.getElementById('mcWall');if(ce)ce.textContent=counts.wall;
 
   // Summary strip
   var sh='';
-  var typeKeys=['lf','sf','elev','vol','count'];
+  var typeKeys=['lf','sf','elev','vol','count','wall'];
   for(var ti=0;ti<typeKeys.length;ti++){
     var tk3=typeKeys[ti],t=MTYPES[tk3];
     if(!measTypeFilter[tk3])continue;
@@ -7186,7 +7193,7 @@ function renderMeasPanel(){
       var mm=filtered[mi];
       var t2=MTYPES[measTypeKey(mm.type,mm.unit)]||MTYPES.lf;
       var isVis=mm.visible;
-      var isSFLF=(mm.type==='SF'||mm.type==='LF'||mm.type==='VOL'||mm.type==='COUNT');
+      var isSFLF=(mm.type==='SF'||mm.type==='LF'||mm.type==='VOL'||mm.type==='COUNT'||mm.type==='WALL');
       var isCard=(mm.type==='CARD');
 
       // Determine colors
@@ -7206,7 +7213,7 @@ function renderMeasPanel(){
 
       // Value display
       var valDisp=isCard?'':mm.type==='ELEV'?mm.value.toFixed(1)+"'":fmtMeasVal(mm.value,mm.unit);
-      var mUnit=isCard?'':mm.type==='VOL'?'CY':mm.type==='COUNT'?'EA':isSFLF?mm.type:t2.unit;
+      var mUnit=isCard?'':mm.type==='VOL'?'CY':mm.type==='COUNT'?'EA':mm.type==='WALL'?'LF':isSFLF?mm.type:t2.unit;
 
       // Count display
       var countDisp='';
@@ -7214,6 +7221,7 @@ function renderMeasPanel(){
       else if(mm.type==='LF')countDisp=(mm.segments||0)+' segs';
       else if(mm.type==='COUNT')countDisp=(mm.markerCount||mm.value||0)+' markers';
       else if(mm.type==='VOL')countDisp=(mm.objectCount||0)+' objs';
+      else if(mm.type==='WALL')countDisp=(mm.segmentCount||0)+' segs';
 
       // Find derived parts for this measurement
       var cardParts=[];
@@ -7234,8 +7242,8 @@ function renderMeasPanel(){
       }
 
       // Callback names for SF/LF add/remove
-      var addCb=mm.type==='SF'?'addSFFaces':mm.type==='LF'?'addLFFaces':mm.type==='VOL'?'addVolObjects':mm.type==='COUNT'?'addCountMarkers':'';
-      var rmCb=mm.type==='SF'?'removeSFFaces':mm.type==='LF'?'removeLFFaces':mm.type==='VOL'?'removeVolObjects':mm.type==='COUNT'?'removeCountMarkers':'';
+      var addCb=mm.type==='SF'?'addSFFaces':mm.type==='LF'?'addLFFaces':mm.type==='VOL'?'addVolObjects':mm.type==='COUNT'?'addCountMarkers':mm.type==='WALL'?'addWallSegments':'';
+      var rmCb=mm.type==='SF'?'removeSFFaces':mm.type==='LF'?'removeLFFaces':mm.type==='VOL'?'removeVolObjects':mm.type==='COUNT'?'removeCountMarkers':mm.type==='WALL'?'removeWallSegments':'';
 
       // ── Card start ──
       h+='<div class="mcard'+(isVis?'':' mcard-hidden')+'" data-eid="'+mm.eid+'">';
@@ -7276,13 +7284,27 @@ function renderMeasPanel(){
         if(countDisp)h+='<span class="mcard-count">'+countDisp+'</span>';
         h+='</div>';
       }
+      // Wall segment details (consolidated by nominal + height)
+      if(mm.type==='WALL'&&mm.wallDetails&&mm.wallDetails.length){
+        h+='<div style="margin-top:3px;padding:3px 0;border-top:1px solid var(--surface0)">';
+        for(var wi=0;wi<mm.wallDetails.length;wi++){
+          var wd=mm.wallDetails[wi];
+          var cnt=wd.count||1;
+          h+='<div style="font-size:9px;color:var(--subtext0);line-height:1.6;display:flex;align-items:baseline">';
+          h+='<span style="color:var(--sapphire);font-weight:600;width:32px;flex:none">'+(wd.nominal||'?')+'</span>';
+          h+='<span style="flex:1">'+(wd.lf||0)+'\' L <span style="color:var(--overlay0)">\u00d7</span> '+(wd.h||0)+'\' H</span>';
+          if(cnt>1)h+='<span style="color:var(--text);font-weight:600;flex:none;text-align:right">'+cnt+'\u00d7</span>';
+          h+='</div>';
+        }
+        h+='</div>';
+      }
       h+='</div>'; // end mcard-info
 
       // Action buttons
       h+='<div class="mcard-acts">';
       if(!isCard && addCb){
-        var addTip=mm.type==='VOL'?'Add objects':mm.type==='COUNT'?'Add markers':'Add faces';
-        var rmTip=mm.type==='VOL'?'Remove objects':mm.type==='COUNT'?'Remove markers':'Remove faces';
+        var addTip=mm.type==='VOL'?'Add objects':mm.type==='COUNT'?'Add markers':mm.type==='WALL'?'Add segments':'Add faces';
+        var rmTip=mm.type==='VOL'?'Remove objects':mm.type==='COUNT'?'Remove markers':mm.type==='WALL'?'Remove segments':'Remove faces';
         h+='<button class="mcard-act add" onclick="call(\''+addCb+'\',JSON.stringify({eid:'+mm.eid+',category:\''+X2(mm.category)+'\'}))" title="'+addTip+'">+</button>';
         h+='<button class="mcard-act sub" onclick="call(\''+rmCb+'\',\''+mm.eid+'\')" title="'+rmTip+'">&minus;</button>';
       }
@@ -7299,9 +7321,25 @@ function renderMeasPanel(){
       h+='<button class="mcard-parts-add" onclick="openPB('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')">+ part</button>';
       h+='<button class="mcard-parts-add" onclick="showAddPartForm('+mm.eid+',\''+X2(mm.category)+'\',\''+X2(mm.type||'SF')+'\')" style="color:var(--overlay0);font-size:8px" title="Legacy add part">+ link</button>';
       h+='</div>';
-      if(cardParts.length===0){
+      // Wall inline parts (studs + plates computed from wall data)
+      var wallParts=(mm.type==='WALL')?computeWallParts(mm):[];
+      if(wallParts.length){
+        for(var wp=0;wp<wallParts.length;wp++){
+          var wpt=wallParts[wp];
+          var wpColor=wpt.type==='stud'?'var(--sapphire)':'var(--green)';
+          var wpCode=wpt.type==='stud'?'ST':'PL';
+          h+='<div class="mcard-part" style="flex-wrap:wrap">';
+          h+='<span class="pb-ico" style="background:'+wpColor+';font-size:7px;width:18px;height:18px;line-height:18px">'+wpCode+'</span>';
+          h+='<span class="mcard-part-name" style="color:'+wpColor+'">'+X(wpt.label)+'</span>';
+          h+='<span class="mcard-part-order">'+wpt.qty+'</span>';
+          h+='<span class="mcard-part-unit">'+wpt.unit+'</span>';
+          h+='<div style="width:100%;padding-left:24px;font-size:8px;color:var(--overlay0)">'+X(wpt.detail)+'</div>';
+          h+='</div>';
+        }
+      }
+      if(cardParts.length===0 && wallParts.length===0){
         h+='<div class="mcard-noparts">No derived parts</div>';
-      } else {
+      } else if(cardParts.length>0) {
         for(var pi=0;pi<cardParts.length;pi++){
           var pp=cardParts[pi],ppd=pp.data;
 
@@ -7350,6 +7388,10 @@ function renderMeasPanel(){
               var rmCbP=gt==='LF'?'removeLFFaces':'removeSFFaces';
               h+='<button class="mcard-part-add" onclick="call(\''+addCbP+'\',JSON.stringify({eid:'+ppd.sourceEid+',category:\''+X2(ppd.category||'')+'\'}))" title="Add faces">+</button>';
               h+='<button class="mcard-part-sub" onclick="call(\''+rmCbP+'\',\''+ppd.sourceEid+'\')" title="Remove faces">&minus;</button>';
+            }
+            // + part button: create PB part from this linked/tool card's value
+            if((isLinked||isTool)&&ppd.sourceEid&&pVal>0){
+              h+='<button class="mcard-parts-add" onclick="openPBFromLinked('+mm.eid+','+ppd.sourceEid+','+pVal+',\''+X2(pUnit)+'\',\''+X2(ppd.name||'Linked')+'\',\''+X2(mm.category||'')+'\')" title="Create part from '+X(ppd.name||'this')+'" style="font-size:7px;padding:1px 4px">+P</button>';
             }
             h+='<button class="mcard-part-del" onclick="delDerived(\''+X2(pp.id)+'\')" title="Delete">\u00d7</button>';
             h+='</div>';
@@ -7437,6 +7479,8 @@ function renderMeasPanel(){
     h+=MSVG.plus+' Add card</div>';
     h+='<div class="mcard-add" onclick="measCountNew()" style="flex:none;padding:6px 12px;color:#f9e2af">';
     h+='&#9670; Count</div>';
+    h+='<div class="mcard-add" onclick="measWallNew()" style="flex:none;padding:6px 12px;color:#74c7ec">';
+    h+='&#9640; Wall</div>';
     h+='</div>';
   }
 
@@ -7477,20 +7521,61 @@ function csvSafe(s){return (s||'').replace(/\u2014/g,'-').replace(/\u2013/g,'-')
 function measCleanUnit(mm){
   if(mm.type==='SF')return 'SF';if(mm.type==='LF')return 'LF';
   if(mm.type==='VOL')return 'CF';if(mm.type==='COUNT')return 'EA';
-  if(mm.type==='ELEV')return 'FT';return mm.unit||'';
+  if(mm.type==='WALL')return 'LF';if(mm.type==='ELEV')return 'FT';return mm.unit||'';
 }
-var CSV_HDR='Parent,Part,Type,Base Qty,Unit,Waste %,Order Qty,Order Unit,Order Desc,Cost Code,Category\n';
-function csvRow(parent,part,type,baseQty,unit,waste,orderQty,orderUnit,orderDesc,cc,cat){
-  return Q(csvSafe(parent))+','+Q(csvSafe(part))+','+type+','
-    +(baseQty===''?'':Math.round(baseQty*100)/100)+','+unit+','
-    +(waste===''||waste===0?'':waste)+','
-    +(orderQty===''?'':Math.round(orderQty*100)/100)+','
-    +Q(csvSafe(orderUnit))+','+Q(csvSafe(orderDesc))+','
-    +Q(csvSafe(cc))+','+Q(csvSafe(cat));
+var CSV_HDR='Parent,Category,Cost Code,Part,Qty,Height/Length,Type,Unit,Waste %,Order Desc\n';
+function csvRow(parent,cat,cc,part,qty,heightLen,type,unit,waste,orderDesc){
+  return Q(csvSafe(parent))+','+Q(csvSafe(cat))+','+Q(csvSafe(cc))+','
+    +Q(csvSafe(part))+','
+    +(qty===''||qty==null?'':Math.round(qty*100)/100)+','
+    +(heightLen===''||heightLen==null?'':Math.round(heightLen*100)/100)+','
+    +type+','+unit+','
+    +(waste===''||waste===0||waste==null?'':waste)+','
+    +Q(csvSafe(orderDesc));
 }
-function csvMeasRow(mm){
+function csvMeasRows(mm){
   var label=mm.label||mm.partName||mm.category||'Measurement';
-  return csvRow(label,'','Measurement',mm.value,measCleanUnit(mm),'','','','',mm.costCode||'',mm.category||'');
+  var cat=mm.category||'';
+  var cc=mm.costCode||'';
+  var unit=measCleanUnit(mm);
+  var rows=[csvRow(label,cat,cc,'',mm.value,'','Measurement',unit,'','')];
+  if(mm.type==='WALL'){
+    var cfg=mm.wallConfig||{};
+    var details=mm.wallDetails||[];
+    var oc=mm.ocSpacing||cfg.oc_spacing||16;
+    var waste=cfg.waste_pct||5;
+    // Stud rows per nominal+height group
+    for(var di=0;di<details.length;di++){
+      var d=details[di],cnt=d.count||1;
+      var wallIn=(d.lf||0)*12;
+      var studs=Math.ceil(wallIn/oc);
+      studs=Math.ceil(studs*(1+waste/100));
+      rows.push(csvRow(label,cat,cc,(d.nominal||'?')+' Studs',studs,d.h||'','ST','EA',waste,studs+' studs '+oc+'" OC'));
+    }
+    // Plate rows per nominal
+    var plates=cfg.plates||[];
+    if(plates.length){
+      var lfByNom={};
+      for(var ni=0;ni<details.length;ni++){
+        var dn=details[ni],nom=dn.nominal||'?';
+        lfByNom[nom]=(lfByNom[nom]||0)+(dn.lf||0);
+      }
+      for(var nom in lfByNom){
+        if(!lfByNom.hasOwnProperty(nom))continue;
+        var nomLF=lfByNom[nom];
+        for(var j=0;j<plates.length;j++){
+          var p=plates[j];
+          var mult=p.multiplier||1;
+          var pLF=nomLF*mult*(1+waste/100);
+          pLF=Math.ceil(pLF*10)/10;
+          var sLen=p.stickLen||16;
+          var sticks=Math.ceil(pLF/sLen);
+          rows.push(csvRow(label,cat,cc,nom+' '+(p.material||'Plate')+' ('+mult+'x)',sticks,sLen,'PL','sticks',waste,sticks+' @ '+sLen+"' = "+pLF.toFixed(1)+' LF'));
+        }
+      }
+    }
+  }
+  return rows;
 }
 /* PB type code map */
 function pbTypeCode(t){
@@ -7506,58 +7591,61 @@ function pbCSVRows(dp,parentVal,parentLabel,cc,cat){
   var name=csvSafe(dp.cfg.name||dp.name||'Part');
   var rows=[];
   if(r.compound&&r.lines){
-    // Studs row
     var ln0=r.lines[0];
     var studLen=dp.cfg.studLen||8;
     var oc=dp.cfg.ocSpacing||16;
     var wh=dp.cfg.wallHeight||8;
-    rows.push(csvRow(parentLabel,name+' - Studs','WF',ln0.sticks,'EA',w,ln0.sticks,'studs',oc+'" OC '+wh+"' walls "+studLen+"' studs",cc,cat));
-    // Plate rows
+    rows.push(csvRow(parentLabel,cat,cc,name+' - Studs',ln0.sticks,wh,'WF','EA',w,oc+'" OC '+studLen+"' studs"));
     var plates=dp.cfg.plates||[];
     for(var li=1;li<r.lines.length;li++){
       var ln=r.lines[li];
       var pc=plates[li-1]||{};
       var pm=csvSafe(ln.material||'Plate');
-      var sLen=pc.stickLen||8;
-      rows.push(csvRow(parentLabel,name+' - '+pm,'PL',ln.lf,'LF',w,ln.sticks,'sticks',sLen+"' sticks"+(pc.multiplier>1?' ('+pc.multiplier+'x)':''),cc,cat));
+      var sLen=pc.stickLen||16;
+      rows.push(csvRow(parentLabel,cat,cc,name+' - '+pm,ln.sticks,sLen,'PL','sticks',w,(pc.multiplier>1?pc.multiplier+'x ':'')+'= '+ln.lf.toFixed(1)+' LF'));
     }
   } else if(dp.pbType==='sheets'){
     var sw=dp.cfg.sheetW||4;var sh=dp.cfg.sheetH||8;
-    rows.push(csvRow(parentLabel,name,'SH',r.raw,'SF',w,r.order,'sheets',sw+"'x"+sh+"' sheets",cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,'','SH','sheets',w,sw+"'x"+sh+"' sheets"));
   } else if(dp.pbType==='linear'){
     var sl=dp.cfg.stickLen||12;
-    rows.push(csvRow(parentLabel,name,'LN',r.raw,'LF',w,r.order,'sticks',sl+"' sticks",cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,sl,'LN','sticks',w,r.raw.toFixed(1)+' LF'));
   } else if(dp.pbType==='rolls'){
     var cov=dp.cfg.coverage||150;var cu=dp.cfg.covUnit||'SF';
-    rows.push(csvRow(parentLabel,name,'RL',r.raw,cu==='LF'?'LF':'SF',w,r.order,'rolls',cov+' '+(cu||'SF')+'/roll',cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,'','RL','rolls',w,cov+' '+(cu||'SF')+'/roll'));
   } else if(dp.pbType==='oncenter'){
     var sp=dp.cfg.spacing||32;var su=dp.cfg.spaceUnit||'in';
     var spLbl=su==='in'?(sp+'"'):(sp+"'");
-    rows.push(csvRow(parentLabel,name,'OC',r.raw,'LF',w,r.order,'EA',spLbl+' O.C.',cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,'','OC','EA',w,spLbl+' O.C.'));
   } else if(dp.pbType==='coverage'){
     var cr=dp.cfg.coverageRate||350;var cvu=dp.cfg.covUnit||'SF/gal';
     var cvParts=cvu.split('/');var ouLbl=cvParts.length>1?cvParts[1]:'units';
     var coats=dp.cfg.coats||1;
-    rows.push(csvRow(parentLabel,name,'CV',r.raw,'SF',w,r.order,ouLbl,cr+' '+cvu+(coats>1?', '+coats+' coats':''),cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,'','CV',ouLbl,w,cr+' '+cvu+(coats>1?', '+coats+' coats':'')));
   } else if(dp.pbType==='custom'){
     var ru=dp.cfg.resultUnit||'units';
-    rows.push(csvRow(parentLabel,name,'FX',parentVal,'',w,r.order,ru,dp.cfg.formula||'',cc,cat));
+    rows.push(csvRow(parentLabel,cat,cc,name,r.order,'','FX',ru,w,dp.cfg.formula||''));
   }
   return rows;
 }
 /* Build CSV rows for a legacy (non-PB) derived part */
 function legacyCSVRow(dp,parentLabel,cc,cat){
   var waste=dp.multiplier?Math.round((dp.multiplier-1)*100):0;
-  var baseQty=dp.multiplier&&dp.multiplier>0?(dp.computedValue/dp.multiplier):dp.computedValue||0;
   var totalQty=dp.computedValue||0;
   var srcLabel='Part';
   if(dp.sourceType==='category_scan')srcLabel='Scan';
   else if(dp.sourceType==='measurement')srcLabel='Derived';
   else if(dp.sourceType==='linked')srcLabel='Linked';
   else if(dp.sourceType==='manual')srcLabel='Manual';
-  return csvRow(parentLabel,csvSafe(dp.name||'Part'),srcLabel,baseQty,dp.unit||'SF',waste,totalQty,dp.unit||'SF','',cc,cat);
+  return csvRow(parentLabel,cat,cc,csvSafe(dp.name||'Part'),totalQty,'',srcLabel,dp.unit||'SF',waste,'');
 }
 function pbFindParentVal(dp){
+  // If part tracks a linked source, use that source's value
+  if(dp.cfg&&dp.cfg.pbSourceEid){
+    for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===dp.cfg.pbSourceEid)return MEAS[i].value||0;}
+    // Linked card may not be in MEAS (filtered by part_link); use Ruby-computed value
+    return dp.computedValue||0;
+  }
   if(!dp.parentMeasEid&&!dp.sourceEid)return dp.computedValue||0;
   var eid=dp.parentMeasEid||dp.sourceEid;
   for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid)return MEAS[i].value||0;}
@@ -7578,7 +7666,8 @@ function exportMeasCSV(eid){
   var cc=mm.costCode||'';
 
   var csv=CSV_HDR;
-  csv+=csvMeasRow(mm)+'\n';
+  var mRows=csvMeasRows(mm);
+  for(var mri=0;mri<mRows.length;mri++)csv+=mRows[mri]+'\n';
 
   var parts=[];
   for(var id in DERIVED){
@@ -7611,7 +7700,8 @@ function exportAllMeasCSV(){
     if(mm.type==='NOTE'||mm.type==='BENCHMARK')continue;
     var label=mm.label||mm.partName||mm.category||'Measurement';
     var cc=mm.costCode||'';
-    csv+=csvMeasRow(mm)+'\n';
+    var mRows2=csvMeasRows(mm);
+    for(var mri2=0;mri2<mRows2.length;mri2++)csv+=mRows2[mri2]+'\n';
     for(var id in DERIVED){
       if(!DERIVED.hasOwnProperty(id)||usedDp[id])continue;
       var dp=DERIVED[id];
@@ -7687,7 +7777,7 @@ function closeSFCP(){if(_sfCPEl){_sfCPEl.remove();_sfCPEl=null;}}
 function pickSFColor(eid,cat,rgb){
   closeSFCP();
   var mtype='SF';for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mtype=MEAS[i].type;break;}}
-  var cb=mtype==='LF'?'updateLFColor':mtype==='VOL'?'updateVolColor':mtype==='COUNT'?'updateCountColor':'updateSFColor';
+  var cb=mtype==='LF'?'updateLFColor':mtype==='VOL'?'updateVolColor':mtype==='COUNT'?'updateCountColor':mtype==='WALL'?'updateWallColor':'updateSFColor';
   callJSON(cb,{eid:eid,color:rgb});
   for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){MEAS[i].sfColor=rgb;MEAS[i].color=rgb;break;}}
   renderMeasPanel();
@@ -7695,7 +7785,7 @@ function pickSFColor(eid,cat,rgb){
 function editSFLabel(el,eid){
   var cur=el.textContent;
   var mtype='SF';for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mtype=MEAS[i].type;break;}}
-  var cb=mtype==='LF'?'updateLFLabel':mtype==='VOL'?'updateVolLabel':mtype==='COUNT'?'updateCountLabel':'updateSFLabel';
+  var cb=mtype==='LF'?'updateLFLabel':mtype==='VOL'?'updateVolLabel':mtype==='COUNT'?'updateCountLabel':mtype==='WALL'?'updateWallLabel':'updateSFLabel';
   var inp=document.createElement('input');inp.type='text';inp.value=cur;
   inp.style.cssText='font:inherit;background:var(--surface0);color:var(--text);border:1px solid var(--overlay0);border-radius:3px;padding:1px 4px;width:100%;outline:none;font-size:11px';
   el.textContent='';el.appendChild(inp);inp.focus();inp.select();
@@ -7802,6 +7892,115 @@ function measCountNew(){
     callJSON('measureCount',{category:'Custom',label:label,color:null});
     showToast('Count tool active — click to place markers','info');
   });
+}
+/* ── Compute wall parts from measurement data ── */
+function computeWallParts(mm){
+  var parts=[];
+  if(!mm||mm.type!=='WALL')return parts;
+  var cfg=mm.wallConfig||{};
+  var oc=mm.ocSpacing||cfg.oc_spacing||16;
+  var waste=cfg.waste_pct||5;
+  var details=mm.wallDetails||[];
+  // Studs — one line per consolidated group (nominal + height)
+  for(var i=0;i<details.length;i++){
+    var d=details[i],cnt=d.count||1;
+    var wallLF=d.lf||0;
+    var wallIn=wallLF*12;
+    var studs=Math.ceil(wallIn/oc);
+    studs=Math.ceil(studs*(1+waste/100));
+    var hLbl=d.h?(d.h+"'"):'';
+    parts.push({type:'stud',label:(d.nominal||'?')+' Studs'+(hLbl?' @ '+hLbl+' H':''),qty:studs,unit:'EA',detail:studs+' studs '+oc+'" OC'});
+  }
+  // Plates — computed per nominal size so 2x4 walls get 2x4 plates etc.
+  var plates=cfg.plates||[];
+  if(plates.length){
+    var lfByNom={};
+    for(var ni=0;ni<details.length;ni++){
+      var dn=details[ni],nom=dn.nominal||'?';
+      lfByNom[nom]=(lfByNom[nom]||0)+(dn.lf||0);
+    }
+    for(var nom in lfByNom){
+      if(!lfByNom.hasOwnProperty(nom))continue;
+      var nomLF=lfByNom[nom];
+      for(var j=0;j<plates.length;j++){
+        var p=plates[j];
+        var mult=p.multiplier||1;
+        var pLF=nomLF*mult*(1+waste/100);
+        pLF=Math.ceil(pLF*10)/10;
+        var sLen=p.stickLen||16;
+        var sticks=Math.ceil(pLF/sLen);
+        parts.push({type:'plate',label:nom+' '+(p.material||'Plate')+' ('+mult+'x)',qty:sticks,unit:'sticks',detail:sticks+' @ '+sLen+"' = "+pLF.toFixed(1)+' LF'});
+      }
+    }
+  }
+  return parts;
+}
+
+var _wallPlates=[];
+function measWallNew(){
+  _wallPlates=[];
+  var acts=document.getElementById('portalActions');
+  document.getElementById('portalTitle').textContent='New Wall Measurement';
+  document.getElementById('portalDesc').textContent='';
+  document.getElementById('portalProgress').style.display='none';
+  acts.style.display='block';
+  var h='<div style="display:flex;flex-direction:column;gap:6px;width:100%">';
+  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--overlay1);width:70px;flex:none">Label</span><input id="wlLabel" class="pb-inp" placeholder="e.g. Interior 2x4 Walls" style="flex:1"></div>';
+  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--overlay1);width:70px;flex:none">OC spacing</span><select id="wlOC" class="pb-sel" style="flex:none">';
+  h+='<option value="12">12" OC</option><option value="16" selected>16" OC</option><option value="24">24" OC</option></select></div>';
+  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:var(--overlay1);width:70px;flex:none">Waste %</span><input id="wlWaste" class="pb-inp" type="number" step="1" value="5" style="width:60px;flex:none"></div>';
+  h+='<div style="border-top:1px solid var(--surface0);margin:6px 0 4px;padding-top:6px">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  h+='<span style="font-size:10px;font-weight:600;color:var(--overlay1)">Plates</span>';
+  h+='<button class="pb-btn sec" onclick="wallAddPlate()" style="padding:2px 8px;font-size:9px">+ Plate</button>';
+  h+='</div><div id="wlPlateList"><span style="font-size:9px;color:var(--overlay0);font-style:italic">No plates added</span></div></div>';
+  h+='<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">';
+  h+='<span class="portal-btn portal-cancel" onclick="hidePortal()">Cancel</span>';
+  h+='<span class="portal-btn portal-confirm" onclick="measWallSubmit()">Start</span>';
+  h+='</div></div>';
+  acts.innerHTML=h;
+  var ov=document.getElementById('portalOverlay');
+  ov.style.display='flex';ov.style.opacity='';ov.style.transition='';
+  setTimeout(function(){document.getElementById('wlLabel').focus();},100);
+}
+function wallAddPlate(){
+  _wallPlates.push({material:'Plate',multiplier:1,stickLen:16});
+  wallRenderPlates();
+}
+function wallRemovePlate(i){
+  _wallPlates.splice(i,1);
+  wallRenderPlates();
+}
+function wallRenderPlates(){
+  var el=document.getElementById('wlPlateList');
+  if(!el)return;
+  var h='';
+  _wallPlates.forEach(function(p,i){
+    h+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">';
+    h+='<select class="pb-sel" style="flex:0 0 80px;font-size:9px" onchange="_wallPlates['+i+'].material=this.value">';
+    h+='<option value="Plate"'+(p.material==='Plate'?' selected':'')+'>Plate</option>';
+    h+='<option value="PT Plate"'+(p.material==='PT Plate'?' selected':'')+'>PT Plate</option>';
+    h+='</select>';
+    h+='<span style="font-size:9px;color:var(--overlay0)">\u00d7</span>';
+    h+='<input type="number" class="pb-inp" value="'+p.multiplier+'" min="1" max="10" step="1" style="width:36px;flex:none;font-size:9px;text-align:center" onchange="_wallPlates['+i+'].multiplier=parseInt(this.value)||1">';
+    h+='<select class="pb-sel" style="flex:0 0 58px;font-size:9px" onchange="_wallPlates['+i+'].stickLen=parseInt(this.value)">';
+    [8,10,12,14,16,20].forEach(function(l){h+='<option value="'+l+'"'+(p.stickLen===l?' selected':'')+'>'+l+"'</option>";});
+    h+='</select>';
+    h+='<button class="pb-btn sec" onclick="wallRemovePlate('+i+')" style="padding:1px 5px;font-size:9px;color:var(--red);border-color:var(--red)">\u00d7</button>';
+    h+='</div>';
+  });
+  if(!_wallPlates.length)h='<span style="font-size:9px;color:var(--overlay0);font-style:italic">No plates added</span>';
+  el.innerHTML=h;
+}
+function measWallSubmit(){
+  var label=(document.getElementById('wlLabel').value||'').trim();
+  if(!label){showToast('Enter a label','warn');return;}
+  var oc=parseInt(document.getElementById('wlOC').value)||16;
+  var waste=parseInt(document.getElementById('wlWaste').value)||5;
+  var plates=_wallPlates.map(function(p){return{material:p.material,multiplier:p.multiplier,stickLen:p.stickLen};});
+  hidePortal();
+  callJSON('measureWall',{category:'Wall Framing',label:label,color:null,ocSpacing:oc,plates:plates,waste:waste});
+  showToast('Wall tool active \u2014 click wall components','info');
 }
 
 /* ── Link-pick mode: click a card to link it ── */
@@ -8110,15 +8309,30 @@ var PB_TYPES={
 };
 var _pbPlates=[];
 var _pbEid=0,_pbCat='',_pbVal=0,_pbUnit='',_pbType=null,_pbLabel='';
+var _pbSourceEid=0; // non-zero when PB opened from a linked part's value
+
+function openPBFromLinked(parentEid,sourceEid,sourceVal,sourceUnit,sourceName,cat){
+  parentEid=parseInt(parentEid)||0;
+  sourceEid=parseInt(sourceEid)||0;
+  _pbSourceEid=sourceEid;
+  _pbEid=parentEid;_pbCat=cat;
+  _pbVal=sourceVal||0;_pbUnit=sourceUnit||'SF';_pbType=null;
+  _pbLabel=sourceName||'Linked';
+  document.getElementById('pbParentLabel').textContent=fmtMeasVal(_pbVal,_pbUnit)+' '+_pbUnit+' \u2014 '+_pbLabel;
+  _openPBTypes();
+}
 
 function openPB(eid,cat,mtype){
   var mm=null;
   for(var i=0;i<MEAS.length;i++){if(MEAS[i].eid===eid){mm=MEAS[i];break;}}
   if(!mm)return;
+  _pbSourceEid=0;
   _pbEid=eid;_pbCat=cat;_pbVal=mm.value||0;_pbUnit=mm.unit||mm.type||'SF';_pbType=null;
   _pbLabel=(mm.label||mm.category||'Measurement');
   document.getElementById('pbParentLabel').textContent=fmtMeasVal(_pbVal,_pbUnit)+' '+_pbUnit+' \u2014 '+_pbLabel;
-  // Render type picker
+  _openPBTypes();
+}
+function _openPBTypes(){
   var h='';
   for(var k in PB_TYPES){
     if(!PB_TYPES.hasOwnProperty(k))continue;
@@ -8366,7 +8580,10 @@ function pbSubmit(){
   if(_pbType==='custom' && !c.formula){showToast('Enter a formula','warning');return;}
   var r=pbCompute(_pbType,_pbVal,c);
   if(!r){showToast('Cannot calculate — check inputs','warning');return;}
-  // Build derived part payload
+  // Track linked source so JS-side value lookup uses the right measurement
+  if(_pbSourceEid)c.pbSourceEid=_pbSourceEid;
+  // Build derived part payload — sourceEid always points to parent card
+  // so Ruby can resolve it; pbSourceEid in cfg handles JS-side lookup
   var payload={
     name:c.name||'Custom part',
     category:_pbCat,
@@ -8381,6 +8598,7 @@ function pbSubmit(){
     cfg:c
   };
   callJSON('createDerivedPart',payload);
+  _pbSourceEid=0;
   closePB();
   showToast(PB_TYPES[_pbType].code+' part "'+c.name+'" added','success');
 }
@@ -8389,7 +8607,12 @@ function pbSubmit(){
 function pbPartRow(pp,ppd){
   var h='';
   var t=PB_TYPES[ppd.pbType]||{code:'??',color:'#6c7086'};
-  var r=pbCompute(ppd.pbType,ppd.computedValue||0,ppd.cfg);
+  // If part was created from a linked source, look up that source's current value
+  var pv=ppd.computedValue||0;
+  if(ppd.cfg&&ppd.cfg.pbSourceEid){
+    for(var si=0;si<MEAS.length;si++){if(MEAS[si].eid===ppd.cfg.pbSourceEid){pv=MEAS[si].value||0;break;}}
+  }
+  var r=pbCompute(ppd.pbType,pv,ppd.cfg);
   if(r && r.compound && r.lines){
     /* Compound framing: header + sub-lines */
     h+='<div class="mcard-part" style="flex-wrap:wrap">';

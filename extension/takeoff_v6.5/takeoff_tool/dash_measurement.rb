@@ -810,6 +810,85 @@ module TakeoffTool
         end
       end
 
+      # ─── WALL callbacks ───
+
+      dialog.add_action_callback('measureWall') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          opts = {
+            category: data['category'] || 'Wall Framing',
+            label: data['label'] || data['category'] || 'Wall Framing',
+            color: data['color'],
+            oc_spacing: data['ocSpacing'] || 16,
+            plates: data['plates'] || [],
+            stud_length: data['studLength'],
+            waste: data['waste'] || 5
+          }
+          TakeoffTool.activate_wall_tool(opts)
+        rescue => e
+          puts "measureWall error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('addWallSegments') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          eid = data['eid'].to_i
+          cat = data['category'] || 'Wall Framing'
+          grp = TakeoffTool.find_entity(eid)
+          if grp && grp.valid?
+            label = grp.get_attribute('TakeoffMeasurement', 'label') || cat
+            # Restore full config from group so plates/OC/waste are preserved
+            opts = { category: cat, label: label }
+            cfg_json = grp.get_attribute('TakeoffMeasurement', 'wall_config')
+            if cfg_json
+              cfg = JSON.parse(cfg_json) rescue {}
+              opts[:oc_spacing] = cfg['oc_spacing'] if cfg['oc_spacing']
+              opts[:plates] = cfg['plates'] if cfg['plates']
+              opts[:stud_length] = cfg['stud_length'] if cfg['stud_length']
+              opts[:waste] = cfg['waste_pct'] if cfg['waste_pct']
+            end
+            TakeoffTool.activate_wall_tool(opts)
+          end
+        rescue => e
+          puts "addWallSegments error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('removeWallSegments') do |_ctx, eid_str|
+        begin
+          TakeoffTool.activate_remove_wall_tool(eid_str.to_i)
+        rescue => e
+          puts "removeWallSegments error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateWallLabel') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_wall_label(data['eid'].to_i, data['label'].to_s)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateWallLabel error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('updateWallColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          TakeoffTool.update_wall_color(data['eid'].to_i, data['color'])
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+        rescue => e
+          puts "updateWallColor error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
       # Forward arrow keys from dashboard to active measurement tool
       dialog.add_action_callback('toolArrowKey') do |_ctx, key_str|
         begin
