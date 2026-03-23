@@ -3443,44 +3443,5 @@
     "times_applied": 1,
     "created": "2026-03-09",
     "last_applied": "2026-03-09"
-  },
-  {
-    "keyword": "Component#1",
-    "material": "",
-    "ifc_type": "",
-    "size_pattern": "",
-    "from_category": "Uncategorized",
-    "to_category": "Wall Framing",
-    "to_subcategory": "Studs",
-    "to_cost_code": "",
-    "times_applied": 1,
-    "created": "2026-03-21",
-    "last_applied": "2026-03-21"
-  },
-  {
-    "keyword": "Component#822",
-    "material": "",
-    "ifc_type": "",
-    "size_pattern": "",
-    "from_category": "Uncategorized",
-    "to_category": "Wall Framing",
-    "to_subcategory": "Studs",
-    "to_cost_code": "",
-    "times_applied": 2,
-    "created": "2026-03-21",
-    "last_applied": "2026-03-21"
-  },
-  {
-    "keyword": "Component#3544",
-    "material": "",
-    "ifc_type": "",
-    "size_pattern": "",
-    "from_category": "Uncategorized",
-    "to_category": "Trusses",
-    "to_subcategory": "Floor Trusses",
-    "to_cost_code": "",
-    "times_applied": 1,
-    "created": "2026-03-21",
-    "last_applied": "2026-03-21"
   }
 ]
