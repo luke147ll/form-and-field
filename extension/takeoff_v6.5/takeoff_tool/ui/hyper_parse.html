@@ -213,7 +213,7 @@ select optgroup{color:#89b4fa;font-weight:700;font-size:10px}select option{color
 
 <script>
 var GROUPS=[], METHOD='', CATS=[], SUBCATS={}, SELECTED={};
-var SAMPLE_PROPS=[], SAMPLE_EID=0;
+var SAMPLE_PROPS=[], SAMPLE_EID=0, SAMPLE_CAT='';
 var GRP_VIS={};  /* idx → false if hidden */
 var HP_EIDS={};
 
@@ -264,6 +264,9 @@ function populateCatSelect(sel){
         o.value=cat.name;o.textContent=cat.name;
         grp.appendChild(o);
       });
+      var cc=document.createElement('option');
+      cc.value='__custom_in__'+cont.name;cc.textContent='+ Custom...';
+      grp.appendChild(cc);
       sel.appendChild(grp);
     });
     // Add any categories not in a container
@@ -274,16 +277,17 @@ function populateCatSelect(sel){
       orphans.forEach(function(c){
         var o=document.createElement('option');o.value=c;o.textContent=c;grp.appendChild(o);
       });
+      var oc=document.createElement('option');oc.value='__custom__';oc.textContent='+ Custom...';grp.appendChild(oc);
       sel.appendChild(grp);
     }
   }else{
     CATS.forEach(function(c){
       var o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);
     });
+    var custom=document.createElement('option');
+    custom.value='__custom__';custom.textContent='+ Custom...';
+    sel.appendChild(custom);
   }
-  var custom=document.createElement('option');
-  custom.value='__custom__';custom.textContent='+ Custom...';
-  sel.appendChild(custom);
   if(cur)sel.value=cur;
 }
 function updateSubcatDropdown(){
@@ -501,7 +505,10 @@ function receiveColorSample(json){
 /* ═══ Commit ═══ */
 document.addEventListener('change',function(e){
   if(e.target.id==='catSelect'){
-    if(e.target.value==='__custom__'){
+    var cv=e.target.value;
+    var cm=cv.match(/^__custom_in__(.+)$/);
+    if(cv==='__custom__'||cm){
+      var tCont=cm?cm[1]:'';
       e.target.value='';
       showInputModal('New category name',function(name){
         var eids=getSelectedEids();
@@ -511,7 +518,7 @@ document.addEventListener('change',function(e){
           var ruleKw=(document.getElementById('ruleKeyword')||{}).value||'';
           callJSON('commitParse',{eids:eids,category:name,subcategory:sub,ruleKeyword:ruleKw});
         }
-        call('addCustomCategory',name);
+        call('addCustomCategory',JSON.stringify({name:name,container:tCont}));
         document.getElementById('catSelect').value=name;
         updateSubcatDropdown();
       });
@@ -626,6 +633,7 @@ function receiveSampledProperties(json){
     SAMPLE_PROPS=d.properties||[];
     SAMPLE_EID=d.entity_id||0;
     var curCat=d.category||'Uncategorized';
+    SAMPLE_CAT=curCat;
     var curSub=d.subcategory||'';
     // Show sample panel
     document.getElementById('resultsArea').classList.remove('show');
@@ -893,7 +901,10 @@ function doSingleAssign(){
 }
 document.addEventListener('change',function(e){
   if(e.target.id==='sampleCatSelect'){
-    if(e.target.value==='__custom__'){
+    var sv=e.target.value;
+    var sm=sv.match(/^__custom_in__(.+)$/);
+    if(sv==='__custom__'||sm){
+      var sCont=sm?sm[1]:'';
       e.target.value='';
       showInputModal('New category name',function(name){
         if(SAMPLE_EID>0){
@@ -901,7 +912,7 @@ document.addEventListener('change',function(e){
           var sub=subSel.value;if(sub==='__custom_sub__')sub='';
           callJSON('commitSingle',{eid:SAMPLE_EID,category:name,subcategory:sub});
         }
-        call('addCustomCategory',name);
+        call('addCustomCategory',JSON.stringify({name:name,container:sCont}));
         // Add to CATS and refresh
         if(CATS.indexOf(name)===-1)CATS.push(name);
         populateSampleCatDropdown();

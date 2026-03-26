@@ -592,7 +592,7 @@ module TakeoffTool
   # ═══════════════════════════════════════════════════════════════════
 
   class SectionAlignTool
-    PLANE_TOL = 1.0  # inches — edge counts as horizontal if Z delta < this
+    PLANE_TOL = 1.0 unless defined?(PLANE_TOL)  # inches — edge counts as horizontal if Z delta < this
 
     def initialize(section_group)
       @group = section_group

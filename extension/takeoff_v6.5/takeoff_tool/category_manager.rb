@@ -2,13 +2,18 @@ module TakeoffTool
 
   # ═══ CUSTOM CATEGORIES ═══
 
-  # Add a user-created custom category name and persist to model attributes
-  def self.add_custom_category(name)
+  # Add a user-created custom category name and persist to model attributes.
+  # target_container: if provided, places the new category directly in this
+  # container (from the per-container "+ Custom" option in dropdowns).
+  def self.add_custom_category(name, target_container: nil)
     return if name.nil? || name.strip.empty?
     name = name.strip
     unless @custom_categories.include?(name)
       @custom_categories << name
       save_custom_categories
+    end
+    if target_container && !target_container.empty?
+      add_category_to_container(name, target_container)
     end
     add_category(name)
   end

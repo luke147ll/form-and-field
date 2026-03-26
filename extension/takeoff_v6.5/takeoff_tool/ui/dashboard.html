@@ -2441,16 +2441,17 @@ function buildGroupedCatOptions(placeholder,includeCustom){
       var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
       h+='<optgroup label="'+X(cont.name)+'">';
       for(var j=0;j<sorted.length;j++){if(sorted[j].name==='_IGNORE')continue;inCont[sorted[j].name]=true;h+='<option value="'+X(sorted[j].name)+'">'+X(sorted[j].name)+'</option>';}
+      if(includeCustom)h+='<option value="__custom_in__'+X(cont.name)+'">+ Custom...</option>';
       h+='</optgroup>';
     }
     // Orphan categories not in any container
     var orphans=ALL_CA.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
-    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'">'+X(orphans[oi])+'</option>';h+='</optgroup>';}
+    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'">'+X(orphans[oi])+'</option>';if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';h+='</optgroup>';}
   }else{
     var sa=ALL_CA.slice().sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
     for(var i=0;i<sa.length;i++){if(sa[i]==='_IGNORE')continue;h+='<option value="'+X(sa[i])+'">'+X(sa[i])+'</option>';}
+    if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
   }
-  if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
   return h;
 }
 function buildGroupedCatOptionsSelected(selCat,includeCustom){
@@ -2465,16 +2466,17 @@ function buildGroupedCatOptionsSelected(selCat,includeCustom){
         var cn=sorted[j].name;if(cn==='_IGNORE')continue;inCont[cn]=true;
         h+='<option value="'+X(cn)+'"'+(cn===selCat?' selected':'')+'>'+X(cn)+'</option>';
       }
+      if(includeCustom)h+='<option value="__custom_in__'+X(cont.name)+'">+ Custom...</option>';
       h+='</optgroup>';
     }
     var orphans=ALL_CA.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
-    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'"'+(orphans[oi]===selCat?' selected':'')+'>'+X(orphans[oi])+'</option>';h+='</optgroup>';}
+    if(orphans.length){h+='<optgroup label="Other">';for(var oi=0;oi<orphans.length;oi++)h+='<option value="'+X(orphans[oi])+'"'+(orphans[oi]===selCat?' selected':'')+'>'+X(orphans[oi])+'</option>';if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';h+='</optgroup>';}
   }else{
     for(var i=0;i<ALL_CA.length;i++){
       h+='<option value="'+X(ALL_CA[i])+'"'+(ALL_CA[i]===selCat?' selected':'')+'>'+X(ALL_CA[i])+'</option>';
     }
+    if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
   }
-  if(includeCustom)h+='<option value="__custom__">+ Custom...</option>';
   return h;
 }
 function buildBulkDDs(){
@@ -9018,19 +9020,18 @@ function scOnChange(sel){
 /* ═══ BULK EDIT ═══ */
 function bulkSetCat(){
   var v=document.getElementById('bulkCat').value;if(!v)return;
-  if(v==='__custom__'){
+  var contMatch=v.match(/^__custom_in__(.+)$/);
+  if(v==='__custom__'||contMatch){
+    var targetCont=contMatch?contMatch[1]:'';
     document.getElementById('bulkCat').value='';
     showInputModal('New category name',function(n){
-      // Update CA and ALL_CA locally first
       if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
       if(ALL_CA.indexOf(n)===-1){ALL_CA.push(n);ALL_CA.sort();}
       var ids=getSelIds();if(!ids.length)return;
       recordUndo(ids,'category',n);
-      // Assign FIRST (queues bulkSetCategory callback in Ruby)
       callJSON('bulkSetCategory',{eids:ids,val:n});
       for(var i=0;i<D.length;i++){if(SEL[D[i].entityId]){D[i].category=n;D[i].subcategory='';}}
-      // Then persist new category (queues addCustomCategory → broadcast will include assignment)
-      call('addCustomCategory',n);
+      call('addCustomCategory',JSON.stringify({name:n,container:targetCont}));
       clearSel();buildDD();buildBulkDDs();filt();
     });
     return;
@@ -9222,20 +9223,19 @@ document.addEventListener('keydown',function(e){
 /* ═══ INLINE EDIT ═══ */
 function doSetCat(eid,v){
   console.log('[FF doSetCat] eid='+eid+' (type='+typeof eid+') val='+v);
-  if(v==='__custom__'){
+  var contMatch=v.match(/^__custom_in__(.+)$/);
+  if(v==='__custom__'||contMatch){
+    var targetCont=contMatch?contMatch[1]:'';
     // Revert dropdown to current category while modal is open
     var curCat='';
     for(var i=0;i<D.length;i++){if(D[i].entityId==eid){curCat=D[i].category;break;}}
     var row=document.getElementById('r'+eid);
     if(row){var dd=row.querySelector('select.cs');if(dd)dd.value=curCat;}
     showInputModal('New category name',function(n){
-      // Update CA and ALL_CA locally first
       if(CA.indexOf(n)===-1){CA.push(n);CA.sort();}
       if(ALL_CA.indexOf(n)===-1){ALL_CA.push(n);ALL_CA.sort();}
-      // Assign FIRST (queues setCategory/bulkSetCategory callback in Ruby)
       applySetCat(eid,n);
-      // Then persist new category (queues addCustomCategory → broadcast will include assignment)
-      call('addCustomCategory',n);
+      call('addCustomCategory',JSON.stringify({name:n,container:targetCont}));
       buildDD();buildBulkDDs();filt();
     });
     return;

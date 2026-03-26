@@ -135,10 +135,21 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
-        name = name_str.to_s.strip
+        raw = name_str.to_s.strip
+        next if raw.empty?
+        container = nil
+        if raw.start_with?('{')
+          require 'json'
+          data = JSON.parse(raw) rescue {}
+          name = (data['name'] || '').strip
+          container = (data['container'] || '').strip
+          container = nil if container.empty?
+        else
+          name = raw
+        end
         next if name.empty?
-        TakeoffTool.add_custom_category(name)
-        puts "Takeoff: IdentifyDialog addCustomCategory '#{name}'"
+        TakeoffTool.add_custom_category(name, target_container: container)
+        puts "Takeoff: IdentifyDialog addCustomCategory '#{name}' → container: #{container || 'auto'}"
       end
 
       @dialog.add_action_callback('createPart') do |_ctx, arg_str|
@@ -438,6 +449,7 @@ module TakeoffTool
             sel = cat['name'] == selected ? ' selected' : ''
             opts += "<option value=\"#{h(cat['name'])}\"#{sel}>#{h(cat['name'])}</option>"
           end
+          opts += "<option value=\"__custom_in__#{h(cont['name'])}\">+ Custom...</option>"
           opts += "</optgroup>"
         end
         orphans = all_cats.reject { |c| in_cont[c] }.sort_by(&:downcase)
@@ -447,9 +459,10 @@ module TakeoffTool
             sel = c == selected ? ' selected' : ''
             opts += "<option value=\"#{h(c)}\"#{sel}>#{h(c)}</option>"
           end
+          opts += "<option value=\"__custom__\">+ Custom...</option>"
           opts += "</optgroup>"
         end
-        opts + "\n<option value=\"__custom__\">+ Custom...</option>"
+        opts
       else
         cats = all_cats.sort_by(&:downcase)
         opts = cats.map { |c|
@@ -726,13 +739,16 @@ module TakeoffTool
         else{document.body.innerHTML=html+'<div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()"><div class="modal-card"><h3 id="modalTitle">New category name</h3><input type="text" id="modalInput" onkeydown="if(event.key===\\'Enter\\')confirmModal();if(event.key===\\'Escape\\')cancelModal();"><div class="modal-btns"><button onclick="cancelModal()">Cancel</button><button class="pri" onclick="confirmModal()">OK</button></div></div></div>';}
       }
       function onCatChange(sel){
-        if(sel.value==='__custom__'){
+        var v=sel.value;
+        var contMatch=v.match(/^__custom_in__(.+)$/);
+        if(v==='__custom__'||contMatch){
+          var targetCont=contMatch?contMatch[1]:'';
           sel.value='';
           showInputModal('New category name',function(name){
             var sub=document.getElementById('subSel');
             var subVal=sub?sub.value:'';if(subVal==='__custom_sub__')subVal='';
             sketchup.applyCategory(JSON.stringify({category:name,subcategory:subVal}));
-            sketchup.addCustomCategory(name);
+            sketchup.addCustomCategory(JSON.stringify({name:name,container:targetCont}));
           });
           return;
         }
@@ -884,6 +900,7 @@ module TakeoffTool
             for(var m=0;m<catSel.options.length;m++){if(catSel.options[m].value===d.category){hasC=true;break;}}
             if(!hasC){var co=document.createElement('option');co.value=d.category;co.textContent=d.category;var cx=catSel.querySelector('option[value="__custom__"]');if(cx)catSel.insertBefore(co,cx);else catSel.appendChild(co);}
             catSel.value=d.category;
+            catSel.setAttribute('data-prev',d.category);
           }
           var subSel=document.getElementById('subSel');
           if(subSel&&d.subcategory){

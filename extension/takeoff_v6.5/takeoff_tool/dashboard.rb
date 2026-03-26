@@ -347,11 +347,21 @@ module TakeoffTool
       end
 
       @dialog.add_action_callback('addCustomCategory') do |_ctx, name_str|
-        name = name_str.to_s.strip
-        unless name.empty?
-          TakeoffTool.add_custom_category(name)
-          puts "Takeoff: addCustomCategory '#{name}'"
+        raw = name_str.to_s.strip
+        next if raw.empty?
+        container = nil
+        if raw.start_with?('{')
+          require 'json'
+          data = JSON.parse(raw) rescue {}
+          name = (data['name'] || '').strip
+          container = (data['container'] || '').strip
+          container = nil if container.empty?
+        else
+          name = raw
         end
+        next if name.empty?
+        TakeoffTool.add_custom_category(name, target_container: container)
+        puts "Takeoff: addCustomCategory '#{name}' → container: #{container || 'auto'}"
       end
 
       # Bulk set category for multiple entities at once
