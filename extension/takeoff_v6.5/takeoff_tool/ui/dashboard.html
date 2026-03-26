@@ -2471,16 +2471,21 @@ function receiveData(json){
       renderSplitPanels();
       return;
     }
-    /* Sync VIS — hide entities entering hidden categories/containers */
-    var _reHide=[];
+    /* Sync VIS — rebuild from Ruby state, then enforce HIDDEN_CATS.
+       This avoids stale VIS entries from prior isolation or category changes. */
+    var _reHide=[],freshVIS={};
     for(var i=0;i<D.length;i++){
       var eid=D[i].entityId,cat=D[i].category;
-      if(!(eid in VIS) && D[i].visible===false) VIS[eid]=false;
-      /* Entity in a hidden category → force hidden regardless of prior VIS */
-      if(cat && HIDDEN_CATS[cat] && VIS[eid]!==false) VIS[eid]=false;
-      /* Collect all hidden entities — Ruby may have shown them (e.g. Highlighter.show_all) */
-      if(VIS[eid]===false && D[i].visible!==false) _reHide.push(eid);
+      /* Start from Ruby's actual visibility */
+      if(D[i].visible===false) freshVIS[eid]=false;
+      /* Entity in a user-hidden category → force hidden */
+      if(cat && HIDDEN_CATS[cat]){
+        freshVIS[eid]=false;
+        /* Ruby might not know yet — queue re-hide */
+        if(D[i].visible!==false) _reHide.push(eid);
+      }
     }
+    VIS=freshVIS;
     if(_reHide.length) call('hideEntities',_reHide.join(','));
     buildDD();buildBulkDDs();
     for(var i=0;i<D.length;i++){if(D[i].category==='Uncategorized'){openCats['Uncategorized']=true;break;}}
@@ -5482,9 +5487,7 @@ function receiveNewEntitiesBanner(data){
 
 function dismissNewEntitiesBanner(){
   if(NE_ISOLATED){
-    var showIds=[];
-    NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
-    call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+    call('showAll');
   }
   document.getElementById('newEntitiesBanner').classList.remove('active');
   document.getElementById('neReviewPanel').classList.remove('active');
@@ -5576,19 +5579,15 @@ function neClickItem(eid){
 
 function neIsolateAll(){
   if(NE_ISOLATED){
-    // Show all NE entities back, don't touch anything else
-    var showIds=[];
-    NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
-    call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+    call('showAll');
     NE_ISOLATED=false;
     NE_ISOLATED_CAT=null;
   }else{
-    var show=[],hide=[];
+    var ids=[];
     NE_ENTITIES.forEach(function(e){
-      if(!neIsDone(e))show.push(e.eid); else hide.push(e.eid);
+      if(!neIsDone(e))ids.push(e.eid);
     });
-    // Hide done items, show remaining — only touches NE entities
-    call('neIsolate',JSON.stringify({show:show,hide:hide}));
+    if(ids.length)call('isolateEntities',ids.join(','));
     NE_ISOLATED=true;
     NE_ISOLATED_CAT=null;
   }
@@ -5596,13 +5595,12 @@ function neIsolateAll(){
 }
 
 function neIsolateGroup(cat){
-  var show=[],hide=[];
+  var ids=[];
   NE_ENTITIES.forEach(function(e){
-    if((e.scannerCat||'Uncategorized')===cat && !neIsDone(e))show.push(e.eid);
-    else hide.push(e.eid);
+    if((e.scannerCat||'Uncategorized')===cat && !neIsDone(e))ids.push(e.eid);
   });
-  if(show.length){
-    call('neIsolate',JSON.stringify({show:show,hide:hide}));
+  if(ids.length){
+    call('isolateEntities',ids.join(','));
     NE_ISOLATED=true;
     NE_ISOLATED_CAT=cat;
     renderNewEntitiesReview();
@@ -5700,26 +5698,21 @@ function neRefreshReview(){
     txt.innerHTML='All new entities reviewed! <b>Template can be updated.</b>';
     if(NE_ISOLATED){
       NE_ISOLATED=false;NE_ISOLATED_CAT=null;
-      var showIds=[];NE_ENTITIES.forEach(function(e){showIds.push(e.eid);});
-      call('neIsolate',JSON.stringify({show:showIds,hide:[]}));
+      call('showAll');
     }
   }else{
     txt.innerHTML='<b>'+remaining+'</b> of '+NE_ENTITIES.length+' new entit'+(NE_ENTITIES.length!==1?'ies':'y')+' remaining';
   }
   // Re-isolate remaining new entities if isolation is active
   if(NE_ISOLATED && remaining>0){
-    var show=[],hide=[];
+    var ids=[];
     NE_ENTITIES.forEach(function(e){
       if(!neIsDone(e)){
-        // If isolating a specific group, only show that group's items
         if(!NE_ISOLATED_CAT || (e.scannerCat||'Uncategorized')===NE_ISOLATED_CAT)
-          show.push(e.eid);
-        else hide.push(e.eid);
-      }else{
-        hide.push(e.eid);
+          ids.push(e.eid);
       }
     });
-    if(show.length)call('neIsolate',JSON.stringify({show:show,hide:hide}));
+    if(ids.length)call('isolateEntities',ids.join(','));
   }
 }
 

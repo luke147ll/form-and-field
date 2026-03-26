@@ -532,6 +532,13 @@ module TakeoffTool
         end
       end
 
+      # Mark committed entities as "don't restore" in cleanup —
+      # on_category_changed may have hidden them during isolation and cleanup
+      # should not undo that.
+      if @hp_pre_hidden
+        eids.each { |eid| @hp_pre_hidden.add(eid) }
+      end
+
       # Refresh all open dialogs (dashboard, HP, identify)
       TakeoffTool.broadcast_category_update
 
@@ -739,23 +746,26 @@ module TakeoffTool
     def self.cleanup
       clear_preview
       # Restore only entities that HP itself hid — leave pre-hidden alone
+      # Skip restore entirely if HP never touched visibility (hp_pre_hidden is nil)
       begin
-        pre = @hp_pre_hidden || Set.new
-        sr = TakeoffTool.filtered_scan_results
-        m = Sketchup.active_model
-        if m && sr && sr.any?
-          m.start_operation('HP Cleanup', true)
-          visible = []
-          sr.each do |r|
-            next if pre.include?(r[:entity_id])
-            e = TakeoffTool.find_entity(r[:entity_id])
-            if e && e.valid? && !e.visible?
-              e.visible = true
-              visible << e
+        if @hp_pre_hidden
+          pre = @hp_pre_hidden
+          sr = TakeoffTool.filtered_scan_results
+          m = Sketchup.active_model
+          if m && sr && sr.any?
+            m.start_operation('HP Cleanup', true)
+            visible = []
+            sr.each do |r|
+              next if pre.include?(r[:entity_id])
+              e = TakeoffTool.find_entity(r[:entity_id])
+              if e && e.valid? && !e.visible?
+                e.visible = true
+                visible << e
+              end
             end
+            Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
+            m.commit_operation
           end
-          Highlighter.ensure_ancestors_visible(visible, m) if visible.any?
-          m.commit_operation
         end
       rescue => e
         puts "HyperParser cleanup restore error: #{e.message}"
