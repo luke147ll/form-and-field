@@ -41,7 +41,9 @@ module TakeoffTool
           colors[section][key] = color
           Dashboard.save_custom_colors_for_view(colors)
           Highlighter.refresh_highlights
-          Dashboard.send_live_data
+          # Do NOT call send_live_data here — it triggers receiveData → syncIsolation
+          # which can queue hideEntities callbacks that override enforce_isolation.
+          # JS already has updated CCOL and calls renderGroups() after this callback.
         rescue => e
           puts "Takeoff setCustomColor error: #{e.message}"
         end
@@ -63,7 +65,7 @@ module TakeoffTool
           end
           Dashboard.save_custom_colors_for_view(colors)
           Highlighter.refresh_highlights
-          Dashboard.send_live_data
+          # Do NOT call send_live_data here — same reason as setCustomColor.
         rescue => e
           puts "Takeoff clearCustomColor error: #{e.message}"
         end

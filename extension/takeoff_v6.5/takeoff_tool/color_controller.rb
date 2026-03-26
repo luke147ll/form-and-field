@@ -633,6 +633,7 @@ module TakeoffTool
       @active_mode = :highlight
       Dashboard.heartbeat_stop if defined?(Dashboard)
       puts "CC: Done. found=#{found} colored=#{colored} missed=#{missed}"
+      enforce_isolation
     end
 
     def self.highlight_category(sr, ca, tc)
@@ -665,6 +666,7 @@ module TakeoffTool
       @highlights_active = true
       @active_mode = :highlight
       puts "CC: Category '#{tc}' highlighted #{n}"
+      enforce_isolation
     end
 
     def self.highlight_single(eid)
@@ -776,6 +778,7 @@ module TakeoffTool
 
       m.commit_operation
       puts "CC: Color ON '#{cat_name}' (#{n} entities, #{hex})"
+      enforce_isolation
     end
 
     def self.clear_category_color(sr, ca, cat_name)
@@ -819,6 +822,7 @@ module TakeoffTool
 
       m.commit_operation
       puts "CC: Color OFF '#{cat_name}' (#{n} entities restored)"
+      enforce_isolation
     end
 
     def self.deactivate
@@ -844,6 +848,7 @@ module TakeoffTool
       ensure
         @refreshing = false
       end
+      enforce_isolation
     end
 
     # ─── set_color / set_opacity / clear_color ───
@@ -1157,15 +1162,45 @@ module TakeoffTool
       m.commit_operation
       m.active_view.invalidate
 
-      # Phase 5: after restoring materials, re-apply isolation if active
-      if defined?(VisibilityManager) && VisibilityManager.isolated?
-        VisibilityManager.reapply_isolation
-      end
+      enforce_isolation
 
       unless @refreshing
         @highlights_active = false
         @active_cat_colors = {}
       end
+    end
+
+    # Re-enforce isolation visibility after any color operation that may
+    # have side-effected entity visibility (restore/repaint cycles).
+    def self.enforce_isolation
+      return unless defined?(VisibilityManager) && VisibilityManager.isolated?
+      m = Sketchup.active_model; return unless m
+      iso_ids = VisibilityManager.isolated_entity_ids
+      fixed = 0
+      m.start_operation('Enforce Isolation', true)
+      (TakeoffTool.filtered_scan_results || []).each do |r|
+        e = TakeoffTool.find_entity(r[:entity_id])
+        next unless e && e.valid?
+        next if cad_or_grid_entity?(e)
+        should_show = iso_ids.include?(r[:entity_id])
+        if e.visible? != should_show
+          e.visible = should_show
+          fixed += 1
+        end
+      end
+      m.commit_operation
+      m.active_view.invalidate if fixed > 0
+      puts "CC: enforce_isolation fixed #{fixed} entities" if fixed > 0
+    end
+
+    def self.cad_or_grid_entity?(e)
+      return false unless e.is_a?(Sketchup::Group)
+      return true if e.get_attribute('FF_CadOverlay', 'sheet_name')
+      return true if e.get_attribute('TakeoffGridline', 'label')
+      return true if e.get_attribute('TakeoffMeasurement', 'type')
+      false
+    rescue
+      false
     end
 
     def self.apply_paint(entity, eid, mat)
