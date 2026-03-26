@@ -155,7 +155,7 @@ module TakeoffTool
     sub.add_separator
     sub.add_item('Highlight by Category') { Highlighter.highlight_all(@scan_results, @category_assignments) }
     sub.add_item('Clear Highlights') { Highlighter.clear_all }
-    sub.add_item('Show All Elements') { Highlighter.show_all }
+    sub.add_item('Show All Elements') { VisibilityManager.show_all }
     sub.add_item('Hyper Parse') { HyperParser.show_dialog }
     sub.add_item('Learned Rules') { LearningSystem.show_dialog }
     sub.add_item('Rule Builder') { LearningSystem.show_rule_builder }

@@ -8,6 +8,7 @@ module TakeoffTool
     @isolation_source = nil
     # Category map snapshot: category_name => true, used by on_category_changed
     @isolated_categories = nil
+    @operation_in_progress = false
 
     class << self
       attr_reader :isolation_active, :isolated_entity_ids, :hidden_entity_ids, :isolation_source
@@ -20,196 +21,215 @@ module TakeoffTool
       # Hide all scan entities except those in entity_ids.
       # Resolves ancestors via Highlighter, respects multiverse layers.
       def isolate(entity_ids, source: "scan")
-        m = Sketchup.active_model; return unless m
+        with_vis_lock('isolate') do
+          m = Sketchup.active_model; return unless m
 
-        id_set = entity_ids.is_a?(Set) ? entity_ids : Set.new(entity_ids)
+          id_set = entity_ids.is_a?(Set) ? entity_ids : Set.new(entity_ids)
 
-        # Resolve to actual entities
-        visible = []
-        id_set.each do |eid|
-          e = TakeoffTool.find_entity(eid)
-          visible << e if e && e.valid?
+          # Resolve to actual entities
+          visible = []
+          id_set.each do |eid|
+            e = TakeoffTool.find_entity(eid)
+            visible << e if e && e.valid?
+          end
+
+          if visible.empty?
+            puts "VisibilityManager: WARNING — no entities matched, skipping isolate"
+            return
+          end
+
+          keep_ids, keep_layers = Highlighter.build_keep_visible_set(visible)
+
+          m.start_operation('Isolate', true)
+
+          # Hide all scan entities not in keep set
+          (TakeoffTool.filtered_scan_results || []).each do |r|
+            e = TakeoffTool.find_entity(r[:entity_id])
+            next unless e && e.valid?
+            e.visible = !!keep_ids[e.entityID]
+          end
+
+          # Show ancestors
+          keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
+
+          # Force layers visible (respecting multiverse, preserving CAD/gridline)
+          mv_view = TakeoffTool.active_mv_view rescue nil
+          keep_layers.each_key do |ln|
+            next if mv_view == 'a' && ln == 'FF_Model_B'
+            next if mv_view == 'b' && ln == 'FF_Model_A'
+            next if ln.start_with?('FF_CAD_')
+            next if ln == 'FF_Gridlines'
+            next if ln == 'FF_Elevation_Tags'
+            l = m.layers[ln]
+            l.visible = true if l && !l.visible?
+          end
+
+          m.commit_operation
+
+          @isolation_active = true
+          @isolation_source = source.to_s
+          @isolated_entity_ids = id_set
+          @hidden_entity_ids = Set.new
+          @isolated_categories = nil
+
+          puts "VisibilityManager: isolated #{visible.length} entities (source=#{source})"
+          TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, source: source, action: :isolate)
         end
-
-        if visible.empty?
-          puts "VisibilityManager: WARNING — no entities matched, skipping isolate"
-          return
-        end
-
-        keep_ids, keep_layers = Highlighter.build_keep_visible_set(visible)
-
-        m.start_operation('Isolate', true)
-
-        # Hide all scan entities not in keep set
-        (TakeoffTool.filtered_scan_results || []).each do |r|
-          e = TakeoffTool.find_entity(r[:entity_id])
-          next unless e && e.valid?
-          e.visible = !!keep_ids[e.entityID]
-        end
-
-        # Show ancestors
-        keep_ids.each_value { |a| a.visible = true if a.valid? && !a.visible? }
-
-        # Force layers visible (respecting multiverse, preserving CAD/gridline)
-        mv_view = TakeoffTool.active_mv_view rescue nil
-        keep_layers.each_key do |ln|
-          next if mv_view == 'a' && ln == 'FF_Model_B'
-          next if mv_view == 'b' && ln == 'FF_Model_A'
-          next if ln.start_with?('FF_CAD_')
-          next if ln == 'FF_Gridlines'
-          next if ln == 'FF_Elevation_Tags'
-          l = m.layers[ln]
-          l.visible = true if l && !l.visible?
-        end
-
-        m.commit_operation
-
-        @isolation_active = true
-        @isolation_source = source.to_s
-        @isolated_entity_ids = id_set
-        @hidden_entity_ids = Set.new
-        @isolated_categories = nil
-
-        puts "VisibilityManager: isolated #{visible.length} entities (source=#{source})"
-        TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, source: source, action: :isolate)
       end
 
       # ── hide ──
       # Incrementally hide entities. Routes measurements through their own
       # visibility system. Checks for scan children before hiding containers.
       def hide(entity_ids)
-        m = Sketchup.active_model; return unless m
+        with_vis_lock('hide') do
+          m = Sketchup.active_model; return unless m
 
-        ids = entity_ids.is_a?(Array) ? entity_ids : entity_ids.to_a
-        scan_eid_set = Set.new((TakeoffTool.scan_results || []).map { |r| r[:entity_id] })
-        hide_set = Set.new(ids)
-        meas_changed = false
+          ids = entity_ids.is_a?(Array) ? entity_ids : entity_ids.to_a
+          scan_eid_set = Set.new((TakeoffTool.scan_results || []).map { |r| r[:entity_id] })
+          hide_set = Set.new(ids)
+          meas_changed = false
 
-        m.start_operation('Hide', true)
-        ids.each do |eid|
-          e = TakeoffTool.find_entity(eid)
-          next unless e && e.valid?
+          m.start_operation('Hide', true)
+          ids.each do |eid|
+            e = TakeoffTool.find_entity(eid)
+            next unless e && e.valid?
 
-          # Route measurement entities through Highlighter
-          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
-            mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            e.visible = false
-            e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
-            meas_changed = true
-          else
-            # Part groups: hide directly
-            is_part = (e.get_attribute('FormAndField', 'is_part') rescue nil) == true
-            unless is_part
-              # Don't hide if this entity contains scan children that should stay visible
-              if e.respond_to?(:definition) && Dashboard._has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
-                next
+            # Route measurement entities through Highlighter
+            if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
+              mtype = e.get_attribute('TakeoffMeasurement', 'type')
+              e.visible = false
+              e.set_attribute('TakeoffMeasurement', 'highlights_visible', false)
+              meas_changed = true
+            else
+              # Part groups: hide directly
+              is_part = (e.get_attribute('FormAndField', 'is_part') rescue nil) == true
+              unless is_part
+                # Don't hide if this entity contains scan children that should stay visible
+                if e.respond_to?(:definition) && Dashboard._has_visible_scan_child?(e.definition, scan_eid_set, hide_set)
+                  next
+                end
               end
+              e.visible = false
+              @hidden_entity_ids.add(eid)
             end
-            e.visible = false
-            @hidden_entity_ids.add(eid)
           end
-        end
-        m.commit_operation
+          m.commit_operation
 
-        if meas_changed && defined?(Dashboard)
-          Dashboard.invalidate_measurement_cache
-          Dashboard.send_measurement_data
+          if meas_changed && defined?(Dashboard)
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+          end
+          # No EVENT_VISIBILITY_CHANGED publish — hide() is always JS-initiated,
+          # so JS already has the correct VIS state. Publishing here caused a
+          # race condition where stale send_vis_state overwrote JS's optimistic state.
         end
-        # No EVENT_VISIBILITY_CHANGED publish — hide() is always JS-initiated,
-        # so JS already has the correct VIS state. Publishing here caused a
-        # race condition where stale send_vis_state overwrote JS's optimistic state.
       end
 
       # ── show ──
       # Show entities and ensure ancestors are visible.
       # Routes measurements through their own visibility system.
       def show(entity_ids)
-        m = Sketchup.active_model; return unless m
+        with_vis_lock('show') do
+          m = Sketchup.active_model; return unless m
 
-        ids = entity_ids.is_a?(Array) ? entity_ids : entity_ids.to_a
-        meas_changed = false
-        regular = []
+          ids = entity_ids.is_a?(Array) ? entity_ids : entity_ids.to_a
+          meas_changed = false
+          regular = []
 
-        m.start_operation('Show', true)
-        ids.each do |eid|
-          e = TakeoffTool.find_entity(eid)
-          next unless e && e.valid?
+          m.start_operation('Show', true)
+          ids.each do |eid|
+            e = TakeoffTool.find_entity(eid)
+            next unless e && e.valid?
 
-          if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
-            mtype = e.get_attribute('TakeoffMeasurement', 'type')
-            e.visible = true
-            e.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
-            meas_changed = true
-          else
-            e.visible = true
-            regular << e
-            @hidden_entity_ids.delete(eid)
+            if e.is_a?(Sketchup::Group) && e.get_attribute('TakeoffMeasurement', 'type')
+              mtype = e.get_attribute('TakeoffMeasurement', 'type')
+              e.visible = true
+              e.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+              meas_changed = true
+            else
+              e.visible = true
+              regular << e
+              @hidden_entity_ids.delete(eid)
+            end
           end
-        end
-        Highlighter.ensure_ancestors_visible(regular, m) if regular.any?
-        m.commit_operation
+          Highlighter.ensure_ancestors_visible(regular, m) if regular.any?
+          m.commit_operation
 
-        if meas_changed && defined?(Dashboard)
-          Dashboard.invalidate_measurement_cache
-          Dashboard.send_measurement_data
+          if meas_changed && defined?(Dashboard)
+            Dashboard.invalidate_measurement_cache
+            Dashboard.send_measurement_data
+          end
+          # No EVENT_VISIBILITY_CHANGED publish — show() is always JS-initiated.
         end
-        # No EVENT_VISIBILITY_CHANGED publish — show() is always JS-initiated.
       end
 
       # ── show_all ──
       # Clears all isolation/hide state and shows everything.
       # Respects multiverse layer state. Preserves CAD overlay and gridline visibility.
       def show_all
-        m = Sketchup.active_model; return unless m
+        with_vis_lock('show_all') do
+          m = Sketchup.active_model; return unless m
 
-        m.start_operation('Show All', true)
+          m.start_operation('Show All', true)
 
-        # Show all scan entities — skip CAD overlays and gridlines
-        TakeoffTool.entity_registry.each_value do |e|
-          next unless e && e.valid?
-          next if cad_or_grid?(e)
-          e.visible = true
-        end
-
-        # Show hierarchy for scan entities only — skip CAD/grid groups
-        show_scan_hierarchy(m.entities)
-
-        mv_view = TakeoffTool.active_mv_view rescue nil
-        m.layers.each do |l|
-          name = l.name
-          # Skip CAD and gridline layers — they manage their own visibility
-          next if name.start_with?('FF_CAD_')
-          next if name == 'FF_Gridlines'
-          next if name == 'FF_Elevation_Tags'
-          if mv_view == 'a' && name == 'FF_Model_B'
-            l.visible = false
-          elsif mv_view == 'b' && name == 'FF_Model_A'
-            l.visible = false
-          else
-            l.visible = true
+          # Show all scan entities — skip CAD overlays and gridlines
+          TakeoffTool.entity_registry.each_value do |e|
+            next unless e && e.valid?
+            next if cad_or_grid?(e)
+            e.visible = true
           end
+
+          # Show hierarchy for scan entities only — skip CAD/grid groups
+          show_scan_hierarchy(m.entities)
+
+          mv_view = TakeoffTool.active_mv_view rescue nil
+          m.layers.each do |l|
+            name = l.name
+            # Skip CAD and gridline layers — they manage their own visibility
+            next if name.start_with?('FF_CAD_')
+            next if name == 'FF_Gridlines'
+            next if name == 'FF_Elevation_Tags'
+            if mv_view == 'a' && name == 'FF_Model_B'
+              l.visible = false
+            elsif mv_view == 'b' && name == 'FF_Model_A'
+              l.visible = false
+            else
+              l.visible = true
+            end
+          end
+
+          m.commit_operation
+
+          @isolation_active = false
+          @isolation_source = nil
+          @isolated_entity_ids = Set.new
+          @hidden_entity_ids = Set.new
+          @isolated_categories = nil
+
+          TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :show_all)
         end
-
-        m.commit_operation
-
-        @isolation_active = false
-        @isolation_source = nil
-        @isolated_entity_ids = Set.new
-        @hidden_entity_ids = Set.new
-        @isolated_categories = nil
-
-        TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :show_all)
       end
 
-      # ── clear_isolation_state ──
-      # Clears isolation tracking WITHOUT changing any entity visibility.
-      # Used when JS exits isolation mode via incremental hide/show.
-      def clear_isolation_state
+      # ── clear_isolation ──
+      # Clears isolation tracking. When rebuild_hidden is true (default),
+      # rebuilds hidden_entity_ids from actual entity visibility.
+      # When false, clears state without touching entity tracking.
+      def clear_isolation(rebuild_hidden: true)
         @isolation_active = false
         @isolation_source = nil
         @isolated_entity_ids = Set.new
         @isolated_categories = nil
-        puts "VisibilityManager: isolation state cleared (entities unchanged)"
+        if rebuild_hidden
+          reg = TakeoffTool.entity_registry || {}
+          @hidden_entity_ids = Set.new
+          reg.each do |eid, e|
+            next unless e && e.valid?
+            @hidden_entity_ids.add(eid) unless e.visible?
+          end
+          puts "VisibilityManager: isolation cleared, #{@hidden_entity_ids.length} hidden"
+        else
+          puts "VisibilityManager: isolation cleared (entities unchanged)"
+        end
       end
 
       # ── on_category_changed ──
@@ -240,6 +260,22 @@ module TakeoffTool
         m.commit_operation
       end
 
+      # ── reapply_isolation ──
+      # Re-applies the current isolation state to all scan entities.
+      # Useful after operations that may have changed entity visibility.
+      def reapply_isolation
+        return unless @isolation_active
+        m = Sketchup.active_model; return unless m
+        m.start_operation('Reapply Isolation', true)
+        (TakeoffTool.filtered_scan_results || []).each do |r|
+          e = TakeoffTool.find_entity(r[:entity_id])
+          next unless e && e.valid?
+          next if cad_or_grid?(e)
+          e.visible = @isolated_entity_ids.include?(r[:entity_id])
+        end
+        m.commit_operation
+      end
+
       # ── isolate_by_category ──
       # Convenience: isolate all entities matching one or more categories.
       # Stores the category map for on_category_changed.
@@ -263,6 +299,18 @@ module TakeoffTool
         @isolated_categories = cat_set
       end
 
+      # ── isolate_by_container ──
+      # Isolate all entities belonging to a named container's categories.
+      def isolate_by_container(container_name, source: "scan")
+        containers = TakeoffTool.master_containers || []
+        cont = containers.find { |c| c['name'] == container_name }
+        return unless cont
+        cats = cont['categories'] || []
+        return if cats.empty?
+        cat_hash = cats.each_with_object({}) { |c, h| h[c] = true }
+        isolate_by_category(cat_hash, source: source)
+      end
+
       # ── reset ──
       # Clears internal state without touching the viewport.
       # Used when a new scan replaces all data.
@@ -274,27 +322,18 @@ module TakeoffTool
         @isolated_categories = nil
       end
 
-      # Clear isolation tracking without changing entity visibility.
-      # Called when the dashboard exits isolation mode via eye toggles.
-      def clear_isolation_tracking
-        was_active = @isolation_active
-        @isolation_active = false
-        @isolation_source = nil
-        @isolated_entity_ids = Set.new
-        @isolated_categories = nil
-        # Rebuild hidden_entity_ids from actual entity visibility
-        if was_active
-          reg = TakeoffTool.entity_registry || {}
-          @hidden_entity_ids = Set.new
-          reg.each do |eid, e|
-            next unless e && e.valid?
-            @hidden_entity_ids.add(eid) unless e.visible?
-          end
-        end
-        puts "VisibilityManager: isolation tracking cleared, #{@hidden_entity_ids.length} hidden"
-      end
-
       private
+
+      # Operation guard — prevents re-entrant visibility operations
+      def with_vis_lock(op_name)
+        return if @operation_in_progress
+        @operation_in_progress = true
+        begin
+          yield
+        ensure
+          @operation_in_progress = false
+        end
+      end
 
       # Returns true for groups that have their own visibility controls
       # and should not be touched by show_all/isolate/hide_category.

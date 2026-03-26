@@ -379,7 +379,7 @@ module TakeoffTool
       end
 
       dlg.add_action_callback('clearHighlights') do |_ctx|
-        Highlighter.show_all
+        VisibilityManager.show_all
       end
 
       dlg.add_action_callback('skipReview') do |_ctx|

@@ -6,13 +6,13 @@ module TakeoffTool
         groups = InteractiveScanner.current_groups
         if groups && groups.length > 0
           all_eids = groups.flat_map { |g| g[:entity_ids] }
-          Highlighter.isolate_entities(TakeoffTool.filtered_scan_results, all_eids)
+          VisibilityManager.isolate(all_eids, source: "scanner")
           Dashboard.send_scanner_groups
         end
       end
 
       dialog.add_action_callback('exitScannerMode') do |_ctx|
-        Highlighter.show_all
+        VisibilityManager.show_all
         Highlighter.clear_all
         Dashboard.send_live_data
       end

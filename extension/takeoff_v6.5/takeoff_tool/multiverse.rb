@@ -566,7 +566,7 @@ module TakeoffTool
     end
 
     # Clear any active Highlighter state (isolate tracking, not entity iteration)
-    Highlighter.clear_isolate_state
+    VisibilityManager.clear_isolation(rebuild_hidden: false)
 
     # Update stored active view BEFORE visibility changes
     # so filtered_scan_results uses the correct view
@@ -1580,7 +1580,7 @@ module TakeoffTool
       model.rendering_options['DisplayColorByLayer'] = true if model
     end
 
-    Highlighter.show_all
+    VisibilityManager.show_all
   end
 
   # Serialize quantity delta results for JSON transport to dashboard

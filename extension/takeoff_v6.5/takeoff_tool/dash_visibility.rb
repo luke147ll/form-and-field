@@ -102,11 +102,11 @@ module TakeoffTool
       end
 
       dialog.add_action_callback('clearIsolationTracking') do |_ctx|
-        VisibilityManager.clear_isolation_tracking
+        VisibilityManager.clear_isolation(rebuild_hidden: true)
       end
 
       dialog.add_action_callback('clearIsolation') do |_ctx|
-        VisibilityManager.clear_isolation_state
+        VisibilityManager.clear_isolation(rebuild_hidden: false)
       end
 
       dialog.add_action_callback('isolateCategories') do |_ctx, json_str|

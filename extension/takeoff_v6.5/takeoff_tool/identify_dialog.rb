@@ -109,10 +109,10 @@ module TakeoffTool
 
         # Update viewport isolation if active
         hidden_count = 0
-        if Highlighter.isolated_categories
+        if VisibilityManager.isolated?
           @current_entities.each do |e|
-            result = Highlighter.update_entity_isolation(e.entityID, cat)
-            hidden_count += 1 if result
+            VisibilityManager.on_category_changed(e.entityID, cat)
+            hidden_count += 1 unless (TakeoffTool.find_entity(e.entityID)&.visible? rescue true)
           end
         end
 

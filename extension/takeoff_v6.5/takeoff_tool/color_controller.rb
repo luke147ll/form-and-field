@@ -24,7 +24,7 @@ module TakeoffTool
 
     # ─── State ───
 
-    @originals       = {}   # eid => { instance: mat, faces: [[face, front_mat, back_mat], ...] }
+    @originals       = {}   # eid => { instance_name: str, faces: [[:face, defn_oid, idx, fn, bn], [:inst, entity_id, mat_name], ...], defn_oid: int }
     @mats            = {}   # key => Sketchup::Material
     @color_settings  = {}   # level => { key => { 'color' => '#hex', 'opacity' => float } }
     @level_to_mat_key = {}  # "level:key" => material key string
@@ -46,7 +46,7 @@ module TakeoffTool
       if inst_mat && inst_mat.respond_to?(:name) && inst_mat.name.start_with?('FF_')
         inst_mat = nil
       end
-      entry = { instance: inst_mat, faces: nil }
+      inst_name = inst_mat ? inst_mat.display_name : nil
 
       defn = nil
       if entity.respond_to?(:definition)
@@ -55,10 +55,12 @@ module TakeoffTool
         defn = entity.entities.parent
       end
 
+      entry = { instance_name: inst_name, faces: nil, defn_oid: defn ? defn.object_id : nil }
+
       if defn && defn.respond_to?(:entities) && defn.respond_to?(:instances)
         if defn.instances.length <= 1
           face_list = []
-          collect_face_originals(defn.entities, face_list)
+          collect_face_originals(defn.entities, face_list, defn.object_id)
           entry[:faces] = face_list if face_list.length > 0
         end
       end
@@ -68,29 +70,39 @@ module TakeoffTool
 
     def self.original_material(eid)
       entry = @originals[eid]
-      entry ? entry[:instance] : nil
+      return nil unless entry
+      name = entry[:instance_name]
+      name ? Sketchup.active_model&.materials&.[](name) : nil
     end
 
     def self.restore(eid)
       entry = @originals.delete(eid)
       return unless entry
+      materials = Sketchup.active_model&.materials
 
       e = TakeoffTool.find_entity(eid)
       if e && e.valid?
-        safe_set_material(e, entry[:instance])
+        orig_mat = entry[:instance_name] ? materials&.[](entry[:instance_name]) : nil
+        safe_set_material(e, orig_mat)
       end
 
-      if entry[:faces]
+      if entry[:faces] && e && e.valid?
+        defn_map = build_defn_oid_map(e)
         entry[:faces].each do |arr|
-          obj = arr[0]
-          next unless obj.valid?
-          if arr.length == 3
-            # [face, front_mat, back_mat]
-            safe_set_material(obj, arr[1])
-            safe_set_back_material(obj, arr[2])
-          else
-            # [inst, mat] pair for nested components
-            safe_set_material(obj, arr[1])
+          if arr[0] == :face
+            # [:face, defn_oid, face_index, front_name, back_name]
+            defn = defn_map[arr[1]]
+            next unless defn
+            faces = defn.entities.grep(Sketchup::Face)
+            f = faces[arr[2]]
+            next unless f
+            safe_set_material(f, arr[3] ? materials&.[](arr[3]) : nil)
+            safe_set_back_material(f, arr[4] ? materials&.[](arr[4]) : nil)
+          elsif arr[0] == :inst
+            # [:inst, entity_id, mat_name]
+            child = TakeoffTool.find_entity(arr[1])
+            next unless child && child.valid?
+            safe_set_material(child, arr[2] ? materials&.[](arr[2]) : nil)
           end
         end
       end
@@ -99,23 +111,30 @@ module TakeoffTool
     def self.restore_all
       m = Sketchup.active_model
       return unless m
+      materials = m.materials
       m.start_operation('CC Restore All', true)
 
-      @originals.each_key do |eid|
-        entry = @originals[eid]
+      @originals.each do |eid, entry|
         e = TakeoffTool.find_entity(eid)
         if e && e.valid?
-          safe_set_material(e, entry[:instance])
+          orig_mat = entry[:instance_name] ? materials[entry[:instance_name]] : nil
+          safe_set_material(e, orig_mat)
         end
-        next unless entry[:faces]
+        next unless entry[:faces] && e && e.valid?
+        defn_map = build_defn_oid_map(e)
         entry[:faces].each do |arr|
-          obj = arr[0]
-          next unless obj.valid?
-          if arr.length == 3
-            safe_set_material(obj, arr[1])
-            safe_set_back_material(obj, arr[2])
-          else
-            safe_set_material(obj, arr[1])
+          if arr[0] == :face
+            defn = defn_map[arr[1]]
+            next unless defn
+            faces = defn.entities.grep(Sketchup::Face)
+            f = faces[arr[2]]
+            next unless f
+            safe_set_material(f, arr[3] ? materials[arr[3]] : nil)
+            safe_set_back_material(f, arr[4] ? materials[arr[4]] : nil)
+          elsif arr[0] == :inst
+            child = TakeoffTool.find_entity(arr[1])
+            next unless child && child.valid?
+            safe_set_material(child, arr[2] ? materials[arr[2]] : nil)
           end
         end
       end
@@ -129,14 +148,17 @@ module TakeoffTool
       @originals.key?(eid)
     end
 
-    # Recursive: saves [face, front_mat, back_mat] triples and [inst, mat] pairs
-    def self.collect_face_originals(ents, list)
-      ents.grep(Sketchup::Face).each do |face|
+    # Recursive: saves [defn_object_id, face_index, front_mat_name, back_mat_name] and
+    # [inst_entity_id, mat_name] for nested single-instance components.
+    # Using indices + names instead of object references so cache survives undo.
+    def self.collect_face_originals(ents, list, defn_oid = nil)
+      defn_oid ||= ents.respond_to?(:parent) ? ents.parent.object_id : nil
+      ents.grep(Sketchup::Face).each_with_index do |face, idx|
         fm = face.material
         bm = face.back_material
-        fm = nil if fm && fm.respond_to?(:name) && fm.name.start_with?('FF_')
-        bm = nil if bm && bm.respond_to?(:name) && bm.name.start_with?('FF_')
-        list << [face, fm, bm]
+        fn = (fm && fm.respond_to?(:name) && !fm.name.start_with?('FF_')) ? fm.display_name : nil
+        bn = (bm && bm.respond_to?(:name) && !bm.name.start_with?('FF_')) ? bm.display_name : nil
+        list << [:face, defn_oid, idx, fn, bn]
       end
       ents.each do |child|
         next unless child.valid?
@@ -146,10 +168,10 @@ module TakeoffTool
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
         if child.respond_to?(:material)
           cm = child.material
-          cm = nil if cm && cm.respond_to?(:name) && cm.name.start_with?('FF_')
-          list << [child, cm]
+          cn = (cm && cm.respond_to?(:name) && !cm.name.start_with?('FF_')) ? cm.display_name : nil
+          list << [:inst, child.entityID, cn]
         end
-        collect_face_originals(child_defn.entities, list)
+        collect_face_originals(child_defn.entities, list, child_defn.object_id)
       end
     end
 
@@ -691,6 +713,7 @@ module TakeoffTool
       m.start_operation('Color ' + cat_name, true)
 
       # Restore existing highlights for this category before re-applying
+      materials = m.materials
       sr.each do |r|
         eid = r[:entity_id]
         cat = ca[eid] || r[:parsed][:auto_category] || 'Uncategorized'
@@ -698,13 +721,24 @@ module TakeoffTool
         e = TakeoffTool.find_entity(eid); next unless e && e.valid?
         if @originals.key?(eid)
           entry = @originals[eid]
-          safe_set_material(e, entry[:instance])
+          orig_mat = entry[:instance_name] ? materials[entry[:instance_name]] : nil
+          safe_set_material(e, orig_mat)
           if entry[:faces]
+            defn_map = build_defn_oid_map(e)
             entry[:faces].each do |arr|
-              obj = arr[0]
-              next unless obj.valid?
-              safe_set_material(obj, arr[1])
-              safe_set_back_material(obj, arr[2]) if arr.length == 3
+              if arr[0] == :face
+                defn = defn_map[arr[1]]
+                next unless defn
+                faces = defn.entities.grep(Sketchup::Face)
+                f = faces[arr[2]]
+                next unless f
+                safe_set_material(f, arr[3] ? materials[arr[3]] : nil)
+                safe_set_back_material(f, arr[4] ? materials[arr[4]] : nil)
+              elsif arr[0] == :inst
+                child = TakeoffTool.find_entity(arr[1])
+                next unless child && child.valid?
+                safe_set_material(child, arr[2] ? materials[arr[2]] : nil)
+              end
             end
           end
         end
@@ -747,6 +781,7 @@ module TakeoffTool
     def self.clear_category_color(sr, ca, cat_name)
       m = Sketchup.active_model; return unless m
       @active_cat_colors.delete(cat_name)
+      materials = m.materials
 
       m.start_operation('Uncolor ' + cat_name, true)
       n = 0
@@ -757,13 +792,24 @@ module TakeoffTool
         e = TakeoffTool.find_entity(eid); next unless e && e.valid?
         if @originals.key?(eid)
           entry = @originals[eid]
-          safe_set_material(e, entry[:instance])
+          orig_mat = entry[:instance_name] ? materials[entry[:instance_name]] : nil
+          safe_set_material(e, orig_mat)
           if entry[:faces]
+            defn_map = build_defn_oid_map(e)
             entry[:faces].each do |arr|
-              obj = arr[0]
-              next unless obj.valid?
-              safe_set_material(obj, arr[1])
-              safe_set_back_material(obj, arr[2]) if arr.length == 3
+              if arr[0] == :face
+                defn = defn_map[arr[1]]
+                next unless defn
+                faces = defn.entities.grep(Sketchup::Face)
+                f = faces[arr[2]]
+                next unless f
+                safe_set_material(f, arr[3] ? materials[arr[3]] : nil)
+                safe_set_back_material(f, arr[4] ? materials[arr[4]] : nil)
+              elsif arr[0] == :inst
+                child = TakeoffTool.find_entity(arr[1])
+                next unless child && child.valid?
+                safe_set_material(child, arr[2] ? materials[arr[2]] : nil)
+              end
             end
           end
           @originals.delete(eid)
@@ -1073,23 +1119,31 @@ module TakeoffTool
     # Internal deactivate: restore all without clearing mode state
     def self.deactivate_internal
       m = Sketchup.active_model; return unless m
+      materials = m.materials
       m.start_operation('CC Clear', true)
 
       unless @originals.empty?
         @originals.each do |eid, entry|
           e = TakeoffTool.find_entity(eid)
           if e && e.valid?
-            safe_set_material(e, entry[:instance])
+            orig_mat = entry[:instance_name] ? materials[entry[:instance_name]] : nil
+            safe_set_material(e, orig_mat)
           end
-          next unless entry[:faces]
+          next unless entry[:faces] && e && e.valid?
+          defn_map = build_defn_oid_map(e)
           entry[:faces].each do |arr|
-            obj = arr[0]
-            next unless obj.valid?
-            if arr.length == 3
-              safe_set_material(obj, arr[1])
-              safe_set_back_material(obj, arr[2])
-            else
-              safe_set_material(obj, arr[1])
+            if arr[0] == :face
+              defn = defn_map[arr[1]]
+              next unless defn
+              faces = defn.entities.grep(Sketchup::Face)
+              f = faces[arr[2]]
+              next unless f
+              safe_set_material(f, arr[3] ? materials[arr[3]] : nil)
+              safe_set_back_material(f, arr[4] ? materials[arr[4]] : nil)
+            elsif arr[0] == :inst
+              child = TakeoffTool.find_entity(arr[1])
+              next unless child && child.valid?
+              safe_set_material(child, arr[2] ? materials[arr[2]] : nil)
             end
           end
         end
@@ -1102,6 +1156,11 @@ module TakeoffTool
 
       m.commit_operation
       m.active_view.invalidate
+
+      # Phase 5: after restoring materials, re-apply isolation if active
+      if defined?(VisibilityManager) && VisibilityManager.isolated?
+        VisibilityManager.reapply_isolation
+      end
 
       unless @refreshing
         @highlights_active = false
@@ -1126,7 +1185,7 @@ module TakeoffTool
             repaint_faces_recursive(defn.entities, mat)
           else
             face_list = []
-            paint_faces_recursive(defn.entities, mat, face_list)
+            paint_faces_recursive(defn.entities, mat, face_list, defn.object_id)
             @originals[eid][:faces] = face_list if face_list.length > 0
           end
         end
@@ -1138,9 +1197,14 @@ module TakeoffTool
       false
     end
 
-    def self.paint_faces_recursive(ents, mat, face_list)
-      ents.grep(Sketchup::Face).each do |face|
-        face_list << [face, face.material, face.back_material]
+    def self.paint_faces_recursive(ents, mat, face_list, defn_oid = nil)
+      defn_oid ||= ents.respond_to?(:parent) ? ents.parent.object_id : nil
+      ents.grep(Sketchup::Face).each_with_index do |face, idx|
+        fm = face.material
+        bm = face.back_material
+        fn = (fm && fm.respond_to?(:name) && !fm.name.start_with?('FF_')) ? fm.display_name : nil
+        bn = (bm && bm.respond_to?(:name) && !bm.name.start_with?('FF_')) ? bm.display_name : nil
+        face_list << [:face, defn_oid, idx, fn, bn]
         face.material = mat
         face.back_material = mat
       end
@@ -1150,8 +1214,12 @@ module TakeoffTool
         child_defn = child.respond_to?(:definition) ? child.definition : nil
         next unless child_defn
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
-        face_list << [child, child.material] if child.respond_to?(:material)
-        paint_faces_recursive(child_defn.entities, mat, face_list)
+        if child.respond_to?(:material)
+          cm = child.material
+          cn = (cm && cm.respond_to?(:name) && !cm.name.start_with?('FF_')) ? cm.display_name : nil
+          face_list << [:inst, child.entityID, cn]
+        end
+        paint_faces_recursive(child_defn.entities, mat, face_list, child_defn.object_id)
       end
     end
 
@@ -1167,6 +1235,28 @@ module TakeoffTool
         next unless child_defn
         next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
         repaint_faces_recursive(child_defn.entities, mat)
+      end
+    end
+
+    # Build a lookup from object_id → definition for face restore
+    def self.build_defn_oid_map(entity)
+      map = {}
+      defn = entity.respond_to?(:definition) ? entity.definition : nil
+      defn ||= (entity.is_a?(Sketchup::Group) ? entity.entities.parent : nil)
+      return map unless defn
+      map[defn.object_id] = defn
+      _collect_nested_defns(defn.entities, map)
+      map
+    end
+
+    def self._collect_nested_defns(ents, map)
+      ents.each do |child|
+        next unless child.valid?
+        next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
+        child_defn = child.respond_to?(:definition) ? child.definition : nil
+        next unless child_defn
+        map[child_defn.object_id] = child_defn
+        _collect_nested_defns(child_defn.entities, map)
       end
     end
 
