@@ -1,15 +1,15 @@
 module TakeoffTool
 
   # Predefined event names
-  EVENT_CATEGORIES_CHANGED = :categories_changed
-  EVENT_SCAN_COMPLETE      = :scan_complete
-  EVENT_ASSIGNMENT_CHANGED = :assignment_changed
-  EVENT_VISIBILITY_CHANGED = :visibility_changed
-  EVENT_COLORS_CHANGED     = :colors_changed
-  EVENT_ASSEMBLY_CREATED   = :assembly_created
-  EVENT_ASSEMBLY_CHANGED   = :assembly_changed
-  EVENT_ASSEMBLY_DELETED   = :assembly_deleted
-  EVENT_PARTS_CHANGED      = :parts_changed
+  EVENT_CATEGORIES_CHANGED = :categories_changed unless defined?(EVENT_CATEGORIES_CHANGED)
+  EVENT_SCAN_COMPLETE      = :scan_complete      unless defined?(EVENT_SCAN_COMPLETE)
+  EVENT_ASSIGNMENT_CHANGED = :assignment_changed unless defined?(EVENT_ASSIGNMENT_CHANGED)
+  EVENT_VISIBILITY_CHANGED = :visibility_changed unless defined?(EVENT_VISIBILITY_CHANGED)
+  EVENT_COLORS_CHANGED     = :colors_changed     unless defined?(EVENT_COLORS_CHANGED)
+  EVENT_ASSEMBLY_CREATED   = :assembly_created   unless defined?(EVENT_ASSEMBLY_CREATED)
+  EVENT_ASSEMBLY_CHANGED   = :assembly_changed   unless defined?(EVENT_ASSEMBLY_CHANGED)
+  EVENT_ASSEMBLY_DELETED   = :assembly_deleted   unless defined?(EVENT_ASSEMBLY_DELETED)
+  EVENT_PARTS_CHANGED      = :parts_changed      unless defined?(EVENT_PARTS_CHANGED)
 
   @_event_subscribers ||= {}
   @_event_sub_counter ||= 0

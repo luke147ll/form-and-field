@@ -10,8 +10,8 @@ module TakeoffTool
     def self.current_ca; @current_ca; end
 
     # Confidence thresholds
-    HIGH_CONFIDENCE = 85
-    MEDIUM_CONFIDENCE = 50
+    HIGH_CONFIDENCE = 85 unless defined?(HIGH_CONFIDENCE)
+    MEDIUM_CONFIDENCE = 50 unless defined?(MEDIUM_CONFIDENCE)
 
     # ═══════════════════════════════════════════════════════════
     # analyze — Called after scan completes
@@ -65,7 +65,7 @@ module TakeoffTool
     #   5. Merge size variants ("Header, H8" + "Header, H10" → "Header")
     # ═══════════════════════════════════════════════════════════
 
-    MAX_GROUPS = 50
+    MAX_GROUPS = 50 unless defined?(MAX_GROUPS)
 
     def self.group_low_confidence(scan_results, category_assignments)
       # Step 1: Collect low-confidence unassigned entities

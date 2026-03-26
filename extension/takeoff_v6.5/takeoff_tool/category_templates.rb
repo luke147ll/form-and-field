@@ -1,6 +1,6 @@
 module TakeoffTool
   module CategoryTemplates
-    TEMPLATES_DIR = File.join(PLUGIN_DIR, 'data', 'templates')
+    TEMPLATES_DIR = File.join(PLUGIN_DIR, 'data', 'templates') unless defined?(TEMPLATES_DIR)
     @dialog = nil
     @pending_definition_map = nil  # Set during template apply, consumed after scan
 

@@ -30,6 +30,7 @@ module TakeoffTool
       @cutout_pt1 = nil
       @cutout_mouse = nil
       @category_detected = false
+      @selected_color = nil
 
       @save_pending = false
     end
@@ -313,16 +314,16 @@ module TakeoffTool
       [2, 3, 7, 6],  # back  (Y-max)
       [0, 3, 7, 4],  # left  (X-min)
       [1, 2, 6, 5],  # right (X-max)
-    ]
+    ] unless defined?(BOX_FACE_INDICES)
 
-    BOX_FACE_NAMES = [:bottom, :top, :front, :back, :left, :right]
+    BOX_FACE_NAMES = [:bottom, :top, :front, :back, :left, :right] unless defined?(BOX_FACE_NAMES)
 
     # 12 edge pairs as index pairs
     BOX_EDGE_INDICES = [
       [0,1],[1,2],[2,3],[3,0],  # bottom
       [4,5],[5,6],[6,7],[7,4],  # top
       [0,4],[1,5],[2,6],[3,7],  # verticals
-    ]
+    ] unless defined?(BOX_EDGE_INDICES)
 
     # ═══════════════════════════════════════════════════════════════
     # DRAWING HELPERS
@@ -763,7 +764,7 @@ module TakeoffTool
 
       @panel = UI::HtmlDialog.new(
         dialog_title: "Box Measurement",
-        width: 280, height: 580,
+        width: 280, height: 630,
         left: 80, top: 200,
         style: UI::HtmlDialog::STYLE_UTILITY,
         resizable: false
@@ -803,6 +804,16 @@ module TakeoffTool
         box_tool.send(:reset_full)
         box_tool.send(:update_panel)
         Sketchup.active_model.active_view.invalidate
+      end
+
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          box_tool.instance_variable_set(:@selected_color, rgb) if rgb.is_a?(Array) && rgb.length >= 3
+        rescue => e
+          puts "Box pickColor error: #{e.message}"
+        end
       end
 
       @panel.set_on_closed do
@@ -858,6 +869,14 @@ module TakeoffTool
     end
 
     def box_panel_html(cat_options)
+      initial_color = @selected_color || TakeoffTool.random_sf_color
+      @selected_color = initial_color
+      r, g, b = initial_color
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
       <<~HTML
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
         *{margin:0;padding:0;box-sizing:border-box}
@@ -893,6 +912,10 @@ module TakeoffTool
         .btn-cancel:hover{background:#585b70}
         #customRow{display:none;margin-top:6px}
         #customRow.show{display:block}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
         </style></head><body>
         <div class="hdr">Box Measurement</div>
         <div class="dims" id="dimsVal">0'-0" x 0'-0" x 0'-0"</div>
@@ -911,6 +934,8 @@ module TakeoffTool
         <div class="co-list" id="coList"></div>
         <div class="net-row"><span class="lbl">Net Wall SF</span><span class="val" id="netSF">0.0</span></div>
         <div class="divider"></div>
+        <label>Color</label>
+        <div class="swatches" id="swatches">#{swatches}</div>
         <label>Name</label>
         <input id="name" type="text" placeholder="e.g. Garage Slab, Foundation Wall...">
         <label>Category</label>
@@ -957,6 +982,12 @@ module TakeoffTool
         function doCancel(){sketchup.cancel();}
         function focusName(){document.getElementById('name').focus();}
         function setCategory(cat){var sel=document.getElementById('cat');for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===cat){sel.selectedIndex=i;onCatChange();return;}}}
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
         document.addEventListener('keydown',function(e){if(e.key==='Escape')doCancel();});
         </script>
         </body></html>
@@ -1025,16 +1056,18 @@ module TakeoffTool
       pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
       grp.name = pn ? "TO_BOX: #{pn} — #{cat} — #{format_dims}" : "TO_BOX: #{cat} — #{format_dims}"
 
-      # Material — reuse SF colors if available, else default
-      rgba = SF_COLORS[cat] || BOX_DEFAULT_COLOR
-      rgba = [rgba[0], rgba[1], rgba[2], 120]  # Override alpha for box
-      mat_name = "TO_BOX_#{cat.gsub(/[\s\/]+/, '_')}"
-      mat = model.materials[mat_name]
-      unless mat
-        mat = model.materials.add(mat_name)
-        mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
-        mat.alpha = rgba[3] / 255.0
+      # Material — use selected color from picker, SF colors for category, or default
+      base_rgb = if @selected_color.is_a?(Array) && @selected_color.length >= 3
+        @selected_color
+      else
+        sf = SF_COLORS[cat] || BOX_DEFAULT_COLOR
+        [sf[0], sf[1], sf[2]]
       end
+      rgba = [base_rgb[0], base_rgb[1], base_rgb[2], 120]  # Override alpha for box
+      mat_name = "TO_BOX_#{grp.entityID}"
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
+      mat.alpha = rgba[3] / 255.0
 
       # Build 6 faces
       corners = box_corners
@@ -1076,7 +1109,11 @@ module TakeoffTool
       grp.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
       grp.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
       grp.set_attribute('TakeoffMeasurement', 'material_name', mat_name)
-      grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
+      if @selected_color.is_a?(Array) && @selected_color.length >= 3
+        grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(@selected_color + [102]))
+      else
+        grp.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgba))
+      end
 
       TakeoffTool.entity_registry[grp.entityID] = grp
 

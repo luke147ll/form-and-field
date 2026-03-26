@@ -1,8 +1,8 @@
 module TakeoffTool
   module SectionCuts
-    LAYER_NAME = 'FF_Section_Cuts'.freeze
-    ATTR_DICT  = 'FFSectionCut'.freeze
-    DEFAULT_OFFSET = 48.0  # 4 feet in inches
+    LAYER_NAME = 'FF_Section_Cuts'.freeze unless defined?(LAYER_NAME)
+    ATTR_DICT  = 'FFSectionCut'.freeze    unless defined?(ATTR_DICT)
+    DEFAULT_OFFSET = 48.0                 unless defined?(DEFAULT_OFFSET)  # 4 feet in inches
 
     @cuts = []  # cached list of { name:, elevation_z:, label:, sp_eid: }
 

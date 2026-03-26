@@ -453,8 +453,8 @@ module TakeoffTool
     #   "Basic Wall, Finish - Tile on CMU" → "Finish - Tile"
     #   "M_Toilet-Commercial-Wall Mounted, Type A" → "M_Toilet"
     # Detect Revit GUIDs: "ace8a45d-794c-4d45-b..." or plain hex "8db9691d"
-    GUID_RE = /^[0-9a-f]{8}(-[0-9a-f]{4,})+$/i
-    HEX_ONLY_RE = /^[0-9a-f]{6,}$/i
+    GUID_RE = /^[0-9a-f]{8}(-[0-9a-f]{4,})+$/i unless defined?(GUID_RE)
+    HEX_ONLY_RE = /^[0-9a-f]{6,}$/i unless defined?(HEX_ONLY_RE)
 
     def self.guid?(s)
       s = s.to_s.strip

@@ -1,11 +1,11 @@
 module TakeoffTool
   module ColorController
-    DEFAULT_OPACITY   = 0.85
-    FOCUS_DIM_OPACITY = 0.15
-    DIFF_COLORS       = { a: [166, 227, 161], b: [137, 180, 250] }
-    DIFF_OPACITY      = 100 / 255.0
-    FOCUS_COLOR       = [203, 166, 247]
-    SELECTION_COLOR   = [255, 255, 0]
+    DEFAULT_OPACITY   = 0.85 unless defined?(DEFAULT_OPACITY)
+    FOCUS_DIM_OPACITY = 0.15 unless defined?(FOCUS_DIM_OPACITY)
+    DIFF_COLORS       = { a: [166, 227, 161], b: [137, 180, 250] } unless defined?(DIFF_COLORS)
+    DIFF_OPACITY      = 100 / 255.0 unless defined?(DIFF_OPACITY)
+    FOCUS_COLOR       = [203, 166, 247] unless defined?(FOCUS_COLOR)
+    SELECTION_COLOR   = [255, 255, 0] unless defined?(SELECTION_COLOR)
 
     DEFAULT_COLORS = {
       'Drywall'=>[255,240,140],'Wall Framing'=>[255,180,100],'Walls'=>[240,200,160],
@@ -20,7 +20,7 @@ module TakeoffTool
       'Ceilings'=>[160,200,230],'Plumbing'=>[100,200,200],
       'Hardware'=>[200,200,200],'Trim'=>[180,140,200],'Fascia'=>[180,160,200],
       'Soffit'=>[200,180,220],'Generic Models'=>[200,200,160],'Uncategorized'=>[255,100,100],
-    }
+    } unless defined?(DEFAULT_COLORS)
 
     # ─── State ───
 
@@ -975,12 +975,12 @@ module TakeoffTool
     SMART_DIFF_COLORS = {
       a: [243, 139, 168],  # Red — Model A
       b: [137, 180, 250]   # Blue — Model B
-    }
+    } unless defined?(SMART_DIFF_COLORS)
 
     SMART_DIFF_OPACITY = {
       a: 0.70,
       b: 0.70
-    }
+    } unless defined?(SMART_DIFF_OPACITY)
 
     @smart_diff_settings = nil
     @smart_diff_visibility = nil
@@ -1225,7 +1225,7 @@ module TakeoffTool
       ['refrigerator','Specialty'],['oven','Specialty'],['range','Specialty'],
       ['dishwasher','Specialty'],['furniture','Specialty'],
       ['equipment','Specialty'],['specialty','Specialty'],
-    ].freeze
+    ].freeze unless defined?(CONT_KEYWORDS)
 
     # Find container name for a category from master_containers
     def self.find_container_for_cat(cat)

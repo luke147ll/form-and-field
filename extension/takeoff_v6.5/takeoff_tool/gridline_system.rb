@@ -1,7 +1,7 @@
 module TakeoffTool
   class GridlineSystem
-    GRID_LAYER = 'FF_Gridlines'
-    GRID_DICT = 'TakeoffGridline'
+    GRID_LAYER = 'FF_Gridlines' unless defined?(GRID_LAYER)
+    GRID_DICT = 'TakeoffGridline' unless defined?(GRID_DICT)
 
     @gridlines = {}
 

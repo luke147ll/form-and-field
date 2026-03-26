@@ -22,16 +22,16 @@ module TakeoffTool
   # Stores elevation attributes so section alignment picks them up.
   # ═══════════════════════════════════════════════════════════════
   class AnnotationTagTool
-    VK_RIGHT = 39  # Red (X)
-    VK_LEFT  = 37  # Green (Y)
-    VK_UP    = 38  # Blue (Z)
-    VK_DOWN  = 40  # Unlock
+    VK_RIGHT = 39 unless defined?(VK_RIGHT)  # Red (X)
+    VK_LEFT  = 37 unless defined?(VK_LEFT)   # Green (Y)
+    VK_UP    = 38 unless defined?(VK_UP)     # Blue (Z)
+    VK_DOWN  = 40 unless defined?(VK_DOWN)   # Unlock
 
     AXIS_COLORS = {
       red:   Sketchup::Color.new(255, 0, 0),
       green: Sketchup::Color.new(0, 180, 0),
       blue:  Sketchup::Color.new(0, 0, 255)
-    }.freeze
+    }.freeze unless defined?(AXIS_COLORS)
 
     def initialize
       @ip = Sketchup::InputPoint.new

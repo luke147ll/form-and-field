@@ -5,10 +5,10 @@ module TakeoffTool
     # Constants
     # ═══════════════════════════════════════════════════════════
 
-    TIER_AUTO     = 70   # pct threshold — auto-assign
-    TIER_PROBABLE = 42   # pct threshold — flag for review
-    TIER_LOW      = 17   # pct threshold — low match
-    APPLY_BATCH_SIZE = 50
+    TIER_AUTO     = 70   unless defined?(TIER_AUTO)     # pct threshold — auto-assign
+    TIER_PROBABLE = 42   unless defined?(TIER_PROBABLE) # pct threshold — flag for review
+    TIER_LOW      = 17   unless defined?(TIER_LOW)      # pct threshold — low match
+    APPLY_BATCH_SIZE = 50 unless defined?(APPLY_BATCH_SIZE)
 
     @reference_library = {}   # { 'Category' => [{ fingerprint:, material:, ifc_type:, entity_count: }] }
     @review_mr = nil          # match results for active review dialog

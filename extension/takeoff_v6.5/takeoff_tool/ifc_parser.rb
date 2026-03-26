@@ -502,7 +502,7 @@ module TakeoffTool
       'IfcBeam'   => ['Beam', 'Beam'],
       'IfcColumn' => ['Post', 'Post'],
       'IfcMember' => ['Member', 'Beam'],
-    }.freeze
+    }.freeze unless defined?(IFC_MEMBER_TYPE)
 
     def self.try_timber(name, mat, tag = nil)
       size = nil

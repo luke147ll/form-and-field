@@ -4,17 +4,17 @@ module TakeoffTool
   module FlattenPass
 
     # Attribute dictionary for stamped ancestry metadata
-    FLATTEN_DICT = 'FF_Flatten'.freeze
+    FLATTEN_DICT = 'FF_Flatten'.freeze unless defined?(FLATTEN_DICT)
 
     # IFC organizational containers — ALWAYS flatten
-    IFC_ORG_TAGS = %w[IfcProject IfcSite IfcBuilding IfcBuildingStorey].freeze
+    IFC_ORG_TAGS = %w[IfcProject IfcSite IfcBuilding IfcBuildingStorey].freeze unless defined?(IFC_ORG_TAGS)
 
     # IFC assembly types — NEVER flatten (multi-part objects that should stay together)
     IFC_ASSEMBLY_TAGS = %w[
       IfcWindow IfcDoor IfcCurtainWall IfcStair IfcStairFlight
       IfcRailing IfcFurnishingElement IfcSanitaryTerminal
       IfcLightFixture IfcElectricalAppliance
-    ].freeze
+    ].freeze unless defined?(IFC_ASSEMBLY_TAGS)
 
     # ─────────────────────────────────────────────────────────
     # Entry point. Flattens nesting in a single undo operation.

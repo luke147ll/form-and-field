@@ -252,7 +252,8 @@ body{background:var(--base);color:var(--text);font:12px/1.4 var(--font-mono);
     <button class="t-btn warn" onclick="toggleGlobalDD(event)">+ Measure</button>
     <div class="meas-dd-menu" id="globalDD">
       <button class="meas-dd-item" onclick="call('activateLF');closeDD()"><span class="dd-dot" style="background:var(--green)"></span>Linear Feet</button>
-      <button class="meas-dd-item" onclick="call('activateSF');closeDD()"><span class="dd-dot" style="background:var(--blue)"></span>Square Feet</button>
+      <button class="meas-dd-item" onclick="call('activateSF');closeDD()"><span class="dd-dot" style="background:var(--blue)"></span>SF (Face Pick)</button>
+      <button class="meas-dd-item" onclick="call('polySF');closeDD()"><span class="dd-dot" style="background:var(--teal)"></span>SF (Poly Draw)</button>
       <button class="meas-dd-item" onclick="call('activateBox');closeDD()"><span class="dd-dot" style="background:var(--mauve)"></span>Box / Volume</button>
     </div>
   </div>

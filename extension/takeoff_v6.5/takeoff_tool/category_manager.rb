@@ -333,7 +333,7 @@ module TakeoffTool
     ["refrigerator","Specialty"],["oven","Specialty"],["range","Specialty"],
     ["dishwasher","Specialty"],["furniture","Specialty"],
     ["equipment","Specialty"],["specialty","Specialty"]
-  ].freeze
+  ].freeze unless defined?(CONTAINER_KEYWORDS)
 
   def self.get_container_for_category(cat)
     build_container_lookup unless @container_lookup

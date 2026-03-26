@@ -230,7 +230,7 @@ module TakeoffTool
 
   # Import wrappers — organizational containers that must be recursed into
   # even when they appear "shared" between Model A and B
-  IMPORT_WRAPPER_RE = /Ifc(Project|Site|Building(Storey)?|Space)|\.rvt|\.ifc|FF_ModelB/i
+  IMPORT_WRAPPER_RE = /Ifc(Project|Site|Building(Storey)?|Space)|\.rvt|\.ifc|FF_ModelB/i unless defined?(IMPORT_WRAPPER_RE)
 
   # Tag all Model B entities by walking DOWN from known roots.
   # After explode, top-level Model B entities are in active_entities with
@@ -1060,7 +1060,7 @@ module TakeoffTool
 
   # ═══ SMART A+B DIFF — Spatial Classification ═══
 
-  SMART_DIFF_CELL_SIZE = 24.0  # inches
+  SMART_DIFF_CELL_SIZE = 24.0 unless defined?(SMART_DIFF_CELL_SIZE)  # inches
 
   # Classify all entities into 4 states: matched, changed, new_b, removed_a
   # Returns Hash: { entity_id => :matched | :changed | :new_b | :removed_a }
@@ -1352,10 +1352,10 @@ module TakeoffTool
 
   # ═══ PART 2 — SEMI-TRANSPARENT OVERLAY DIFF ═══
 
-  DIFF_BATCH_SIZE = 50       # entities per async batch
-  DIFF_COLOR_A    = [166, 227, 161]  # green  #a6e3a1
-  DIFF_COLOR_B    = [137, 180, 250]  # blue   #89b4fa
-  DIFF_ALPHA      = 100              # out of 255 (~39% opacity)
+  DIFF_BATCH_SIZE = 50               unless defined?(DIFF_BATCH_SIZE)  # entities per async batch
+  DIFF_COLOR_A    = [166, 227, 161]  unless defined?(DIFF_COLOR_A)    # green  #a6e3a1
+  DIFF_COLOR_B    = [137, 180, 250]  unless defined?(DIFF_COLOR_B)    # blue   #89b4fa
+  DIFF_ALPHA      = 100              unless defined?(DIFF_ALPHA)       # out of 255 (~39% opacity)
 
   # Start async overlay diff. Collects entities by model_source, creates
   # 2 materials, then applies in batches of 50 via UI.start_timer(0.01).

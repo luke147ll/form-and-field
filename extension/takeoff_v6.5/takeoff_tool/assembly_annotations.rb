@@ -1,14 +1,14 @@
 module TakeoffTool
   module AssemblyAnnotations
 
-    ASSEMBLY_TAG_LAYER  = 'FF_Assembly_Tags'
-    ASSEMBLY_TAG_COLOR  = [166, 227, 161]  # Catppuccin green
-    ASSEMBLY_TAG_SCALE  = 5.0
-    ASSEMBLY_TEXT_HEIGHT = 1.5
-    ASSEMBLY_MIN_RADIUS = 2.0
-    ASSEMBLY_BORDER_W   = 0.15
-    ASSEMBLY_CIRCLE_SEGS = 32
-    ASSEMBLY_STANDOFF   = 0.1
+    ASSEMBLY_TAG_LAYER   = 'FF_Assembly_Tags' unless defined?(ASSEMBLY_TAG_LAYER)
+    ASSEMBLY_TAG_COLOR   = [166, 227, 161] unless defined?(ASSEMBLY_TAG_COLOR)  # Catppuccin green
+    ASSEMBLY_TAG_SCALE   = 5.0 unless defined?(ASSEMBLY_TAG_SCALE)
+    ASSEMBLY_TEXT_HEIGHT = 1.5 unless defined?(ASSEMBLY_TEXT_HEIGHT)
+    ASSEMBLY_MIN_RADIUS  = 2.0 unless defined?(ASSEMBLY_MIN_RADIUS)
+    ASSEMBLY_BORDER_W    = 0.15 unless defined?(ASSEMBLY_BORDER_W)
+    ASSEMBLY_CIRCLE_SEGS = 32 unless defined?(ASSEMBLY_CIRCLE_SEGS)
+    ASSEMBLY_STANDOFF    = 0.1 unless defined?(ASSEMBLY_STANDOFF)
 
     # ─── Show tags for an assembly ───
 

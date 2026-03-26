@@ -1043,9 +1043,9 @@ module TakeoffTool
     #   Single-sided → total face area
     # ═══════════════════════════════════════════════════════════
 
-    SHEET_GOOD_RE = /sheathing|drywall|plywood|osb|roofing|siding|insulation|membrane|soffit|fascia|gypcrete|decking|flooring|tile|stucco|wall\s*finish|ceiling|shingle/i
+    SHEET_GOOD_RE = /sheathing|drywall|plywood|osb|roofing|siding|insulation|membrane|soffit|fascia|gypcrete|decking|flooring|tile|stucco|wall\s*finish|ceiling|shingle/i unless defined?(SHEET_GOOD_RE)
 
-    NORMAL_TOLERANCE_RAD = 18.0 * Math::PI / 180.0
+    NORMAL_TOLERANCE_RAD = 18.0 * Math::PI / 180.0 unless defined?(NORMAL_TOLERANCE_RAD)
 
     def self.load_sampled_normal(category)
       return nil unless category
@@ -2318,12 +2318,12 @@ module TakeoffTool
     # Green = exposed, Yellow = partially blocked, Red = fully blocked.
     # ═══════════════════════════════════════════════════════════
 
-    DEBUG_OCC_SAMPLES = 6     # ray sample points per face
-    DEBUG_OCC_OFFSET  = 0.5   # inches offset from surface to avoid self-hit
-    DEBUG_OCC_MIN     = 2.0   # inches min distance (ignore very close self-geometry)
+    DEBUG_OCC_SAMPLES = 6     unless defined?(DEBUG_OCC_SAMPLES) # ray sample points per face
+    DEBUG_OCC_OFFSET  = 0.5   unless defined?(DEBUG_OCC_OFFSET)  # inches offset from surface to avoid self-hit
+    DEBUG_OCC_MIN     = 2.0   unless defined?(DEBUG_OCC_MIN)     # inches min distance (ignore very close self-geometry)
 
     # Categories/tags to ignore as blockers (rooms, volumes, levels)
-    OCC_IGNORE_RE = /room|volume|level|datum|space|zone|story|storey/i
+    OCC_IGNORE_RE = /room|volume|level|datum|space|zone|story|storey/i unless defined?(OCC_IGNORE_RE)
 
     # Wall assembly / structural categories to ignore as blockers.
     # These are expected behind drywall, not true occlusion.
@@ -2332,7 +2332,7 @@ module TakeoffTool
       window|door|opening|curtain\s*wall|
       footing|foundation|slab|masonry|veneer|
       framing|stud|joist|rafter|beam|header|
-      insulation|vapor\s*barrier|membrane|flashing/ix
+      insulation|vapor\s*barrier|membrane|flashing/ix unless defined?(OCC_ASSEMBLY_RE)
 
     def self.debug_occlusion(category, threshold_in = 18.0)
       sr = TakeoffTool.filtered_scan_results

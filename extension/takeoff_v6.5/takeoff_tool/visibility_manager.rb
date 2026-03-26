@@ -115,7 +115,9 @@ module TakeoffTool
           Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
         end
-        TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :hide, count: ids.length)
+        # No EVENT_VISIBILITY_CHANGED publish — hide() is always JS-initiated,
+        # so JS already has the correct VIS state. Publishing here caused a
+        # race condition where stale send_vis_state overwrote JS's optimistic state.
       end
 
       # ── show ──
@@ -151,7 +153,7 @@ module TakeoffTool
           Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
         end
-        TakeoffTool.publish(TakeoffTool::EVENT_VISIBILITY_CHANGED, action: :show, count: ids.length)
+        # No EVENT_VISIBILITY_CHANGED publish — show() is always JS-initiated.
       end
 
       # ── show_all ──

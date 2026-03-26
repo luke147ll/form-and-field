@@ -26,6 +26,10 @@ module TakeoffTool
     'Tile','Backsplash','Shower Walls','Custom']
   end # unless defined?(SF_COLORS)
 
+  def self.random_sf_color
+    SF_COLOR_PALETTE.sample[:rgb]
+  end
+
   def self.refresh_sf_material_colors
     m = Sketchup.active_model
     return unless m
@@ -91,8 +95,8 @@ module TakeoffTool
   # ═══════════════════════════════════════════════════════════
 
   class MeasureSFTool
-    FLOOD_ANGLE_TOL = 5.0   # degrees — coplanar threshold
-    OFFSET_DIST     = 0.5   # inches — offset toward camera
+    FLOOD_ANGLE_TOL = 5.0   unless defined?(FLOOD_ANGLE_TOL)  # degrees — coplanar threshold
+    OFFSET_DIST     = 0.5   unless defined?(OFFSET_DIST)      # inches — offset toward camera
 
     def initialize(category, opts = {})
       @category = category
@@ -109,16 +113,20 @@ module TakeoffTool
       @measurement_group = nil
       @total_sf = 0.0
       @face_count = 0
+      @panel = nil
     end
 
     def activate
       find_or_create_group
       recompute_totals
+      update_panel_total
       display = @label != @category ? "#{@category} / #{@label}" : @category
       Sketchup.status_text = "Measure SF [#{display}]: Click faces to add. Ctrl+Click to remove. Total = #{'%.1f' % @total_sf} SF. Escape to finish."
+      open_panel
     end
 
     def deactivate(view)
+      close_panel
       # Link measurement group to derived part if this was a tool measurement
       if @part_link_id && @measurement_group && @measurement_group.valid?
         begin
@@ -143,9 +151,101 @@ module TakeoffTool
 
     def resume(view)
       recompute_totals
+      update_panel_total
       display = @label != @category ? "#{@category} / #{@label}" : @category
       Sketchup.status_text = "Measure SF [#{display}]: #{'%.1f' % @total_sf} SF (#{@face_count} faces). Click to add, Ctrl+Click to remove. Escape to finish."
       view.invalidate
+    end
+
+    def open_panel
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "SF Face Tool",
+        width: 240, height: 220,
+        left: 80, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+      tool_ref = self
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          if rgb.is_a?(Array) && rgb.length >= 3
+            tool_ref.instance_variable_set(:@color_rgb, rgb)
+            tool_ref.send(:apply_color, rgb)
+          end
+        rescue => e
+          puts "SF pickColor error: #{e.message}"
+        end
+      end
+      @panel.set_on_closed { @panel = nil }
+      @panel.set_html(color_panel_html)
+      @panel.show
+    end
+
+    def close_panel
+      return unless @panel
+      p = @panel
+      @panel = nil
+      begin; p.set_on_closed {}; p.close; rescue; end
+    end
+
+    def apply_color(rgb)
+      return unless @measurement_group && @measurement_group.valid?
+      require 'json'
+      m = Sketchup.active_model
+      m.start_operation('Change SF Color', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgb + [153]))
+      mat = get_sf_material(m)
+      @measurement_group.entities.grep(Sketchup::Face).each do |face|
+        face.material = mat
+        face.back_material = mat
+      end
+      m.commit_operation
+      Sketchup.active_model.active_view.invalidate
+    end
+
+    def update_panel_total
+      return unless @panel
+      @panel.execute_script("document.getElementById('total').textContent='#{'%.1f' % @total_sf} SF (#{@face_count})'") rescue nil
+    end
+
+    def color_panel_html
+      r, g, b = active_color_rgb
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px}
+        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:6px}
+        .cat{font-size:11px;color:#a6adc8;text-align:center;margin-bottom:10px}
+        .cat b{color:#f9e2af}
+        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
+        .total{font-size:16px;font-weight:700;color:#a6e3a1;text-align:center;margin-top:12px}
+        </style></head><body>
+        <div class="hdr">SF Face Tool</div>
+        <div class="cat">Category: <b>#{@category}</b></div>
+        <label>Color</label>
+        <div class="swatches">#{swatches}</div>
+        <div class="total" id="total">#{'%.1f' % @total_sf} SF (#{@face_count})</div>
+        <script>
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
+        </script>
+        </body></html>
+      HTML
     end
 
     # ─── Mouse ───
@@ -240,6 +340,7 @@ module TakeoffTool
           @remove_hover_face = nil
           edges.each { |e| e.erase! if e.valid? && e.faces.empty? }
           recompute_totals
+          update_panel_total
           update_group_attributes
           model.commit_operation
           display = @label != @category ? "#{@category} / #{@label}" : @category
@@ -278,6 +379,7 @@ module TakeoffTool
         end
 
         recompute_totals
+        update_panel_total
         update_group_attributes
         model.commit_operation
 
@@ -579,7 +681,8 @@ module TakeoffTool
       require 'json'
       tag_name = 'TO_Measurements'
       tag = m.layers[tag_name] || m.layers.add(tag_name)
-      r, g, b = @color_rgb || [166, 227, 161]
+      @color_rgb ||= TakeoffTool.random_sf_color
+      r, g, b = @color_rgb
 
       @measurement_group = m.active_entities.add_group
       @measurement_group.layer = tag
@@ -777,6 +880,565 @@ module TakeoffTool
     end
   end
 
+  # ═══════════════════════════════════════════════════════════
+  #  MeasurePolySFTool — draw freehand polygons (like the SU
+  #  line tool) to create SF measurement faces. Close a shape
+  #  to automatically generate a face in the measurement group.
+  # ═══════════════════════════════════════════════════════════
+
+  class MeasurePolySFTool
+    CLOSE_PX = 15 unless defined?(CLOSE_PX) # screen-pixel snap radius to close
+
+    def initialize(preset_category = nil, opts = {})
+      @points = []
+      @ip = Sketchup::InputPoint.new
+      @ip_start = Sketchup::InputPoint.new
+      @mouse_pt = nil
+      @preset_category = preset_category
+      @category = preset_category || 'Custom'
+      @label = opts[:label] || @category
+      @color_rgb = opts[:color]
+      @part_link_id = opts[:part_link_id]
+      @group_eid = opts[:group_eid]
+      @measurement_group = nil
+      @total_sf = 0.0
+      @face_count = 0
+      @panel = nil
+    end
+
+    def activate
+      reset_polygon
+      open_panel
+      update_status
+    end
+
+    def deactivate(view)
+      close_panel
+      if @part_link_id && @measurement_group && @measurement_group.valid?
+        begin
+          require 'json'
+          m = Sketchup.active_model
+          dp_json = m.get_attribute('FormAndField', 'derived_parts')
+          parts = dp_json && !dp_json.empty? ? JSON.parse(dp_json) : {}
+          if parts[@part_link_id]
+            parts[@part_link_id]['sourceEid'] = @measurement_group.entityID
+            m.set_attribute('FormAndField', 'derived_parts', JSON.generate(parts))
+          end
+        rescue => e
+          puts "Takeoff: PolySF part link error: #{e.message}"
+        end
+      end
+      Dashboard.invalidate_measurement_cache rescue nil
+      Dashboard.send_measurement_data rescue nil
+      Dashboard.send_live_data rescue nil
+      MeasurementsPanel.send_data rescue nil
+      view.invalidate
+    end
+
+    def resume(view)
+      update_status
+      view.invalidate
+    end
+
+    # ─── Mouse ───
+
+    def onMouseMove(flags, x, y, view)
+      @ip.pick(view, x, y, @ip_start)
+      if @ip.valid?
+        @mouse_pt = @ip.position
+        view.tooltip = @ip.tooltip
+      end
+      view.invalidate
+    end
+
+    def onLButtonDown(flags, x, y, view)
+      @ip.pick(view, x, y, @ip_start)
+      return unless @ip.valid?
+
+      pt = @ip.position
+
+      # Auto-detect category from first click if no preset
+      if @points.empty? && !@preset_category
+        cat = detect_category_at(x, y, view)
+        if cat
+          @category = cat
+          @label = cat
+          set_panel_category(cat)
+        end
+      end
+
+      # Close if clicking near the first point
+      if @points.length >= 3
+        fs = view.screen_coords(@points.first)
+        cs = view.screen_coords(pt)
+        dx = fs.x - cs.x; dy = fs.y - cs.y
+        if Math.sqrt(dx * dx + dy * dy) < CLOSE_PX
+          close_polygon(view)
+          return
+        end
+      end
+
+      @points << pt
+      @ip_start.copy!(@ip)
+      update_status
+      view.invalidate
+    end
+
+    def onLButtonDoubleClick(flags, x, y, view)
+      close_polygon(view) if @points.length >= 3
+    end
+
+    def getMenu(menu, flags, x, y, view)
+      if @points.length >= 3
+        menu.add_item("Close Shape") { close_polygon(view) }
+      end
+      if @points.length > 0
+        menu.add_item("Cancel Shape") { reset_polygon; update_status; view.invalidate }
+      end
+      menu.add_item("Exit Tool") { Sketchup.active_model.select_tool(nil) }
+      true
+    end
+
+    # ─── Keyboard ───
+
+    def onKeyDown(key, repeat, flags, view)
+      case key
+      when 13 # Enter — close polygon
+        close_polygon(view) if @points.length >= 3
+      when 8  # Backspace — undo last point
+        if @points.length > 0
+          @points.pop
+          @ip_start = Sketchup::InputPoint.new
+          update_status
+          view.invalidate
+        end
+      end
+      false
+    end
+
+    def onCancel(reason, view)
+      if @points.length > 0
+        reset_polygon
+        update_status
+        view.invalidate
+      else
+        Sketchup.active_model.select_tool(nil)
+      end
+    end
+
+    # ─── Draw ───
+
+    def draw(view)
+      @ip.draw(view) if @ip.valid?
+      return if @points.empty?
+
+      r, g, b = active_color_rgb
+
+      # Completed edges
+      if @points.length >= 2
+        view.drawing_color = Sketchup::Color.new(r, g, b)
+        view.line_width = 2
+        view.line_stipple = ''
+        @points.each_cons(2) { |a, b2| view.draw_line(a, b2) }
+      end
+
+      # Rubber-band from last point to cursor
+      if @mouse_pt && @points.length >= 1
+        view.drawing_color = Sketchup::Color.new(r, g, b, 128)
+        view.line_width = 1
+        view.line_stipple = '_'
+        view.draw_line(@points.last, @mouse_pt)
+        view.line_stipple = ''
+
+        # Ghost closing line back to first point
+        if @points.length >= 2
+          view.drawing_color = Sketchup::Color.new(r, g, b, 60)
+          view.line_stipple = '-'
+          view.draw_line(@mouse_pt, @points.first)
+          view.line_stipple = ''
+        end
+      end
+
+      # Vertex dots
+      view.draw_points(@points, 8, 2, Sketchup::Color.new(r, g, b))
+
+      # Gold snap ring when cursor is near the first point
+      if @points.length >= 3 && @mouse_pt
+        fs = view.screen_coords(@points.first)
+        ms = view.screen_coords(@mouse_pt)
+        dx = fs.x - ms.x; dy = fs.y - ms.y
+        if Math.sqrt(dx * dx + dy * dy) < CLOSE_PX
+          view.draw_points([@points.first], 14, 4, Sketchup::Color.new(249, 226, 175))
+        end
+      end
+
+      # Translucent fill preview
+      if @points.length >= 2 && @mouse_pt
+        preview = @points + [@mouse_pt]
+        view.drawing_color = Sketchup::Color.new(r, g, b, 40)
+        view.draw(GL_POLYGON, preview)
+      end
+
+      # Live area readout near centroid
+      if @points.length >= 3 && @mouse_pt
+        preview = @points + [@mouse_pt]
+        sf = polygon_area(preview) / 144.0
+        cx = cy = cz = 0.0
+        preview.each { |p| cx += p.x; cy += p.y; cz += p.z }
+        n = preview.length.to_f
+        centroid = Geom::Point3d.new(cx / n, cy / n, cz / n)
+        scr = view.screen_coords(centroid)
+        view.draw_text(scr, "#{'%.1f' % sf} SF", color: Sketchup::Color.new(r, g, b))
+      end
+    end
+
+    def getExtents
+      bb = Geom::BoundingBox.new
+      @points.each { |p| bb.add(p) }
+      bb.add(@mouse_pt) if @mouse_pt
+      bb
+    end
+
+    private
+
+    # ─── Close & Reset ───
+
+    def close_polygon(view)
+      return if @points.length < 3
+
+      model = Sketchup.active_model
+      model.start_operation('Add SF Polygon', false)
+
+      begin
+        find_or_create_group unless @measurement_group && @measurement_group.valid?
+
+        # Transform world points into the group's local coordinate space
+        xform_inv = @measurement_group.transformation.inverse
+        local_pts = @points.map { |pt| xform_inv * pt }
+
+        new_face = @measurement_group.entities.add_face(local_pts)
+        if new_face
+          mat = get_sf_material(model)
+          new_face.material = mat
+          new_face.back_material = mat
+        end
+
+        recompute_totals
+        update_group_attributes
+        model.commit_operation
+
+        Sketchup.status_text = "Poly SF [#{@category}]: Added face — #{'%.1f' % @total_sf} SF (#{@face_count} faces). Draw another or Escape to finish."
+      rescue => e
+        model.abort_operation
+        puts "PolySF error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+      end
+
+      reset_polygon
+      update_panel
+      view.invalidate
+    end
+
+    def reset_polygon
+      @points = []
+      @mouse_pt = nil
+      @ip = Sketchup::InputPoint.new
+      @ip_start = Sketchup::InputPoint.new
+    end
+
+    # ─── Geometry Helpers ───
+
+    def polygon_area(pts)
+      return 0.0 if pts.length < 3
+      nx = ny = nz = 0.0
+      pts.length.times do |i|
+        j = (i + 1) % pts.length
+        nx += (pts[i].y - pts[j].y) * (pts[i].z + pts[j].z)
+        ny += (pts[i].z - pts[j].z) * (pts[i].x + pts[j].x)
+        nz += (pts[i].x - pts[j].x) * (pts[i].y + pts[j].y)
+      end
+      Math.sqrt(nx * nx + ny * ny + nz * nz) / 2.0
+    end
+
+    def detect_category_at(x, y, view)
+      ph = view.pick_helper
+      ph.do_pick(x, y)
+      path = ph.path_at(0)
+      return nil unless path
+      assignments = TakeoffTool.category_assignments
+      path.each do |ent|
+        next unless ent.respond_to?(:entityID)
+        cat = assignments[ent.entityID]
+        return cat if cat
+      end
+      nil
+    end
+
+    # ─── Group & Material (mirrors MeasureSFTool) ───
+
+    def find_or_create_group
+      m = Sketchup.active_model
+      return unless m
+
+      if @group_eid
+        grp = TakeoffTool.find_entity(@group_eid)
+        if grp && grp.valid? && grp.get_attribute('TakeoffMeasurement', 'type') == 'SF'
+          @measurement_group = grp
+          @label = grp.get_attribute('TakeoffMeasurement', 'label') || @label
+          return
+        end
+      end
+
+      require 'json'
+      tag_name = 'TO_Measurements'
+      tag = m.layers[tag_name] || m.layers.add(tag_name)
+      @color_rgb ||= TakeoffTool.random_sf_color
+      r, g, b = @color_rgb
+
+      @measurement_group = m.active_entities.add_group
+      @measurement_group.layer = tag
+      @measurement_group.name = "TO_SF: #{@label} — 0.0 SF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'type', 'SF')
+      @measurement_group.set_attribute('TakeoffMeasurement', 'category', @category)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'label', @label)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_sf', 0.0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'face_count', 0)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'highlights_visible', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([r, g, b, 153]))
+      @measurement_group.set_attribute('TakeoffMeasurement', 'material_name', "FF_SF_#{@measurement_group.entityID}")
+
+      if @part_link_id
+        @measurement_group.set_attribute('TakeoffMeasurement', 'part_link', @part_link_id)
+      end
+
+      TakeoffTool.entity_registry[@measurement_group.entityID] = @measurement_group
+      TakeoffTool.invalidate_entity_cache
+    end
+
+    def recompute_totals
+      if @measurement_group && @measurement_group.valid?
+        faces = @measurement_group.entities.grep(Sketchup::Face)
+        @face_count = faces.length
+        @total_sf = (faces.sum { |f| f.area } / 144.0).round(2)
+      else
+        @face_count = 0
+        @total_sf = 0.0
+      end
+    end
+
+    def update_group_attributes
+      return unless @measurement_group && @measurement_group.valid?
+      @measurement_group.set_attribute('TakeoffMeasurement', 'total_sf', @total_sf)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'face_count', @face_count)
+      @measurement_group.name = "TO_SF: #{@label} — #{'%.1f' % @total_sf} SF"
+      @measurement_group.set_attribute('TakeoffMeasurement', 'timestamp', Time.now.to_s)
+    end
+
+    def active_color_rgb
+      @color_rgb || begin
+        if @measurement_group && @measurement_group.valid?
+          require 'json'
+          rgba_json = @measurement_group.get_attribute('TakeoffMeasurement', 'color_rgba')
+          arr = rgba_json ? (JSON.parse(rgba_json) rescue nil) : nil
+          arr && arr.length >= 3 ? arr[0..2] : [166, 227, 161]
+        else
+          [166, 227, 161]
+        end
+      end
+    end
+
+    def get_sf_material(model)
+      r, g, b = active_color_rgb
+      eid = @measurement_group ? @measurement_group.entityID : 0
+      mat_name = "FF_SF_#{eid}"
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(r, g, b)
+      mat.alpha = 0.6
+      mat
+    end
+
+    # ─── Status ───
+
+    def update_status
+      n = @points.length
+      if n == 0
+        Sketchup.status_text = "Poly SF [#{@category}]: Click to place first point. #{'%.1f' % @total_sf} SF total. Escape to finish."
+      elsif n < 3
+        Sketchup.status_text = "Poly SF [#{@category}]: #{n} point#{'s' if n > 1} placed — need #{3 - n} more to close."
+      else
+        Sketchup.status_text = "Poly SF [#{@category}]: #{n} points — click first point, Enter, or double-click to close. Backspace to undo."
+      end
+      Sketchup.vcb_label = "Total SF"
+      Sketchup.vcb_value = "#{'%.1f' % @total_sf} SF"
+    end
+
+    # ─── Panel ───
+
+    def open_panel
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "SF Measurement",
+        width: 260, height: 380,
+        left: 80, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+
+      tool = self
+
+      @panel.add_action_callback('done') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          label = data['label'].to_s.strip
+          note = data['note'].to_s
+          tool.send(:apply_label_note, label, note)
+        rescue => e
+          puts "PolySF panel error: #{e.message}"
+        end
+        Sketchup.active_model.select_tool(nil)
+      end
+
+      @panel.add_action_callback('cancel') do |_ctx|
+        Sketchup.active_model.select_tool(nil)
+      end
+
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          tool.send(:apply_color, rgb)
+        rescue => e
+          puts "PolySF pickColor error: #{e.message}"
+        end
+      end
+
+      @panel.set_on_closed do
+        @panel = nil
+        UI.start_timer(0) { Sketchup.active_model.select_tool(nil) }
+      end
+
+      @panel.set_html(panel_html)
+      @panel.show
+    end
+
+    def close_panel
+      return unless @panel
+      p = @panel; @panel = nil
+      begin; p.set_on_closed {}; p.close; rescue; end
+    end
+
+    def update_panel
+      return unless @panel
+      @panel.execute_script("updateTotal('#{'%.1f' % @total_sf}',#{@face_count})") rescue nil
+    end
+
+    def set_panel_category(cat)
+      return unless @panel
+      require 'json'
+      @panel.execute_script("setCategory(#{JSON.generate(cat)})") rescue nil
+    end
+
+    def apply_color(rgb)
+      return unless rgb.is_a?(Array) && rgb.length >= 3
+      @color_rgb = rgb
+      return unless @measurement_group && @measurement_group.valid?
+      require 'json'
+      m = Sketchup.active_model
+      m.start_operation('Change SF Color', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate([rgb[0], rgb[1], rgb[2], 153]))
+      mat = get_sf_material(m)
+      @measurement_group.entities.grep(Sketchup::Face).each do |face|
+        face.material = mat
+        face.back_material = mat
+      end
+      m.commit_operation
+      Sketchup.active_model.active_view.invalidate
+    end
+
+    def apply_label_note(label, note)
+      return unless @measurement_group && @measurement_group.valid?
+      m = Sketchup.active_model
+      m.start_operation('Update SF Label', true)
+      @label = label unless label.empty?
+      @measurement_group.set_attribute('TakeoffMeasurement', 'label', @label)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'note', note) unless note.empty?
+      update_group_attributes
+      m.commit_operation
+    end
+
+    def panel_html
+      safe_label = @label.gsub('"', '&quot;')
+      # Pick a random color if none set yet
+      @color_rgb ||= TakeoffTool.random_sf_color
+      r, g, b = @color_rgb
+      # Build swatch dots from palette
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow:hidden}
+        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
+        .total-val{font-size:28px;font-weight:700;color:#a6e3a1;text-align:center;margin:4px 0 2px}
+        .total-detail{font-size:11px;color:#6c7086;text-align:center;margin-bottom:10px}
+        .divider{height:1px;background:#313244;margin:0 -14px 10px}
+        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:3px;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        label:first-of-type{margin-top:0}
+        input[type=text]{width:100%;padding:7px 9px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
+        input:focus{outline:none;border-color:#89b4fa}
+        .cat-badge{display:inline-block;padding:4px 10px;background:#313244;border:1px solid #585b70;border-radius:5px;font-size:12px;color:#89b4fa;margin-top:3px}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
+        .btns{display:flex;gap:8px;margin-top:14px}
+        .btn{flex:1;padding:8px 0;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
+        .btn-done{background:#a6e3a1;color:#1e1e2e}
+        .btn-done:hover{background:#8cd68c}
+        .btn-cancel{background:#45475a;color:#cdd6f4}
+        .btn-cancel:hover{background:#585b70}
+        </style></head><body>
+        <div class="hdr">SF Measurement</div>
+        <div class="total-val" id="totalVal">0.0 SF</div>
+        <div class="total-detail" id="totalDetail">Draw a closed shape to measure</div>
+        <div class="divider"></div>
+        <label>Category</label>
+        <div class="cat-badge" id="catBadge">#{@category}</div>
+        <label>Color</label>
+        <div class="swatches" id="swatches">#{swatches}</div>
+        <label>Label</label>
+        <input id="label" type="text" value="#{safe_label}" placeholder="e.g. Kitchen Floor, South Wall...">
+        <label>Note</label>
+        <input id="note" type="text" placeholder="Optional">
+        <div class="btns">
+          <button class="btn btn-cancel" onclick="doCancel()">Cancel</button>
+          <button class="btn btn-done" onclick="doDone()">Done</button>
+        </div>
+        <script>
+        function updateTotal(sf,faces){
+          document.getElementById('totalVal').textContent=sf+' SF';
+          document.getElementById('totalDetail').textContent=faces+' face'+(faces!==1?'s':'')+' drawn';
+        }
+        function setCategory(cat){document.getElementById('catBadge').textContent=cat;}
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
+        function doDone(){
+          sketchup.done(JSON.stringify({label:document.getElementById('label').value,note:document.getElementById('note').value}));
+        }
+        function doCancel(){sketchup.cancel();}
+        </script>
+        </body></html>
+      HTML
+    end
+  end
+
   # ─── Module entry points ───
 
   def self.activate_sf_tool
@@ -793,6 +1455,10 @@ module TakeoffTool
 
   def self.activate_sf_tool_new(category, label, color_rgb)
     Sketchup.active_model.select_tool(MeasureSFTool.new(category, label: label, color: color_rgb))
+  end
+
+  def self.activate_poly_sf_tool(category = nil, opts = {})
+    Sketchup.active_model.select_tool(MeasurePolySFTool.new(category, opts))
   end
 
   def self.activate_remove_sf_tool(group_eid)

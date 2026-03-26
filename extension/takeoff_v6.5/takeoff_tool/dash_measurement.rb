@@ -18,6 +18,10 @@ module TakeoffTool
         TakeoffTool.activate_sf_tool
       end
 
+      dialog.add_action_callback('polySF') do |_ctx|
+        TakeoffTool.activate_poly_sf_tool
+      end
+
       dialog.add_action_callback('activateSFForCat') do |_ctx, cat_str|
         TakeoffTool.activate_sf_tool_for_category(cat_str.to_s)
       end
@@ -193,6 +197,20 @@ module TakeoffTool
           Dashboard.send_measurement_data
         rescue => e
           puts "Takeoff deleteMeasurement error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('combineMeasurements') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          Highlighter.combine_measurements(data['targetEid'].to_i, data['sourceEid'].to_i)
+          Dashboard.invalidate_measurement_cache
+          Dashboard.send_measurement_data
+          Dashboard.send_live_data
+          MeasurementsPanel.send_data rescue nil
+        rescue => e
+          puts "Takeoff combineMeasurements error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -580,6 +598,14 @@ module TakeoffTool
           TakeoffTool.activate_remove_sf_tool(eid_str.to_i)
         rescue => e
           puts "removeSFFaces error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      dialog.add_action_callback('polySFForCat') do |_ctx, cat_str|
+        begin
+          TakeoffTool.activate_poly_sf_tool(cat_str.to_s)
+        rescue => e
+          puts "polySFForCat error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 

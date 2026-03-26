@@ -1,8 +1,8 @@
 module TakeoffTool
   module ScanBackup
 
-    BACKUP_DIR = File.join(PLUGIN_DIR, 'data')
-    MAX_BACKUPS = 3
+    BACKUP_DIR = File.join(PLUGIN_DIR, 'data') unless defined?(BACKUP_DIR)
+    MAX_BACKUPS = 3 unless defined?(MAX_BACKUPS)
 
     # ═══════════════════════════════════════════════════════════
     # save — Write current scan state to a JSON backup file
@@ -155,8 +155,8 @@ module TakeoffTool
       h
     end
 
-    SYMBOL_FIELDS = %w[source].freeze
-    PARSED_SYMBOL_FIELDS = %w[confidence].freeze
+    SYMBOL_FIELDS = %w[source].freeze unless defined?(SYMBOL_FIELDS)
+    PARSED_SYMBOL_FIELDS = %w[confidence].freeze unless defined?(PARSED_SYMBOL_FIELDS)
 
     def self.deserialize_result(h)
       r = {}

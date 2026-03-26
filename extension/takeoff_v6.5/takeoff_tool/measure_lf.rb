@@ -104,6 +104,7 @@ module TakeoffTool
       @part_link_id = opts[:part_link_id]  # derived part ID to link on save
       @part_link_label = opts[:label]      # label override for part-linked measurements
       @part_link_color = opts[:color]      # color override [r,g,b]
+      @selected_color = nil
     end
 
     def activate
@@ -238,6 +239,8 @@ module TakeoffTool
     # ─── Draw ───
 
     def draw(view)
+      @ip.draw(view) if @ip.valid?
+
       @segments.each do |chain|
         next if chain.length < 2
         chain.each_cons(2) do |a, b|
@@ -290,17 +293,11 @@ module TakeoffTool
     # ─── Panel ───
 
     def open_panel
-      all_cats = TakeoffTool.master_categories
       default_cat = @preset_category || @last_cat || 'Trim'
-      cat_opts = all_cats.map { |c|
-        sel = c == default_cat ? ' selected' : ''
-        "<option value=\"#{c}\"#{sel}>#{c}</option>"
-      }.join
-      cat_opts += '<option value="__custom__">+ Custom...</option>'
 
       @panel = UI::HtmlDialog.new(
         dialog_title: "LF Measurement",
-        width: 260, height: 440,
+        width: 260, height: 380,
         left: 80, top: 200,
         style: UI::HtmlDialog::STYLE_UTILITY,
         resizable: false
@@ -313,10 +310,9 @@ module TakeoffTool
           require 'json'
           data = JSON.parse(json_str.to_s)
           cat = data['cat'].to_s.strip
-          cc  = data['cc'].to_s
           note = data['note'].to_s
-          part_name = data['name'].to_s.strip
-          lf_tool.send(:save_measurement, cat, cc, note, part_name) unless cat.empty?
+          part_name = data['label'].to_s.strip
+          lf_tool.send(:save_measurement, cat, '', note, part_name) unless cat.empty?
         rescue => e
           puts "Takeoff LF: save error: #{e.message}"
         end
@@ -326,18 +322,28 @@ module TakeoffTool
         Sketchup.active_model.select_tool(nil)
       end
 
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          lf_tool.instance_variable_set(:@selected_color, rgb) if rgb.is_a?(Array) && rgb.length >= 3
+        rescue => e
+          puts "LF pickColor error: #{e.message}"
+        end
+      end
+
       @panel.set_on_closed do
         @panel = nil
         UI.start_timer(0) { Sketchup.active_model.select_tool(nil) }
       end
 
-      @panel.set_html(lf_panel_html(cat_opts))
+      @panel.set_html(lf_panel_html(default_cat))
       @panel.show
 
-      # Pre-fill name when launched from a derived part
+      # Pre-fill label when launched from a derived part
       if @part_link_label && !@part_link_label.empty?
         safe = @part_link_label.gsub("'", "\\\\'")
-        UI.start_timer(0.1) { @panel.execute_script("document.getElementById('name').value='#{safe}'") if @panel }
+        UI.start_timer(0.1) { @panel.execute_script("document.getElementById('label').value='#{safe}'") if @panel }
       end
     end
 
@@ -361,10 +367,18 @@ module TakeoffTool
       return unless @panel && total_points >= 2
       @save_pending = true
       @panel.bring_to_front rescue nil
-      @panel.execute_script("focusName()") rescue nil
+      @panel.execute_script("focusLabel()") rescue nil
     end
 
-    def lf_panel_html(cat_options)
+    def lf_panel_html(default_cat)
+      initial_color = @selected_color || TakeoffTool.random_sf_color
+      @selected_color = initial_color
+      r, g, b = initial_color
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
       <<~HTML
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
         *{margin:0;padding:0;box-sizing:border-box}
@@ -375,8 +389,13 @@ module TakeoffTool
         .divider{height:1px;background:#313244;margin:0 -14px 10px}
         label{display:block;color:#a6adc8;font-size:11px;margin-bottom:3px;margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
         label:first-of-type{margin-top:0}
-        select,input[type=text]{width:100%;padding:7px 9px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
-        select:focus,input:focus{outline:none;border-color:#89b4fa}
+        input[type=text]{width:100%;padding:7px 9px;background:#313244;color:#cdd6f4;border:1px solid #585b70;border-radius:5px;font-size:12px;font-family:inherit}
+        input:focus{outline:none;border-color:#89b4fa}
+        .cat-badge{display:inline-block;padding:4px 10px;background:#313244;border:1px solid #585b70;border-radius:5px;font-size:12px;color:#89b4fa;margin-top:3px}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
         .btns{display:flex;gap:8px;margin-top:14px}
         .btn{flex:1;padding:8px 0;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center}
         .btn-save{background:#a6e3a1;color:#1e1e2e}
@@ -384,20 +403,18 @@ module TakeoffTool
         .btn-save:disabled{opacity:0.4;cursor:default}
         .btn-cancel{background:#45475a;color:#cdd6f4}
         .btn-cancel:hover{background:#585b70}
-        #customRow{display:none;margin-top:6px}
-        #customRow.show{display:block}
         </style></head><body>
         <div class="hdr">LF Measurement</div>
         <div class="total-val" id="totalVal">0'-0"</div>
         <div class="total-detail" id="totalDetail">Click to start measuring</div>
         <div class="divider"></div>
-        <label>Name</label>
-        <input id="name" type="text" placeholder="e.g. Drip Edge, Crown Mold...">
         <label>Category</label>
-        <select id="cat" onchange="onCatChange()">#{cat_options}</select>
-        <div id="customRow"><input id="customName" type="text" placeholder="New category name..."></div>
-        <label>Cost Code</label>
-        <input id="cc" type="text" placeholder="Optional">
+        <div class="cat-badge" id="catBadge">#{default_cat}</div>
+        <input type="hidden" id="cat" value="#{default_cat}">
+        <label>Color</label>
+        <div class="swatches" id="swatches">#{swatches}</div>
+        <label>Label</label>
+        <input id="label" type="text" placeholder="e.g. Drip Edge, Crown Mold...">
         <label>Note</label>
         <input id="note" type="text" placeholder="Optional">
         <div class="btns">
@@ -412,16 +429,20 @@ module TakeoffTool
           document.getElementById('totalDetail').textContent=d;
           document.getElementById('saveBtn').disabled=points<2;
         }
-        function onCatChange(){document.getElementById('customRow').className=document.getElementById('cat').value==='__custom__'?'show':'';}
         function doSave(){
           var cat=document.getElementById('cat').value;
-          if(cat==='__custom__'){cat=document.getElementById('customName').value.trim();if(!cat)return;}
-          if(document.getElementById('saveBtn').disabled)return;
-          sketchup.save(JSON.stringify({name:document.getElementById('name').value,cat:cat,cc:document.getElementById('cc').value,note:document.getElementById('note').value}));
+          if(!cat||document.getElementById('saveBtn').disabled)return;
+          sketchup.save(JSON.stringify({label:document.getElementById('label').value,cat:cat,note:document.getElementById('note').value}));
         }
         function doCancel(){sketchup.cancel();}
-        function focusName(){document.getElementById('name').focus();}
-        function setCategory(cat){var sel=document.getElementById('cat');for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===cat){sel.selectedIndex=i;onCatChange();return;}}}
+        function focusLabel(){document.getElementById('label').focus();}
+        function setCategory(cat){document.getElementById('cat').value=cat;document.getElementById('catBadge').textContent=cat;}
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
         document.addEventListener('keydown',function(e){if(e.key==='Escape')doCancel();});
         </script>
         </body></html>
@@ -444,6 +465,7 @@ module TakeoffTool
 
     def set_panel_category(cat)
       return unless @panel
+      @active_category = cat
       require 'json'
       @panel.execute_script("setCategory(#{JSON.generate(cat)})") rescue nil
     end
@@ -580,18 +602,17 @@ module TakeoffTool
       pn = @last_part_name && !@last_part_name.empty? ? @last_part_name : nil
       grp.name = pn ? "TO_LF: #{pn} — #{cat} — #{'%.1f' % total_ft} ft" : "TO_LF: #{cat} — #{'%.1f' % total_ft} ft"
 
-      rgba = if @part_link_color.is_a?(Array) && @part_link_color.length >= 3
+      rgba = if @selected_color.is_a?(Array) && @selected_color.length >= 3
+               @selected_color.length >= 4 ? @selected_color : @selected_color + [160]
+             elsif @part_link_color.is_a?(Array) && @part_link_color.length >= 3
                @part_link_color.length >= 4 ? @part_link_color : @part_link_color + [160]
              else
                LF_COLORS[cat] || LF_DEFAULT_COLOR
              end
-      mat_name = "TO_LF_#{cat.gsub(/\s+/,'_')}"
-      mat = model.materials[mat_name]
-      unless mat
-        mat = model.materials.add(mat_name)
-        mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
-        mat.alpha = (rgba[3] || 160) / 255.0
-      end
+      mat_name = "TO_LF_#{grp.entityID}"
+      mat = model.materials[mat_name] || model.materials.add(mat_name)
+      mat.color = Sketchup::Color.new(rgba[0], rgba[1], rgba[2])
+      mat.alpha = (rgba[3] || 160) / 255.0
 
       @segments.each do |chain|
         next if chain.length < 2
@@ -856,16 +877,16 @@ module TakeoffTool
   # ═══════════════════════════════════════════════════════════
 
   class MeasureLFFaceTool
-    FLOOD_ANGLE_TOL = 5.0   # degrees — coplanar threshold
-    OFFSET_DIST     = 0.5   # inches — offset toward camera
-    LF_RIBBON_WIDTH = 1.5   # inches — ribbon visual width
-    DIR_HORIZ_Z_MAX = 0.342 # sin(20°) — Z ratio below this = horizontal edge
-    DIR_VERT_Z_MIN  = 0.940 # cos(20°) — Z ratio above this = vertical edge
-    VK_LEFT = 37; VK_UP = 38; VK_RIGHT = 39; VK_DOWN = 40
+    FLOOD_ANGLE_TOL = 5.0   unless defined?(FLOOD_ANGLE_TOL)   # degrees — coplanar threshold
+    OFFSET_DIST     = 0.5   unless defined?(OFFSET_DIST)       # inches — offset toward camera
+    LF_RIBBON_WIDTH = 1.5   unless defined?(LF_RIBBON_WIDTH)   # inches — ribbon visual width
+    DIR_HORIZ_Z_MAX = 0.342 unless defined?(DIR_HORIZ_Z_MAX)   # sin(20°) — Z ratio below this = horizontal edge
+    DIR_VERT_Z_MIN  = 0.940 unless defined?(DIR_VERT_Z_MIN)    # cos(20°) — Z ratio above this = vertical edge
+    VK_LEFT = 37 unless defined?(VK_LEFT); VK_UP = 38 unless defined?(VK_UP); VK_RIGHT = 39 unless defined?(VK_RIGHT); VK_DOWN = 40 unless defined?(VK_DOWN)
     DIR_LABELS = {
       bottom: "\u2193 BOTTOM", top: "\u2191 TOP",
       vert_left: "\u2190 VERT-L", vert_right: "\u2192 VERT-R", all: 'ALL'
-    }.freeze
+    }.freeze unless defined?(DIR_LABELS)
 
     def initialize(category, opts = {})
       @category = category
@@ -883,15 +904,19 @@ module TakeoffTool
       @total_lf = 0.0
       @edge_count = 0
       @dir_filter = :bottom  # :bottom, :top, :vert_left, :vert_right, :all
+      @panel = nil
     end
 
     def activate
       find_or_create_group
       recompute_totals
+      update_panel_total
       update_status
+      open_panel
     end
 
     def deactivate(view)
+      close_panel
       TakeoffTool.instance_variable_set(:@active_lf_face_tool, nil)
       # Link measurement group to derived part if this was a tool measurement
       if @part_link_id && @measurement_group && @measurement_group.valid?
@@ -917,8 +942,102 @@ module TakeoffTool
 
     def resume(view)
       recompute_totals
+      update_panel_total
       update_status
       view.invalidate
+    end
+
+    # ─── Color Panel ───
+
+    def open_panel
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "LF Face Tool",
+        width: 240, height: 220,
+        left: 80, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+      tool_ref = self
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          if rgb.is_a?(Array) && rgb.length >= 3
+            tool_ref.instance_variable_set(:@color_rgb, rgb)
+            tool_ref.send(:apply_color, rgb)
+          end
+        rescue => e
+          puts "LF Face pickColor error: #{e.message}"
+        end
+      end
+      @panel.set_on_closed { @panel = nil }
+      @panel.set_html(color_panel_html)
+      @panel.show
+    end
+
+    def close_panel
+      return unless @panel
+      p = @panel
+      @panel = nil
+      begin; p.set_on_closed {}; p.close; rescue; end
+    end
+
+    def apply_color(rgb)
+      return unless @measurement_group && @measurement_group.valid?
+      require 'json'
+      m = Sketchup.active_model
+      m.start_operation('Change LF Color', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgb + [178]))
+      mat = get_lf_material(m)
+      @measurement_group.entities.grep(Sketchup::Face).each do |face|
+        face.material = mat
+        face.back_material = mat
+      end
+      m.commit_operation
+      Sketchup.active_model.active_view.invalidate
+    end
+
+    def update_panel_total
+      return unless @panel
+      @panel.execute_script("document.getElementById('total').textContent='#{'%.1f' % @total_lf} LF (#{@edge_count})'") rescue nil
+    end
+
+    def color_panel_html
+      r, g, b = @color_rgb
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px}
+        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:6px}
+        .cat{font-size:11px;color:#a6adc8;text-align:center;margin-bottom:10px}
+        .cat b{color:#f9e2af}
+        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
+        .total{font-size:16px;font-weight:700;color:#a6e3a1;text-align:center;margin-top:12px}
+        </style></head><body>
+        <div class="hdr">LF Face Tool</div>
+        <div class="cat">Category: <b>#{@category}</b></div>
+        <label>Color</label>
+        <div class="swatches">#{swatches}</div>
+        <div class="total" id="total">#{'%.1f' % @total_lf} LF (#{@edge_count})</div>
+        <script>
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
+        </script>
+        </body></html>
+      HTML
     end
 
     # ─── Mouse ───
@@ -1003,6 +1122,7 @@ module TakeoffTool
         end
 
         recompute_totals
+        update_panel_total
         update_group_attributes
         model.commit_operation
         update_status

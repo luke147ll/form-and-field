@@ -316,7 +316,7 @@ module TakeoffTool
     ELEV_LABEL_SUGGESTIONS = [
       'T.O.S.', 'T.O.F.', 'T.O.W.', 'F.F.', 'T.O.P.',
       'B.O.S.', 'T.O.C.', 'Ridge', 'Eave'
-    ]
+    ] unless defined?(ELEV_LABEL_SUGGESTIONS)
 
     def onLButtonDown(flags, x, y, view)
       @ip.pick(view, x, y)

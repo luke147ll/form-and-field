@@ -30,6 +30,7 @@ module TakeoffTool
     #   lf       = linear feet
     #   sf_sheets = SF primary + sheet count secondary (sheathing)
     #   volume   = ft³ fallback
+    unless defined?(CATEGORY_MEASUREMENTS)
     CATEGORY_MEASUREMENTS = {
       'Casework'          => 'lf',
       'Countertops'       => 'lf',
@@ -128,12 +129,9 @@ module TakeoffTool
       'Interior Doors'       => 'ea',
       'Interior Trim'        => 'lf',
       'Cabinets/Vanities'    => 'lf',
-      'Countertops'          => 'lf',
       'Architectural Metal'  => 'lf',
       'Custom Stairs'        => 'ea',
       'Interior Railing'     => 'lf',
-      'Roof Sheathing'       => 'sf_sheets',
-      'Wall Sheathing'       => 'sf_sheets',
       # IFC template — timber categories
       'Timber Beams'         => 'ea_bf',
       'Timber Posts'         => 'ea_bf',
@@ -163,6 +161,7 @@ module TakeoffTool
       'Steel Plates'         => 'ea',
       'Steel Posts'          => 'lf',
     }
+    end # unless defined?(CATEGORY_MEASUREMENTS)
     end # unless defined?(TAG_CATEGORY_MAP)
 
     def self.measurement_for(category)

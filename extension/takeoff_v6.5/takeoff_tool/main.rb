@@ -20,6 +20,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'dash_multiverse.rb')
   load File.join(PLUGIN_DIR, 'dash_scanner.rb')
   load File.join(PLUGIN_DIR, 'dash_cost_codes.rb')
+  load File.join(PLUGIN_DIR, 'dash_notes.rb')
   load File.join(PLUGIN_DIR, 'startup_dialog.rb')
   load File.join(PLUGIN_DIR, 'exporter.rb')
   load File.join(PLUGIN_DIR, 'color_controller.rb')

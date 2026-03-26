@@ -8,7 +8,7 @@ module TakeoffTool
     @hp_selected_eids = []
     @hp_pre_hidden = nil  # eids hidden before HP touched visibility
 
-    SAMPLE_BATCH_SIZE = 50
+    SAMPLE_BATCH_SIZE = 50 unless defined?(SAMPLE_BATCH_SIZE)
 
     # ─── Color Sampler Tool ───
     # One-shot pick tool: user clicks an entity, we grab its material color

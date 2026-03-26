@@ -299,6 +299,20 @@ module TakeoffTool
         end
       end
 
+      @dialog.add_action_callback('combineMeasurements') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          Highlighter.combine_measurements(data['targetEid'].to_i, data['sourceEid'].to_i)
+          Dashboard.invalidate_measurement_cache rescue nil
+          Dashboard.send_measurement_data rescue nil
+          Dashboard.send_live_data rescue nil
+          send_data
+        rescue => e
+          puts "[FF MeasPanel] combineMeasurements error: #{e.message}"
+        end
+      end
+
       @dialog.add_action_callback('zoomToMeasurement') do |_ctx, eid_str|
         begin
           eid = eid_str.to_s.to_i
@@ -322,6 +336,10 @@ module TakeoffTool
         TakeoffTool.activate_sf_tool
       end
 
+      @dialog.add_action_callback('polySF') do |_ctx|
+        TakeoffTool.activate_poly_sf_tool
+      end
+
       @dialog.add_action_callback('activateBox') do |_ctx|
         TakeoffTool.activate_box_tool
       end
@@ -332,6 +350,10 @@ module TakeoffTool
 
       @dialog.add_action_callback('activateSFForCat') do |_ctx, cat_str|
         TakeoffTool.activate_sf_tool_for_category(cat_str.to_s)
+      end
+
+      @dialog.add_action_callback('polySFForCat') do |_ctx, cat_str|
+        TakeoffTool.activate_poly_sf_tool(cat_str.to_s)
       end
 
       @dialog.add_action_callback('activateBoxForCat') do |_ctx, cat_str|

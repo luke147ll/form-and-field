@@ -15,11 +15,12 @@ module TakeoffTool
   # NOTE TOOL — Click to place text annotation labels in the model
   # ═══════════════════════════════════════════════════════════════
   class NoteTool
-    def initialize
+    def initialize(prefill = nil)
       @ip = Sketchup::InputPoint.new
       @hover_point = nil
       @notes_placed = 0
       @dialog_open = false
+      @prefill = prefill  # { text:, label_type:, color: } or nil
     end
 
     def activate
@@ -95,9 +96,10 @@ module TakeoffTool
         '#cba6f7','#89b4fa','#94e2d5','#a6e3a1','#fab387','#f38ba8',
         '#f9e2af','#f5c2e7','#89dceb','#b4befe','#f2cdcd','#74c7ec'
       ]
+      default_color = (@prefill && @prefill['color']) ? @prefill['color'].to_s : '#89b4fa'
       color_circles = color_palette.map { |c|
-        sel = c == '#89b4fa' ? 'border:2px solid #cdd6f4;' : 'border:2px solid transparent;'
-        "<span class='cc' style='background:#{c};#{sel}' onclick=\"pickClr(this,'#{c}')\"></span>"
+        sel = c == default_color ? 'border:2px solid #cdd6f4;' : 'border:2px solid transparent;'
+        "<span class='cc#{c == default_color ? ' picked' : ''}' style='background:#{c};#{sel}' onclick=\"pickClr(this,'#{c}')\"></span>"
       }.join('')
 
       html = <<~HTML
@@ -115,15 +117,13 @@ module TakeoffTool
         </style></head><body>
         <h1>Place Note</h1>
         <label>Note Text</label>
-        <textarea id="text" rows="3" placeholder="Enter note text..."></textarea>
+        <textarea id="text" rows="3" placeholder="Enter note text...">#{(@prefill && @prefill['text']) ? @prefill['text'].to_s.gsub('<','&lt;').gsub('>','&gt;') : ''}</textarea>
         <label style="margin-top:10px;display:block">Label Type</label>
         <select id="labelType">
-          <option value="None">None</option>
-          <option value="Note" selected>Note</option>
-          <option value="Info">Info</option>
-          <option value="Warning">Warning</option>
-          <option value="Action">Action</option>
-          <option value="Question">Question</option>
+          #{%w[None Note Info Warning Action Question].map { |lt|
+            sel = (@prefill && @prefill['label_type'].to_s == lt) ? ' selected' : (lt == 'Note' && !@prefill ? ' selected' : '')
+            "<option value='#{lt}'#{sel}>#{lt}</option>"
+          }.join}
         </select>
         <label style="margin-top:10px;display:block">Color</label>
         <div class="clrs">#{color_circles}</div>
@@ -132,7 +132,7 @@ module TakeoffTool
           <button class="btn btn-ok" onclick="doOk()">OK</button>
         </div>
         <script>
-        var selColor='#89b4fa';
+        var selColor='#{default_color}';
         function pickClr(el,c){
           selColor=c;
           var all=document.querySelectorAll('.cc');
@@ -177,7 +177,16 @@ module TakeoffTool
         label_type = data['labelType'].to_s
         color_hex = data['color'].to_s
         unless text.empty?
-          TakeoffTool.create_note_label(click_pt, text, label_type, color_hex, view)
+          grp = TakeoffTool.create_note_label(click_pt, text, label_type, color_hex, view)
+          # If placed from a project note, link the 3D tag back
+          if grp && @prefill && @prefill['project_note_id']
+            begin
+              DashNotes.link_tag_to_note(@prefill['project_note_id'], grp.entityID)
+              DashNotes.send_notes_data
+            rescue => le
+              puts "Takeoff: link tag to note error: #{le.message}"
+            end
+          end
           @notes_placed += 1
           update_status
         end
@@ -275,7 +284,7 @@ module TakeoffTool
     grp
   end
 
-  def self.activate_note_tool
-    Sketchup.active_model.select_tool(NoteTool.new)
+  def self.activate_note_tool(prefill = nil)
+    Sketchup.active_model.select_tool(NoteTool.new(prefill))
   end
 end

@@ -10,7 +10,7 @@ module TakeoffTool
   # ═══════════════════════════════════════════════════════════
 
   class MeasureVolTool
-    BOX_EXPAND = 0.75  # inches — expand box outward to avoid z-fighting
+    BOX_EXPAND = 0.75 unless defined?(BOX_EXPAND)  # inches — expand box outward to avoid z-fighting
 
     def initialize(category, opts = {})
       @category = category
@@ -24,17 +24,21 @@ module TakeoffTool
       @total_cy = 0.0
       @object_count = 0
       @measured_eids = {}  # track which entities are already measured
+      @panel = nil
     end
 
     def activate
       find_or_create_group
       rebuild_measured_eids
       recompute_totals
+      update_panel_total
       display = @label != @category ? "#{@category} / #{@label}" : @category
       Sketchup.status_text = "Measure VOL [#{display}]: Click solid objects to measure volume. Total = #{'%.2f' % @total_cy} CY (#{@object_count} objects). Escape to finish."
+      open_panel
     end
 
     def deactivate(view)
+      close_panel
       # Link measurement group to derived part if this was a tool measurement
       if @part_link_id && @measurement_group && @measurement_group.valid?
         begin
@@ -59,9 +63,106 @@ module TakeoffTool
 
     def resume(view)
       recompute_totals
+      update_panel_total
       display = @label != @category ? "#{@category} / #{@label}" : @category
       Sketchup.status_text = "Measure VOL [#{display}]: #{'%.2f' % @total_cy} CY (#{@object_count} objects). Click to add more. Escape to finish."
       view.invalidate
+    end
+
+    # ─── Panel ───
+
+    def open_panel
+      @panel = UI::HtmlDialog.new(
+        dialog_title: "Volume Tool",
+        width: 240, height: 220,
+        left: 80, top: 200,
+        style: UI::HtmlDialog::STYLE_UTILITY,
+        resizable: false
+      )
+      tool_ref = self
+      @panel.add_action_callback('pickColor') do |_ctx, json_str|
+        begin
+          require 'json'
+          rgb = JSON.parse(json_str.to_s)
+          if rgb.is_a?(Array) && rgb.length >= 3
+            tool_ref.instance_variable_set(:@color_rgb, rgb)
+            tool_ref.send(:apply_color, rgb)
+          end
+        rescue => e
+          puts "Vol pickColor error: #{e.message}"
+        end
+      end
+      @panel.set_on_closed { @panel = nil }
+      @panel.set_html(color_panel_html)
+      @panel.show
+    end
+
+    def close_panel
+      return unless @panel
+      p = @panel
+      @panel = nil
+      begin; p.set_on_closed {}; p.close; rescue; end
+    end
+
+    def apply_color(rgb)
+      return unless @measurement_group && @measurement_group.valid?
+      require 'json'
+      m = Sketchup.active_model
+      m.start_operation('Change Vol Color', true)
+      @measurement_group.set_attribute('TakeoffMeasurement', 'color_rgba', JSON.generate(rgb + [153]))
+      mat = get_vol_material(m)
+      # Vol markers are sub-groups with faces inside them
+      @measurement_group.entities.grep(Sketchup::Group).each do |marker|
+        marker.entities.grep(Sketchup::Face).each do |face|
+          face.material = mat
+          face.back_material = mat
+        end
+      end
+      m.commit_operation
+      Sketchup.active_model.active_view.invalidate
+    end
+
+    def update_panel_total
+      return unless @panel
+      @panel.execute_script("document.getElementById('total').textContent='#{'%.2f' % @total_cy} CY (#{@object_count})'") rescue nil
+    end
+
+    def color_panel_html
+      r, g, b = active_color_rgb
+      swatches = SF_COLOR_PALETTE.map { |c|
+        cr, cg, cb = c[:rgb]
+        sel = (cr == r && cg == g && cb == b) ? ' sw-sel' : ''
+        "<span class=\"sw#{sel}\" style=\"background:rgb(#{cr},#{cg},#{cb})\" onclick=\"pickColor(#{cr},#{cg},#{cb})\"></span>"
+      }.join
+      <<~HTML
+        <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px}
+        .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:6px}
+        .cat{font-size:11px;color:#a6adc8;text-align:center;margin-bottom:10px}
+        .cat b{color:#f9e2af}
+        label{display:block;color:#a6adc8;font-size:11px;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+        .sw{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+        .sw:hover{border-color:#cdd6f4}
+        .sw-sel{border-color:#fff;box-shadow:0 0 0 1px #1e1e2e,0 0 4px rgba(255,255,255,.4)}
+        .total{font-size:16px;font-weight:700;color:#a6e3a1;text-align:center;margin-top:12px}
+        </style></head><body>
+        <div class="hdr">Volume Tool</div>
+        <div class="cat">Category: <b>#{@category}</b></div>
+        <label>Color</label>
+        <div class="swatches">#{swatches}</div>
+        <div class="total" id="total">#{'%.2f' % @total_cy} CY (#{@object_count})</div>
+        <script>
+        function pickColor(r,g,b){
+          var dots=document.querySelectorAll('.sw');
+          dots.forEach(function(d){d.classList.remove('sw-sel');});
+          event.target.classList.add('sw-sel');
+          sketchup.pickColor(JSON.stringify([r,g,b]));
+        }
+        </script>
+        </body></html>
+      HTML
     end
 
     # ─── Mouse ───
@@ -190,6 +291,7 @@ module TakeoffTool
         @measured_eids[eid] = true
 
         recompute_totals
+        update_panel_total
         update_group_attributes
         model.commit_operation
 

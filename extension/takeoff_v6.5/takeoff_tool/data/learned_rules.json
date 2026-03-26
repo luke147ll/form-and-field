@@ -3443,5 +3443,70 @@
     "times_applied": 1,
     "created": "2026-03-09",
     "last_applied": "2026-03-09"
+  },
+  {
+    "keyword": "J-Furn SEAT Chair Dining1",
+    "material": "J-Wood Stain 03 (Darker Wood)",
+    "ifc_type": "IfcFurniture",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "test",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 4,
+    "created": "2026-03-25",
+    "last_applied": "2026-03-25"
+  },
+  {
+    "keyword": "J-Furn SEAT Chair Dining1",
+    "material": "J-Wood Stain 03 (Darker Wood)",
+    "ifc_type": "IfcFurniture",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "test2",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-25",
+    "last_applied": "2026-03-25"
+  },
+  {
+    "keyword": "Stool",
+    "material": "Metal - Steel - Black (MA)",
+    "ifc_type": "IfcFurniture",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "test3",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-25",
+    "last_applied": "2026-03-25"
+  },
+  {
+    "keyword": "Stool",
+    "material": "Metal - Steel - Black (MA)",
+    "ifc_type": "IfcFurniture",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "test 4",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-25",
+    "last_applied": "2026-03-25"
+  },
+  {
+    "keyword": "L30AG",
+    "material": "Default",
+    "ifc_type": "IfcBuildingElementProxy",
+    "size_pattern": "",
+    "from_category": "Uncategorized",
+    "to_category": "test5",
+    "to_subcategory": "",
+    "to_cost_code": "",
+    "times_applied": 2,
+    "created": "2026-03-25",
+    "last_applied": "2026-03-25"
   }
 ]

@@ -309,12 +309,8 @@ module TakeoffTool
       # Part-aware isolate: handles part groups that may not be in scan results
       @dialog.add_action_callback('zoomToEntities') do |_ctx, ids_str|
         m = Sketchup.active_model
-        bb = Geom::BoundingBox.new
-        ids_str.to_s.split(',').each do |id|
-          e = TakeoffTool.find_entity(id.to_i)
-          bb.add(e.bounds) if e && e.valid?
-        end
-        m.active_view.zoom(bb) unless bb.empty?
+        ents = ids_str.to_s.split(',').map { |id| TakeoffTool.find_entity(id.to_i) }.compact.select(&:valid?)
+        m.active_view.zoom(ents) unless ents.empty?
       end
 
       @dialog.add_action_callback('exportCSV') do |_ctx|
@@ -657,6 +653,7 @@ module TakeoffTool
       DashOverlay.register_callbacks(@dialog) if defined?(DashOverlay)
       DashMultiverse.register_callbacks(@dialog) if defined?(DashMultiverse)
       DashScanner.register_callbacks(@dialog) if defined?(DashScanner)
+      DashNotes.register_callbacks(@dialog) if defined?(DashNotes)
 
       @dialog.show
     end
@@ -885,16 +882,13 @@ module TakeoffTool
 
     def self.send_vis_state
       return unless @dialog && @dialog.visible?
-      vm = VisibilityManager
       reg = TakeoffTool.entity_registry || {}
 
+      # Check actual entity visibility — authoritative, no stale tracking state
       hidden = {}
-      if vm.isolation_active
-        reg.each_key do |eid|
-          hidden[eid] = true unless vm.isolated_entity_ids.include?(eid)
-        end
-      else
-        vm.hidden_entity_ids.each { |eid| hidden[eid] = true }
+      reg.each do |eid, e|
+        next unless e && e.valid?
+        hidden[eid] = true unless e.visible?
       end
 
       require 'json'

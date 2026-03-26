@@ -12,22 +12,22 @@ module TakeoffTool
 
     # ═══ CONSTANTS ═══
 
-    CELL_SIZE        = 24.0   # spatial grid cell size (inches)
-    COLLISION_TOL    = 1.0    # surface proximity tolerance (inches)
-    SAMPLE_COUNT     = 20     # face points sampled per entity for collision
-    MATCH_THRESHOLD  = 0.85   # collision score >= this -> :matched
-    CHANGE_THRESHOLD = 0.40   # collision score >= this -> :changed
-    BB_MATCH_FLOOR   = 0.30   # BB IoU fallback threshold (when no faces)
+    CELL_SIZE        = 24.0   unless defined?(CELL_SIZE)        # spatial grid cell size (inches)
+    COLLISION_TOL    = 1.0    unless defined?(COLLISION_TOL)    # surface proximity tolerance (inches)
+    SAMPLE_COUNT     = 20     unless defined?(SAMPLE_COUNT)     # face points sampled per entity for collision
+    MATCH_THRESHOLD  = 0.85   unless defined?(MATCH_THRESHOLD)  # collision score >= this -> :matched
+    CHANGE_THRESHOLD = 0.40   unless defined?(CHANGE_THRESHOLD) # collision score >= this -> :changed
+    BB_MATCH_FLOOR   = 0.30   unless defined?(BB_MATCH_FLOOR)   # BB IoU fallback threshold (when no faces)
 
     # Two-color paint: A = red, B = blue
-    PAINT_COLORS = { a: [243, 139, 168], b: [137, 180, 250] }.freeze
-    DEFAULT_OPACITY = { a: 0.70, b: 0.70 }.freeze
+    PAINT_COLORS = { a: [243, 139, 168], b: [137, 180, 250] }.freeze unless defined?(PAINT_COLORS)
+    DEFAULT_OPACITY = { a: 0.70, b: 0.70 }.freeze unless defined?(DEFAULT_OPACITY)
 
     # Classification states kept for report/delta computation only
-    STATES = [:matched, :changed, :new_b, :removed_a].freeze
+    STATES = [:matched, :changed, :new_b, :removed_a].freeze unless defined?(STATES)
 
     # Legacy alias for any code referencing COLORS
-    COLORS = PAINT_COLORS
+    COLORS = PAINT_COLORS unless defined?(COLORS)
 
     # ═══ MODULE STATE ═══
 

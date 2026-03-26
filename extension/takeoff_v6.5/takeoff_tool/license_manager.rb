@@ -2,16 +2,16 @@ module TakeoffTool
   module LicenseManager
 
     # ── LemonSqueezy API endpoints ──
-    LS_VALIDATE_URL   = "https://api.lemonsqueezy.com/v1/licenses/validate".freeze
-    LS_ACTIVATE_URL   = "https://api.lemonsqueezy.com/v1/licenses/activate".freeze
-    LS_DEACTIVATE_URL = "https://api.lemonsqueezy.com/v1/licenses/deactivate".freeze
+    LS_VALIDATE_URL   = "https://api.lemonsqueezy.com/v1/licenses/validate".freeze unless defined?(LS_VALIDATE_URL)
+    LS_ACTIVATE_URL   = "https://api.lemonsqueezy.com/v1/licenses/activate".freeze   unless defined?(LS_ACTIVATE_URL)
+    LS_DEACTIVATE_URL = "https://api.lemonsqueezy.com/v1/licenses/deactivate".freeze unless defined?(LS_DEACTIVATE_URL)
 
-    CACHE_DURATION = 86_400   # 24 hours
-    GRACE_PERIOD   = 259_200  # 72 hours offline grace
+    CACHE_DURATION = 86_400   unless defined?(CACHE_DURATION)   # 24 hours
+    GRACE_PERIOD   = 259_200  unless defined?(GRACE_PERIOD)     # 72 hours offline grace
 
-    DEFAULTS_SECTION = "TakeoffTool_License".freeze
+    DEFAULTS_SECTION = "TakeoffTool_License".freeze unless defined?(DEFAULTS_SECTION)
 
-    EVENT_LICENSE_CHANGED = :license_changed
+    EVENT_LICENSE_CHANGED = :license_changed unless defined?(EVENT_LICENSE_CHANGED)
 
     # Dev bypass — set from Ruby Console:
     #   TakeoffTool::LicenseManager.dev_mode = true
