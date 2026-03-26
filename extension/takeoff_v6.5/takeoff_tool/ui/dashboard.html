@@ -2741,9 +2741,9 @@ function strip(){
   h+='</div>';
   document.getElementById('sstrip').innerHTML=h;
 }
-function togOvMeas(){_ovMeas=!_ovMeas;call(_ovMeas?'showAllMeasurements':'hideAllMeasurements');strip();}
-function togOvCad(){_ovCad=!_ovCad;call(_ovCad?'showAllCad':'hideAllCad');strip();}
-function togOvGrid(){_ovGrid=!_ovGrid;call(_ovGrid?'showAllGridlines':'hideAllGridlines');strip();}
+function togOvMeas(){_ovMeas=!_ovMeas;strip();call(_ovMeas?'showAllMeasurements':'hideAllMeasurements');}
+function togOvCad(){_ovCad=!_ovCad;strip();call(_ovCad?'showAllCad':'hideAllCad');}
+function togOvGrid(){_ovGrid=!_ovGrid;strip();call(_ovGrid?'showAllGridlines':'hideAllGridlines');}
 function bmkTag(){
   if(!BMK)return '';
   var v=BMK.elevation,txt='';

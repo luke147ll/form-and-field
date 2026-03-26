@@ -171,6 +171,7 @@ module TakeoffTool
           else
             Highlighter.hide_measurement_highlight(eid)
           end
+          Dashboard.send_overlay_vis_state
         rescue => e
           puts "Takeoff toggleMeasurement error: #{e.message}"
         end
@@ -180,12 +181,14 @@ module TakeoffTool
         Highlighter.show_all_measurement_highlights
         Dashboard.invalidate_measurement_cache
         Dashboard.send_measurement_data
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('hideAllMeasurements') do |_ctx|
         Highlighter.hide_all_measurement_highlights
         Dashboard.invalidate_measurement_cache
         Dashboard.send_measurement_data
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('deleteMeasurement') do |_ctx, eid_str|
@@ -195,6 +198,7 @@ module TakeoffTool
           Dashboard.invalidate_measurement_cache
           Dashboard.send_live_data
           Dashboard.send_measurement_data
+          Dashboard.send_overlay_vis_state
         rescue => e
           puts "Takeoff deleteMeasurement error: #{e.message}"
         end

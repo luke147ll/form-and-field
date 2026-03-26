@@ -438,6 +438,20 @@ module TakeoffTool
     puts "Takeoff: created container '#{name}'"
   end
 
+  def self.delete_container(name)
+    return if name.nil? || name.strip.empty?
+    name = name.strip
+    @master_containers ||= []
+    removed = @master_containers.reject! { |c| c['name'] == name }
+    if removed
+      # Re-number order fields
+      @master_containers.each_with_index { |c, i| c['order'] = i }
+      save_master_containers
+      invalidate_container_lookup
+      puts "Takeoff: deleted container '#{name}'"
+    end
+  end
+
   # Add a category to a specific container
   def self.add_category_to_container(cat_name, cont_name)
     return if cat_name.nil? || cont_name.nil?

@@ -1,7 +1,7 @@
 {
   "template_name": "Revit Architectural LCR",
   "created": "2026-03-09 11:11",
-  "updated": "2026-03-11 17:20",
+  "updated": "2026-03-26 12:32",
   "containers": [
     {
       "name": "Foundation",
@@ -241,6 +241,21 @@
           "name": "Metal Roofing",
           "code": "",
           "unit": "EA"
+        },
+        {
+          "name": "A-DOOR",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "A-DOOR-FRAM",
+          "code": "",
+          "unit": "EA"
+        },
+        {
+          "name": "A-DOOR-IDEN",
+          "code": "",
+          "unit": "EA"
         }
       ]
     },
@@ -385,6 +400,11 @@
           "name": "Plumbing Fixtures",
           "code": "",
           "unit": "EA"
+        },
+        {
+          "name": "Plumbing Rough In",
+          "code": "",
+          "unit": "EA"
         }
       ]
     },
@@ -491,6 +511,18 @@
           "name": "Uncategorized",
           "code": "",
           "unit": ""
+        },
+        {
+          "name": "FF_Elevation_Tags"
+        },
+        {
+          "name": "Untagged00"
+        },
+        {
+          "name": "Elevation Tags"
+        },
+        {
+          "name": "Gridlines"
         }
       ]
     },
@@ -523,6 +555,82 @@
           "name": "Driveway",
           "code": "",
           "unit": "EA"
+        }
+      ]
+    },
+    {
+      "name": "Cad Layers",
+      "color": "#f38ba8",
+      "order": 9,
+      "categories": [
+        {
+          "name": "A-ANNO-SYMB"
+        },
+        {
+          "name": "A-AREA-IDEN"
+        },
+        {
+          "name": "A-CLNG-PATT"
+        },
+        {
+          "name": "A-DETL-GENF"
+        },
+        {
+          "name": "A-DETL-MBND"
+        },
+        {
+          "name": "A-FLOR-HRAL"
+        },
+        {
+          "name": "A-FLOR-LEVL"
+        },
+        {
+          "name": "A-FLOR-PATT"
+        },
+        {
+          "name": "A-GENM"
+        },
+        {
+          "name": "A-GLAZ"
+        },
+        {
+          "name": "A-ROOF-PATT"
+        },
+        {
+          "name": "A-WALL-PATT"
+        },
+        {
+          "name": "E-ELEC-FIXT"
+        },
+        {
+          "name": "G-ANNO-DIMS"
+        },
+        {
+          "name": "G-ANNO-SYMB"
+        },
+        {
+          "name": "G-ANNO-TEXT"
+        },
+        {
+          "name": "G-IMPT"
+        },
+        {
+          "name": "I-FURN"
+        },
+        {
+          "name": "Q-CASE"
+        },
+        {
+          "name": "Q-SPCQ"
+        },
+        {
+          "name": "S-FNDN"
+        },
+        {
+          "name": "S-GRID-IDEN"
+        },
+        {
+          "name": "S-STRS"
         }
       ]
     }
@@ -21442,6 +21550,4851 @@
     },
     "Group2859#1": {
       "category": "Elevation Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Detail View - Callout Head-8566-BLDG_ SECTION 10": {
+      "category": "A-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Tag - Room Tag - Small _MA_ - Room Tag-3366617-PLAN - MAIN LEVEL": {
+      "category": "A-AREA-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Tag - Room Tag - Smallest _MA_ - Room Tag-4226113-PLAN - MAIN LEVEL": {
+      "category": "A-AREA-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Tag - Room Tag - SqFt _MA_ - Room Tag-11737372-PLAN - MAIN LEVEL": {
+      "category": "A-AREA-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1245": {
+      "category": "A-CLNG-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1249": {
+      "category": "A-CLNG-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1250": {
+      "category": "A-CLNG-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1271": {
+      "category": "A-CLNG-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Washer _MA_ - Dryer-3377616-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Washer _MA_ - Washer-3377614-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-32190978-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-32308956-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-32308957-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-32348625-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-32349290-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V17-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V18-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V19-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V20-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V21-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V22-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Block - Section - Adjustable - Wood Block-V23-BLDG_ SECTION 10": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x4-9267129-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-9267131-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-9267131-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V14-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V15-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V16-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V59-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V60-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V61-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x6-V62-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x8-9267133-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "06_Wood Frame Section - Nominal - 2x8-V24-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "07_Insulation - Spray Foam - 2_-30091280-BLDG_ SECTION 10": {
+      "category": "Insulation",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "07_Insulation - Spray Foam - 2_-30091425-BLDG_ SECTION 10": {
+      "category": "Insulation",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ 6-PANEL _MA_ - 3_-0_W x 2_-6_H-27647534-PLAN - MAIN LEVEL": {
+      "category": "Electrical Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ 6-PANEL _MA_ - 3_-0_W x 2_-6_H-29046054-PLAN - MAIN LEVEL": {
+      "category": "Electrical Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 5_-8_H-31443431-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 6_-4_H-28368946-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 7_-0_H-28368287-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 7_-8_H-28368155-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 8_-4_H-28367959-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 9_-0_H _MTL_-28670306-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 3_-0_W x 9_-0_H-28366408-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 4_-0_W x 6_-0_H-31853710-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_ - 6_-4_W x 6_-8_H-31750475-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ 5-PANEL SLIDERTM_V2_ - 2_-6_W x 4_-0_H-31618937-PLAN - MAIN LEVEL": {
+      "category": "Electrical Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Double - 4_6x10_ _TM_ - 2_-6_W x 4_-0_H-26189444-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Double Door - Slider W SIDELIGHTS _TM_ - 4_-0_W x 10_-0_H-26520918-BLDG_ SECTION 10": {
+      "category": "Structural Steel",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Double Door - Slider W SIDELIGHTS _TM_ - 4_-0_W x 10_-0_H-26520918-PLAN - MAIN LEVEL": {
+      "category": "Structural Steel",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Double Door - Slider W SIDELIGHTS _TM_ - 4_-0_W x 10_-0_H-26521063-BLDG_ SECTION 10": {
+      "category": "Structural Steel",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Double Door - Slider W SIDELIGHTS _TM_ - 4_-0_W x 10_-0_H-26521063-PLAN - MAIN LEVEL": {
+      "category": "Structural Steel",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _DOOR_ Single W SIDELIGHT _TM_ - 4_-0_W x 10_-0_H-26507952-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1212": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1213": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1214": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1215": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1272": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1273": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1274": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1275": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1276": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1277": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1278": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1279": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1280": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1281": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1282": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1283": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1284": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1285": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1286": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1287": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1288": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1289": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1290": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1291": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1292": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1293": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1294": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1295": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1296": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1297": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1298": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1299": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1300": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1301": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1302": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#360": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#361": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#362": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#363": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Exterior - Double - Lever Default_MA_ - Flush 2_-6_W x 8_-0_H _PTD_-31760644-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Exterior - Single - Lever Default _MA_ - Flush 3_-0_W x 8_-0_H _PTD_-31433770-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Exterior - Single - Lever Default _MA_ - Flush 3_-0_W x 8_-0_H _PTD_-31435595-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Shower _MA_ - Frameless Glass 2_-6_W x 7_-0_H-32059812-PLAN - MAIN LEVEL": {
+      "category": "Shower Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Shower _MA_ - Frameless Glass 2_-6_W x 7_-0_H-32207855-PLAN - MAIN LEVEL": {
+      "category": "Shower Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 2_-10_W x 8_-0_H-31637638-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Det MS Lutron - Sivoia QS Roller 100-150-200 CW_20141204-170827-114 - J-Det MS Lutron - Sivoia QS Roller 100-150-200 CW_20141204-170827-114-32198298-BLDG_ SECTION 10": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Pickup Truck - Pickup Truck-25014640-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-GENF",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sanitary_Showers_Dornbracht_27803660FF0010-Dornbracht-Hand-shower-se - Polished Chrome-32055211-PLAN - MAIN LEVEL": {
+      "category": "Plumbing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-28714436-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Rug _MA_ - Rug _MA_-31774142-PLAN - MAIN LEVEL": {
+      "category": "A-DETL-MBND",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Bypass_Door_20152 - Bypass_Door_20152-29104285-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#264": {
+      "category": "A-DOOR",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Exterior - Single - Lever Default _MA_ - Flush 3_-0_W x 8_-0_H _PTD_-31042077-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Cased Opening _MA_ - Cased Opening 4_-0_W x 8_-0_H-31528281-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 2_-10_W x 8_-0_H _HIDDEN_-28216032-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 2_-10_W x 8_-0_H-25270966-BLDG_ SECTION 10": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 2_-10_W x 8_-0_H-25270966-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 2_-10_W x 8_-0_H-31527845-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 3_-0_W x 8_-0_H-28743277-BLDG_ SECTION 10": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 3_-0_W x 8_-0_H-28743277-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 3_-0_W x 8_-0_H-29725172-BLDG_ SECTION 10": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 3_-0_W x 8_-0_H-29725172-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Door - Interior - Single - Lever Default_MA_ - Flush 3_-0_W x 8_-0_H-32271236-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1239": {
+      "category": "A-DOOR-FRAM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Symbol - Door Tag - Small _TM_ - Door Tag-25764251-PLAN - MAIN LEVEL": {
+      "category": "A-DOOR-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#350": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#351": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31970448-BLDG_ SECTION 10": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31970448-PLAN - MAIN LEVEL": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31974873-BLDG_ SECTION 10": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31981833-BLDG_ SECTION 10": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31981833-PLAN - MAIN LEVEL": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Railing - Railing-31981839-BLDG_ SECTION 10": {
+      "category": "A-FLOR-HRAL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1303": {
+      "category": "A-FLOR-LEVL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1304": {
+      "category": "A-FLOR-LEVL",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#100": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#101": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#105": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#106": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#107": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#108": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#112": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1218": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1219": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1221": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1222": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1227": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1228": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1237": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1240": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1251": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1252": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1253": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1269": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1270": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#138": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#143": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#144": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#145": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#158": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#199": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#200": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#201": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#203": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#204": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#216": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#223": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#228": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#229": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#231": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#258": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#263": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#289": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#305": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#306": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#308": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#310": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#314": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#99": {
+      "category": "A-FLOR-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "AC_Condenser_20850 - AC_Condenser_20850-25206975-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "AC_Condenser_20850 - AC_Condenser_20850-V10-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "AC_Condenser_20850 - AC_Condenser_20850-V11-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1258": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1259": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1260": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1261": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1262": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1263": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#236": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#237": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#259": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#277": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#278": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#348": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#349": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "DUPLICATE-ENTO_DecM Mirror Only1 - Plate Glass Only - Square_ Rect-32017356-PLAN - MAIN LEVEL": {
+      "category": "Window Coverings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "DUPLICATE-ENTO_DecM Mirror Only1 - Plate Glass Only - Square_ Rect-32200875-BLDG_ SECTION 10": {
+      "category": "Window Coverings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "DUPLICATE-ENTO_DecM Mirror Only1 - Plate Glass Only - Square_ Rect-32200875-PLAN - MAIN LEVEL": {
+      "category": "Window Coverings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "DUPLICATE-ENTO_DecM Mirror Only1 - Plate Glass Only - Square_ Rect-32238943-PLAN - MAIN LEVEL": {
+      "category": "Window Coverings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "FP_1_28-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "FP_1_29-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 100 - Generic Models 100-30627029-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 102 - Generic Models 101-29113555-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 104 - Generic Models 104-29117670-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 105 - Generic Models 105-29163468-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 106 - Generic Models 45-31756931-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 107 - Generic Models 130-30504789-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 109 - Generic Models 109-29435988-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 12 - Generic Models 12-31422206-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 122 - Generic Models 122-30530428-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 126 - Generic Models 45-31756988-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 127 - Generic Models 127-29801684-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 128 - Generic Models 128-29801874-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 13 - Generic Models 13-28090272-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 130 - Generic Models 130-29933650-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 131 - Generic Models 45-31757499-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 134 - Generic Models 134-30532349-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 139 - Generic Models 139-30532605-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 14 - Generic Models 14-28085686-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 140 - Generic Models 140-30533496-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 141 - Generic Models 45-31757621-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 143 - Generic Models 143-30536145-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 144 - Generic Models 143-30536253-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 145 - Generic Models 145-30538348-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 146 - Generic Models 145-30538472-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 148 - Generic Models 100-30627861-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 149 - Generic Models 149-30628828-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 151 - Generic Models 149-30629110-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 152 - Generic Models 149-30629521-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 153 - Generic Models 153-30780757-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 17 - Generic Models 17-28086329-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 173 - Generic Models 66-32240274-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 175 - Generic Models 175-31967849-BLDG_ SECTION 10": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 176 - Generic Models 175-31944901-BLDG_ SECTION 10": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 176 - Generic Models 175-31944901-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 177 - Generic Models 177-31983473-BLDG_ SECTION 10": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 177 - Generic Models 177-31983473-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 2 - Generic Models 2-28614070-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 3 - Generic Models 3-32097089-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 31 - Generic Models 40-31010789-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 32 - Generic Models 40-31010811-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 38 - Generic Models 108-31877170-PLAN - MAIN LEVEL": {
+      "category": "Roofing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 40 - Generic Models 40-28159352-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 41 - Generic Models 40-31024107-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 45 - Generic Models 45-31755895-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 46 - Generic Models 45-31756445-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 47 - Generic Models 45-31424538-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 49 - Generic Models 49-31427234-PLAN - MAIN LEVEL": {
+      "category": "Tile",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 50 - Generic Models 50-31427391-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 52 - Generic Models 40-31010833-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 54 - Generic Models 40-31010855-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 55 - Generic Models 40-31023728-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 6 - Generic Models 6-25109800-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 62 - Generic Models 62-28231760-PLAN - MAIN LEVEL": {
+      "category": "Pools and Pond",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 64 - Generic Models 64-28243160-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 68 - Generic Models 68-28358884-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 69 - Generic Models 69-28362333-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 7 - Generic Models 7-25111176-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 70 - Generic Models 70-28372436-PLAN - MAIN LEVEL": {
+      "category": "Trim and Millwork",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 71 - Generic Models 71-28384308-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 73 - Generic Models 73-29994874-PLAN - MAIN LEVEL": {
+      "category": "Outdoor Kitchen",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 79 - Generic Models 79-28869267-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 8 - Generic Models 40-31010741-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 81 - Generic Models 81-32207072-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 85 - Generic Models 85-28881146-BLDG_ SECTION 10": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 9 - Generic Models 40-31010767-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 92 - Generic Models 45-31756104-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 93 - Generic Models 40-31606182-PLAN - MAIN LEVEL": {
+      "category": "Interior Railings",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 96 - Generic Models 96-31323520-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Generic Models 98 - Generic Models 98-31323562-PLAN - MAIN LEVEL": {
+      "category": "Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Geometry - Geometry-29709467-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Geometry - Geometry-V23-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-SPEC Misc Firepit Round - J-SPEC Misc Firepit Round-V49-PLAN - MAIN LEVEL": {
+      "category": "A-GENM",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-VOID Shower Shampoo Niche Single _Framing _ Finished_ - Default Size 1_-2_W x 1_-4_H _4_-3_ Abv Flr-32063751-PLAN - MAIN LEVEL": {
+      "category": "Tile",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-VOID Shower Shampoo Niche Single _Framing _ Finished_ - Default Size 1_-2_W x 1_-4_H _4_-3_ Abv Flr-32067469-PLAN - MAIN LEVEL": {
+      "category": "Tile",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-VOID Shower Shampoo Niche Single _Framing _ Finished_ - Default Size 1_-2_W x 1_-4_H _4_-3_ Abv Flr-32202735-PLAN - MAIN LEVEL": {
+      "category": "Tile",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-VOID Shower Shampoo Niche Single _Framing _ Finished_ - Default Size 1_-2_W x 1_-4_H _4_-3_ Abv Flr-32226679-PLAN - MAIN LEVEL": {
+      "category": "Tile",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "PARAMETRIC_PADDED_WALL_PANEL_22953 - PARAMETRIC_PADDED_WALL_PANEL_22953-32129813-PLAN - MAIN LEVEL": {
+      "category": "Electrical Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Lynx - Outdoor BBQ  Drawer Access Doors - Single-30826706-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ 10-PANEL _MA_ - 2_-6_W x 4_-0_H 2-29917064-BLDG_ SECTION 10": {
+      "category": "Electrical Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 2_-6_W x 5_-0_H _MTL_-31029072-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 2_-6_W x 5_-0_H _MTL_-31029097-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 2_-6_W x 5_-0_H _MTL_-32229181-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 3_-0_W x 10_-0_H-26012579-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 3_-0_W x 10_-0_H-V13-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 4_-0_W x 10_-0_H-26046390-BLDG_ SECTION 10": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 4_-0_W x 10_-0_H-26046390-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 4_-0_W x 10_-0_H-V12-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 4_-0_W x 10_-0_H-V3-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _1_ Single _MA_1 - 4_-0_W x 10_-0_H-V4-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _2_ Double _MA_ - 4_-0_W x 4_-0_H _MTL_-28746120-BLDG_ SECTION 10": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Casement _4_ Quad _MA_ - 4_-0_W x 10_-0_H-30510347-PLAN - MAIN LEVEL": {
+      "category": "A-GLAZ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - 4_12 Pitch _Enter Unit Dimensions_ 3-26056895-BLDG_ SECTION 10": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - 4_12 Pitch _Enter Unit Dimensions_ 3-V6-BLDG_ SECTION 10": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - 4_12 Pitch _Enter Unit Dimensions_ 4-26056893-BLDG_ SECTION 10": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 15-28692591-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 16-28692597-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 17-32045074-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 18-28692609-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 19-28693100-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_I_ Window-MC-Casement-Loewen-Rakehead Right - OPPOSITE Pitch 20-28693094-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Symbol - Window Tag - Small _TM_ - Window Tag-25735295-BLDG_ SECTION 10": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Symbol - Window Tag - Small _TM_ - Window Tag-25735295-PLAN - MAIN LEVEL": {
+      "category": "Windows & Exterior Glass Doors",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1220": {
+      "category": "A-ROOF-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1223": {
+      "category": "A-ROOF-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1224": {
+      "category": "A-ROOF-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1226": {
+      "category": "A-ROOF-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#10": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#102": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#103": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#104": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#109": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#11": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#110": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#111": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#113": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#114": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#115": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#116": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#117": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#118": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#119": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#12": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#120": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#121": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1216": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1217": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#122": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1229": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#123": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1230": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1231": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1232": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1235": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1236": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1238": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#124": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1241": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1242": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1243": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1244": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1246": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1247": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1248": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#125": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1254": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1255": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1256": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1257": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#126": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1264": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1265": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1268": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#127": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#128": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#129": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#13": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#130": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#131": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#132": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#133": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#134": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#135": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#136": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#137": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#139": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#14": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#140": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#141": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#142": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#146": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#147": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#148": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#149": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#15": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#150": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#151": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#152": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#153": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#154": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#155": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#156": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#157": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#159": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#16": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#160": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#161": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#162": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#163": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#164": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#165": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#166": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#167": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#168": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#169": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#17": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#171": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#172": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#173": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#174": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#175": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#176": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#177": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#178": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#179": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#18": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#180": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#181": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#182": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#183": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#184": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#185": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#186": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#187": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#188": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#189": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#19": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#190": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#191": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#192": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#193": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#194": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#195": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#196": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#197": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#198": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#2": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#20": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#202": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#205": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#206": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#207": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#208": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#209": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#21": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#210": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#211": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#212": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#213": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#214": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#215": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#217": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#218": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#219": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#22": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#220": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#221": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#222": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#224": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#225": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#226": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#227": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#23": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#233": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#234": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#235": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#238": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#239": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#24": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#240": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#241": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#242": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#243": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#244": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#245": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#246": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#247": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#248": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#249": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#25": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#250": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#251": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#252": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#253": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#254": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#255": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#256": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#26": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#260": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#261": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#262": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#27": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#28": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#280": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#281": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#282": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#283": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#284": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#285": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#286": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#287": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#288": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#29": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#290": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#291": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#292": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#293": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#294": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#295": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#296": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#297": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#298": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#299": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#3": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#30": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#300": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#301": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#302": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#303": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#304": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#307": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#309": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#311": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#312": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#313": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#315": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#316": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#317": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#318": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#319": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#320": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#321": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#322": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#323": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#324": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#325": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#326": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#327": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#328": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#329": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#330": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#331": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#332": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#333": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#334": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#335": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#336": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#337": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#338": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#339": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#340": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#341": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#342": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#343": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#344": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#345": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#346": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#347": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#352": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#353": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#354": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#355": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#356": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#357": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#359": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#4": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#45": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#46": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#47": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#48": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#49": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#5": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#50": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#51": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#52": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#53": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#54": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#55": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#56": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#57": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#58": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#59": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#6": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#60": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#61": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#62": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#63": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#64": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#65": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#66": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#67": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#68": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#69": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#7": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#70": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#71": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#72": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#73": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#74": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#75": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#76": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#77": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#78": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#79": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#8": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#80": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#81": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#82": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#83": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#84": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#85": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#86": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#87": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#88": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#89": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#9": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#90": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#91": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#92": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#93": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#94": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#95": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#96": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#97": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#98": {
+      "category": "A-WALL-PATT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Fan-Ceiling-Bigassfan-Haiku-L-52-Dia - See Type Catalog-27844946-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC GAS _Key _ Valve_ - Gas Valve-24758606-PLAN - MAIN LEVEL": {
+      "category": "E-ELEC-FIXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-27749570-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-28946033-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V10-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V11-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V12-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V13-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V7-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V8-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Rec Cans - Typical - 3 IN CAN-V9-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-ELEC LIGHT-FIXT Wall Sconce 01Arm New - J-ELEC LIGHT-FIXT Wall Sconce 01Arm New-29205338-BLDG_ SECTION 10": {
+      "category": "Lighting Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Group3632#1": {
+      "category": "FF_Elevation_Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Group3633#1": {
+      "category": "Elevation Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Group3634#1": {
+      "category": "Elevation Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1313": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1314": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1316": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1317": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#372": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#373": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#410": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Spot Elevations - Spot Elevation - Target Filled w Extension - Small-13384149-BLDG_ SECTION 10": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Spot Elevations - Spot Elevation - Target Filled w Extension - Small-13384149-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Spot Elevations - Spot Elevation - Target Filled w Extension - Small-V26-BLDG_ SECTION 10": {
+      "category": "G-ANNO-DIMS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1305": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1306": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1307": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1308": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1320": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1321": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1322": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1323": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#364": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#365": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#366": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#367": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#368": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#406": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#438": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#439": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#440": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#441": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Detail View - Section Head - Filled-3294543-BLDG_ SECTION 10": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Detail View - Section Head - Filled-3294543-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Elevation - Detail Number Auto-8056-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Elevation - Detail Number Auto-8313-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Section - 1_8_ x 1_32_-14276-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Section - Section Head - Filled-5390-BLDG_ SECTION 10": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Section - Section Head - Filled-5390-PLAN - MAIN LEVEL": {
+      "category": "G-ANNO-SYMB",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1309": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1310": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1311": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1312": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1315": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1318": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1319": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#369": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#370": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#371": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#374": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#375": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#376": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#377": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#378": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#379": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#380": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#381": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#382": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#383": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#384": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#385": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#386": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#387": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#388": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#389": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#390": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#391": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#392": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#393": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#394": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#395": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#396": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#397": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#398": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#399": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#400": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#401": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#402": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#403": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#404": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#405": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#407": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#408": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#409": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#411": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#412": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#413": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#414": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#415": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#416": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#417": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#418": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#419": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#420": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#421": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#422": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#423": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#424": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#425": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#426": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#427": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#428": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#429": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#430": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#431": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#432": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#433": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#434": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#435": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#436": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#437": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#442": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#443": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#444": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#445": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#446": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#447": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#448": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#449": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#450": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#451": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#452": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#453": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#454": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#455": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#456": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#457": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#458": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#459": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#460": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#461": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#462": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#463": {
+      "category": "G-ANNO-TEXT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "LPB-LP_RFA - Standard-28529973-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "LPB-LP_RFA - Standard-V17-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "LSB2-2-LP_RFA - Standard-28531297-PLAN - MAIN LEVEL": {
+      "category": "G-IMPT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado-25107708-PLAN - MAIN LEVEL": {
+      "category": "G-IMPT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "VDOE130SS_RFA - Standard-31699776-PLAN - MAIN LEVEL": {
+      "category": "G-IMPT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "m11220253_VRUO5240DRSS_RFA - Standard-30690376-PLAN - MAIN LEVEL": {
+      "category": "G-IMPT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "m11220253_VRUO5240DRSS_RFA - Standard-30690595-PLAN - MAIN LEVEL": {
+      "category": "G-IMPT",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Barstool - High Height-14609796-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Barstool - High Height-V1-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#31": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#32": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#33": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#34": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#35": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#36": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#37": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#38": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#39": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#40": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#41": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#42": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#43": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#44": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "End Table _MA_ - End Table-31774139-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "End Table _MA_ - End Table-31786709-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-FURN TABLE Round-Oval - J-FURN TABLE Round-Oval-27947124-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-FURN TABLE Round-Oval - J-FURN TABLE Round-Oval-V30-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-27944733-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-27947565-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V19-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V20-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V21-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V22-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V31-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V32-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V33-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V34-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V35-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Dining - Upholstered chair-V36-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Preset Sizes1 - 36_ x 34_ Square Back-24834778-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Chair Preset Sizes1 - 36_ x 34_ Square Back-24837740-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-28559681-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-28559683-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-31785513-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-31785979-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-V40-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-V43-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - 1 Arm-V47-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-28559682-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-31785920-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V41-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V42-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V44-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V45-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V46-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Furn SEAT Sectional - No Arms-V48-PLAN - MAIN LEVEL": {
+      "category": "I-FURN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Pool Table _MRA_ - 8_ Table-24084559-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Stool - Round _MA_ - 18_ Diameter-24829492-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Table_Rectangular _MA_ - Dining Table _10 Chair_-790868-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "BM-00197_MS614114CEF - TOTO - TOILET- CARLYLE 2-28458773-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "BM-00197_MS614114CEF - TOTO - TOILET- CARLYLE 2-V15-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Faucet-Wall_Mounted-Waterworks-Flyte - Lever Handles - Graphite-29271612-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb Faucet Kitchen One Handle - SS-DST-24823949-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb Faucet Lavatory Simple Square Spout - Spout Filler _ 2 Knobs-24528563-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb Faucet Lavatory Simple Square Spout - Spout Filler _ 2 Knobs-29192656-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb Faucet Lavatory Simple Square Spout - Spout Filler _ 2 Knobs-32231212-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb Faucet Lavatory Simple Square Spout - Spout Filler _ 2 Knobs-V18-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb HoseBib - Hosebib at Stucco Wall-29713571-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb HoseBib - Hosebib at Stucco Wall-V25-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb HoseBib - Hosebib at Stucco Wall-V39-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb SINK Single RECT Undrmnt no top piece -OR-DropIn - NO PIPE - Drop In Sink-29196027-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb SINK Single RECT Undrmnt-OR-DropIn - NO PIPE - Drop In Sink-29265355-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Plumb SINK Single RECT Undrmnt-OR-DropIn - NO PIPE - Drop In Sink-29265356-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Kitchen-Faucets-Brizo-Rook-Wall_Mount_Pot_Filler-62874LF _1_ - Chrome-29447441-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sanitary_Toilet-Accessories_hansgrohe_04787000-Joleena-Roll-holder - Chrome 000-29441779-PLAN - MAIN LEVEL": {
+      "category": "Bath Accessories",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Shower Head and Controls - Shower Head and Controls-29580727-PLAN - MAIN LEVEL": {
+      "category": "Plumbing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Shower Head and Controls - Shower Head and Controls-29600361-PLAN - MAIN LEVEL": {
+      "category": "Plumbing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Shower Head and Controls - Shower Head and Controls-V50-PLAN - MAIN LEVEL": {
+      "category": "Plumbing",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sink - Bathroom - Rectangular - Sink - Bathroom - 18_ x 12_-14604075-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sink - Bathroom - Rectangular - Sink - Bathroom - 18_ x 12_-V14-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sink - Kitchen - Undermount - Sink - Undermount - 30_ x 16_ - 1 faucet hole-14779748-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sink-Bathroom_Vessel-KOHLER-Reve-K-4819 - 0-White-29269837-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Fixtures",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-28724561-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-30257020-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-30843936-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-32060484-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-32062238-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Drain - Square _MA_ - 4_ Sq Drain-32335826-PLAN - MAIN LEVEL": {
+      "category": "Plumbing Rough In",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-29206747-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-31687883-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-31706252-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-32229442-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-32235778-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-32264952-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-V37-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet - Filler Panel - Cabinet - Filler Panel-V38-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32159476-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32205118-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32229071-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32260106-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32260107-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32261918-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-32268878-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V52-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V53-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V54-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V55-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V56-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V57-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Base-Wall hosted - Base Cabinet-V58-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32167141-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32169181-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32169318-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32170165-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32170236-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32170237-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32170263-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32170264-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32177545-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32177546-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32177547-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32177548-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-32383430-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Cabinet Run-Upper -Wall hosted - Upper Cabinet Run-Wall hosted-V51-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Closet Rod w Shelf - Closet Rod w Shelf-31323214-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#232": {
+      "category": "Q-CASE",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#257": {
+      "category": "Q-CASE",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Counter Top - No Backsplash _MA_ - 24_ Depth _actual_-28525782-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Counter Top - No Backsplash _MA_2 - 24_ Depth 2_ Thick-29497966-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Counter Top-L Shaped - No Backsplash - 24_ Depth _actual_-31717454-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Counter Top-L Shaped - No Backsplash - 25_ Depth _actual_-31688429-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Counter Top-L Shaped - No Backsplash - 25_ Depth _actual_-31691775-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-31690370-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-31690426-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-31702148-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-31702204-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32205380-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32225139-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32225153-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32234414-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32234428-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32260142-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32260156-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32260170-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32260184-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32262127-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32262202-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32263437-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32263451-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32267965-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-Cab DR M5 SLAB 01H Door or Drawer - Door for Base-32268671-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mirror _MA_ - instance-32206298-PLAN - MAIN LEVEL": {
+      "category": "Q-CASE",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mirror _MA_ - instance-32225901-PLAN - MAIN LEVEL": {
+      "category": "Q-CASE",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab Base Box Floating - Box Only-31706336-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab USB Shelves Fixed _ADJUSTABLE SHELF THICKNESS_ - No Base 2-30382206-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab USB Shelves Fixed _ADJUSTABLE SHELF THICKNESS_ - No Base 2-30382714-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab USB Shelves Fixed _ADJUSTABLE SHELF THICKNESS_ - No Base 2-31687077-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab USB Shelves Fixed _ADJUSTABLE SHELF THICKNESS_ - No Base 2-31691829-PLAN - MAIN LEVEL": {
+      "category": "Furniture",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "_TM_ Cab Base Box Floating - Box Only-28866758-PLAN - MAIN LEVEL": {
+      "category": "Casework",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "36INCH REF - Refrigerator - 30_-28441087-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "36INCH REF - Refrigerator - 30_-28441611-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "36INCH REF - Refrigerator - 30_-V26-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "36INCH REF - Refrigerator - 30_-V27-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Accessories-Brizo-Vettis-30__Towel_Bar-693088-PC - Matte Black-29594272-PLAN - MAIN LEVEL": {
+      "category": "Bath Accessories",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Dishwasher - Dishwasher-28269801-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Range 48in _MA_ - Range - 48_ _MA_-15246346-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Refrigerator-UnderCounter - 24_ x 24_ x 32_5_-25174994-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Appliance_Refrigerator-UnderCounter - 24_ x 24_ x 32_5_-29127021-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Bath_Accessory-Delta-Ara-Towel_Bar-77518-77524-77530 _1_ - 24_ Matte Black-30512704-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Bath_Accessory-Delta-Ara-Towel_Bar-77518-77524-77530 _1_ - 24_ Matte Black-30590392-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-App Grill Hasty-Bake Access Doors - Hasty-Bake 18x26SD-DLX _Single Door_ 2_-30741834-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-App Grill Hasty-Bake Access Doors - Hasty-Bake 48DD-DLX _Double Door_ 5-30743121-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-App Grill Hasty-Bake Trash - Hasty-Bake TCTO-18x26 _Tilt-Out_ 2-30744152-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-App Grill Hasty-Bake Trash - Hasty-Bake TCTO-18x26 _Tilt-Out_ 2-30744189-PLAN - MAIN LEVEL": {
+      "category": "Q-SPCQ",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Sports-Recreation_Goals-Nets_Unisport_Upward-Hinged-Practice-Basketball-Goall - Default-25474298-BLDG_ SECTION 10": {
+      "category": "Equipment",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "qf_evo_10-0054 - DefaultType-29992662-PLAN - MAIN LEVEL": {
+      "category": "Appliances",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "J-App Grill Hasty-Bake Access Drawers 2H - Hasty-Bake 3DR-18x26 _3 Drawer_-30741516-PLAN - MAIN LEVEL": {
+      "category": "Cabinets/Vanities",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "HSS-Hollow Structural Section-Column - HSS5X5X5_16-24503588-PLAN - MAIN LEVEL": {
+      "category": "Steel Tubes (HSS)",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "HSS-Hollow Structural Section-Column - HSS5X5X5_16-25052084-PLAN - MAIN LEVEL": {
+      "category": "Steel Tubes (HSS)",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "HSS-Hollow Structural Section-Column - HSS5X5X5_16-V2-PLAN - MAIN LEVEL": {
+      "category": "Steel Tubes (HSS)",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1233": {
+      "category": "S-FNDN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1234": {
+      "category": "S-FNDN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1266": {
+      "category": "S-FNDN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#1267": {
+      "category": "S-FNDN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Grid - Grid Head _MA_ 2-14799796-BLDG_ SECTION 10": {
+      "category": "S-GRID-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Grid - Grid Head _MA_ 2-14799796-PLAN - MAIN LEVEL": {
+      "category": "S-GRID-IDEN",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#265": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#266": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#267": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#268": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#269": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#270": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#271": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#272": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#273": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#274": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#275": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Component#276": {
+      "category": "S-STRS",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "LSB2-2-LP_RFA - LSB2-2-NG_iam-28531296-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg-25107687-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_0114-25107698-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_0114-V7-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_0120-25107700-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_0120-V6-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_018-25107691-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_018-V5-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_018-V8-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_056-25107693-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Mercedes Benz sprinter - Ivan Santiago Diaz Maldonado - Furgoneta_dwg_Layer_056-V9-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "VDOE130SS_RFA - VDOE130SS_stp raw_Shrinkwrap_1_ipt-31701748-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "m11220253_VRUO5240DRSS_RFA - Assembly37_Shrinkwrap_1_ipt-30690375-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "m11220253_VRUO5240DRSS_RFA - Assembly37_Shrinkwrap_1_ipt-V24-PLAN - MAIN LEVEL": {
+      "category": "Untagged00",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "EL. 100'-2\"": {
+      "category": "Elevation Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "EL. 113'-3\"": {
+      "category": "Elevation Tags",
+      "subcategory": "",
+      "cost_code": ""
+    },
+    "Gridlines — 0.0 LF": {
+      "category": "Gridlines",
       "subcategory": "",
       "cost_code": ""
     }

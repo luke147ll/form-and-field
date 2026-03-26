@@ -1651,18 +1651,16 @@ module TakeoffTool
         end
       end
 
-      # Gridlines: check FF_Gridlines layer and GRID-type tags
+      # Gridlines: layer must be visible AND at least one entity must be visible
       grid_vis = false
       gl = m.layers['FF_Gridlines']
-      grid_vis = true if gl && gl.visible?
-      unless grid_vis
-        m.entities.grep(Sketchup::Group).each do |grp|
-          next unless grp.valid?
-          if grp.get_attribute('TakeoffGridline', 'label') || grp.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
-            if grp.visible?
-              grid_vis = true
-              break
-            end
+      layer_ok = !gl || gl.visible?  # true if layer doesn't exist or is visible
+      m.entities.grep(Sketchup::Group).each do |grp|
+        next unless grp.valid?
+        if grp.get_attribute('TakeoffGridline', 'label') || grp.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
+          if grp.visible? && layer_ok
+            grid_vis = true
+            break
           end
         end
       end

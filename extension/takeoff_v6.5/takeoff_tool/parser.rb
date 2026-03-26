@@ -548,7 +548,18 @@ module TakeoffTool
 
     def self.tag_fb(tag)
       return 'Uncategorized' unless tag
-      TAG_CATEGORY_MAP[tag] || tag
+      mapped = TAG_CATEGORY_MAP[tag]
+      return mapped if mapped
+      # CAD/AIA layer patterns: A-Wall, A-DOOR, S-Beam, C-Road, etc.
+      return 'Uncategorized' if tag =~ /\A[A-Za-z]{1,2}-[A-Za-z]/
+      # SketchUp default layers
+      return 'Uncategorized' if tag == 'Layer0' || tag == 'Untagged'
+      # FF internal layers (FF_CAD_*, FF_Gridlines, etc.)
+      return 'Uncategorized' if tag.start_with?('FF_')
+      # AutoCAD artifacts
+      return 'Uncategorized' if tag == 'Defpoints' || tag == '0'
+      # Unknown tag — use as-is (may be a valid Revit/IFC tag not yet mapped)
+      tag
     end
 
     # ─── Material-based Classification ───

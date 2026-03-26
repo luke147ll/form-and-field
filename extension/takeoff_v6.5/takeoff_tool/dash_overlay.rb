@@ -18,6 +18,7 @@ module TakeoffTool
           if grp && grp.layer
             grp.layer.visible = !!show
           end
+          Dashboard.send_overlay_vis_state
         rescue => e
           puts "Dashboard: toggleCadSheet error: #{e.message}"
         end
@@ -66,6 +67,7 @@ module TakeoffTool
           grp.layer.visible = true if grp.layer
         end
         Dashboard.send_cad_sheets
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('hideAllCad') do |_ctx|
@@ -75,6 +77,7 @@ module TakeoffTool
           grp.layer.visible = false if grp.layer
         end
         Dashboard.send_cad_sheets
+        Dashboard.send_overlay_vis_state
       end
 
       # ═══ ELEVATION / NOTE / BENCHMARK ═══
@@ -231,11 +234,13 @@ module TakeoffTool
       dialog.add_action_callback('deleteGridline') do |_ctx, label_str|
         TakeoffTool::GridlineSystem.delete_gridline(label_str.to_s)
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('clearAllGridlines') do |_ctx|
         TakeoffTool::GridlineSystem.clear_all
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('listGridlines') do |_ctx|
@@ -248,33 +253,40 @@ module TakeoffTool
       dialog.add_action_callback('toggleGridline') do |_ctx, eid_str|
         TakeoffTool::GridlineSystem.toggle_gridline(eid_str.to_i)
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('toggleAllGridlines') do |_ctx|
         TakeoffTool::GridlineSystem.toggle_all
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('showAllGridlines') do |_ctx|
         model = Sketchup.active_model
-        return unless model
+        next unless model
+        # Ensure the FF_Gridlines layer is visible too
+        gl = model.layers['FF_Gridlines']
+        gl.visible = true if gl
         model.active_entities.grep(Sketchup::Group).each do |g|
           next unless g.valid?
           next unless g.get_attribute('TakeoffGridline', 'label') || g.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
           g.visible = true
         end
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
       dialog.add_action_callback('hideAllGridlines') do |_ctx|
         model = Sketchup.active_model
-        return unless model
+        next unless model
         model.active_entities.grep(Sketchup::Group).each do |g|
           next unless g.valid?
           next unless g.get_attribute('TakeoffGridline', 'label') || g.get_attribute('TakeoffMeasurement', 'type') == 'GRID'
           g.visible = false
         end
         dialog.execute_script("refreshGridlines()") rescue nil
+        Dashboard.send_overlay_vis_state
       end
 
     end
