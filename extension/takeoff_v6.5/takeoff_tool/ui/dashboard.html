@@ -524,9 +524,10 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .cg.open .cgb{display:block}
 /* ── Category measurement strip ── */
 .cat-meas-strip{padding:6px 12px 6px 34px;border-bottom:1px solid var(--surface0);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.cat-meas-strip .cms-tools{display:flex;gap:4px;align-items:center}
-.cat-meas-strip .cms-tool{font:600 9px var(--font-mono,monospace);padding:3px 8px;border-radius:4px;border:1px solid var(--surface1);background:transparent;color:var(--subtext0);cursor:pointer;white-space:nowrap;transition:all .12s}
+.cat-meas-strip .cms-tools{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.cat-meas-strip .cms-tool{font:600 10px var(--font-mono,monospace);padding:4px 10px;border-radius:5px;border:1px solid var(--surface1);background:transparent;color:var(--subtext0);cursor:pointer;white-space:nowrap;transition:all .12s;display:inline-flex;align-items:center;gap:4px}
 .cat-meas-strip .cms-tool:hover{border-color:var(--overlay0);color:var(--text);background:var(--surface0)}
+.cat-meas-strip .cms-tool svg{flex-shrink:0}
 .cat-meas-cards{display:flex;flex-wrap:wrap;gap:4px;margin-left:auto;align-items:center}
 .cms-card{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px;background:var(--surface0);font-size:10px;cursor:default;transition:background .12s;position:relative}
 .cms-card:hover{background:var(--surface1)}
@@ -849,9 +850,6 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .asm-card-actions button{background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:#a6adc8}
 .asm-card-actions button:hover{color:#cdd6f4}
 /* ASSEMBLY TAG TOGGLE */
-.asm-tag-btn{background:none;border:1px solid #45475a;border-radius:3px;cursor:pointer;padding:1px 5px;font-size:9px;color:#a6adc8;font-family:inherit;white-space:nowrap;flex-shrink:0}
-.asm-tag-btn:hover{background:#45475a;color:#cdd6f4}
-.asm-tag-btn.active{border-color:#89b4fa;color:#89b4fa;background:#1e3a5f}
 /* ASSEMBLY CARD BODY */
 .asm-card-body{display:none;padding:4px 8px 8px 12px;border-top:1px solid #313244;background:#181825}
 .asm-card-body.open{display:block}
@@ -1007,6 +1005,8 @@ body{font:12px/1.4 'JetBrains Mono',-apple-system,'Segoe UI',Roboto,sans-serif;b
 .ib.danger svg{stroke:#f38ba8}.ib.danger:hover svg{stroke:#ff6b8a}
 .ib.accent:hover svg{stroke:#89b4fa}
 .ib.warn svg{stroke:#f9e2af}.ib.warn:hover svg{stroke:#ffe566}
+.ib.lock-active svg{stroke:#f9e2af}.ib.lock-active:hover svg{stroke:#ffe566}
+.cat-lock-badge{display:inline-flex;align-items:center;margin-left:4px;opacity:0.8}
 
 /* TABLE */
 table{width:100%;border-collapse:collapse;font-size:11px}
@@ -1147,6 +1147,15 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
 .modal-card input[type=text]{width:100%;background:#1e1e2e;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box}
 .modal-card input[type=text]:focus{border-color:#cba6f7}
 .modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.exp-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:4px;background:#1e1e2e;border:1px solid #45475a;border-radius:6px;cursor:pointer;font-size:11px;color:#cdd6f4;transition:border-color .15s;user-select:none}
+.exp-opt:hover{border-color:#a6e3a1}
+.exp-opt input{display:none}
+.exp-ck{width:16px;height:16px;border:2px solid #585b70;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.exp-opt input:checked+.exp-ck{background:#a6e3a1;border-color:#a6e3a1}
+.exp-opt input:checked+.exp-ck::after{content:'';display:block;width:4px;height:8px;border:solid #1e1e2e;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-2px}
+.atc{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .15s}
+.atc:hover{transform:scale(1.15)}
+.atc.picked{border-color:#cdd6f4}
 .comb-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#1e1e2e;border:1px solid #45475a;border-radius:6px;cursor:pointer;transition:border-color .15s}
 .comb-row:hover{border-color:#94e2d5}
 .comb-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -1572,10 +1581,11 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
     <span class="badge-text" id="ekgText"></span>
   </div>
   <div class="sep"></div>
-  <button class="t-btn primary" onclick="call('showAll');resetVis()">Show All</button>
+  <button class="t-btn primary" onclick="showAllRespectLocks()">Show All</button>
   <button class="t-btn accent" onclick="call('highlightAll')">Highlight All</button>
   <button class="t-btn" onclick="call('clearHighlights')">Clear</button>
   <button class="t-btn" id="undoBtn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">Undo</button>
+  <button class="t-btn" onclick="showExportModal()" style="color:#a6e3a1">Export</button>
   <button class="t-btn" onclick="toggleDebug()" title="Debug" style="font-size:9px;color:var(--green)">dbg</button>
 </div>
 
@@ -1616,6 +1626,7 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
   <label>Code:</label><select id="bulkCC"></select><button class="hb pri" onclick="bulkSetCC()">Set</button>
   <label>Size:</label><input type="text" id="bulkSize" placeholder="1x6" onkeydown="if(event.key==='Enter')bulkSetSize()">
   <label>Sub:</label><select id="bulkSub"></select><button class="hb pri" onclick="bulkSetSub()">Set</button>
+  <label>Cont:</label><select id="bulkCont"></select><button class="hb pri" onclick="bulkSetContainer()">Move</button>
   <div class="sep"></div>
   <button class="hb" onclick="toggleCosmeticSel()" style="color:#94e2d5;border-color:#94e2d5">&#9671; Cosmetic</button>
   <button class="hb" onclick="bulkExclude()" style="color:#f38ba8">Exclude</button>
@@ -2224,6 +2235,7 @@ var ISO_CATS=null;
 var FISO=false;
 var ASMB={};
 var ASMVIS={};
+var AUTO_TAGS={};
 var _asmViewMode='cards';
 var _ac2Tab={};
 var _ac2OpenSections={};
@@ -2233,6 +2245,7 @@ var currentMvView=null;
 var CCOL={};
 var CSETTINGS={};
 var CONTAINERS=[];
+var LOCKED_CATS={};
 var CAT_TO_CONT={};
 var openConts={};
 var splitOpenConts={a:{},b:{}};
@@ -2288,6 +2301,8 @@ var ICO_POLY_SF='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
 var ICO_LF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="5" x2="2" y2="11"/><line x1="14" y1="5" x2="14" y2="11"/><line x1="8" y1="6" x2="8" y2="10"/></svg>';
 var ICO_SF_SM='<svg style="vertical-align:middle;margin-left:2px" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a6adc8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" fill="#a6adc8" fill-opacity="0.12"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/></svg>';
 var ICO_HL='<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1"><path d="M6 1L7.5 4.5L11 5L8.5 7.5L9 11L6 9.5L3 11L3.5 7.5L1 5L4.5 4.5L6 1Z"/></svg>';
+var ICO_LOCK='<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+var ICO_UNLOCK='<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
 /* Returns small inline unit label: icon for LF/SF, text for others */
 function uLabel(m){
   if(m==='lf')return ICO_LF_SM;
@@ -2421,6 +2436,7 @@ function receiveData(json){
     var d=JSON.parse(json);
     D=d.rows||[];CA=d.categories||[];ALL_CA=d.allCategories||CA;CO=d.costCodes||[];CAT_CCM=d.catCostCodeMap||{};MSUB=d.masterSubcategories||{};ALL_MSUB=d.allMasterSubcategories||MSUB;CATMT=d.categoryMT||{};CCOL=d.customColors||{};CSETTINGS=d.colorSettings||{};
     CONTAINERS=d.containers||[];
+    if(d.lockedCategories){LOCKED_CATS={};for(var li=0;li<d.lockedCategories.length;li++)LOCKED_CATS[d.lockedCategories[li]]=true;}
     OC_WARNINGS=d.overcountWarnings||[];
     console.log('[FF receiveData] '+D.length+' rows, '+CONTAINERS.length+' containers');
     buildCatToContMap();
@@ -2609,6 +2625,10 @@ function buildBulkDDs(){
   for(var si=0;si<asList.length;si++)h+='<option value="'+X(asList[si])+'">'+X(asList[si])+'</option>';
   h+='<option value="__custom_sub__">+ Custom...</option>';
   document.getElementById('bulkSub').innerHTML=h;
+  // Bulk container dropdown
+  h='<option value="">--</option>';
+  for(var ci=0;ci<CONTAINERS.length;ci++)h+='<option value="'+X(CONTAINERS[ci].name)+'">'+X(CONTAINERS[ci].name)+'</option>';
+  document.getElementById('bulkCont').innerHTML=h;
 }
 function fCatChange(sel){filt();}
 function fSubChange(sel){filt();}
@@ -3293,7 +3313,7 @@ document.addEventListener('click',function(e){
 /* Toggle entity check in div-based subcategory view */
 function togECheck(eid){
   if(SEL[eid])delete SEL[eid];else SEL[eid]=true;
-  syncCBs();updateBulkBar();hlSel();renderGroups();
+  syncCBs();updateBulkBar();renderGroups();
 }
 
 /* Toggle select-all for subcategory (div-based) */
@@ -3303,7 +3323,7 @@ function togScCheck(cat,sub){
   var allSel=true;
   for(var j=0;j<items.length;j++){if(!SEL[items[j].entityId]){allSel=false;break;}}
   for(var k=0;k<items.length;k++){if(allSel)delete SEL[items[k].entityId];else SEL[items[k].entityId]=true;}
-  syncCBs();updateBulkBar();hlSel();renderGroups();
+  syncCBs();updateBulkBar();renderGroups();
 }
 
 /* ═══ CATEGORY SORT ═══ */
@@ -3394,6 +3414,7 @@ function renderGroups(){
       var badgeColor=catCol||'var(--overlay1)';
       h+='<span class="cat-badge" style="background:'+badgeColor+'">'+X(gk).substring(0,2).toUpperCase()+'</span>';
       h+=catNameSpan(gk);
+      if(LOCKED_CATS[gk]) h+='<span class="cat-lock-badge" title="Visibility locked — Show All will skip this category"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#f9e2af" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>';
     }
     else if(gBy==='measurement'&&gk!=='Unmeasured') h+='<span class="cname" style="background:var(--surface1);color:'+(gk.indexOf('SF: ')===0?'var(--green)':'var(--blue)')+'">'+X(gk)+'</span>';
     else h+='<span class="cname" style="background:var(--surface2);color:var(--text)">'+X(gk)+'</span>';
@@ -3411,6 +3432,7 @@ function renderGroups(){
     if(gBy==='category') h+='<button class="ib danger" onclick="excludeCat(\''+X2(gk)+'\')" title="Exclude">'+ICO_X+'</button>';
     if(gBy==='category'&&gk!=='Uncategorized'&&gk!=='_IGNORE') h+='<button class="ib danger" onclick="deleteCat(\''+X2(gk)+'\')" title="Delete category">'+ICO_TRASH+'</button>';
     if(gBy==='category') h+='<button class="ab" onclick="promptAddSubcategory(\''+X2(gk)+'\')" title="Add subcategory">+ Sub</button>';
+    if(gBy==='category') h+='<button class="ab'+(LOCKED_CATS[gk]?' lock-active':'')+'" onclick="togCatLock(\''+X2(gk)+'\')" title="'+(LOCKED_CATS[gk]?'Unlock — Show All will show this category':'Lock — Show All will skip this category')+'" style="display:inline-flex;align-items:center;gap:4px;'+(LOCKED_CATS[gk]?'border-color:#f9e2af;color:#f9e2af':'')+'">'+( LOCKED_CATS[gk]?ICO_LOCK:ICO_UNLOCK)+''+(LOCKED_CATS[gk]?'Locked':'Lock')+'</button>';
     h+='</span></div>';
     // ── Measurement strip: tool buttons + existing measurement cards ──
     if(gBy==='category'&&gk!=='Uncategorized'&&gk!=='_IGNORE'){
@@ -3418,11 +3440,11 @@ function renderGroups(){
       for(var mi=0;mi<MEAS.length;mi++){if(MEAS[mi].category===gk)catMeasItems.push(MEAS[mi]);}
       h+='<div class="cat-meas-strip">';
       h+='<div class="cms-tools">';
-      h+='<button class="cms-tool" onclick="call(\'activateLFForCat\',\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.3)">+ LF Poly</button>';
-      h+='<button class="cms-tool" onclick="newLFMeasurement(\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.25)">+ LF Face</button>';
-      h+='<button class="cms-tool" onclick="newSFMeasurement(\''+X2(gk)+'\')" style="color:#89b4fa;border-color:rgba(137,180,250,.3)">+ SF Face</button>';
-      h+='<button class="cms-tool" onclick="call(\'polySFForCat\',\''+X2(gk)+'\')" style="color:#94e2d5;border-color:rgba(148,226,213,.3)">+ SF Poly</button>';
-      h+='<button class="cms-tool" onclick="newVolMeasurement(\''+X2(gk)+'\')" style="color:#cba6f7;border-color:rgba(203,166,247,.3)">+ VOL</button>';
+      h+='<button class="cms-tool" onclick="call(\'activateLFForCat\',\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 18 8 10 13 16 18 6 21 12"/></svg>LF Poly</button>';
+      h+='<button class="cms-tool" onclick="newLFMeasurement(\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.25)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z" opacity=".25"/><path d="M7 4 7 16" stroke-width="3"/></svg>LF Face</button>';
+      h+='<button class="cms-tool" onclick="newSFMeasurement(\''+X2(gk)+'\')" style="color:#89b4fa;border-color:rgba(137,180,250,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z" opacity=".25"/><path d="M7 4 17 4 21 8 17 16 7 16 3 8Z" fill="currentColor" opacity=".4"/></svg>SF Face</button>';
+      h+='<button class="cms-tool" onclick="call(\'polySFForCat\',\''+X2(gk)+'\')" style="color:#94e2d5;border-color:rgba(148,226,213,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 22 8 18 20 6 20 2 8"/></svg>SF Poly</button>';
+      h+='<button class="cms-tool" onclick="newVolMeasurement(\''+X2(gk)+'\')" style="color:#cba6f7;border-color:rgba(203,166,247,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z"/></svg>Vol</button>';
       h+='</div>';
       if(catMeasItems.length>0){
         h+='<div class="cat-meas-cards">';
@@ -3688,7 +3710,8 @@ function renderContainerGroups(){
       var catItems=groups[cm.cats[cci]]||[];
       for(var ai=0;ai<catItems.length;ai++)allItems.push(catItems[ai]);
     }
-    if(hideEmpty&&allItems.length===0)continue;
+    /* Never hide containers — they are user-created structural groups.
+       hideEmpty only applies to categories within containers. */
     var contVis=false;
     for(var vi2=0;vi2<allItems.length;vi2++){if(VIS[allItems[vi2].entityId]!==false){contVis=true;break;}}
     if(allItems.length===0)contVis=true;
@@ -3705,10 +3728,11 @@ function renderContainerGroups(){
     var activeCats=0;
     for(var ac=0;ac<cm.cats.length;ac++){if((groups[cm.cats[ac]]||[]).length>0)activeCats++;}
     h+='<span class="cont-stat"><b>'+activeCats+'</b>/'+cm.cats.length+' active</span>';
-    h+='<span class="cont-total">'+contTotal(allItems)+'</span>';
+    h+='<span class="cont-total">'+grpCount(allItems)+' EA</span>';
     h+='<span class="row-actions">';
     h+='<button class="s-btn" onclick="event.stopPropagation();togContVis(\''+X2(cm.name)+'\')" title="'+(contVis?'Hide all':'Show all')+'">'+(contVis?ICO_EYE_OPEN:ICO_EYE_CLOSED)+'</button>';
     h+='<button class="s-btn" onclick="event.stopPropagation();isoContainer(\''+X2(cm.name)+'\')" title="Isolate container">'+ICO_ISO+'</button>';
+    h+='<button class="s-btn danger" onclick="event.stopPropagation();deleteContainer(\''+X2(cm.name)+'\')" title="Delete container" style="color:#f38ba8">'+ICO_TRASH+'</button>';
     h+='</span>';
     h+='</div>';
     h+='<div class="cont-body">';
@@ -3752,6 +3776,7 @@ function renderContainerGroups(){
         h+='<button class="ib danger" onclick="excludeCat(\''+X2(gk)+'\')" title="Exclude">'+ICO_X+'</button>';
         if(gk!=='Uncategorized'&&gk!=='_IGNORE') h+='<button class="ib danger" onclick="deleteCat(\''+X2(gk)+'\')" title="Delete category">'+ICO_TRASH+'</button>';
         h+='<button class="ab" onclick="promptAddSubcategory(\''+X2(gk)+'\')" title="Add subcategory">+ Sub</button>';
+        h+='<button class="ab'+(LOCKED_CATS[gk]?' lock-active':'')+'" onclick="togCatLock(\''+X2(gk)+'\')" title="'+(LOCKED_CATS[gk]?'Unlock — Show All will show this category':'Lock — Show All will skip this category')+'" style="display:inline-flex;align-items:center;gap:4px;'+(LOCKED_CATS[gk]?'border-color:#f9e2af;color:#f9e2af':'')+'">'+( LOCKED_CATS[gk]?ICO_LOCK:ICO_UNLOCK)+''+(LOCKED_CATS[gk]?'Locked':'Lock')+'</button>';
         h+='</span></div>';
         // ── Measurement strip: tool buttons + existing measurement cards ──
         if(gk!=='Uncategorized'&&gk!=='_IGNORE'){
@@ -3759,11 +3784,11 @@ function renderContainerGroups(){
           for(var cmi2=0;cmi2<MEAS.length;cmi2++){if(MEAS[cmi2].category===gk)catMeasItems2.push(MEAS[cmi2]);}
           h+='<div class="cat-meas-strip">';
           h+='<div class="cms-tools">';
-          h+='<button class="cms-tool" onclick="call(\'activateLFForCat\',\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.3)">+ LF Poly</button>';
-      h+='<button class="cms-tool" onclick="newLFMeasurement(\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.25)">+ LF Face</button>';
-          h+='<button class="cms-tool" onclick="newSFMeasurement(\''+X2(gk)+'\')" style="color:#89b4fa;border-color:rgba(137,180,250,.3)">+ SF Face</button>';
-          h+='<button class="cms-tool" onclick="call(\'polySFForCat\',\''+X2(gk)+'\')" style="color:#94e2d5;border-color:rgba(148,226,213,.3)">+ SF Poly</button>';
-          h+='<button class="cms-tool" onclick="newVolMeasurement(\''+X2(gk)+'\')" style="color:#cba6f7;border-color:rgba(203,166,247,.3)">+ VOL</button>';
+          h+='<button class="cms-tool" onclick="call(\'activateLFForCat\',\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 18 8 10 13 16 18 6 21 12"/></svg>LF Poly</button>';
+          h+='<button class="cms-tool" onclick="newLFMeasurement(\''+X2(gk)+'\')" style="color:#a6e3a1;border-color:rgba(166,227,161,.25)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z" opacity=".25"/><path d="M7 4 7 16" stroke-width="3"/></svg>LF Face</button>';
+          h+='<button class="cms-tool" onclick="newSFMeasurement(\''+X2(gk)+'\')" style="color:#89b4fa;border-color:rgba(137,180,250,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z" opacity=".25"/><path d="M7 4 17 4 21 8 17 16 7 16 3 8Z" fill="currentColor" opacity=".4"/></svg>SF Face</button>';
+          h+='<button class="cms-tool" onclick="call(\'polySFForCat\',\''+X2(gk)+'\')" style="color:#94e2d5;border-color:rgba(148,226,213,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12 2 22 8 18 20 6 20 2 8"/></svg>SF Poly</button>';
+          h+='<button class="cms-tool" onclick="newVolMeasurement(\''+X2(gk)+'\')" style="color:#cba6f7;border-color:rgba(203,166,247,.3)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"><path d="M3 20 7 16 17 16 21 20 21 8 17 4 7 4 3 8Z"/></svg>Vol</button>';
           h+='</div>';
           if(catMeasItems2.length>0){
             h+='<div class="cat-meas-cards">';
@@ -4113,11 +4138,11 @@ function zoomSub(cat,sub){
 }
 function selSubItems(cat,sub){
   for(var i=0;i<F.length;i++){if(F[i].category===cat&&(F[i].subcategory||'')===sub)SEL[F[i].entityId]=true;}
-  syncCBs();updateBulkBar();hlSel();
+  syncCBs();updateBulkBar();
 }
 function selSubAll(cat,sub,chk){
   for(var i=0;i<F.length;i++){if(F[i].category===cat&&(F[i].subcategory||'')===sub){if(chk)SEL[F[i].entityId]=true;else delete SEL[F[i].entityId];}}
-  syncCBs();updateBulkBar();hlSel();
+  syncCBs();updateBulkBar();
 }
 
 /* ═══ DRAG & DROP SUBCATEGORY BETWEEN CATEGORIES ═══ */
@@ -4231,6 +4256,10 @@ function showCatMoveConfirm(catName,fromCont,toCont,count,headerEl){
   headerEl.insertAdjacentElement('afterend',bar);
   requestAnimationFrame(function(){bar.classList.add('visible');});
   bar._timeout=setTimeout(cancelMove,8000);
+}
+function moveCatToContainer(cat,cont){
+  if(!cont)return;
+  callJSON('moveCategoryToContainer',{category:cat,targetContainer:cont});
 }
 function doConfirmCatMove(catName,targetCont){
   var bar=document.getElementById('moveConfirmBar');
@@ -5973,6 +6002,11 @@ function togCatVis(gk){
   FISO=false;updateFisoBtn();
   filt();
 }
+function togCatLock(gk){
+  if(LOCKED_CATS[gk]){delete LOCKED_CATS[gk];}else{LOCKED_CATS[gk]=true;}
+  callJSON('setLockedCategories',{categories:Object.keys(LOCKED_CATS)});
+  filt();
+}
 function togItemVis(eid){
   if(ISO_CATS){call('clearIsolationTracking');}
   ISO_CATS=null;FISO=false;updateFisoBtn();
@@ -6091,6 +6125,16 @@ function isoCat(cat){
 function zoomCat(cat){
   var ids=[];for(var i=0;i<F.length;i++){if(F[i].category===cat)ids.push(F[i].entityId);}
   if(ids.length) call('zoomToEntities',ids.join(','));
+}
+function showAllRespectLocks(){
+  var locked=Object.keys(LOCKED_CATS);
+  if(locked.length){callJSON('showAllExcept',{lockedCategories:locked});}else{call('showAll');}
+  if(ISO_CATS){call('clearIsolation');}
+  ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};FISO=false;containerIsolate=null;
+  // Re-apply locked categories
+  for(var i=0;i<D.length;i++){if(LOCKED_CATS[D[i].category])VIS[D[i].entityId]=false;}
+  for(var k in LOCKED_CATS){if(LOCKED_CATS.hasOwnProperty(k))HIDDEN_CATS[k]=true;}
+  updateFisoBtn();document.getElementById('fAsm').value='';filt();
 }
 function resetVis(){if(ISO_CATS){call('clearIsolation');}ISO_CATS=null;VIS={};HIDDEN_CATS={};HIDDEN_CONTS={};FISO=false;containerIsolate=null;updateFisoBtn();document.getElementById('fAsm').value='';filt();}
 function receiveVisState(hidden){
@@ -6308,7 +6352,6 @@ function renderAsmCard(id,asm,idx,fasm){
   h+='<span class="asm-entity-count">'+eCnt+' items</span>';
   h+='<span class="asm-part-count">'+pCnt+' parts</span>';
   h+='<div class="asm-card-actions">';
-  h+='<button class="asm-tag-btn'+(tagsOn?' active':'')+'" onclick="event.stopPropagation();asmToggleTags('+si+')" title="'+(tagsOn?'Hide':'Show')+' part tags in viewport">Tags</button>';
   h+='<button onclick="event.stopPropagation();asmExport('+si+')" title="Export CSV"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
   h+='<button onclick="event.stopPropagation();asmRename('+si+')" title="Rename"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
   h+='<button onclick="event.stopPropagation();editAssemblyNotes('+si+')" title="Edit notes"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>';
@@ -6324,17 +6367,45 @@ function renderAsmCard(id,asm,idx,fasm){
 }
 
 /* ═══ INLINE GROUPED PARTS VIEW ═══ */
+function renderAutoTagList(id){
+  var tags=AUTO_TAGS[id];
+  if(!tags||!tags.length)return'';
+  var h='<div style="border-bottom:2px solid var(--surface1)">';
+  h+='<div style="display:flex;align-items:center;padding:4px 10px;background:var(--mantle);border-bottom:1px solid var(--surface0)">';
+  h+='<span style="font-size:9px;font-weight:600;color:var(--yellow)">AUTO TAGS ('+tags.length+')</span>';
+  h+='<span style="flex:1"></span>';
+  h+='<button class="hb" onclick="event.stopPropagation();AUTO_TAGS[\''+id+'\']=null;callJSON(\'clearAutoTags\',{asmId:\''+id+'\'});renderAsmPanel()" style="font-size:8px;padding:1px 6px;color:var(--red);border-color:var(--surface2)">Clear</button>';
+  h+='</div>';
+  for(var i=0;i<tags.length;i++){
+    var t=tags[i];
+    var eids=t.eid?JSON.stringify([t.eid]):'[]';
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:3px 10px;border-bottom:1px solid rgba(49,50,68,.4);font-size:10px">';
+    h+='<span style="font-weight:700;color:var(--yellow);min-width:32px">'+X(t.label)+'</span>';
+    h+='<span style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+X(t.name)+'">'+X(t.name)+'</span>';
+    if(t.category)h+='<span style="font-size:9px;color:var(--overlay1);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+X(t.category)+'</span>';
+    if(t.eid){
+      h+='<button onclick="event.stopPropagation();isoPartGroup('+eids+')" style="border:none;background:transparent;cursor:pointer;color:var(--overlay0);font-size:9px;padding:0;font-family:inherit" title="Isolate">iso</button>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
 function renderAsmPartsInline(id,asm){
   var bi=asm.beamInventory||[];
   var parts=asm.parts||[];
-  if(!bi.length&&!parts.length)return'<div class="asm-bd-empty">No parts</div>';
+  if(!bi.length&&!parts.length&&!AUTO_TAGS[id])return'<div class="asm-bd-empty">No parts</div>';
+
+  // Auto tag list (if tags have been placed)
+  var tagHtml=renderAutoTagList(id);
 
   // If no beam inventory, show simple grouped list
   if(!bi.length){
-    return renderAsmPartsSimple(id,asm);
+    return tagHtml+renderAsmPartsSimple(id,asm);
   }
 
-  var h='';
+  var h=tagHtml;
   var totalPcs=0,totalLF=0,totalBF=0;
 
   for(var i=0;i<bi.length;i++){
@@ -6601,6 +6672,9 @@ function renderAsmPanelV2(){
       // Tab content
       h+='<div class="ac2-content">';
 
+      // Auto tag list (if placed)
+      h+=renderAutoTagList(id);
+
       if(tabKey==='beams'){
         // Column header
         h+='<div class="ac2-col-hdr">';
@@ -6637,7 +6711,7 @@ function renderAsmPanelV2(){
           h+='<span style="font-weight:700;color:var(--green);min-width:22px;text-align:right;font-size:11px">'+bm.count+'</span>';
           h+='<span style="font-weight:600;color:var(--sapphire);min-width:38px;text-align:right;font-size:10px">'+(bm.totalLF||0).toFixed(1)+'\'</span>';
           h+='<span style="font-weight:600;color:var(--yellow);min-width:46px;text-align:right;font-size:10px">'+Math.round(secBF)+' BF</span>';
-          h+='<button class="ac2-rm" onclick="event.stopPropagation();if(confirm(\'Remove '+bm.count+' '+X(bm.defn)+' from assembly?\')){callJSON(\'removePartsFromAssembly\',{asmId:'+si+',eids:'+bmEidsStr+'})}" title="Remove from assembly"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+          h+='<button class="ac2-rm" onclick="event.stopPropagation();showConfirmModal(\'Remove '+bm.count+' '+X(bm.defn)+' from assembly?\',function(){callJSON(\'removePartsFromAssembly\',{asmId:'+si+',eids:'+bmEidsStr+'})})" title="Remove from assembly"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
           h+='</div>';
 
           // Expanded subrows
@@ -6820,7 +6894,6 @@ function renderAsmPanelV2(){
       // Action bar
       h+='<div class="ac2-actions">';
       h+='<button style="color:var(--green);border-color:var(--green)" onclick="event.stopPropagation();callJSON(\'addToAssemblyFromSelection\',{asmId:'+si+'})">Add Selected</button>';
-      h+='<button onclick="event.stopPropagation();asmToggleTags('+si+')">Tags</button>';
       h+='<button onclick="event.stopPropagation();asmExport('+si+')">Export</button>';
       h+='<button onclick="event.stopPropagation();asmRename('+si+')">Rename</button>';
       h+='<button onclick="event.stopPropagation();editAssemblyNotes('+si+')">Notes</button>';
@@ -7032,11 +7105,6 @@ function asmDeletePart(asmId,partNum){
 function asmZoomToPart(entityId){
   call('zoomToEntity',String(entityId));
 }
-function asmToggleTags(id){
-  var a=ASMB[id];if(!a)return;
-  var newState=!a.tags_visible;
-  callJSON('toggleAsmTags',{asmId:id,visible:newState});
-}
 function asmExport(id){
   callJSON('exportAssembly',{asmId:id});
 }
@@ -7126,7 +7194,7 @@ function ckClick(cb,ev){
     for(var i=lo;i<=hi;i++){var id=FIDX[i];if(id!==undefined){if(chk)SEL[id]=true;else delete SEL[id];}}
     syncCBs();
   }else{if(chk)SEL[eid]=true;else delete SEL[eid];var row=document.getElementById('r'+eid);if(row)row.className=chk?'sel':'';}
-  lastCheckIdx=vi; updateBulkBar(); hlSel();
+  lastCheckIdx=vi; updateBulkBar();
 }
 function syncCBs(){
   var cbs=document.querySelectorAll('td.ck input[type=checkbox]');
@@ -7135,12 +7203,12 @@ function syncCBs(){
 function selGrpItems(gk){
   var gBy=document.getElementById('gBy').value||'category';
   for(var i=0;i<F.length;i++){if(grpKey(F[i],gBy)===gk)SEL[F[i].entityId]=true;}
-  syncCBs();updateBulkBar();hlSel();
+  syncCBs();updateBulkBar();
 }
 function selGrpAll(gk,chk){
   var gBy=document.getElementById('gBy').value||'category';
   for(var i=0;i<F.length;i++){if(grpKey(F[i],gBy)===gk){if(chk)SEL[F[i].entityId]=true;else delete SEL[F[i].entityId];}}
-  syncCBs();updateBulkBar();hlSel();
+  syncCBs();updateBulkBar();
 }
 function clearSel(){SEL={};lastCheckIdx=-1;syncCBs();updateBulkBar();call('clearHighlights');renderGroups();}
 function togSelMode(){var on=document.body.classList.toggle('sel-mode');var b=document.getElementById('btnSelMode');if(b){b.style.color=on?'var(--blue)':'';b.style.borderColor=on?'var(--blue)':'';}if(!on)clearSel();}
@@ -7309,7 +7377,7 @@ function renderMeasPanel(){
     h+='<span style="font-size:9px;font-weight:600;color:var(--peach)">'+importedCount+' IMPORTED</span>';
     h+='<span style="flex:1;font-size:8px;color:var(--overlay0)">Review and commit to keep</span>';
     h+='<button onclick="call(\'commitAllImported\')" style="background:var(--green);color:var(--base);border:none;border-radius:3px;font:600 8px var(--font-mono);padding:2px 8px;cursor:pointer">\u2713 Commit All</button>';
-    h+='<button onclick="if(confirm(\'Discard all imported measurements?\'))call(\'discardAllImported\')" style="background:none;border:1px solid var(--red);border-radius:3px;color:var(--red);font:600 8px var(--font-mono);padding:2px 8px;cursor:pointer">\u2717 Discard All</button>';
+    h+='<button onclick="showConfirmModal(\'Discard all imported measurements?\',function(){call(\'discardAllImported\')})" style="background:none;border:1px solid var(--red);border-radius:3px;color:var(--red);font:600 8px var(--font-mono);padding:2px 8px;cursor:pointer">\u2717 Discard All</button>';
     h+='</div>';
   }
 
@@ -8416,12 +8484,17 @@ function toggleAsmAutoDD(btn,asmId){
     {key:'beams',label:'Auto Beam',dot:'var(--peach)'},
     {key:'auto_sf',label:'Auto SF',dot:'var(--blue)'},
     {key:'auto_lf',label:'Auto LF',dot:'var(--green)'},
-    {key:'auto_vol',label:'Auto Vol',dot:'var(--mauve)'}
+    {key:'auto_vol',label:'Auto Vol',dot:'var(--mauve)'},
+    {key:'auto_tag',label:'Auto Tag',dot:'var(--yellow)'}
   ];
   var h='';
   for(var i=0;i<opts.length;i++){
     var o=opts[i];
-    h+='<button class="meas-gdd-item" onclick="event.stopPropagation();_ac2Tab[\''+asmId+'\']=\''+o.key+'\';closeAsmAutoDD();renderAsmPanel()">';
+    if(o.key==='auto_tag'){
+      h+='<button class="meas-gdd-item" onclick="event.stopPropagation();closeAsmAutoDD();showAutoTagModal(\''+asmId+'\')">';
+    } else {
+      h+='<button class="meas-gdd-item" onclick="event.stopPropagation();_ac2Tab[\''+asmId+'\']=\''+o.key+'\';closeAsmAutoDD();renderAsmPanel()">';
+    }
     h+='<span class="dd-dot" style="background:'+o.dot+'"></span>'+o.label+'</button>';
   }
   dd.innerHTML=h;
@@ -9248,6 +9321,14 @@ function bulkSetSub(){
   for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])D[i].subcategory=v;}
   clearSel();buildDD();filt();
 }
+function bulkSetContainer(){
+  var v=document.getElementById('bulkCont').value;if(!v)return;
+  var ids=getSelIds();if(!ids.length)return;
+  var cats={};
+  for(var i=0;i<D.length;i++){if(SEL[D[i].entityId])cats[D[i].category]=1;}
+  for(var c in cats){if(cats.hasOwnProperty(c))moveCatToContainer(c,v);}
+  clearSel();filt();
+}
 function bulkHide(){
   var ids=getSelIds();if(!ids.length)return;
   for(var i=0;i<ids.length;i++)VIS[ids[i]]=false;
@@ -9860,6 +9941,12 @@ function ffConfirmContainer(){
   if(inp&&inp.value.trim())call('addContainer',inp.value.trim());
 }
 function ffCancelContainer(){renderGroups();}
+function deleteContainer(name){
+  var catCount=0;
+  for(var i=0;i<CONTAINERS.length;i++){if(CONTAINERS[i].name===name){catCount=(CONTAINERS[i].categories||[]).length;break;}}
+  var msg=catCount>0?'Delete "'+name+'" and move '+catCount+' categor'+(catCount>1?'ies':'y')+' to Other?':'Delete empty container "'+name+'"?';
+  showConfirmModal(msg,function(){call('deleteContainer',name);});
+}
 
 function showAddCatInput(el,contName){
   if(document.getElementById('ff_new_cat'))return;
@@ -10045,6 +10132,72 @@ function doConfirm(){
 function cancelConfirm(){
   document.getElementById('confirmModal').className='modal-bg';
   _confirmCb=null;
+}
+
+/* ═══ AUTO TAG MODAL ═══ */
+var _autoTagAsmId=null;
+var _autoTagColor='#f9e2af';
+function showAutoTagModal(asmId){
+  _autoTagAsmId=asmId;
+  _autoTagColor='#f9e2af';
+  document.getElementById('autoTagPrefix').value='';
+  updateAutoTagPreview();
+  // Reset color picks
+  var cs=document.querySelectorAll('.atc');
+  for(var i=0;i<cs.length;i++){cs[i].classList.toggle('picked',cs[i].dataset.color==='#f9e2af');}
+  document.getElementById('autoTagModal').className='modal-bg show';
+  setTimeout(function(){document.getElementById('autoTagPrefix').focus();},50);
+}
+function closeAutoTagModal(){document.getElementById('autoTagModal').className='modal-bg';_autoTagAsmId=null;}
+function pickAutoTagColor(el){
+  _autoTagColor=el.dataset.color;
+  var cs=document.querySelectorAll('.atc');
+  for(var i=0;i<cs.length;i++)cs[i].classList.remove('picked');
+  el.classList.add('picked');
+}
+function updateAutoTagPreview(){
+  var p=(document.getElementById('autoTagPrefix').value||'').trim();
+  document.getElementById('autoTagPreview').textContent=p+'1, '+p+'2, '+p+'3...';
+}
+function doAutoTag(){
+  if(!_autoTagAsmId)return;
+  var asmId=_autoTagAsmId;
+  var prefix=(document.getElementById('autoTagPrefix').value||'').trim();
+  var color=_autoTagColor;
+  closeAutoTagModal();
+  callJSON('autoTagAssembly',{asmId:asmId,prefix:prefix,color:color});
+}
+
+function receiveAutoTags(data){
+  if(!data||!data.asmId)return;
+  AUTO_TAGS[data.asmId]=data.tags||[];
+  expandedAssemblies[data.asmId]=true;
+  renderAsmPanel();
+}
+
+/* ═══ EXPORT MODAL ═══ */
+function showExportModal(){document.getElementById('exportModal').className='modal-bg show';}
+function closeExportModal(){document.getElementById('exportModal').className='modal-bg';}
+function toggleExpAll(lbl){
+  var all=document.getElementById('expAll').checked;
+  var items=document.querySelectorAll('.exp-item');
+  for(var i=0;i<items.length;i++)items[i].checked=all;
+}
+document.addEventListener('change',function(e){
+  if(e.target.classList.contains('exp-item')){
+    var items=document.querySelectorAll('.exp-item');
+    var allOn=true;
+    for(var i=0;i<items.length;i++){if(!items[i].checked){allOn=false;break;}}
+    document.getElementById('expAll').checked=allOn;
+  }
+});
+function doExportModel(){
+  var t=document.getElementById('expTakeoff').checked;
+  var m=document.getElementById('expMeas').checked;
+  var n=document.getElementById('expNotes').checked;
+  if(!t&&!m&&!n){showToast('Select at least one section','#f38ba8');return;}
+  closeExportModal();
+  callJSON('exportModel',{takeoff:t,measurements:m,notes:n});
 }
 
 /* ═══ FULL-PAGE TABS ═══ */
@@ -10537,6 +10690,44 @@ window.onload=function(){log('init');setTimeout(function(){call('requestData');}
     <div class="modal-btns">
       <button class="hb" onclick="cancelConfirm()">Cancel</button>
       <button class="hb" onclick="doConfirm()" style="background:#f38ba8;color:#1e1e2e;border-color:#f38ba8;font-weight:600">Delete</button>
+    </div>
+  </div>
+</div>
+<div id="autoTagModal" class="modal-bg" onclick="if(event.target===this)closeAutoTagModal()">
+  <div class="modal-card" style="max-width:320px;text-align:left">
+    <h3 style="color:#f9e2af;margin-bottom:4px">Auto Tag</h3>
+    <p style="font-size:10px;color:#6c7086;margin-bottom:12px">Place numbered callout tags on each entity in this assembly</p>
+    <label style="font-size:11px;color:#a6adc8;display:block;margin-bottom:4px">Tag Prefix</label>
+    <input type="text" id="autoTagPrefix" placeholder="e.g. A-, STL-, W-" style="width:100%;margin-bottom:10px" maxlength="20" oninput="updateAutoTagPreview()">
+    <div style="font-size:10px;color:#6c7086;margin-bottom:12px">Tags will read: <span id="autoTagPreview" style="color:#f9e2af;font-weight:600">1, 2, 3...</span></div>
+    <label style="font-size:11px;color:#a6adc8;display:block;margin-bottom:4px">Tag Color</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="autoTagColors">
+      <span class="atc picked" data-color="#f9e2af" style="background:#f9e2af" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#89b4fa" style="background:#89b4fa" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#a6e3a1" style="background:#a6e3a1" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#fab387" style="background:#fab387" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#cba6f7" style="background:#cba6f7" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#f38ba8" style="background:#f38ba8" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#94e2d5" style="background:#94e2d5" onclick="pickAutoTagColor(this)"></span>
+      <span class="atc" data-color="#f5c2e7" style="background:#f5c2e7" onclick="pickAutoTagColor(this)"></span>
+    </div>
+    <div class="modal-btns">
+      <button class="hb" onclick="closeAutoTagModal()">Cancel</button>
+      <button class="hb" onclick="doAutoTag()" style="background:#f9e2af;color:#1e1e2e;border-color:#f9e2af;font-weight:600">Place Tags</button>
+    </div>
+  </div>
+</div>
+<div id="exportModal" class="modal-bg" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal-card" style="max-width:340px;text-align:left">
+    <h3 style="color:#a6e3a1;margin-bottom:4px">Export Model</h3>
+    <p style="font-size:10px;color:#6c7086;margin-bottom:12px">Save a .skp copy with Form and Field data for collaboration</p>
+    <label class="exp-opt" onclick="toggleExpAll(this)"><input type="checkbox" id="expAll" checked><span class="exp-ck"></span><span>All</span></label>
+    <label class="exp-opt"><input type="checkbox" class="exp-item" id="expTakeoff" checked><span class="exp-ck"></span><span>Takeoff <span style="color:#6c7086;font-size:10px">— categories, quantities, cost codes</span></span></label>
+    <label class="exp-opt"><input type="checkbox" class="exp-item" id="expMeas" checked><span class="exp-ck"></span><span>Measurements <span style="color:#6c7086;font-size:10px">— LF, SF, volume groups</span></span></label>
+    <label class="exp-opt"><input type="checkbox" class="exp-item" id="expNotes" checked><span class="exp-ck"></span><span>Notes <span style="color:#6c7086;font-size:10px">— RFIs, punch, field notes</span></span></label>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="hb" onclick="closeExportModal()">Cancel</button>
+      <button class="hb" onclick="doExportModel()" style="background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1;font-weight:600">Export .skp</button>
     </div>
   </div>
 </div>

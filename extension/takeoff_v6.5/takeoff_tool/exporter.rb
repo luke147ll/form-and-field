@@ -694,6 +694,110 @@ module TakeoffTool
       HTML
     end
 
+    # ─── SKP MODEL EXPORT ───
+    # Saves a .skp copy with FF data embedded for collaboration.
+    # Strips excluded sections via start_operation / abort_operation
+    # so the original model is never modified.
+
+    def self.export_model(scan_results:, category_assignments:, cost_code_assignments:,
+                          include_takeoff: true, include_measurements: true, include_notes: true)
+      model = Sketchup.active_model
+      return UI.messagebox("No active model.") unless model
+
+      model_name = File.basename(model.path, '.*') rescue 'Untitled'
+      model_name = 'Untitled' if model_name.empty?
+      timestamp = Time.now.strftime('%Y-%m-%d_%H%M')
+      default_name = "#{model_name}_FF_Export_#{timestamp}.skp"
+
+      path = UI.savepanel("Export Form and Field Model", "", default_name)
+      return unless path
+      path += '.skp' unless path.downcase.end_with?('.skp')
+
+      need_strip = !include_takeoff || !include_measurements || !include_notes
+
+      begin
+        # ── Stamp current FF data to model attributes before save ──
+        stamp_ff_metadata(model, scan_results, category_assignments, cost_code_assignments)
+
+        if need_strip
+          # Use an operation to temporarily strip excluded data,
+          # save the copy, then abort to restore everything.
+          model.start_operation('FF Export Prep', true)
+
+          unless include_measurements
+            # Delete all TakeoffMeasurement groups
+            to_erase = []
+            model.entities.grep(Sketchup::Group).each do |grp|
+              next unless grp.valid?
+              to_erase << grp if grp.get_attribute('TakeoffMeasurement', 'type')
+            end
+            to_erase.each { |g| g.erase! if g.valid? }
+          end
+
+          unless include_notes
+            # Clear notes attribute
+            model.set_attribute('FormAndField', 'ff_notes', '{}')
+            model.set_attribute('FormAndField', 'ff_authors', '{}')
+          end
+
+          unless include_takeoff
+            # Clear category assignments, cost codes, containers, assemblies
+            model.set_attribute('FormAndField', 'category_assignments', '{}')
+            model.set_attribute('FormAndField', 'cost_code_assignments', '{}')
+            model.set_attribute('FormAndField', 'master_containers', '[]')
+            model.set_attribute('FormAndField', 'assemblies', '{}')
+            model.set_attribute('FormAndField', 'master_subcategories', '{}')
+            model.set_attribute('FormAndField', 'category_mt', '{}')
+          end
+
+          model.save(path)
+          model.abort_operation  # Restores everything — original model untouched
+        else
+          # All included — just save a copy directly
+          model.save(path)
+        end
+
+        UI.messagebox("Model exported:\n#{path}")
+        puts "[FF] export_model: saved to #{path}"
+      rescue => e
+        # Safety: abort if we started an operation
+        model.abort_operation rescue nil
+        UI.messagebox("Export failed: #{e.message}")
+        puts "[FF] export_model error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+      end
+    end
+
+    # Stamps all current FF state into model attributes so the .skp is self-contained.
+    def self.stamp_ff_metadata(model, sr, ca, cca)
+      require 'json'
+      model.set_attribute('FormAndField', 'ff_version', TakeoffTool::PLUGIN_VERSION) rescue nil
+      model.set_attribute('FormAndField', 'ff_exported', Time.now.iso8601)
+      model.set_attribute('FormAndField', 'ff_export_author', ENV['USERNAME'] || ENV['USER'] || 'unknown')
+
+      # Ensure category assignments are current
+      if ca && ca.any?
+        model.set_attribute('FormAndField', 'category_assignments', JSON.generate(ca))
+      end
+      if cca && cca.any?
+        model.set_attribute('FormAndField', 'cost_code_assignments', JSON.generate(cca))
+      end
+
+      # Stamp containers
+      containers = TakeoffTool.master_containers rescue []
+      if containers.any?
+        model.set_attribute('FormAndField', 'master_containers', JSON.generate(containers))
+      end
+
+      # Stamp assemblies
+      assemblies = TakeoffTool.load_assemblies rescue {}
+      if assemblies.any?
+        model.set_attribute('FormAndField', 'assemblies', JSON.generate(assemblies))
+      end
+
+      # Notes are already in model attributes (ff_notes) — no action needed
+      # Measurements are physical groups in the model — no action needed
+    end
+
     private
 
     def self.ce(s)

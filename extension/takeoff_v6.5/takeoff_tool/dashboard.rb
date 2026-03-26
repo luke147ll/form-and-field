@@ -321,6 +321,24 @@ module TakeoffTool
         Exporter.export_html(TakeoffTool.scan_results, TakeoffTool.category_assignments, TakeoffTool.cost_code_assignments)
       end
 
+      @dialog.add_action_callback('exportModel') do |_ctx, json_str|
+        begin
+          require 'json'
+          opts = JSON.parse(json_str.to_s)
+          Exporter.export_model(
+            scan_results: TakeoffTool.scan_results,
+            category_assignments: TakeoffTool.category_assignments,
+            cost_code_assignments: TakeoffTool.cost_code_assignments,
+            include_takeoff: opts['takeoff'],
+            include_measurements: opts['measurements'],
+            include_notes: opts['notes']
+          )
+        rescue => e
+          puts "[FF] exportModel error: #{e.message}"
+          UI.messagebox("Export failed: #{e.message}")
+        end
+      end
+
       @dialog.add_action_callback('rescan') do |_ctx, tpl_str|
         invalidate_measurement_cache
         tpl = tpl_str.to_s.strip
@@ -497,6 +515,19 @@ module TakeoffTool
           end
         rescue => e
           puts "[FF] addContainer ERROR: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
+        end
+      end
+
+      @dialog.add_action_callback('deleteContainer') do |_ctx, name_str|
+        begin
+          name = name_str.to_s.strip
+          unless name.empty?
+            TakeoffTool.delete_container(name)
+            puts "[FF] deleteContainer '#{name}' — now #{(TakeoffTool.master_containers || []).length} containers"
+            send_live_data
+          end
+        rescue => e
+          puts "[FF] deleteContainer ERROR: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -1039,7 +1070,14 @@ module TakeoffTool
       puts "[FF send_data] #{rows.length} rows, #{containers.length} containers: #{cont_names.join(', ')}"
       color_settings = ColorController.get_settings rescue {}
       oc_warnings = Scanner.overcount_warnings rescue []
-      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers, overcountWarnings: oc_warnings })
+      locked_cats = begin
+        require 'json'
+        raw = Sketchup.active_model&.get_attribute('FormAndField', 'ff_locked_categories')
+        raw ? JSON.parse(raw) : []
+      rescue
+        []
+      end
+      js = JSON.generate({ rows: rows, categories: cats, allCategories: all_cats, costCodes: cc, catCostCodeMap: ccm, masterSubcategories: msub, allMasterSubcategories: all_msub, categoryMT: cat_mt, customColors: custom_colors, colorSettings: color_settings, containers: containers, overcountWarnings: oc_warnings, lockedCategories: locked_cats })
       # Double-escape backslashes, escape single quotes for JS string
       esc = js.gsub('\\', '\\\\\\\\').gsub("'", "\\\\'").gsub("\n", "\\\\n")
       @dialog.execute_script("receiveData('#{esc}')")

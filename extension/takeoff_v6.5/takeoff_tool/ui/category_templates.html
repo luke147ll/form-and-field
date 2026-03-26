@@ -58,6 +58,17 @@
 
   .empty { color:#6c7086; font-style:italic; padding:16px; text-align:center; font-size:11px; }
 
+  .modal-bg{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center}
+  .modal-bg.show{display:flex}
+  .modal-card{background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;min-width:280px;max-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+  .modal-card .modal-msg{color:#cdd6f4;font-size:12px;margin-bottom:16px;line-height:1.5;white-space:pre-line}
+  .modal-card .modal-btns{display:flex;gap:8px;justify-content:center}
+  .modal-card .modal-btns button{padding:5px 16px;border-radius:4px;font-size:11px;font-family:inherit;cursor:pointer;border:1px solid #45475a;font-weight:600}
+  .modal-card .mbtn-ok{background:#f38ba8;color:#1e1e2e;border-color:#f38ba8}
+  .modal-card .mbtn-ok:hover{background:#eba0ac}
+  .modal-card .mbtn-cancel{background:#45475a;color:#cdd6f4}
+  .modal-card .mbtn-cancel:hover{background:#585b70}
+
   ::-webkit-scrollbar { width:6px; }
   ::-webkit-scrollbar-track { background:#181825; }
   ::-webkit-scrollbar-thumb { background:#45475a; border-radius:3px; }
@@ -86,7 +97,22 @@
 
   <div id="msgBox" class="msg"></div>
 
+  <div class="modal-bg" id="confirmModal">
+    <div class="modal-card">
+      <div class="modal-msg" id="confirmMsg"></div>
+      <div class="modal-btns">
+        <button class="mbtn-cancel" onclick="cancelConfirm()">Cancel</button>
+        <button class="mbtn-ok" onclick="doConfirm()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    var _confirmCb=null;
+    function showConfirmModal(msg,cb){_confirmCb=cb;document.getElementById('confirmMsg').textContent=msg;document.getElementById('confirmModal').className='modal-bg show';}
+    function doConfirm(){document.getElementById('confirmModal').className='modal-bg';if(_confirmCb)_confirmCb();_confirmCb=null;}
+    function cancelConfirm(){document.getElementById('confirmModal').className='modal-bg';_confirmCb=null;}
+
     var TEMPLATES = [];
     var DEFAULT_TPL = '';
 
@@ -149,25 +175,34 @@
       var name = document.getElementById('tplName').value.trim();
       if (!name) { showMsg('Enter a template name', 'error'); return; }
       var exists = TEMPLATES.some(function(t) { return t.name.toLowerCase() === name.toLowerCase(); });
-      if (exists && !confirm('Template "' + name + '" already exists. Overwrite?')) return;
+      if (exists) {
+        showConfirmModal('Template "' + name + '" already exists. Overwrite?', function() {
+          sketchup.saveTemplate(name);
+          document.getElementById('tplName').value = '';
+        });
+        return;
+      }
       sketchup.saveTemplate(name);
       document.getElementById('tplName').value = '';
     }
 
     function applyTpl(name) {
-      if (!confirm('Apply template "' + name + '" to current model?\nThis will replace your current category structure.')) return;
-      sketchup.applyTemplate(name);
+      showConfirmModal('Apply template "' + name + '" to current model?\nThis will replace your current category structure.', function() {
+        sketchup.applyTemplate(name);
+      });
     }
 
     function updateTpl(name) {
-      if (!confirm('Update template "' + name + '" with current model state?\nThis merges new definitions and updates changed categories.')) return;
-      sketchup.updateTemplate(name);
+      showConfirmModal('Update template "' + name + '" with current model state?\nThis merges new definitions and updates changed categories.', function() {
+        sketchup.updateTemplate(name);
+      });
     }
 
     function deleteTpl(name) {
-      if (!confirm('Delete template "' + name + '"?')) return;
-      sketchup.deleteTemplate(name);
-      document.getElementById('previewPanel').className = 'preview';
+      showConfirmModal('Delete template "' + name + '"?', function() {
+        sketchup.deleteTemplate(name);
+        document.getElementById('previewPanel').className = 'preview';
+      });
     }
 
     function previewTpl(name) {

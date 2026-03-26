@@ -148,6 +148,17 @@ body{font:11px/1.4 var(--font-mono);background:var(--base);color:var(--text);
   color:var(--overlay0);font:600 9px var(--font-mono);cursor:pointer;transition:all .15s}
 .sort-btn:hover{background:var(--surface0);color:var(--text)}
 .sort-btn.active{background:var(--surface0);color:var(--mauve);border-color:rgba(203,166,247,.3)}
+
+.modal-bg{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-card{background:var(--surface0);border:1px solid var(--surface1);border-radius:8px;padding:20px;min-width:280px;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.modal-card .modal-msg{color:var(--text);font-size:11px;font-family:var(--font-mono);margin-bottom:16px;line-height:1.5;white-space:pre-line}
+.modal-card .modal-btns{display:flex;gap:8px;justify-content:center}
+.modal-card .modal-btns button{padding:5px 16px;border-radius:4px;font:600 10px var(--font-mono);cursor:pointer;border:1px solid var(--surface1)}
+.modal-card .mbtn-ok{background:var(--red);color:var(--crust);border-color:var(--red)}
+.modal-card .mbtn-ok:hover{filter:brightness(1.1)}
+.modal-card .mbtn-cancel{background:var(--surface1);color:var(--text)}
+.modal-card .mbtn-cancel:hover{background:var(--surface2)}
 </style>
 </head>
 <body>
@@ -199,7 +210,22 @@ body{font:11px/1.4 var(--font-mono);background:var(--base);color:var(--text);
   <div class="cc-picker-list" id="ccPickerList"></div>
 </div>
 
+<div class="modal-bg" id="confirmModal">
+  <div class="modal-card">
+    <div class="modal-msg" id="confirmMsg"></div>
+    <div class="modal-btns">
+      <button class="mbtn-cancel" onclick="cancelConfirm()">Cancel</button>
+      <button class="mbtn-ok" onclick="doConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
+var _confirmCb=null;
+function showConfirmModal(msg,cb){_confirmCb=cb;document.getElementById('confirmMsg').textContent=msg;document.getElementById('confirmModal').className='modal-bg show';}
+function doConfirm(){document.getElementById('confirmModal').className='modal-bg';if(_confirmCb)_confirmCb();_confirmCb=null;}
+function cancelConfirm(){document.getElementById('confirmModal').className='modal-bg';_confirmCb=null;}
+
 /* ═══ DATA ═══ */
 var CODES=[],CAT_MAP={},CATEGORIES=[];
 var _divOpen={};
@@ -342,8 +368,7 @@ function doAddCode(){
 }
 
 function removeCode(code,desc){
-  if(!confirm('Delete cost code '+code+' ('+desc+')?'))return;
-  sketchup.ccRemoveCode(code);
+  showConfirmModal('Delete cost code '+code+' ('+desc+')?',function(){sketchup.ccRemoveCode(code);});
 }
 
 /* ═══ RENDER CATEGORIES ═══ */
@@ -479,8 +504,7 @@ function pickCode(code){
 function doImportCSV(){sketchup.ccImportCSV();}
 function doExportCSV(){sketchup.ccExportCSV();}
 function doReset(){
-  if(!confirm('Reset all cost codes to defaults?\nThis will remove any custom codes and category mappings.'))return;
-  sketchup.ccResetDefaults();
+  showConfirmModal('Reset all cost codes to defaults?\nThis will remove any custom codes and category mappings.',function(){sketchup.ccResetDefaults();});
 }
 
 /* ═══ STATUS ═══ */

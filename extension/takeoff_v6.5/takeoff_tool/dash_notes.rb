@@ -6,14 +6,14 @@
 module TakeoffTool
   module DashNotes
 
-    NOTE_TYPES     = %w[RFI PUNCH FIELD CHANGE SAFETY GENERAL].freeze
-    URGENCY_LEVELS = %w[CRITICAL HIGH NORMAL LOW].freeze
-    STATUS_VALUES  = %w[OPEN PROGRESS BLOCKED RESOLVED].freeze
+    NOTE_TYPES     = %w[RFI PUNCH FIELD CHANGE SAFETY GENERAL].freeze   unless defined?(NOTE_TYPES)
+    URGENCY_LEVELS = %w[CRITICAL HIGH NORMAL LOW].freeze               unless defined?(URGENCY_LEVELS)
+    STATUS_VALUES  = %w[OPEN PROGRESS BLOCKED RESOLVED].freeze         unless defined?(STATUS_VALUES)
 
     STATUS_CYCLE = {
       'OPEN' => 'PROGRESS', 'PROGRESS' => 'BLOCKED',
       'BLOCKED' => 'RESOLVED', 'RESOLVED' => 'OPEN'
-    }.freeze
+    }.freeze unless defined?(STATUS_CYCLE)
 
     # ─── Load / Save ───
 

@@ -65,6 +65,42 @@ module TakeoffTool
         VisibilityManager.show_all
       end
 
+      dialog.add_action_callback('showAllExcept') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          locked = data['lockedCategories'] || []
+          VisibilityManager.show_all
+          if locked.any?
+            locked_set = locked.each_with_object({}) { |c, h| h[c] = true }
+            ca = TakeoffTool.category_assignments || {}
+            fsr = TakeoffTool.filtered_scan_results || []
+            hide_ids = []
+            fsr.each do |r|
+              cat = ca[r[:entity_id]] || r[:parsed][:auto_category] || 'Uncategorized'
+              hide_ids << r[:entity_id] if locked_set[cat]
+            end
+            VisibilityManager.hide(hide_ids) if hide_ids.any?
+          end
+        rescue => e
+          puts "[FF] showAllExcept error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('setLockedCategories') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          cats = data['categories'] || []
+          m = Sketchup.active_model
+          if m
+            m.set_attribute('FormAndField', 'ff_locked_categories', JSON.generate(cats))
+          end
+        rescue => e
+          puts "[FF] setLockedCategories error: #{e.message}"
+        end
+      end
+
       dialog.add_action_callback('clearIsolationTracking') do |_ctx|
         VisibilityManager.clear_isolation_tracking
       end

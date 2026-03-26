@@ -261,6 +261,37 @@ module TakeoffTool
         end
       end
 
+      dialog.add_action_callback('autoTagAssembly') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          asm_id = data['asmId'].to_s.strip
+          prefix = data['prefix'].to_s
+          color  = data['color'].to_s
+          next if asm_id.empty?
+          tag_list = AssemblyAnnotations.place_auto_tags(asm_id, prefix, color) || []
+          if tag_list.any?
+            safe = JSON.generate({ 'asmId' => asm_id, 'tags' => tag_list }).gsub('</') { '<\\/' }
+            dialog.execute_script("receiveAutoTags(#{safe})") rescue nil
+          end
+        rescue => e
+          puts "Takeoff autoTagAssembly error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('clearAutoTags') do |_ctx, json_str|
+        begin
+          require 'json'
+          data = JSON.parse(json_str.to_s)
+          asm_id = data['asmId'].to_s.strip
+          next if asm_id.empty?
+          AssemblyAnnotations.cleanup_auto_tags(asm_id)
+          puts "Takeoff: Cleared auto tags for #{asm_id}"
+        rescue => e
+          puts "Takeoff clearAutoTags error: #{e.message}"
+        end
+      end
+
       dialog.add_action_callback('exportAssembly') do |_ctx, json_str|
         begin
           require 'json'
