@@ -382,8 +382,12 @@ module TakeoffTool
     end
   end
 
-  if Sketchup.active_model && !Sketchup.active_model.observers.any? { |obs| obs.is_a?(FFModelObserver) }
-    Sketchup.active_model.add_observer(FFModelObserver.new)
+  unless @_ff_model_observer_attached
+    if Sketchup.active_model
+      @_ff_observer_instance = FFModelObserver.new
+      Sketchup.active_model.add_observer(@_ff_observer_instance)
+    end
+    @_ff_model_observer_attached = true
   end
 
 end # TakeoffTool
