@@ -69,47 +69,6 @@ module TakeoffTool
         end
       end
 
-      dialog.add_action_callback('debugArea') do |_ctx, eid_str|
-        begin
-          eid = eid_str.to_i
-          Scanner.debug_area(eid)
-        rescue => e
-          puts "[FF Debug] debugArea error: #{e.message}"
-        end
-      end
-
-      dialog.add_action_callback('debugAreaCategory') do |_ctx, cat_str|
-        begin
-          Scanner.debug_area_category(cat_str.to_s)
-        rescue => e
-          puts "[FF Debug] debugAreaCategory error: #{e.message}"
-        end
-      end
-
-      dialog.add_action_callback('debugOcclusion') do |_ctx, cat_str|
-        begin
-          Scanner.debug_occlusion(cat_str.to_s)
-        rescue => e
-          puts "[FF Debug] debugOcclusion error: #{e.message}"
-        end
-      end
-
-      dialog.add_action_callback('debugOccSingle') do |_ctx, eid_str|
-        begin
-          Scanner.debug_occlusion_single(eid_str.to_i)
-        rescue => e
-          puts "[FF Debug] debugOccSingle error: #{e.message}"
-        end
-      end
-
-      dialog.add_action_callback('clearDebug') do |_ctx|
-        begin
-          Scanner.clear_debug
-        rescue => e
-          puts "[FF Debug] clearDebug error: #{e.message}"
-        end
-      end
-
       # ─── Create empty measurement card (container for parts) ───
 
       dialog.add_action_callback('createEmptyCard') do |_ctx, label_str|
@@ -978,7 +937,6 @@ module TakeoffTool
 
           # Recalculate SF and repaint
           Scanner.recalculate_sf
-          Scanner.debug_area_category(cat) rescue nil
           Dashboard.invalidate_measurement_cache rescue nil
           Dashboard.send_measurement_data rescue nil
           Dashboard.send_live_data rescue nil

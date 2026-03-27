@@ -3139,10 +3139,6 @@ function renderEntityRow(row,gBy,gk,isChild){
     h+='<td style="white-space:nowrap">';
     h+='<button class="ib accent" onclick="call(\'isolateEntities\',\''+row.entityId+'\')" title="Isolate">'+ICO_ISO+'</button>';
     h+='<button class="ib accent" onclick="call(\'zoomToEntity\',\''+row.entityId+'\')" title="Zoom to">'+ICO_ZOOM+'</button>';
-    if(row.areaSF>0){
-      h+='<button class="ib" onclick="call(\'debugArea\',\''+row.entityId+'\')" title="Debug SF area" style="color:#f9e2af;font-size:10px">SF?</button>';
-      h+='<button class="ib" onclick="call(\'debugOccSingle\',\''+row.entityId+'\')" title="Occlusion debug" style="color:#fab387;font-size:10px">OCC</button>';
-    }
     h+='</td></tr>';
   }
   return h;
@@ -8380,7 +8376,6 @@ function toggleMeasHideEmpty(){
 /* ── Beam highlight ── */
 function hlBeamEids(eids){
   call('clearHighlights');
-  call('clearDebug');
   if(eids&&eids.length>0){
     callJSON('highlightBeamEntities',{eids:eids});
   }
@@ -8389,12 +8384,12 @@ function hlBeamEids(eids){
 var _hlScanId=null;
 function togScanHL(id){
   if(_hlScanId===id){clrScanHL();renderMeasPanel();return;}
-  call('clearDebug');call('clearHighlights');
+  call('clearHighlights');
   var dp=DERIVED[id];if(!dp){return;}
   callJSON('highlightCategoryScan',{category:dp.category||'',unit:dp.unit||'SF',entityIds:dp.entityIds||[]});
   _hlScanId=id;renderMeasPanel();
 }
-function clrScanHL(){call('clearDebug');call('clearHighlights');_hlScanId=null;}
+function clrScanHL(){call('clearHighlights');_hlScanId=null;}
 /* ── Category visibility controls (measurements tab) ── */
 var _measHiddenCats={};
 var _measIsoCat=null;

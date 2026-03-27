@@ -235,24 +235,10 @@ module TakeoffTool
         begin
           require 'json'
           data = JSON.parse(json_str.to_s)
-          cat  = data['category'].to_s
-          unit = data['unit'].to_s
-
-          if unit == 'SF' && !cat.empty?
-            # Use face-level debug: paints measured faces green, excluded red
-            Scanner.clear_debug
-            Scanner.debug_area_category(cat)
-          elsif unit == 'LF' && !cat.empty?
-            # Use face-level debug: paints end caps blue, side faces green
-            Scanner.clear_debug
-            Scanner.debug_lf_category(cat)
-          else
-            # CF/other: highlight whole entities
-            eids = data['entityIds'] || []
-            ids = eids.map(&:to_i)
-            Highlighter.clear_all
-            Highlighter.highlight_entities(ids) if ids.any?
-          end
+          eids = data['entityIds'] || []
+          ids = eids.map(&:to_i)
+          Highlighter.clear_all
+          Highlighter.highlight_entities(ids) if ids.any?
         rescue => e
           puts "Dashboard highlightCategoryScan error: #{e.message}"
         end
