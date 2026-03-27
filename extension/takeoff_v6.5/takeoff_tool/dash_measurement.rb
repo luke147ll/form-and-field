@@ -171,7 +171,6 @@ module TakeoffTool
           Dashboard.invalidate_measurement_cache
           Dashboard.send_measurement_data
           Dashboard.send_live_data
-          MeasurementsPanel.send_data rescue nil
         rescue => e
           puts "Takeoff combineMeasurements error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end

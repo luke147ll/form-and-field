@@ -1,0 +1,10 @@
+# Scan backups — generated at runtime per model, should not be committed
+extension/takeoff_v6.5/takeoff_tool/data/scan_backup_*.json
+
+# SketchUp temp files
+*.skb
+~*
+
+# OS files
+.DS_Store
+Thumbs.db
