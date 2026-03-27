@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 16px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+h1 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #cba6f7;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #313244;
+}
+.entity-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #89b4fa;
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+.def-name-sub {
+  font-size: 10px;
+  color: #6c7086;
+  margin-bottom: 12px;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid #181825;
+}
+.label {
+  color: #a6adc8;
+  font-size: 11px;
+  flex-shrink: 0;
+  min-width: 85px;
+}
+.value {
+  text-align: right;
+  font-weight: 500;
+  word-break: break-all;
+}
+.cat-assigned { color: #a6e3a1; }
+.cat-unassigned { color: #f38ba8; font-style: italic; }
+.dim { color: #fab387; font-family: Consolas, monospace; font-size: 11px; }
+hr {
+  border: none;
+  border-top: 1px solid #313244;
+  margin: 14px 0;
+}
+select {
+  width: 100%;
+  padding: 7px 8px;
+  background: #313244;
+  color: #cdd6f4;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+select:focus { outline: none; border-color: #89b4fa; }
+.apply-btn {
+  width: 100%;
+  padding: 8px;
+  background: #cba6f7;
+  color: #1e1e2e;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.apply-btn:hover { background: #b4befe; }
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.badge-yes { background: #a6e3a1; color: #1e1e2e; }
+.badge-no { background: #45475a; color: #a6adc8; }
+.multi-count {
+  font-size: 16px;
+  font-weight: 700;
+  color: #cba6f7;
+  margin-bottom: 12px;
+}
+.def-list {
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+.def-list li {
+  padding: 5px 8px;
+  background: #181825;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.def-list .dname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.def-list .dcount {
+  color: #89b4fa;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.sect-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #6c7086;
+  margin-bottom: 6px;
+}
+.id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 14px; }
+.id-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.3px; cursor: pointer; transition: all .15s; position: relative;
+}
+.id-badge:hover { filter: brightness(1.2); }
+.id-badge-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+.id-badge-cat { color: #a6e3a1; background: rgba(166,227,161,.1); border: 1px solid rgba(166,227,161,.25); }
+.id-badge-sub { color: #94e2d5; background: rgba(148,226,213,.08); border: 1px solid rgba(148,226,213,.2); }
+.id-badge-cc { color: #f9e2af; background: rgba(249,226,175,.08); border: 1px solid rgba(249,226,175,.2); }
+.id-badge-sku { color: #89b4fa; background: rgba(137,180,250,.1); border: 1px solid rgba(137,180,250,.2); }
+.id-badge-zone { color: #a6adc8; background: #313244; border: 1px solid #45475a; }
+.id-badge-tag { color: #7f849c; background: rgba(127,132,156,.1); border: 1px solid rgba(127,132,156,.2); }
+.id-badge-mat { color: #fab387; background: rgba(250,179,135,.08); border: 1px solid rgba(250,179,135,.2); }
+.id-badge-iso { font-size: 8px; margin-left: 2px; opacity: 0.5; }
+.id-badge:hover .id-badge-iso { opacity: 1; }
+.id-asm-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.id-asm-card {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border-radius: 5px;
+  background: #181825; border: 1px solid #313244;
+  cursor: pointer; transition: all .15s;
+}
+.id-asm-card:hover { border-color: #cba6f7; background: #1f1f33; }
+.id-asm-dot { width: 8px; height: 8px; border-radius: 50%; background: #cba6f7; flex-shrink: 0; }
+.id-asm-name { font-size: 11px; font-weight: 600; color: #cdd6f4; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.id-asm-zone { font-size: 9px; color: #a6adc8; background: #313244; padding: 1px 6px; border-radius: 3px; }
+.id-asm-iso { font-size: 8px; color: #cba6f7; opacity: 0.5; }
+.id-asm-card:hover .id-asm-iso { opacity: 1; }
+.id-qty-row { display: flex; gap: 8px; padding: 8px 0; }
+.id-qty-card {
+  flex: 1; text-align: center; padding: 8px 4px;
+  background: #181825; border-radius: 6px; border: 1px solid #313244;
+}
+.id-qty-val { font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+.id-qty-lbl { font-size: 8px; color: #6c7086; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+.id-iso-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  color: #89b4fa; background: rgba(137,180,250,.08); border: 1px solid rgba(137,180,250,.2);
+  cursor: pointer; transition: all .15s; margin-bottom: 10px;
+}
+.id-iso-btn:hover { background: rgba(137,180,250,.15); border-color: #89b4fa; }
+.id-showall-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  color: #a6e3a1; background: rgba(166,227,161,.08); border: 1px solid rgba(166,227,161,.2);
+  cursor: pointer; transition: all .15s; margin-left: 6px;
+}
+.id-showall-btn:hover { background: rgba(166,227,161,.15); border-color: #a6e3a1; }
+
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200}
+.modal-bg.show{display:block}
+.modal-card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#313244;border:1px solid #45475a;border-radius:8px;padding:20px;z-index:201;width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.modal-card h3{font-size:13px;font-weight:600;color:#cdd6f4;margin-bottom:12px}
+.modal-card input[type=text]{width:100%;background:#1e1e2e;border:1px solid #45475a;color:#cdd6f4;border-radius:4px;padding:8px 10px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box}
+.modal-card input[type=text]:focus{border-color:#cba6f7}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.modal-btns button{padding:6px 16px;border-radius:4px;border:1px solid #45475a;background:#313244;color:#cdd6f4;cursor:pointer;font-size:12px;font-family:inherit}
+.modal-btns button.pri{background:#cba6f7;color:#1e1e2e;border-color:#cba6f7;font-weight:600}
+.modal-btns button:hover{opacity:0.85}
+</style>
+</head>
+<body>
+<div id="idContent"></div>
+<div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()">
+  <div class="modal-card">
+    <h3 id="modalTitle">New category name</h3>
+    <input type="text" id="modalInput" onkeydown="if(event.key==='Enter')confirmModal();if(event.key==='Escape')cancelModal();">
+    <div class="modal-btns">
+      <button onclick="cancelModal()">Cancel</button>
+      <button class="pri" onclick="confirmModal()">OK</button>
+    </div>
+  </div>
+</div>
+<script>
+var _modalCb=null;
+function updateContent(html){
+  var container=document.getElementById('idContent');
+  if(container){container.innerHTML=html;}
+  else{document.body.innerHTML=html+'<div id="inputModal" class="modal-bg" onclick="if(event.target===this)cancelModal()"><div class="modal-card"><h3 id="modalTitle">New category name</h3><input type="text" id="modalInput" onkeydown="if(event.key===\'Enter\')confirmModal();if(event.key===\'Escape\')cancelModal();"><div class="modal-btns"><button onclick="cancelModal()">Cancel</button><button class="pri" onclick="confirmModal()">OK</button></div></div></div>';}
+}
+function onCatChange(sel){
+  var v=sel.value;
+  var contMatch=v.match(/^__custom_in__(.+)$/);
+  if(v==='__custom__'||contMatch){
+    var targetCont=contMatch?contMatch[1]:'';
+    sel.value='';
+    showInputModal('New category name',function(name){
+      var sub=document.getElementById('subSel');
+      var subVal=sub?sub.value:'';if(subVal==='__custom_sub__')subVal='';
+      sketchup.applyCategory(JSON.stringify({category:name,subcategory:subVal}));
+      sketchup.addCustomCategory(JSON.stringify({name:name,container:targetCont}));
+    });
+    return;
+  }
+  // Request subcategories for selected category
+  if(sel.value) sketchup.requestSubcategoriesForCat(sel.value);
+  else updateSubSel([]);
+}
+function onSubChange(sel){
+  if(sel.value==='__custom_sub__'){
+    var cat=document.getElementById('catSel').value;
+    sel.value='';
+    if(!cat)return;
+    showInputModal('New subcategory for '+cat,function(name){
+      sketchup.applyCategory(JSON.stringify({category:cat,subcategory:name}));
+      sketchup.addSubcategoryForCat(JSON.stringify({cat:cat,name:name}));
+    });
+  }
+}
+function doApply(){
+  var cat=document.getElementById('catSel').value;
+  var sub=document.getElementById('subSel').value;
+  if(sub==='__custom_sub__')sub='';
+  if(cat) sketchup.applyCategory(JSON.stringify({category:cat,subcategory:sub||''}));
+}
+function showInputModal(title,cb){
+  _modalCb=cb;
+  document.getElementById('modalTitle').textContent=title;
+  var inp=document.getElementById('modalInput');inp.value='';
+  document.getElementById('inputModal').className='modal-bg show';
+  setTimeout(function(){inp.focus();},50);
+}
+function confirmModal(){
+  var v=document.getElementById('modalInput').value.trim();
+  document.getElementById('inputModal').className='modal-bg';
+  if(v&&_modalCb)_modalCb(v);
+  _modalCb=null;
+}
+function cancelModal(){
+  document.getElementById('inputModal').className='modal-bg';
+  _modalCb=null;
+}
+function receiveCategories(json){
+  try{
+    var d=JSON.parse(json);
+    var cats=Array.isArray(d)?d:(d.categories||[]);
+    var containers=d.containers||[];
+    var sel=document.getElementById('catSel');
+    var cur=sel.value;
+    sel.innerHTML='<option value="">-- Select --</option>';
+    if(containers.length>0){
+      var inCont={};
+      containers.forEach(function(cont){
+        if(!cont.categories||!cont.categories.length)return;
+        var grp=document.createElement('optgroup');
+        grp.label=cont.name;
+        var sorted=cont.categories.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+        sorted.forEach(function(cat){
+          if(cat.name==='_IGNORE')return;
+          inCont[cat.name]=true;
+          var o=document.createElement('option');
+          o.value=cat.name;o.textContent=cat.name;
+          if(cat.name===cur)o.selected=true;
+          grp.appendChild(o);
+        });
+        sel.appendChild(grp);
+      });
+      var orphans=cats.filter(function(c){return c!=='_IGNORE'&&!inCont[c];}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+      if(orphans.length){
+        var grp=document.createElement('optgroup');grp.label='Other';
+        orphans.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(c===cur)o.selected=true;grp.appendChild(o);});
+        sel.appendChild(grp);
+      }
+    }else{
+      cats.sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+      cats.forEach(function(c){
+        var o=document.createElement('option');o.value=c;o.textContent=c;
+        if(c===cur)o.selected=true;sel.appendChild(o);
+      });
+    }
+    var custom=document.createElement('option');
+    custom.value='__custom__';custom.textContent='+ Custom...';
+    sel.appendChild(custom);
+    if(cur)sel.value=cur;
+  }catch(e){}
+}
+function receiveSubcategories(json){
+  try{
+    var subs=JSON.parse(json);
+    updateSubSel(subs);
+  }catch(e){}
+}
+function updateSubSel(subs){
+  var sel=document.getElementById('subSel');
+  if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">--</option>';
+  var found=false;
+  for(var i=0;i<subs.length;i++){
+    var o=document.createElement('option');
+    o.value=subs[i];o.textContent=subs[i];
+    if(subs[i]===cur){o.selected=true;found=true;}
+    sel.appendChild(o);
+  }
+  if(cur&&!found){var extra=document.createElement('option');extra.value=cur;extra.textContent=cur;extra.selected=true;sel.appendChild(extra);}
+  var custom=document.createElement('option');
+  custom.value='__custom_sub__';custom.textContent='+ Custom...';
+  sel.appendChild(custom);
+}
+function receiveApplyResult(json){
+  try{
+    var d=JSON.parse(json);
+    // Update category info row
+    var rows=document.querySelectorAll('.row');
+    for(var i=0;i<rows.length;i++){
+      var lbl=rows[i].querySelector('.label');
+      var val=rows[i].querySelector('.value');
+      if(!lbl||!val)continue;
+      if(lbl.textContent==='Category'){
+        val.textContent=d.category;
+        val.className='value cat-assigned';
+      }
+      if(lbl.textContent==='Subcategory'){
+        val.textContent=d.subcategory||'';
+      }
+    }
+    // Add subcategory row if it doesn't exist and we have one
+    if(d.subcategory){
+      var hasSub=false;
+      for(var j=0;j<rows.length;j++){
+        var l2=rows[j].querySelector('.label');
+        if(l2&&l2.textContent==='Subcategory'){hasSub=true;break;}
+      }
+      if(!hasSub){
+        for(var k=0;k<rows.length;k++){
+          var l3=rows[k].querySelector('.label');
+          if(l3&&l3.textContent==='Category'){
+            var nr=document.createElement('div');nr.className='row';
+            nr.innerHTML='<span class="label">Subcategory</span><span class="value">'+d.subcategory+'</span>';
+            rows[k].parentNode.insertBefore(nr,rows[k].nextSibling);
+            break;
+          }
+        }
+      }
+    }
+    // Update dropdowns
+    var catSel=document.getElementById('catSel');
+    if(catSel&&d.category){
+      var hasC=false;
+      for(var m=0;m<catSel.options.length;m++){if(catSel.options[m].value===d.category){hasC=true;break;}}
+      if(!hasC){var co=document.createElement('option');co.value=d.category;co.textContent=d.category;var cx=catSel.querySelector('option[value="__custom__"]');if(cx)catSel.insertBefore(co,cx);else catSel.appendChild(co);}
+      catSel.value=d.category;
+      catSel.setAttribute('data-prev',d.category);
+    }
+    var subSel=document.getElementById('subSel');
+    if(subSel&&d.subcategory){
+      var hasS=false;
+      for(var n=0;n<subSel.options.length;n++){if(subSel.options[n].value===d.subcategory){hasS=true;break;}}
+      if(!hasS){var so=document.createElement('option');so.value=d.subcategory;so.textContent=d.subcategory;var sx=subSel.querySelector('option[value="__custom_sub__"]');if(sx)subSel.insertBefore(so,sx);else subSel.appendChild(so);}
+      subSel.value=d.subcategory;
+    }
+    // Show feedback
+    showApplyMsg(d.message,d.hidden);
+  }catch(e){}
+}
+function showApplyMsg(msg,isHidden){
+  var el=document.getElementById('applyMsg');
+  if(!el){
+    el=document.createElement('div');el.id='applyMsg';
+    var btn=document.querySelector('.apply-btn');
+    if(btn)btn.parentNode.insertBefore(el,btn.nextSibling);
+    else document.body.appendChild(el);
+  }
+  el.textContent=msg;
+  el.style.cssText='margin-top:8px;padding:8px;border-radius:4px;font-size:11px;font-weight:600;text-align:center;'
+    +(isHidden?'background:#fab387;color:#1e1e2e':'background:#a6e3a1;color:#1e1e2e');
+  el.style.display='block';el.style.opacity='1';el.style.transition='none';
+  setTimeout(function(){el.style.transition='opacity 1s';el.style.opacity='0';},3000);
+  setTimeout(function(){el.style.display='none';},4200);
+}
+function doAddToPart(){
+  var sel=document.getElementById('addToPartSel');
+  if(!sel||!sel.value)return;
+  sketchup.addToPart(JSON.stringify({name:sel.value}));
+}
+function doCreatePart(){
+  var inp=document.getElementById('partNameInput');
+  if(!inp)return;
+  var name=inp.value.trim();
+  if(!name){inp.style.borderColor='#f38ba8';setTimeout(function(){inp.style.borderColor='#45475a';},1500);return;}
+  var catSel=document.getElementById('catSel');
+  var subSel=document.getElementById('subSel');
+  var cat=catSel?catSel.value:'';
+  var sub=subSel?subSel.value:'';
+  if(sub==='__custom_sub__')sub='';
+  sketchup.createPart(JSON.stringify({name:name,category:cat,subcategory:sub}));
+}
+function receiveVisState(data){
+  var isolated=data.isolated||false;
+  var isoBtn=document.querySelector('.id-iso-btn');
+  if(isoBtn){
+    if(isolated){
+      isoBtn.innerHTML='&#8857; Isolated';
+      isoBtn.style.color='#a6e3a1';
+      isoBtn.style.borderColor='rgba(166,227,161,.3)';
+      isoBtn.style.background='rgba(166,227,161,.1)';
+    }else{
+      isoBtn.innerHTML='&#8857; Isolate';
+      isoBtn.style.color='#89b4fa';
+      isoBtn.style.borderColor='rgba(137,180,250,.2)';
+      isoBtn.style.background='rgba(137,180,250,.08)';
+    }
+  }
+  var showAllBtn=document.querySelector('.id-showall-btn');
+  if(showAllBtn){
+    showAllBtn.style.display=isolated?'inline-flex':'none';
+  }
+}
+
+window.onload = function() {
+  sketchup.idReady();
+};
+</script>
+</body>
+</html>

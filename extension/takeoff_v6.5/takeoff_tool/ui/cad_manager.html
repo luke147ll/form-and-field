@@ -1,0 +1,64 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow-y:auto}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.hdr h1{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px}
+.hdr button{background:#89b4fa;color:#1e1e2e;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer}
+.hdr button:hover{background:#74c7ec}
+.empty{padding:20px;color:#6c7086;font-size:11px;font-style:italic;text-align:center}
+.sheet{background:#313244;border-radius:6px;padding:10px 12px;margin-bottom:8px}
+.sheet-hdr{display:flex;justify-content:space-between;align-items:center}
+.sheet-name{font-weight:600;color:#cdd6f4;font-size:13px}
+.sheet-actions{display:flex;gap:4px}
+.sheet-actions button{background:none;border:none;cursor:pointer;padding:3px;border-radius:3px;display:flex;align-items:center}
+.sheet-actions button:hover{background:#45475a}
+.sheet-actions svg{width:16px;height:16px;stroke:#a6adc8;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sheet-actions button.active svg{stroke:#a6e3a1}
+.sheet-actions button.del svg{stroke:#f38ba8}
+.sheet-detail{display:flex;gap:16px;margin-top:6px;font-size:11px;color:#6c7086}
+.elev-edit{display:inline-flex;align-items:center;gap:4px}
+.elev-edit input{width:60px;padding:2px 5px;background:#45475a;color:#cdd6f4;border:1px solid #585b70;border-radius:3px;font-size:11px;font-family:inherit}
+.elev-edit input:focus{outline:none;border-color:#89b4fa}
+.elev-edit button{background:#89b4fa;color:#1e1e2e;border:none;border-radius:3px;padding:2px 6px;font-size:10px;font-weight:600;cursor:pointer}
+</style></head><body>
+<div class="hdr">
+  <h1>CAD Overlays</h1>
+  <button onclick="sketchup.importSheet()">+ Import DWG</button>
+</div>
+<div id="sheets"><div class="empty">No CAD sheets imported yet.</div></div>
+<script>
+var ICO_EYE='<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var ICO_EYE_OFF='<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+var ICO_ZOOM='<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+var ICO_DEL='<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+function X(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function updateSheets(sheets){
+  var el=document.getElementById('sheets');
+  if(!sheets||!sheets.length){el.innerHTML='<div class="empty">No CAD sheets imported yet.</div>';return;}
+  var h='';
+  for(var i=0;i<sheets.length;i++){
+    var s=sheets[i];
+    h+='<div class="sheet">';
+    h+='<div class="sheet-hdr">';
+    var badge=s.sheet_type==='section'?' <span style="font-size:9px;color:#cba6f7;font-weight:400">[SEC]</span>':'';
+    h+='<span class="sheet-name">'+X(s.name)+badge+'</span>';
+    h+='<div class="sheet-actions">';
+    h+='<button class="'+(s.visible?'active':'')+'" onclick="sketchup.toggleSheet(\''+s.eid+'\')" title="'+(s.visible?'Hide':'Show')+'">'+( s.visible?ICO_EYE:ICO_EYE_OFF)+'</button>';
+    h+='<button onclick="sketchup.zoomSheet(\''+s.eid+'\')" title="Zoom to Sheet">'+ICO_ZOOM+'</button>';
+    if(s.sheet_type==='section'){h+='<button onclick="sketchup.alignSheet(\''+s.eid+'\')" title="Align Section" style="font-size:10px;font-weight:700;color:#cba6f7">&#x2316;</button>';}
+    h+='<button class="del" onclick="if(confirm(\'Delete '+X(s.name)+'?\'))sketchup.deleteSheet(\''+s.eid+'\')" title="Delete">'+ICO_DEL+'</button>';
+    h+='</div></div>';
+    h+='<div class="sheet-detail">';
+    h+='<span>EL. '+s.elevation_ft.toFixed(1)+"'</span>";
+    h+='<div class="elev-edit"><input type="number" id="elev_'+s.eid+'" value="'+s.elevation_ft+'" step="0.5"><button onclick="setElev('+s.eid+')">Set</button></div>';
+    h+='</div>';
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+function setElev(eid){
+  var v=parseFloat(document.getElementById('elev_'+eid).value)||0;
+  sketchup.setElevation(JSON.stringify({eid:eid,elevation:v}));
+}
+</script>
+</body></html>

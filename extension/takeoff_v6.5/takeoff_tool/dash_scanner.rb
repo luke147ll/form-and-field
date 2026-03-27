@@ -70,6 +70,18 @@ module TakeoffTool
         end
       end
 
+      # ── Debug callbacks (moved from dashboard.rb) ──
+
+      dialog.add_action_callback('debugHTML') do |_ctx, html|
+        puts "=== RENDERED HTML (first 5000 chars) ==="
+        puts html.to_s
+        puts "=== END ==="
+      end
+
+      dialog.add_action_callback('debugMsg') do |_ctx, msg|
+        puts "[FF Debug]\n#{msg}"
+      end
+
     end
   end
 end

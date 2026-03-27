@@ -383,6 +383,76 @@ module TakeoffTool
         end
       end
 
+      # ── Part management callbacks (moved from dashboard.rb) ──
+
+      dialog.add_action_callback('movePartCategory') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s
+          new_cat = data['category'].to_s
+          next if part_name.empty? || new_cat.empty?
+          parts = TakeoffTool.load_parts rescue {}
+          pdata = parts[part_name]
+          next unless pdata
+          old_cat = pdata['category']
+          pdata['category'] = new_cat
+          TakeoffTool.save_parts(parts)
+          grp = TakeoffTool.find_part_group(part_name)
+          if grp
+            grp.set_attribute('TakeoffAssignments', 'category', new_cat)
+          end
+          puts "[FF Parts] Moved part '#{part_name}' from #{old_cat} to #{new_cat}"
+          Dashboard.send_live_data
+        rescue => e
+          puts "[FF Parts] movePartCategory error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('movePartSubcategory') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          part_name = data['name'].to_s
+          new_sub = data['subcategory'].to_s
+          next if part_name.empty?
+          parts = TakeoffTool.load_parts rescue {}
+          pdata = parts[part_name]
+          next unless pdata
+          pdata['subcategory'] = new_sub
+          TakeoffTool.save_parts(parts)
+          grp = TakeoffTool.find_part_group(part_name)
+          if grp
+            grp.set_attribute('TakeoffAssignments', 'subcategory', new_sub)
+          end
+          puts "[FF Parts] Moved part '#{part_name}' to subcategory '#{new_sub}'"
+          Dashboard.send_live_data
+        rescue => e
+          puts "[FF Parts] movePartSubcategory error: #{e.message}"
+        end
+      end
+
+      dialog.add_action_callback('renamePart') do |_ctx, arg_str|
+        begin
+          require 'json'
+          data = JSON.parse(arg_str.to_s)
+          old_name = data['oldName'].to_s.strip
+          new_name = data['newName'].to_s.strip
+          next if old_name.empty? || new_name.empty? || old_name == new_name
+          parts = TakeoffTool.load_parts rescue {}
+          next unless parts.key?(old_name)
+          if parts.key?(new_name)
+            puts "[FF Parts] renamePart: '#{new_name}' already exists"
+            next
+          end
+          TakeoffTool.rename_part(old_name, new_name)
+          puts "[FF Parts] Renamed part '#{old_name}' -> '#{new_name}'"
+          Dashboard.send_live_data
+        rescue => e
+          puts "[FF Parts] renamePart error: #{e.message}"
+        end
+      end
+
     end
   end
 end

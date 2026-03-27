@@ -23,7 +23,12 @@ module TakeoffTool
       json = m.get_attribute('FormAndField', 'ff_notes')
       return {} unless json && !json.empty?
       require 'json'
-      JSON.parse(json) rescue {}
+      begin
+        JSON.parse(json)
+      rescue JSON::ParserError => e
+        puts "[FF WARNING] Notes JSON corrupt, returning empty: #{e.message}"
+        {}
+      end
     end
 
     def self.save_notes(notes_hash)
@@ -39,7 +44,12 @@ module TakeoffTool
       json = m.get_attribute('FormAndField', 'ff_authors')
       return {} unless json && !json.empty?
       require 'json'
-      JSON.parse(json) rescue {}
+      begin
+        JSON.parse(json)
+      rescue JSON::ParserError => e
+        puts "[FF WARNING] Authors JSON corrupt, returning empty: #{e.message}"
+        {}
+      end
     end
 
     def self.save_authors(authors_hash)
@@ -73,7 +83,8 @@ module TakeoffTool
       notes = load_notes
       auth = ensure_author
       now = Time.now.iso8601
-      id = "n_#{Time.now.to_i}_#{rand(1000)}"
+      require 'securerandom'
+      id = "n_#{Time.now.to_i}_#{SecureRandom.hex(4)}"
       note = {
         'id'           => id,
         'type'         => NOTE_TYPES.include?(data['type']) ? data['type'] : 'GENERAL',
@@ -98,7 +109,10 @@ module TakeoffTool
       notes = load_notes
       note = notes[id]
       return unless note
-      %w[type urgency status title body entity_pid entity_label].each do |field|
+      note['type']    = data['type']    if data.key?('type')    && NOTE_TYPES.include?(data['type'])
+      note['urgency'] = data['urgency'] if data.key?('urgency') && URGENCY_LEVELS.include?(data['urgency'])
+      note['status']  = data['status']  if data.key?('status')  && STATUS_VALUES.include?(data['status'])
+      %w[title body entity_pid entity_label].each do |field|
         note[field] = data[field] if data.key?(field)
       end
       note['updated'] = Time.now.iso8601
@@ -118,7 +132,7 @@ module TakeoffTool
       return unless note
       auth = ensure_author
       resp = {
-        'id'          => "r_#{Time.now.to_i}_#{rand(1000)}",
+        'id'          => "r_#{Time.now.to_i}_#{SecureRandom.hex(4)}",
         'body'        => body_text.to_s.strip,
         'author_id'   => auth['id'],
         'author_name' => auth['name'],
@@ -185,8 +199,7 @@ module TakeoffTool
     # ─── Data Send ───
 
     def self.send_notes_data
-      return unless Dashboard.instance_variable_get(:@dialog)
-      dialog = Dashboard.instance_variable_get(:@dialog)
+      dialog = Dashboard.dialog rescue nil
       return unless dialog && dialog.visible?
       require 'json'
       notes = load_notes
@@ -208,7 +221,7 @@ module TakeoffTool
           Dashboard.heartbeat_stop
         rescue => e
           Dashboard.heartbeat_stop rescue nil
-          puts "Takeoff loadNotes error: #{e.message}"
+          puts "Takeoff loadNotes error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -227,7 +240,7 @@ module TakeoffTool
           send_notes_data
         rescue => e
           Sketchup.active_model.abort_operation rescue nil
-          puts "Takeoff saveNote error: #{e.message}"
+          puts "Takeoff saveNote error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -240,7 +253,7 @@ module TakeoffTool
           send_notes_data
         rescue => e
           Sketchup.active_model.abort_operation rescue nil
-          puts "Takeoff deleteProjectNote error: #{e.message}"
+          puts "Takeoff deleteProjectNote error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -255,7 +268,7 @@ module TakeoffTool
           send_notes_data
         rescue => e
           Sketchup.active_model.abort_operation rescue nil
-          puts "Takeoff addNoteResponse error: #{e.message}"
+          puts "Takeoff addNoteResponse error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -270,7 +283,7 @@ module TakeoffTool
           send_notes_data
         rescue => e
           Sketchup.active_model.abort_operation rescue nil
-          puts "Takeoff cycleNoteStatus error: #{e.message}"
+          puts "Takeoff cycleNoteStatus error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -280,23 +293,36 @@ module TakeoffTool
           next unless m
           pid_str = pid_str.to_s
           found = false
-          m.definitions.each do |defn|
-            break if found
-            next if defn.image?
-            defn.instances.each do |inst|
-              next unless inst.respond_to?(:persistent_id)
-              if inst.persistent_id.to_s == pid_str
-                m.selection.clear
-                m.selection.add(inst)
-                m.active_view.zoom(m.selection)
-                found = true
-                break
+          # Use SketchUp's built-in persistent_id lookup (SU 2017+)
+          if m.respond_to?(:find_entity_by_persistent_id)
+            ent = m.find_entity_by_persistent_id(pid_str.to_i)
+            if ent && ent.valid?
+              m.selection.clear
+              m.selection.add(ent)
+              m.active_view.zoom(m.selection)
+              found = true
+            end
+          end
+          # Fallback: iterate definitions (for string persistent_ids or older SU)
+          unless found
+            m.definitions.each do |defn|
+              break if found
+              next if defn.image?
+              defn.instances.each do |inst|
+                next unless inst.respond_to?(:persistent_id)
+                if inst.persistent_id.to_s == pid_str
+                  m.selection.clear
+                  m.selection.add(inst)
+                  m.active_view.zoom(m.selection)
+                  found = true
+                  break
+                end
               end
             end
           end
           puts "[FF Notes] Entity with persistent_id #{pid_str} not found" unless found
         rescue => e
-          puts "Takeoff zoomToNoteEntity error: #{e.message}"
+          puts "Takeoff zoomToNoteEntity error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -318,7 +344,7 @@ module TakeoffTool
             dialog.execute_script("if(typeof pnReceiveLinkedEntity==='function')pnReceiveLinkedEntity(null)") rescue nil
           end
         rescue => e
-          puts "Takeoff getSelectedEntity error: #{e.message}"
+          puts "Takeoff getSelectedEntity error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -340,7 +366,7 @@ module TakeoffTool
           }
           TakeoffTool.activate_note_tool(prefill)
         rescue => e
-          puts "Takeoff activateNoteTag error: #{e.message}"
+          puts "Takeoff activateNoteTag error: #{e.message}\n#{e.backtrace.first(3).join("\n")}"
         end
       end
 
@@ -356,9 +382,8 @@ module TakeoffTool
     end
   end
 
-  unless @_ff_model_observer_attached
-    Sketchup.active_model.add_observer(FFModelObserver.new) if Sketchup.active_model
-    @_ff_model_observer_attached = true
+  if Sketchup.active_model && !Sketchup.active_model.observers.any? { |obs| obs.is_a?(FFModelObserver) }
+    Sketchup.active_model.add_observer(FFModelObserver.new)
   end
 
 end # TakeoffTool
