@@ -4,7 +4,7 @@ require 'extensions.rb'
 module TakeoffTool
   PLUGIN_ID = 'takeoff_tool'.freeze
   PLUGIN_NAME = 'Form and Field'.freeze
-  PLUGIN_VERSION = '10.4.3'.freeze
+  PLUGIN_VERSION = '11.0.0'.freeze
   PLUGIN_DIR = File.join(File.dirname(__FILE__), PLUGIN_ID).freeze
 
   extension = SketchupExtension.new(PLUGIN_NAME, File.join(PLUGIN_DIR, 'main'))

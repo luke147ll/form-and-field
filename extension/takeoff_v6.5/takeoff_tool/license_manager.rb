@@ -1,3 +1,5 @@
+require 'set'
+
 module TakeoffTool
   module LicenseManager
 
@@ -13,6 +15,24 @@ module TakeoffTool
 
     EVENT_LICENSE_CHANGED = :license_changed unless defined?(EVENT_LICENSE_CHANGED)
 
+    # ── Beta Keys ──
+    # Local-only keys that bypass LemonSqueezy API.
+    # Expire automatically after BETA_EXPIRY.
+    BETA_KEYS = Set.new(%w[
+      timber-alpha
+      rafter-bravo
+      truss-charlie
+      joist-delta
+      purlin-echo
+      beam-foxtrot
+      stud-golf
+      slab-hotel
+      ridge-india
+      chord-juliet
+    ]).freeze unless defined?(BETA_KEYS)
+
+    BETA_EXPIRY = Time.new(2026, 6, 30, 23, 59, 59).freeze unless defined?(BETA_EXPIRY)
+
     # Dev bypass — set from Ruby Console:
     #   TakeoffTool::LicenseManager.dev_mode = true
     @dev_mode = false
@@ -26,6 +46,9 @@ module TakeoffTool
 
       key = stored_key
       return false unless key && !key.empty?
+
+      # Beta keys — validate locally, no API
+      return beta_valid?(key) if beta_key?(key)
 
       # 1. Check fresh cache
       if cache_valid?
@@ -48,6 +71,20 @@ module TakeoffTool
       key = stored_key
       unless key && !key.empty?
         return { valid: false, status: "inactive", trial: false, expiry: nil }
+      end
+
+      # Beta key status — no cache, local only
+      if beta_key?(key)
+        valid = beta_valid?(key)
+        return {
+          valid: valid,
+          status: valid ? "active" : "expired",
+          trial: false,
+          beta: true,
+          expiry: BETA_EXPIRY.strftime("%Y-%m-%d"),
+          last_validated: Time.now.strftime("%Y-%m-%d %H:%M"),
+          key_tail: key.length >= 8 ? key[-8..] : key
+        }
       end
 
       cached_status = Sketchup.read_default(DEFAULTS_SECTION, "cached_status") || "unknown"
@@ -75,6 +112,18 @@ module TakeoffTool
     def self.activate(license_key)
       return { success: false, error: "No license key provided" } if license_key.nil? || license_key.strip.empty?
       license_key = license_key.strip
+
+      # Beta key — activate locally, no API call
+      if beta_key?(license_key)
+        unless beta_valid?(license_key)
+          return { success: false, error: "Beta key expired (#{BETA_EXPIRY.strftime('%Y-%m-%d')})" }
+        end
+        Sketchup.write_default(DEFAULTS_SECTION, "license_key", license_key)
+        Sketchup.write_default(DEFAULTS_SECTION, "instance_id", "beta-local")
+        cache_validation("active")
+        TakeoffTool.publish(EVENT_LICENSE_CHANGED, valid: true, status: "active") rescue nil
+        return { success: true, error: nil }
+      end
 
       body = { license_key: license_key, instance_name: machine_id }
       resp = ls_request(LS_ACTIVATE_URL, body)
@@ -105,6 +154,12 @@ module TakeoffTool
       key = license_key || stored_key
       return { valid: false, status: "inactive", meta: {} } unless key && !key.empty?
 
+      # Beta key — validate locally, no API call
+      if beta_key?(key)
+        valid = beta_valid?(key)
+        return { valid: valid, status: valid ? "active" : "expired", meta: { beta: true } }
+      end
+
       body = { license_key: key }
       inst = stored_instance_id
       body[:instance_id] = inst if inst && !inst.empty?
@@ -128,7 +183,7 @@ module TakeoffTool
       inst = stored_instance_id
       return { success: false } unless key && !key.empty?
 
-      if inst && !inst.empty?
+      if inst && !inst.empty? && !beta_key?(key)
         body = { license_key: key, instance_id: inst }
         ls_request(LS_DEACTIVATE_URL, body)  # best-effort
       end
@@ -252,6 +307,14 @@ module TakeoffTool
     # ── Private Helpers ─────────────────────────────────────────
 
     private
+
+    def self.beta_key?(key)
+      BETA_KEYS.include?(key.to_s)
+    end
+
+    def self.beta_valid?(key)
+      beta_key?(key) && Time.now < BETA_EXPIRY
+    end
 
     def self.machine_id
       @_machine_id ||= begin

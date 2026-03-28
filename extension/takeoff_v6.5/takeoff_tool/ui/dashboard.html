@@ -1900,7 +1900,6 @@ select.cs.fl{border-color:#fab387;background:#3e3020}
       <div class="asm-toolbar">
         <button class="hb" onclick="saveFilteredAsAssembly()" style="color:#cba6f7;border-color:#cba6f7">From Visible</button>
         <button class="hb" onclick="createAsmFromSelection()" style="color:#a6e3a1;border-color:#a6e3a1">From Selection</button>
-        <button class="hb" onclick="call('importCadworksCSV')" style="color:#fab387;border-color:#fab387">Import CSV</button>
         <div class="ac2-view-toggle">
           <button onclick="_asmViewMode='list';this.classList.add('active');this.nextElementSibling.classList.remove('active');renderAsmPanel()" class="">List</button>
           <button onclick="_asmViewMode='cards';this.previousElementSibling.classList.remove('active');this.classList.add('active');renderAsmPanel()" class="active">Cards</button>
@@ -4052,10 +4051,31 @@ function togContVis(contName){
       if(VIS[D[i].entityId]!==false)anyVis=true;
     }
   }
-  for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
-  if(anyVis){HIDDEN_CONTS[contName]=true;for(var c in catSet)if(catSet.hasOwnProperty(c))HIDDEN_CATS[c]=true;}
-  else{delete HIDDEN_CONTS[contName];for(var c in catSet)if(catSet.hasOwnProperty(c))delete HIDDEN_CATS[c];}
-  if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  if(ISO_CATS){
+    // Isolation active — update ISO_CATS so state stays consistent
+    for(var c in catSet){
+      if(!catSet.hasOwnProperty(c))continue;
+      if(anyVis){delete ISO_CATS[c];HIDDEN_CATS[c]=true;}
+      else{ISO_CATS[c]=true;delete HIDDEN_CATS[c];}
+    }
+    if(anyVis){HIDDEN_CONTS[contName]=true;}else{delete HIDDEN_CONTS[contName];}
+    // Rebuild VIS from ISO_CATS
+    for(var k=0;k<D.length;k++){VIS[D[k].entityId]=!!ISO_CATS[D[k].category];}
+    if(Object.keys(ISO_CATS).length===0){
+      ISO_CATS=null;containerIsolate=null;
+      call('clearIsolationTracking');
+      if(ids.length)call('hideEntities',ids.join(','));
+    }else{
+      callJSON('isolateCategories',{categories:Object.keys(ISO_CATS)});
+    }
+  }else{
+    // No isolation — simple incremental show/hide
+    for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+    if(anyVis){HIDDEN_CONTS[contName]=true;for(var c2 in catSet)if(catSet.hasOwnProperty(c2))HIDDEN_CATS[c2]=true;}
+    else{delete HIDDEN_CONTS[contName];for(var c2 in catSet)if(catSet.hasOwnProperty(c2))delete HIDDEN_CATS[c2];}
+    if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  }
+  FISO=false;updateFisoBtn();
   renderGroups();
 }
 function isoContainer(contName){
@@ -4128,8 +4148,24 @@ function togSub(sKey){openSubs[sKey]=!openSubs[sKey];renderGroups();}
 function togSubVis(cat,sub){
   var anyVis=false,ids=[];
   for(var i=0;i<D.length;i++){if(D[i].category===cat&&(D[i].subcategory||'')===sub){if(VIS[D[i].entityId]!==false)anyVis=true;ids.push(D[i].entityId);}}
-  for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
-  if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));renderGroups();
+  if(ISO_CATS){
+    // Isolation active — toggle the parent category in ISO_CATS
+    if(anyVis){delete ISO_CATS[cat];HIDDEN_CATS[cat]=true;}
+    else{ISO_CATS[cat]=true;delete HIDDEN_CATS[cat];}
+    for(var k=0;k<D.length;k++){VIS[D[k].entityId]=!!ISO_CATS[D[k].category];}
+    if(Object.keys(ISO_CATS).length===0){
+      ISO_CATS=null;containerIsolate=null;
+      call('clearIsolationTracking');
+      if(ids.length)call('hideEntities',ids.join(','));
+    }else{
+      callJSON('isolateCategories',{categories:Object.keys(ISO_CATS)});
+    }
+  }else{
+    for(var j=0;j<ids.length;j++)VIS[ids[j]]=!anyVis;
+    if(ids.length)call(anyVis?'hideEntities':'showEntities',ids.join(','));
+  }
+  FISO=false;updateFisoBtn();
+  renderGroups();
 }
 function isoSub(cat,sub){
   ISO_CATS=null;
