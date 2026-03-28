@@ -296,7 +296,7 @@ module TakeoffTool
 
       @panel = UI::HtmlDialog.new(
         dialog_title: "LF Measurement",
-        width: 260, height: 380,
+        width: 260, height: 460,
         left: 80, top: 200,
         style: UI::HtmlDialog::STYLE_UTILITY,
         resizable: false
@@ -381,7 +381,7 @@ module TakeoffTool
       <<~HTML
         <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow:hidden}
+        body{font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:14px;overflow-y:auto;overflow-x:hidden}
         .hdr{font-size:11px;font-weight:700;color:#cba6f7;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:4px}
         .total-val{font-size:28px;font-weight:700;color:#a6e3a1;text-align:center;margin:4px 0 2px}
         .total-detail{font-size:11px;color:#6c7086;text-align:center;margin-bottom:10px}
