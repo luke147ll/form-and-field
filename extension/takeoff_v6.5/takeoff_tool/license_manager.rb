@@ -19,16 +19,16 @@ module TakeoffTool
     # Local-only keys that bypass LemonSqueezy API.
     # Expire automatically after BETA_EXPIRY.
     BETA_KEYS = Set.new(%w[
-      timber-alpha
-      rafter-bravo
-      truss-charlie
-      joist-delta
-      purlin-echo
-      beam-foxtrot
-      stud-golf
-      slab-hotel
-      ridge-india
-      chord-juliet
+      FF-BETA-TIMBER-ALPHA
+      FF-BETA-RAFTER-BRAVO
+      FF-BETA-TRUSS-CHARLIE
+      FF-BETA-JOIST-DELTA
+      FF-BETA-PURLIN-ECHO
+      FF-BETA-BEAM-FOXTROT
+      FF-BETA-STUD-GOLF
+      FF-BETA-SLAB-HOTEL
+      FF-BETA-RIDGE-INDIA
+      FF-BETA-CHORD-JULIET
     ]).freeze unless defined?(BETA_KEYS)
 
     BETA_EXPIRY = Time.new(2026, 6, 30, 23, 59, 59).freeze unless defined?(BETA_EXPIRY)
