@@ -59,6 +59,7 @@ module TakeoffTool
   load File.join(PLUGIN_DIR, 'annotation_tags.rb')
   load File.join(PLUGIN_DIR, 'assembly_annotations.rb')
   load File.join(PLUGIN_DIR, 'cad_overlay.rb')
+  load File.join(PLUGIN_DIR, 'update_checker.rb')
 
   @scan_results ||= []
   @category_assignments ||= {}
@@ -285,6 +286,9 @@ module TakeoffTool
         LicenseManager.show_activation_dialog
       end
     end
+    UI.start_timer(5.0, false) do
+      UpdateChecker.check_for_update
+    end
     @license_checked = true
   end
 
@@ -317,7 +321,7 @@ module TakeoffTool
           display:flex;flex-direction:column;align-items:center;justify-content:center;
           height:100vh;overflow:hidden;gap:16px}
         .title{font-size:14px;font-weight:700;color:var(--mauve);letter-spacing:1px}
-        .ver{font-size:9px;color:var(--overlay0);margin-top:-12px}
+
         .bar-wrap{width:200px;height:4px;background:var(--surface0);border-radius:2px;overflow:hidden}
         .bar{height:100%;width:30%;background:var(--mauve);border-radius:2px;
           animation:slide 1.2s ease-in-out infinite}
@@ -326,7 +330,6 @@ module TakeoffTool
         #msg{font-size:10px;color:var(--overlay0);min-height:14px;transition:opacity .15s}
       </style></head><body>
         <div class="title">FORM AND FIELD</div>
-        <div class="ver">v#{PLUGIN_VERSION}</div>
         <div class="bar-wrap"><div class="bar"></div></div>
         <div id="msg">Loading...</div>
         <script>function setMsg(t){document.getElementById('msg').textContent=t;}</script>

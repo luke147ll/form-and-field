@@ -902,6 +902,8 @@ module TakeoffTool
       @total_sf = 0.0
       @face_count = 0
       @panel = nil
+      @axis_lock = nil        # nil, :red, :green, :blue
+      @shift_lock = false     # true when shift is holding an auto-detected lock
     end
 
     def activate
@@ -942,7 +944,23 @@ module TakeoffTool
     def onMouseMove(flags, x, y, view)
       @ip.pick(view, x, y, @ip_start)
       if @ip.valid?
-        @mouse_pt = @ip.position
+        pt = @ip.position
+        # Shift auto-detect: lock to the axis closest to current direction
+        if (flags & 1) == 1 && @points.length > 0 && !@axis_lock
+          origin = @points.last
+          dx = (pt.x - origin.x).abs
+          dy = (pt.y - origin.y).abs
+          dz = (pt.z - origin.z).abs
+          if dx >= dy && dx >= dz
+            @axis_lock = :red; @shift_lock = true
+          elsif dy >= dx && dy >= dz
+            @axis_lock = :green; @shift_lock = true
+          else
+            @axis_lock = :blue; @shift_lock = true
+          end
+          update_status
+        end
+        @mouse_pt = constrain_to_axis(pt)
         view.tooltip = @ip.tooltip
       end
       view.invalidate
@@ -952,7 +970,7 @@ module TakeoffTool
       @ip.pick(view, x, y, @ip_start)
       return unless @ip.valid?
 
-      pt = @ip.position
+      pt = constrain_to_axis(@ip.position)
 
       # Auto-detect category from first click if no preset
       if @points.empty? && !@preset_category
@@ -977,6 +995,10 @@ module TakeoffTool
 
       @points << pt
       @ip_start.copy!(@ip)
+      # Arrow key locks persist; shift lock clears on click
+      if @shift_lock
+        @axis_lock = nil; @shift_lock = false
+      end
       update_status
       view.invalidate
     end
@@ -1006,15 +1028,42 @@ module TakeoffTool
         if @points.length > 0
           @points.pop
           @ip_start = Sketchup::InputPoint.new
+          @axis_lock = nil; @shift_lock = false
           update_status
           view.invalidate
         end
+      when 39 # Right arrow → Red (X axis)
+        toggle_axis_lock(:red)
+        update_status; view.invalidate
+      when 37 # Left arrow → Green (Y axis)
+        toggle_axis_lock(:green)
+        update_status; view.invalidate
+      when 38 # Up arrow → Blue (Z axis)
+        toggle_axis_lock(:blue)
+        update_status; view.invalidate
+      when 40 # Down arrow → clear lock
+        @axis_lock = nil; @shift_lock = false
+        update_status; view.invalidate
+      end
+      false
+    end
+
+    def onKeyUp(key, repeat, flags, view)
+      # Release shift lock when shift is released
+      if @shift_lock && (key == 16 || (flags & 1) == 0)
+        @axis_lock = nil
+        @shift_lock = false
+        update_status
+        view.invalidate
       end
       false
     end
 
     def onCancel(reason, view)
-      if @points.length > 0
+      if @axis_lock
+        @axis_lock = nil; @shift_lock = false
+        update_status; view.invalidate
+      elsif @points.length > 0
         reset_polygon
         update_status
         view.invalidate
@@ -1046,6 +1095,19 @@ module TakeoffTool
         view.line_stipple = '_'
         view.draw_line(@points.last, @mouse_pt)
         view.line_stipple = ''
+
+        # Axis lock indicator — infinite-ish colored line along the locked axis
+        if @axis_lock && @points.length >= 1
+          origin = @points.last
+          ax_color, ax_vec = axis_lock_color_and_vector
+          far_pos = origin.offset(ax_vec, 100000)
+          far_neg = origin.offset(ax_vec, -100000)
+          view.line_width = 1
+          view.line_stipple = '-'
+          view.drawing_color = Sketchup::Color.new(*ax_color, 140)
+          view.draw_line(far_neg, far_pos)
+          view.line_stipple = ''
+        end
 
         # Ghost closing line back to first point
         if @points.length >= 2
@@ -1140,6 +1202,8 @@ module TakeoffTool
       @mouse_pt = nil
       @ip = Sketchup::InputPoint.new
       @ip_start = Sketchup::InputPoint.new
+      @axis_lock = nil
+      @shift_lock = false
     end
 
     # ─── Geometry Helpers ───
@@ -1258,15 +1322,52 @@ module TakeoffTool
 
     def update_status
       n = @points.length
+      lock_str = case @axis_lock
+                 when :red   then ' [Red axis]'
+                 when :green then ' [Green axis]'
+                 when :blue  then ' [Blue axis]'
+                 else ''
+                 end
       if n == 0
         Sketchup.status_text = "Poly SF [#{@category}]: Click to place first point. #{'%.1f' % @total_sf} SF total. Escape to finish."
       elsif n < 3
-        Sketchup.status_text = "Poly SF [#{@category}]: #{n} point#{'s' if n > 1} placed — need #{3 - n} more to close."
+        Sketchup.status_text = "Poly SF [#{@category}]: #{n} point#{'s' if n > 1} placed — need #{3 - n} more to close.#{lock_str} Arrow keys to lock axis."
       else
-        Sketchup.status_text = "Poly SF [#{@category}]: #{n} points — click first point, Enter, or double-click to close. Backspace to undo."
+        Sketchup.status_text = "Poly SF [#{@category}]: #{n} points — Enter/dbl-click to close. Backspace to undo.#{lock_str}"
       end
       Sketchup.vcb_label = "Total SF"
       Sketchup.vcb_value = "#{'%.1f' % @total_sf} SF"
+    end
+
+    # ─── Axis Lock Helpers ───
+
+    def toggle_axis_lock(axis)
+      @shift_lock = false
+      @axis_lock = (@axis_lock == axis) ? nil : axis
+    end
+
+    def constrain_to_axis(pt)
+      return pt unless @axis_lock && @points.length > 0
+      origin = @points.last
+      case @axis_lock
+      when :red
+        Geom::Point3d.new(pt.x, origin.y, origin.z)
+      when :green
+        Geom::Point3d.new(origin.x, pt.y, origin.z)
+      when :blue
+        Geom::Point3d.new(origin.x, origin.y, pt.z)
+      else
+        pt
+      end
+    end
+
+    def axis_lock_color_and_vector
+      case @axis_lock
+      when :red   then [[255, 0, 0],   Geom::Vector3d.new(1, 0, 0)]
+      when :green then [[0, 128, 0],   Geom::Vector3d.new(0, 1, 0)]
+      when :blue  then [[0, 0, 255],   Geom::Vector3d.new(0, 0, 1)]
+      else [[200, 200, 200], Geom::Vector3d.new(1, 0, 0)]
+      end
     end
 
     # ─── Panel ───
