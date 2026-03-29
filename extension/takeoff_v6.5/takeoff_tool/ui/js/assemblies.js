@@ -422,8 +422,8 @@ function renderAsmPanelV2(){
       // Tab bar
       h+='<div class="ac2-tabs">';
       var mainTabs=[{key:'breakdown',label:'Breakdown',count:breakdown.length},{key:'parts',label:'Parts',count:otherParts.length}];
-      if(tabKey==='beams')mainTabs.push({key:'beams',label:'Beam Inv',count:bi.length});
-      else if(tabKey==='auto_sf')mainTabs.push({key:'auto_sf',label:'Auto SF',count:eids.length});
+      if(bi.length)mainTabs.push({key:'beams',label:'Beam Inv',count:bi.length});
+      if(tabKey==='auto_sf')mainTabs.push({key:'auto_sf',label:'Auto SF',count:eids.length});
       else if(tabKey==='auto_lf')mainTabs.push({key:'auto_lf',label:'Auto LF',count:eids.length});
       else if(tabKey==='auto_vol')mainTabs.push({key:'auto_vol',label:'Auto Vol',count:eids.length});
       for(var ti=0;ti<mainTabs.length;ti++){

@@ -37,6 +37,7 @@ module TakeoffTool
     @diff_active     = false
     @diff_data       = nil
     @diff_orig_mats  = nil    # kept separate for multiverse async batching compatibility
+    @pending_multi   = {}     # defn_object_id => { defn:, mat:, count:, total: } — multi-instance defs deferred for face painting
 
     # ─── Originals Cache ───
 
@@ -628,6 +629,7 @@ module TakeoffTool
         colored += 1 if applied
       end
 
+      flush_pending_multi
       m.commit_operation
       @highlights_active = true
       @active_mode = :highlight
@@ -662,6 +664,7 @@ module TakeoffTool
         n += 1
       end
 
+      flush_pending_multi
       m.commit_operation
       @highlights_active = true
       @active_mode = :highlight
@@ -678,6 +681,7 @@ module TakeoffTool
       m.start_operation('Highlight', true)
       mat = get_or_create_material(m, 'FF_SEL', SELECTION_COLOR, 0.9)
       apply_paint(e, eid, mat)
+      flush_pending_multi
 
       m.commit_operation
     end
@@ -695,6 +699,7 @@ module TakeoffTool
         n += 1
       end
 
+      flush_pending_multi
       m.commit_operation
       puts "CC: highlighted #{n} of #{ids.length}"
     end
@@ -774,6 +779,7 @@ module TakeoffTool
         n += 1
       end
 
+      flush_pending_multi
       @active_cat_colors[cat_name] = true
 
       m.commit_operation
@@ -1215,13 +1221,29 @@ module TakeoffTool
       end
 
       if defn && defn.respond_to?(:entities) && defn.respond_to?(:instances)
-        if defn.instances.length <= 1
+        inst_count = defn.instances.length
+        if inst_count <= 1
           if backed_up?(eid) && @originals[eid][:faces]
             repaint_faces_recursive(defn.entities, mat)
           else
             face_list = []
             paint_faces_recursive(defn.entities, mat, face_list, defn.object_id)
             @originals[eid][:faces] = face_list if face_list.length > 0
+          end
+        else
+          # Track multi-instance definition for deferred face painting.
+          # If ALL instances end up painted with the same material, it's safe
+          # to paint the shared definition faces.
+          doid = defn.object_id
+          pm = @pending_multi[doid]
+          if pm.nil?
+            @pending_multi[doid] = { defn: defn, mat: mat, count: 1, total: inst_count }
+          elsif pm[:mat].equal?(mat)
+            pm[:count] += 1
+          else
+            # Different materials — mark as mixed so flush_pending_multi skips it
+            pm[:mat] = nil
+            pm[:count] += 1
           end
         end
       end
@@ -1230,6 +1252,30 @@ module TakeoffTool
     rescue => e
       puts "CC: apply_paint error eid=#{eid}: #{e.message}"
       false
+    end
+
+    # After a batch of apply_paint calls, flush any multi-instance definitions
+    # where ALL instances received the same material. Safe to paint shared faces.
+    def self.flush_pending_multi
+      n = 0
+      @pending_multi.each do |_doid, pm|
+        next unless pm[:mat]    # nil = mixed materials across instances, skip
+        defn = pm[:defn]
+        next unless defn && defn.valid?
+
+        # Save face originals on the first instance's backup entry so restore works
+        first_inst = defn.instances.find { |i| i.valid? && @originals.key?(i.entityID) }
+        if first_inst && @originals[first_inst.entityID] && !@originals[first_inst.entityID][:faces]
+          face_list = []
+          collect_face_originals(defn.entities, face_list, defn.object_id)
+          @originals[first_inst.entityID][:faces] = face_list if face_list.length > 0
+        end
+
+        repaint_faces_recursive(defn.entities, pm[:mat])
+        n += pm[:count]
+      end
+      puts "CC: flush_pending_multi painted #{n} multi-instance entities" if n > 0
+      @pending_multi.clear
     end
 
     def self.paint_faces_recursive(ents, mat, face_list, defn_oid = nil)
@@ -1268,7 +1314,6 @@ module TakeoffTool
         next unless child.is_a?(Sketchup::ComponentInstance) || child.is_a?(Sketchup::Group)
         child_defn = child.respond_to?(:definition) ? child.definition : nil
         next unless child_defn
-        next if child_defn.respond_to?(:instances) && child_defn.instances.length > 1
         repaint_faces_recursive(child_defn.entities, mat)
       end
     end

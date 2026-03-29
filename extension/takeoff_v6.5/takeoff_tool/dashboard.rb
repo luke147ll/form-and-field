@@ -548,12 +548,12 @@ module TakeoffTool
         if ent_for_beam && ent_for_beam.valid? && ent_for_beam.respond_to?(:definition)
           dbb = ent_for_beam.definition.bounds
           ddims = [dbb.width, dbb.height, dbb.depth].sort
-          sec_str = "#{ddims[0].round(1)}x#{ddims[1].round(1)}"
+          sec_str = "#{ddims[0].round(2)}x#{ddims[1].round(2)}"
         end
         # Fallback: scan result BB (world-space, may be inflated for diagonal beams)
         unless sec_str
           dims = [r[:bb_width_in] || 0, r[:bb_height_in] || 0, r[:bb_depth_in] || 0].sort
-          sec_str = "#{dims[0].round(1)}x#{dims[1].round(1)}"
+          sec_str = "#{dims[0].round(2)}x#{dims[1].round(2)}"
         end
 
         beam_items << {
